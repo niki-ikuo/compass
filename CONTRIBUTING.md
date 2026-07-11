@@ -2,6 +2,8 @@
 
 Thanks for your interest in contributing.
 
+**English** | [日本語](CONTRIBUTING.ja.md)
+
 **Language:** English is preferred for issues, pull requests, and code review comments. Japanese is also welcome.
 
 ## Getting started
@@ -46,3 +48,5 @@ If `node-pty` fails to build, run `npm run rebuild-native` (Visual Studio Build 
 ## Code of conduct
 
 Be respectful and constructive. We assume good intent and prefer clear, actionable feedback.
+
+See [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) ([日本語](CODE_OF_CONDUCT.ja.md)) for the full policy.

@@ -9,6 +9,6 @@
 | [SPEC.md](./SPEC.md) | 製品仕様（MVP 範囲、画面構成、機能要件） |
 | [ARCHITECTURE.md](./ARCHITECTURE.md) | プロセス構成、IPC、ディレクトリ役割 |
 | [DEVELOPMENT.md](./DEVELOPMENT.md) | 開発環境、コマンド、実装時の注意点 |
-| [Contributing](../../CONTRIBUTING.md) | コントリビューション案内（英語） |
+| [Contributing](../../CONTRIBUTING.ja.md) | コントリビューション案内（英語版: [CONTRIBUTING.md](../../CONTRIBUTING.md)） |
 
 英語版（正本）は [docs/](../README.md) にあります。

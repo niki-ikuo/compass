@@ -9,6 +9,6 @@ Developer docs for Compass. For product overview and install steps, see the root
 | [SPEC.md](./SPEC.md) | Product spec (MVP scope, UI layout, requirements) |
 | [ARCHITECTURE.md](./ARCHITECTURE.md) | Process model, IPC, directory roles |
 | [DEVELOPMENT.md](./DEVELOPMENT.md) | Dev environment, commands, implementation notes |
-| [Contributing](../CONTRIBUTING.md) | How to contribute |
+| [Contributing](../CONTRIBUTING.md) | How to contribute ([日本語](../CONTRIBUTING.ja.md)) |
 
 English is the source of truth for these docs. Japanese translations live under [ja/](ja/README.md).

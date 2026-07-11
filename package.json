@@ -2,6 +2,7 @@
   "name": "compass",
   "version": "0.1.0",
   "description": "AI-powered code editor for Windows",
+  "license": "MIT",
   "main": "./out/main/index.js",
   "scripts": {
     "postinstall": "node scripts/setup-electron.js",

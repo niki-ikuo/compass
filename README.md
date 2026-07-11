@@ -109,9 +109,11 @@ Japanese versions: [docs/ja/](docs/ja/README.md)
 
 ## Contributing
 
-Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md).  
+Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) ([日本語](CONTRIBUTING.ja.md)).  
 Issues and PRs in **English** are preferred; Japanese is also fine.
+
+Please follow the [Code of Conduct](CODE_OF_CONDUCT.md) ([日本語](CODE_OF_CONDUCT.ja.md)).
 
 ## License
 
-Private / Unpublished
+[MIT](LICENSE)

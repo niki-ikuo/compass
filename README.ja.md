@@ -105,13 +105,15 @@ compass/
 - [製品仕様](docs/ja/SPEC.md)
 - [アーキテクチャ](docs/ja/ARCHITECTURE.md)
 - [開発ガイド](docs/ja/DEVELOPMENT.md)
-- [コントリビューション](CONTRIBUTING.md)（英語）
+- [コントリビューション](CONTRIBUTING.ja.md)（英語版: [CONTRIBUTING.md](CONTRIBUTING.md)）
 
 ## Contributing
 
-コントリビューション歓迎です。[CONTRIBUTING.md](CONTRIBUTING.md) を参照してください。  
+コントリビューション歓迎です。[CONTRIBUTING.ja.md](CONTRIBUTING.ja.md) を参照してください。  
 Issue / PR は **英語** を推奨しますが、日本語でも問題ありません。
+
+[行動規範](CODE_OF_CONDUCT.ja.md)（英語版: [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)）に従ってください。
 
 ## License
 
-Private / Unpublished
+[MIT](LICENSE)
