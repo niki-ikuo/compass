@@ -7,6 +7,7 @@ import { generateId } from '@/utils/code-blocks'
 import { getColorTheme } from '@/utils/color-theme'
 import { TERMINAL_LAYOUT_LIMITS } from '@/components/ResizableLayout'
 import type { TerminalShell } from '@/types'
+import { useI18n, t as translate } from '@/i18n'
 
 interface TerminalTab {
   id: string
@@ -226,9 +227,7 @@ function TerminalInstance({
         }
         if (wroteDeadPtyWarning) return
         wroteDeadPtyWarning = true
-        terminal.writeln(
-          '\r\n\x1b[31m[ターミナル接続が切断されました。+ で新しいタブを開いてください]\x1b[0m'
-        )
+        terminal.writeln(translate('terminal.disconnected'))
       })
     }
 
@@ -259,7 +258,7 @@ function TerminalInstance({
       if (!result.ok) {
         if (cancelled) return
         terminal.writeln(`\x1b[31m${result.error}\x1b[0m`)
-        terminal.writeln('\x1b[90mタブを閉じてから再度お試しください。\x1b[0m')
+        terminal.writeln(translate('terminal.retryHint'))
         return
       }
 
@@ -290,7 +289,9 @@ function TerminalInstance({
 
       void window.compass.terminal.listShells().then((shells) => {
         if (!isCurrentMount() || cancelled) return
-        onTitleRef.current(shells.find((s) => s.id === result.shellId)?.label ?? 'ターミナル')
+        onTitleRef.current(
+          shells.find((s) => s.id === result.shellId)?.label ?? translate('terminal.defaultTitle')
+        )
       })
 
       fitTerminal()
@@ -445,6 +446,7 @@ function VerticalResizeHandle({ onDrag }: { onDrag: (deltaY: number) => void }) 
 }
 
 export function TerminalPanel() {
+  const { t } = useI18n()
   const workspaceRoot = useAppStore((s) => s.workspaceRoot)
   const showTerminal = useAppStore((s) => s.showTerminal)
   const terminalHeight = useAppStore((s) => s.panelLayout.terminalHeight)
@@ -482,13 +484,13 @@ export function TerminalPanel() {
       const shell = shellId ?? selectedShellId ?? shells[0]?.id ?? 'powershell'
       const tab: TerminalTab = {
         id,
-        title: `ターミナル ${tabCounterRef.current}`,
+        title: t('terminal.tabTitle', { n: tabCounterRef.current }),
         shellId: shell
       }
       setTabs((prev) => [...prev, tab])
       setActiveTabId(id)
     },
-    [workspaceRoot, selectedShellId, shells]
+    [workspaceRoot, selectedShellId, shells, t]
   )
 
   useEffect(() => {
@@ -556,18 +558,18 @@ export function TerminalPanel() {
     return (
       <div className="terminal-panel" style={{ height: terminalHeight }}>
         <div className="terminal-panel-header">
-          <span className="terminal-panel-title">ターミナル</span>
+          <span className="terminal-panel-title">{t('terminal.defaultTitle')}</span>
           <button
             type="button"
             className="terminal-panel-btn"
             onClick={() => setShowTerminal(false)}
-            title="閉じる"
-            aria-label="閉じる"
+            title={t('common.close')}
+            aria-label={t('common.close')}
           >
             ×
           </button>
         </div>
-        <div className="terminal-empty">フォルダを開くとターミナルが利用できます</div>
+        <div className="terminal-empty">{t('menu.terminalDisabled')}</div>
       </div>
     )
   }
@@ -596,7 +598,7 @@ export function TerminalPanel() {
                   e.stopPropagation()
                   closeTab(tab.id, { hidePanelWhenEmpty: true })
                 }}
-                aria-label="タブを閉じる"
+                aria-label={t('terminal.closeTab')}
               >
                 ×
               </span>
@@ -606,8 +608,8 @@ export function TerminalPanel() {
             type="button"
             className="terminal-tab-add"
             onClick={() => createTab()}
-            title="新しいターミナル"
-            aria-label="新しいターミナル"
+            title={t('terminal.new')}
+            aria-label={t('terminal.new')}
           >
             +
           </button>
@@ -619,7 +621,7 @@ export function TerminalPanel() {
               className="terminal-shell-select"
               value={selectedShellId}
               onChange={(e) => handleShellChange(e.target.value)}
-              title="シェルを選択"
+              title={t('terminal.selectShell')}
             >
               {shells.map((shell) => (
                 <option key={shell.id} value={shell.id}>
@@ -632,8 +634,8 @@ export function TerminalPanel() {
             type="button"
             className="terminal-panel-btn"
             onClick={() => setShowTerminal(false)}
-            title="パネルを閉じる"
-            aria-label="パネルを閉じる"
+            title={t('terminal.closePanel')}
+            aria-label={t('terminal.closePanel')}
           >
             ×
           </button>

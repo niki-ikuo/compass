@@ -1,5 +1,6 @@
 import { mkdir, readdir, readFile, stat, writeFile } from 'fs/promises'
 import { dirname, extname, join, relative } from 'path'
+import { t } from '../../src/i18n/runtime'
 import type { IndexBuildResult, ProjectIndexContext } from '../../src/types'
 
 const INDEX_VERSION = 1
@@ -233,7 +234,7 @@ function buildSummary(files: IndexedFile[], edges: GraphEdge[]): string {
     const symbolNames = file.symbols.map((s) => s.name).slice(0, 6).join(', ')
     const importTargets = file.imports.filter((i) => i.startsWith('.')).slice(0, 4).join(', ')
     lines.push(
-      `- ${file.path} (${file.language}, ${file.lines}行)` +
+      `- ${file.path} (${file.language}, ${t('ai.indexLines', { count: file.lines })})` +
         (symbolNames ? ` | symbols: ${symbolNames}` : '') +
         (importTargets ? ` | imports: ${importTargets}` : '')
     )
@@ -559,7 +560,7 @@ export async function getProjectIndexContext(
 
     const compactSummary = summary.slice(0, 5000)
     const aiContext = [
-      '[プロジェクト構造インデックス (.compass)]',
+      t('ai.indexHeader'),
       `indexedAt: ${meta.indexedAt}`,
       `fileCount: ${meta.fileCount}`,
       '',

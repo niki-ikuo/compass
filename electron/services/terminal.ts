@@ -2,6 +2,7 @@ import { existsSync } from 'fs'
 import { dirname, join, resolve } from 'path'
 import * as pty from 'node-pty'
 import type { WebContents } from 'electron'
+import { t } from '../../src/i18n/runtime'
 
 export interface TerminalShell {
   id: string
@@ -79,7 +80,7 @@ export function listAvailableShells(): TerminalShell[] {
 
   const cmdPath = join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'cmd.exe')
   if (fileExists(cmdPath)) {
-    shells.push({ id: 'cmd', label: 'コマンド プロンプト', path: cmdPath, args: [] })
+    shells.push({ id: 'cmd', label: t('terminal.cmd'), path: cmdPath, args: [] })
   }
 
   const gitBash = detectGitBash()
@@ -241,11 +242,11 @@ export function createTerminal(
 ): { ok: true; shellId: string; replay: string } | { ok: false; error: string } {
   const shell = resolveShell(shellId)
   if (!shell) {
-    return { ok: false, error: '利用可能なシェルが見つかりません' }
+    return { ok: false, error: t('terminal.noShell') }
   }
 
   if (!fileExists(cwd)) {
-    return { ok: false, error: 'ワークスペースフォルダが存在しません' }
+    return { ok: false, error: t('terminal.noWorkspace') }
   }
 
   const existing = activeTerminals.get(id)

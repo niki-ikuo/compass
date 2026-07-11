@@ -1,18 +1,13 @@
 import type { WebContents } from 'electron'
 import type { ChatRequest } from '../../src/types'
+import { t } from '../../src/i18n/runtime'
 import { getSettings } from './settings'
 import { ensureProjectIndex, getProjectIndexContext } from './project-indexer'
 import { resolveChatContext } from './filesystem'
-import { getLlmProvider } from '../../src/utils/llm-providers'
-
-const EDIT_SYSTEM_PROMPT =
-  'あなたはコーディングアシスタントです。日本語で回答してください。Editモードでは、ファイル/フォルダの作成・変更・削除は必ず```compass-actions```コードブロック内のJSONだけで返してください。通常の```css```や```html```などのコードブロックでファイル全体を提示してはいけません。説明文は短くし、実際の変更内容はcompass-actionsに含めてください。形式は {"actions":[{"type":"mkdir","path":"relative/path"},{"type":"writeFile","path":"relative/file.ts","content":"..."},{"type":"deleteFile","path":"relative/file.ts"},{"type":"deleteDir","path":"relative/folder"}]} とし、pathはワークスペース直下からの相対パス（例: style.css。フォルダ名を重複して含めない）のみ使用してください。プロジェクト構造インデックス(.compass)が提供された場合は、ファイル間の関係を踏まえて回答してください。'
-
-const ASK_SYSTEM_PROMPT =
-  'あなたはコーディングアシスタントです。日本語で回答してください。現在はAskモードです。コードの説明、質問への回答、調査、レビューのみを行い、ワークスペースへのファイル作成・変更・削除は行わないでください。```compass-actions```コードブロックは絶対に出力しないでください。コード例は通常の```コードブロックで示し、ユーザーが手動で適用できるようにしてください。プロジェクト構造インデックス(.compass)が提供された場合は、ファイル間の関係を踏まえて回答してください。'
+import { getLlmProvider, getProviderLabel } from '../../src/utils/llm-providers'
 
 function getSystemPrompt(mode: ChatRequest['mode']): string {
-  return mode === 'ask' ? ASK_SYSTEM_PROMPT : EDIT_SYSTEM_PROMPT
+  return mode === 'ask' ? t('ai.askSystemPrompt') : t('ai.editSystemPrompt')
 }
 
 async function buildUserMessage(request: ChatRequest): Promise<string> {
@@ -38,16 +33,16 @@ async function buildUserMessage(request: ChatRequest): Promise<string> {
   if (request.workspaceRoot && request.context?.references?.length) {
     const resolved = await resolveChatContext(request.workspaceRoot, request.context.references)
     if (resolved.files.length > 0 || resolved.folders.length > 0) {
-      parts.push('[ユーザーが指定したファイル/フォルダ]')
-      parts.push('以下はエクスプローラーから明示的に指定されたコンテキストです。')
+      parts.push(t('ai.userRefsHeader'))
+      parts.push(t('ai.userRefsIntro'))
 
       for (const folder of resolved.folders) {
-        parts.push(`## フォルダ: ${folder.relativePath}`)
-        parts.push('### 構造')
+        parts.push(t('ai.folderHeading', { path: folder.relativePath }))
+        parts.push(t('ai.structureHeading'))
         for (const filePath of folder.structure.slice(0, 40)) {
           parts.push(`- ${filePath}`)
         }
-        if (folder.truncated) parts.push('- ... (省略)')
+        if (folder.truncated) parts.push(t('ai.truncated'))
         for (const file of folder.files) {
           const ext = file.relativePath.split('.').pop() ?? ''
           parts.push(`### ${file.relativePath}${file.truncated ? ' (truncated)' : ''}`)
@@ -60,7 +55,9 @@ async function buildUserMessage(request: ChatRequest): Promise<string> {
 
       for (const file of resolved.files) {
         const ext = file.relativePath.split('.').pop() ?? ''
-        parts.push(`## ファイル: ${file.relativePath}${file.truncated ? ' (truncated)' : ''}`)
+        parts.push(
+          `${t('ai.fileHeading', { path: file.relativePath })}${file.truncated ? ' (truncated)' : ''}`
+        )
         parts.push('```' + ext)
         parts.push(file.content)
         parts.push('```')
@@ -71,7 +68,7 @@ async function buildUserMessage(request: ChatRequest): Promise<string> {
 
   if (request.context?.filePath && request.context.fileContent !== undefined) {
     const ext = request.context.filePath.split('.').pop() ?? ''
-    parts.push(`[現在のファイル: ${request.context.filePath}]`)
+    parts.push(t('ai.currentFile', { path: request.context.filePath }))
     parts.push('```' + ext)
     parts.push(request.context.fileContent)
     parts.push('```')
@@ -93,7 +90,7 @@ async function buildUserMessage(request: ChatRequest): Promise<string> {
         : []
 
   if (selections.length > 0) {
-    parts.push('[ユーザーが指定した選択行]')
+    parts.push(t('ai.selectionsHeader'))
     for (const sel of selections) {
       const range =
         sel.startLine > 0
@@ -101,7 +98,7 @@ async function buildUserMessage(request: ChatRequest): Promise<string> {
             ? `:${sel.startLine}`
             : `:${sel.startLine}-${sel.endLine}`
           : ''
-      const label = sel.path ? `${sel.path}${range}` : '選択テキスト'
+      const label = sel.path ? `${sel.path}${range}` : t('ai.selectionText')
       const ext = sel.path.split('.').pop() ?? ''
       parts.push(`## ${label}`)
       parts.push('```' + ext)
@@ -112,15 +109,13 @@ async function buildUserMessage(request: ChatRequest): Promise<string> {
   }
 
   if (request.mode === 'edit') {
-    parts.push(
-      '[Editモード] ファイル変更は通常のコードブロックではなく、必ず```compass-actions```のJSONのみで返してください。'
-    )
+    parts.push(t('ai.editModeReminder'))
     parts.push('')
   }
 
   const lastUser = [...request.messages].reverse().find((m) => m.role === 'user')
   if (lastUser) {
-    parts.push('[ユーザーの質問]')
+    parts.push(t('ai.userQuestion'))
     parts.push(lastUser.content)
   }
 
@@ -158,15 +153,12 @@ export async function streamChat(
 
     const provider = getLlmProvider(settings.providerId)
     if (provider.requiresApiKey && !settings.apiKey) {
-      webContents.send(
-        'ai:error',
-        `${provider.label} の APIキーが設定されていません。設定画面から入力してください。`
-      )
+      webContents.send('ai:error', t('ai.missingApiKey', { provider: getProviderLabel(provider.id) }))
       return
     }
 
     if (!settings.apiBaseUrl.trim()) {
-      webContents.send('ai:error', 'API Base URL が設定されていません。設定画面から入力してください。')
+      webContents.send('ai:error', t('ai.missingBaseUrl'))
       return
     }
 
@@ -214,12 +206,15 @@ export async function streamChat(
 
     if (!response.ok) {
       const errorText = await response.text()
-      webContents.send('ai:error', `APIエラー (${response.status}): ${errorText}`)
+      webContents.send(
+        'ai:error',
+        t('ai.apiError', { status: response.status, body: errorText })
+      )
       return
     }
 
     if (!response.body) {
-      webContents.send('ai:error', 'レスポンスボディがありません')
+      webContents.send('ai:error', t('ai.noResponseBody'))
       return
     }
 
@@ -273,7 +268,7 @@ export async function streamChat(
       webContents.send('ai:aborted')
       return
     }
-    const message = err instanceof Error ? err.message : '不明なエラー'
+    const message = err instanceof Error ? err.message : t('common.unknownError')
     webContents.send('ai:error', message)
   } finally {
     if (activeAbortController === abortController) {

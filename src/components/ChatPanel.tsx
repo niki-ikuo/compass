@@ -33,7 +33,8 @@ import {
   toChatSelectionRef
 } from '@/utils/chat-selection-drag'
 import { buildWorkspaceIndex, ensureWorkspaceIndex } from '@/utils/project-index'
-import { getLlmProvider, getModelOptions } from '@/utils/llm-providers'
+import { getLlmProvider, getModelOptions, getProviderLabel } from '@/utils/llm-providers'
+import { useI18n, getDateLocale } from '@/i18n'
 
 function formatContextLabel(path: string, workspaceRoot: string | null): string {
   if (!workspaceRoot) return path
@@ -64,6 +65,7 @@ function parseWorkspaceActions(raw: string) {
 }
 
 export function ChatPanel() {
+  const { t } = useI18n()
   const [input, setInput] = useState('')
   const [sendMode, setSendMode] = useState<ChatMode>('edit')
   const [pendingCode, setPendingCode] = useState<{ code: string; language: string } | null>(null)
@@ -183,7 +185,7 @@ export function ChatPanel() {
 
   const formatHistoryTime = (timestamp: number) => {
     try {
-      return new Intl.DateTimeFormat('ja-JP', {
+      return new Intl.DateTimeFormat(getDateLocale(), {
         month: 'short',
         day: 'numeric',
         hour: '2-digit',
@@ -226,7 +228,7 @@ export function ChatPanel() {
 
     if (stopRequestedRef.current) {
       setChatLoading(false)
-      updateLastAssistantMessage('（中断されました）')
+      updateLastAssistantMessage(t('chat.aborted'))
       return
     }
 
@@ -255,7 +257,7 @@ export function ChatPanel() {
       accumulated += chunk
       if (isEditMessage) {
         const display = stripAllCompassActionsContent(accumulated)
-        updateLastAssistantMessage(display || '変更を準備しています...')
+        updateLastAssistantMessage(display || t('chat.preparingChanges'))
       } else {
         updateLastAssistantMessage(accumulated)
       }
@@ -281,13 +283,13 @@ export function ChatPanel() {
 
         if (actions.length > 0) {
           try {
-            updateLastAssistantMessage(displayContent || '変更提案をエディタで確認してください。')
+            updateLastAssistantMessage(displayContent || t('chat.reviewProposal'))
 
             const normalizedActions = normalizeWorkspaceActions(workspaceRoot, actions)
             const items = await window.compass.fs.previewActions(workspaceRoot, normalizedActions)
             setPendingWorkspacePreview({ actions: normalizedActions, items })
           } catch (error) {
-            const message = error instanceof Error ? error.message : 'プレビューの生成に失敗しました'
+            const message = error instanceof Error ? error.message : t('chat.previewFailed')
             updateLastAssistantMessage(
               displayContent ? `${displayContent}\n\n⚠️ ${message}` : `⚠️ ${message}`
             )
@@ -302,15 +304,15 @@ export function ChatPanel() {
       finish()
       if (isEditMessage) {
         const display = stripAllCompassActionsContent(accumulated).trim()
-        updateLastAssistantMessage(display || '（中断されました）')
+        updateLastAssistantMessage(display || t('chat.aborted'))
       } else {
-        updateLastAssistantMessage(accumulated.trim() || '（中断されました）')
+        updateLastAssistantMessage(accumulated.trim() || t('chat.aborted'))
       }
     })
 
     unsubError = window.compass.ai.onError((error) => {
       finish()
-      updateLastAssistantMessage(`エラー: ${error}`)
+      updateLastAssistantMessage(t('chat.errorPrefix', { error }))
     })
 
     const history = [
@@ -493,10 +495,10 @@ export function ChatPanel() {
       const tree = await window.compass.fs.readDir(workspaceRoot)
       setFileTree(tree)
       void buildWorkspaceIndex(workspaceRoot)
-      appendAssistantNote(`✅ ${itemCount} 件の変更を適用しました。`)
+      appendAssistantNote(t('chat.applied', { count: itemCount }))
     } catch (error) {
-      const message = error instanceof Error ? error.message : '適用に失敗しました'
-      appendAssistantNote(`⚠️ ファイル操作エラー: ${message}`)
+      const message = error instanceof Error ? error.message : t('chat.applyFailed')
+      appendAssistantNote(t('chat.fileOpError', { message }))
     }
   }
 
@@ -527,15 +529,18 @@ export function ChatPanel() {
   return (
     <div className="chat-panel">
       <div className="panel-header chat-panel-header">
-        <span>AI チャット</span>
+        <span>{t('chat.title')}</span>
         <div className="chat-header-actions">
-          <label className="chat-model-select" title={`${provider.label} のモデル`}>
-            <span className="chat-model-select-label">{provider.label}</span>
+          <label
+            className="chat-model-select"
+            title={t('chat.modelOf', { provider: getProviderLabel(provider.id) })}
+          >
+            <span className="chat-model-select-label">{getProviderLabel(provider.id)}</span>
             <select
               value={settings.model}
               onChange={(e) => void handleModelChange(e.target.value)}
               disabled={isChatLoading}
-              aria-label="LLMモデル"
+              aria-label={t('chat.llmModel')}
             >
               {modelOptions.map((model) => (
                 <option key={model} value={model}>
@@ -549,7 +554,7 @@ export function ChatPanel() {
               ref={historyButtonRef}
               className="btn-icon"
               onClick={() => setHistoryOpen((open) => !open)}
-              title="チャット履歴"
+              title={t('chat.history')}
               aria-expanded={historyOpen}
               aria-haspopup="listbox"
             >
@@ -562,12 +567,12 @@ export function ChatPanel() {
                   ref={historyDropdownRef}
                   className="chat-history-dropdown"
                   role="listbox"
-                  aria-label="チャット履歴"
+                  aria-label={t('chat.history')}
                   style={{ top: historyMenuPos.top, right: historyMenuPos.right }}
                 >
-                  <div className="chat-history-dropdown-header">過去のチャット</div>
+                  <div className="chat-history-dropdown-header">{t('chat.pastChats')}</div>
                   {historySessions.length === 0 ? (
-                    <div className="chat-history-empty">保存された履歴はまだありません</div>
+                    <div className="chat-history-empty">{t('chat.noHistory')}</div>
                   ) : (
                     <ul className="chat-history-list">
                       {historySessions.map((session) => (
@@ -590,13 +595,13 @@ export function ChatPanel() {
                             <span className="chat-history-item-title">{session.title}</span>
                             <span className="chat-history-item-meta">
                               {formatHistoryTime(session.updatedAt)}
-                              {session.isOpen ? ' · 開いています' : ''}
+                              {session.isOpen ? t('chat.openBadge') : ''}
                             </span>
                           </button>
                           <button
                             type="button"
                             className="chat-history-item-delete"
-                            title="履歴から削除"
+                            title={t('chat.deleteFromHistory')}
                             onClick={(e) => {
                               e.stopPropagation()
                               deleteChatSession(session.id)
@@ -615,7 +620,7 @@ export function ChatPanel() {
           <button
             className="btn-icon"
             onClick={() => createChatSession()}
-            title="新しいチャット"
+            title={t('chat.newChat')}
             disabled={isChatLoading}
           >
             ＋
@@ -623,7 +628,7 @@ export function ChatPanel() {
           <button
             className="btn-icon"
             onClick={() => useAppStore.getState().clearChat()}
-            title="このチャットをクリア"
+            title={t('chat.clear')}
             disabled={isChatLoading}
           >
             🗑
@@ -647,7 +652,7 @@ export function ChatPanel() {
                 e.stopPropagation()
                 closeChatSession(session.id)
               }}
-              title="タブを閉じる（履歴は残ります）"
+              title={t('chat.closeTab')}
             >
               ×
             </button>
@@ -658,14 +663,10 @@ export function ChatPanel() {
       <div className="chat-messages">
         {chatMessages.length === 0 && (
           <div className="chat-empty">
-            <p>コードについて質問したり、実装や変更を依頼できます</p>
-            <p className="hint">
-              送信前に Ask / Edit を選べます。Ask は説明のみ、Edit はファイル変更を提案します
-            </p>
-            <p className="hint">現在のファイルが自動的にコンテキストに含まれます</p>
-            <p className="hint">
-              エディタでコピーした選択行をチャットに貼ると、自動で参照カプセルになります
-            </p>
+            <p>{t('chat.emptyLead')}</p>
+            <p className="hint">{t('chat.emptyModes')}</p>
+            <p className="hint">{t('chat.emptyContext')}</p>
+            <p className="hint">{t('chat.emptyPasteHint')}</p>
           </div>
         )}
         {chatMessages.map((msg, index) => {
@@ -675,7 +676,7 @@ export function ChatPanel() {
           return (
             <div key={msg.id} className={`chat-message ${msg.role}`}>
               <div className="chat-role">
-                <span>{msg.role === 'user' ? 'あなた' : 'AI'}</span>
+                <span>{msg.role === 'user' ? t('chat.you') : t('chat.ai')}</span>
                 {msg.role === 'user' && msg.mode && (
                   <span className={`chat-message-mode ${msg.mode}`}>
                     {msg.mode === 'edit' ? 'Edit' : 'Ask'}
@@ -704,7 +705,7 @@ export function ChatPanel() {
         <DiffPreview
           oldText={activeFile.content}
           newText={pendingCode.code}
-          title="エディタへの適用"
+          title={t('chat.applyToEditor')}
           onApply={handleApplyCode}
           onReject={() => setPendingCode(null)}
         />
@@ -713,7 +714,7 @@ export function ChatPanel() {
       {!isEditSendMode && pendingCode && activeFile && (
         <div className="apply-options">
           <button className="btn-secondary" onClick={handleInsert}>
-            カーソル位置に挿入
+            {t('chat.insertAtCursor')}
           </button>
         </div>
       )}
@@ -732,21 +733,19 @@ export function ChatPanel() {
             onSubmit={() => void handleSend()}
             onPasteSelection={handlePasteSelection}
             placeholder={
-              isEditSendMode
-                ? '実装や変更を依頼... (Enterで送信, Shift+Enterで改行)'
-                : '質問を入力... (Enterで送信, Shift+Enterで改行)'
+              isEditSendMode ? t('chat.placeholderEdit') : t('chat.placeholderAsk')
             }
             disabled={isChatLoading}
           />
           <div className="chat-input-footer">
-            <div className="chat-mode-switch" role="group" aria-label="送信モード">
+            <div className="chat-mode-switch" role="group" aria-label={t('chat.sendMode')}>
               <button
                 type="button"
                 aria-pressed={sendMode === 'edit'}
                 className={sendMode === 'edit' ? 'active' : ''}
                 onClick={() => setSendMode('edit')}
                 disabled={isChatLoading}
-                title="このメッセージを Edit モードで送信（ファイルの作成・変更を提案）"
+                title={t('chat.editModeTitle')}
               >
                 Edit
               </button>
@@ -756,7 +755,7 @@ export function ChatPanel() {
                 className={sendMode === 'ask' ? 'active' : ''}
                 onClick={() => setSendMode('ask')}
                 disabled={isChatLoading}
-                title="このメッセージを Ask モードで送信（質問への回答のみ）"
+                title={t('chat.askModeTitle')}
               >
                 Ask
               </button>
@@ -766,9 +765,9 @@ export function ChatPanel() {
                 type="button"
                 className="btn-send btn-stop"
                 onClick={handleStop}
-                title="AIの応答を中断"
+                title={t('chat.stopTitle')}
               >
-                停止
+                {t('chat.stop')}
               </button>
             ) : (
               <button
@@ -777,7 +776,7 @@ export function ChatPanel() {
                 onClick={handleSend}
                 disabled={!input.trim()}
               >
-                送信
+                {t('chat.send')}
               </button>
             )}
           </div>

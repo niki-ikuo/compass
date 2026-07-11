@@ -2,6 +2,7 @@ import { app, BrowserWindow, ipcMain, dialog, Menu } from 'electron'
 import { join } from 'path'
 import appIcon from '../resources/icon.ico?asset'
 import packageJson from '../package.json'
+import { t } from '../src/i18n/runtime'
 import type { FileEncoding } from '../src/types'
 import {
   applyWorkspaceActions,
@@ -90,95 +91,95 @@ function createWindow(): void {
 function createMenu(): void {
   const template: Electron.MenuItemConstructorOptions[] = [
     {
-      label: 'ファイル',
+      label: t('menu.file'),
       submenu: [
         {
-          label: 'フォルダを開く',
+          label: t('menu.openFolder'),
           accelerator: 'CmdOrCtrl+O',
           click: () => mainWindow?.webContents.send('menu:open-folder')
         },
         {
-          label: 'フォルダを閉じる',
+          label: t('menu.closeFolder'),
           accelerator: 'CmdOrCtrl+Shift+W',
           click: () => mainWindow?.webContents.send('menu:close-folder')
         },
         {
-          label: '保存',
+          label: t('menu.save'),
           accelerator: 'CmdOrCtrl+S',
           click: () => mainWindow?.webContents.send('menu:save')
         },
         { type: 'separator' },
         {
-          label: '設定',
+          label: t('menu.settings'),
           accelerator: 'CmdOrCtrl+,',
           click: () => mainWindow?.webContents.send('menu:settings')
         },
         { type: 'separator' },
-        { role: 'quit', label: '終了' }
+        { role: 'quit', label: t('menu.quit') }
       ]
     },
     {
-      label: '編集',
+      label: t('menu.edit'),
       submenu: [
-        { role: 'undo', label: '元に戻す' },
-        { role: 'redo', label: 'やり直し' },
+        { role: 'undo', label: t('menu.undo') },
+        { role: 'redo', label: t('menu.redo') },
         { type: 'separator' },
-        { role: 'cut', label: '切り取り' },
-        { role: 'copy', label: 'コピー' },
-        { role: 'paste', label: '貼り付け' },
+        { role: 'cut', label: t('menu.cut') },
+        { role: 'copy', label: t('menu.copy') },
+        { role: 'paste', label: t('menu.paste') },
         { type: 'separator' },
-        { role: 'selectAll', label: 'すべて選択' },
+        { role: 'selectAll', label: t('menu.selectAll') },
         { type: 'separator' },
         {
-          label: 'ファイル内検索',
+          label: t('menu.findInFile'),
           accelerator: 'CmdOrCtrl+F',
           click: () => mainWindow?.webContents.send('menu:find-in-file')
         },
         {
-          label: 'ファイル内置換',
+          label: t('menu.replaceInFile'),
           accelerator: 'CmdOrCtrl+H',
           click: () => mainWindow?.webContents.send('menu:replace-in-file')
         },
         {
-          label: 'フォルダ内を検索',
+          label: t('menu.findInFiles'),
           accelerator: 'CmdOrCtrl+Shift+F',
           click: () => mainWindow?.webContents.send('menu:find-in-files')
         },
         {
-          label: 'フォルダ内を置換',
+          label: t('menu.replaceInFiles'),
           accelerator: 'CmdOrCtrl+Shift+H',
           click: () => mainWindow?.webContents.send('menu:replace-in-files')
         }
       ]
     },
     {
-      label: '表示',
+      label: t('menu.view'),
       submenu: [
-        { role: 'reload', label: '再読み込み' },
-        { role: 'toggleDevTools', label: '開発者ツール' },
+        { role: 'reload', label: t('menu.reload') },
+        { role: 'toggleDevTools', label: t('menu.toggleDevTools') },
         { type: 'separator' },
-        { role: 'resetZoom', label: 'ズームリセット' },
-        { role: 'zoomIn', label: '拡大' },
-        { role: 'zoomOut', label: '縮小' },
+        { role: 'resetZoom', label: t('menu.resetZoom') },
+        { role: 'zoomIn', label: t('menu.zoomIn') },
+        { role: 'zoomOut', label: t('menu.zoomOut') },
         { type: 'separator' },
         {
-          label: 'ターミナル',
+          label: t('menu.terminal'),
           accelerator: 'CmdOrCtrl+`',
           click: () => mainWindow?.webContents.send('menu:toggle-terminal')
         }
       ]
     },
     {
-      label: 'ヘルプ',
+      label: t('menu.help'),
       submenu: [
         {
-          label: 'バージョン情報',
+          label: t('menu.about'),
           click: () => {
             void dialog.showMessageBox(mainWindow!, {
               type: 'info',
-              title: 'バージョン情報',
+              title: t('menu.about'),
               message: 'Compass',
-              detail: `バージョン ${packageJson.version}`,
+              detail: t('menu.aboutDetail', { version: packageJson.version }),
               buttons: ['OK']
             })
           }
@@ -251,9 +252,9 @@ function registerIpcHandlers(): void {
     if (!mainWindow) return
     await dialog.showMessageBox(mainWindow, {
       type: 'info',
-      title: 'バージョン情報',
+      title: t('menu.about'),
       message: 'Compass',
-      detail: `バージョン ${packageJson.version}`,
+      detail: t('menu.aboutDetail', { version: packageJson.version }),
       buttons: ['OK']
     })
   })
@@ -342,6 +343,7 @@ function registerIpcHandlers(): void {
 
   ipcMain.handle('settings:set', async (_event, settings: AppSettings) => {
     await setSettings(settings)
+    createMenu()
   })
 
   ipcMain.handle('workspace:getLast', async () => {
@@ -470,7 +472,8 @@ function registerIpcHandlers(): void {
   })
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  await getSettings()
   createWindow()
   createMenu()
   registerIpcHandlers()

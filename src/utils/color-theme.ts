@@ -1,4 +1,5 @@
 import type { ColorThemeId } from '../types'
+import { t, type MessageKey } from '../i18n/runtime'
 
 export interface TerminalThemeColors {
   background: string
@@ -25,16 +26,25 @@ export interface TerminalThemeColors {
 
 export interface ColorThemeDefinition {
   id: ColorThemeId
-  label: string
   monacoTheme: 'vs-dark' | 'vs' | 'hc-black'
   colorScheme: 'dark' | 'light'
   terminal: TerminalThemeColors
 }
 
+const THEME_LABEL_KEYS: Record<ColorThemeId, MessageKey> = {
+  dark: 'theme.dark',
+  light: 'theme.light',
+  midnight: 'theme.midnight',
+  'high-contrast': 'theme.high-contrast'
+}
+
+export function getColorThemeLabel(id: ColorThemeId): string {
+  return t(THEME_LABEL_KEYS[id])
+}
+
 export const COLOR_THEMES: ColorThemeDefinition[] = [
   {
     id: 'dark',
-    label: 'ダーク',
     monacoTheme: 'vs-dark',
     colorScheme: 'dark',
     terminal: {
@@ -46,7 +56,6 @@ export const COLOR_THEMES: ColorThemeDefinition[] = [
   },
   {
     id: 'light',
-    label: 'ライト',
     monacoTheme: 'vs',
     colorScheme: 'light',
     terminal: {
@@ -58,7 +67,6 @@ export const COLOR_THEMES: ColorThemeDefinition[] = [
   },
   {
     id: 'midnight',
-    label: 'ミッドナイト',
     monacoTheme: 'vs-dark',
     colorScheme: 'dark',
     terminal: {
@@ -70,7 +78,6 @@ export const COLOR_THEMES: ColorThemeDefinition[] = [
   },
   {
     id: 'high-contrast',
-    label: 'ハイコントラスト',
     monacoTheme: 'hc-black',
     colorScheme: 'dark',
     terminal: {

@@ -1,7 +1,9 @@
 import { useAppStore } from '@/stores/app-store'
 import { buildWorkspaceIndex } from '@/utils/project-index'
+import { useI18n, t as tSync } from '@/i18n'
 
 export function PreviewBar() {
+  const { t } = useI18n()
   const pendingWorkspacePreview = useAppStore((s) => s.pendingWorkspacePreview)
   const activeChatId = useAppStore((s) => s.activeChatId)
   const workspaceRoot = useAppStore((s) => s.workspaceRoot)
@@ -19,9 +21,9 @@ export function PreviewBar() {
     (i) => i.type === 'deleteFile' || i.type === 'deleteDir'
   ).length
   const parts: string[] = []
-  if (fileCount > 0) parts.push(`ファイル ${fileCount}件`)
-  if (dirCount > 0) parts.push(`フォルダ作成 ${dirCount}件`)
-  if (deleteCount > 0) parts.push(`削除 ${deleteCount}件`)
+  if (fileCount > 0) parts.push(t('preview.files', { count: fileCount }))
+  if (dirCount > 0) parts.push(t('preview.mkdir', { count: dirCount }))
+  if (deleteCount > 0) parts.push(t('preview.delete', { count: deleteCount }))
 
   const handleApply = async () => {
     if (!workspaceRoot) return
@@ -35,15 +37,20 @@ export function PreviewBar() {
       const session = state.getActiveChatSession()
       const last = session?.messages[session.messages.length - 1]
       if (last?.role === 'assistant') {
-        state.updateLastAssistantMessage(`${last.content}\n\n✅ ${itemCount} 件の変更を適用しました。`)
+        state.updateLastAssistantMessage(
+          `${last.content}\n\n${tSync('chat.applied', { count: itemCount })}`
+        )
       }
     } catch (error) {
-      const message = error instanceof Error ? error.message : '適用に失敗しました'
+      const message =
+        error instanceof Error ? error.message : tSync('chat.applyFailed')
       const state = useAppStore.getState()
       const session = state.getActiveChatSession()
       const last = session?.messages[session.messages.length - 1]
       if (last?.role === 'assistant') {
-        state.updateLastAssistantMessage(`${last.content}\n\n⚠️ ファイル操作エラー: ${message}`)
+        state.updateLastAssistantMessage(
+          `${last.content}\n\n${tSync('chat.fileOpError', { message })}`
+        )
       }
     }
   }
@@ -51,15 +58,15 @@ export function PreviewBar() {
   return (
     <div className="preview-bar">
       <div className="preview-bar-info">
-        <span className="preview-bar-badge">プレビュー</span>
-        <span>AIの変更提案 ({parts.join(' · ')}) — エディタで差分を確認し、採用/拒否してください</span>
+        <span className="preview-bar-badge">{t('editor.previewTab')}</span>
+        <span>{t('preview.barHint', { summary: parts.join(' · ') })}</span>
       </div>
       <div className="preview-bar-actions">
         <button className="btn-apply" onClick={() => void handleApply()}>
-          すべて適用
+          {t('preview.applyAll')}
         </button>
         <button className="btn-reject" onClick={() => revertWorkspacePreview()}>
-          拒否
+          {t('editor.reject')}
         </button>
       </div>
     </div>

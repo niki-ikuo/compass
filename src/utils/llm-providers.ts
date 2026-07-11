@@ -1,56 +1,73 @@
-import type { LlmProviderId } from '@/types'
+import type { LlmProviderId } from '../types'
+import { t, type MessageKey } from '../i18n/runtime'
 
 export interface LlmProviderDefinition {
   id: LlmProviderId
-  label: string
   apiBaseUrl: string
   requiresApiKey: boolean
   models: string[]
   defaultModel: string
-  /** 設定画面向けの短い説明 */
-  hint: string
+}
+
+const PROVIDER_LABEL_KEYS: Record<LlmProviderId, MessageKey> = {
+  openai: 'provider.openai.label',
+  google: 'provider.google.label',
+  deepseek: 'provider.deepseek.label',
+  groq: 'provider.groq.label',
+  openrouter: 'provider.openrouter.label',
+  ollama: 'provider.ollama.label',
+  custom: 'provider.custom.label'
+}
+
+const PROVIDER_HINT_KEYS: Record<LlmProviderId, MessageKey> = {
+  openai: 'provider.openai.hint',
+  google: 'provider.google.hint',
+  deepseek: 'provider.deepseek.hint',
+  groq: 'provider.groq.hint',
+  openrouter: 'provider.openrouter.hint',
+  ollama: 'provider.ollama.hint',
+  custom: 'provider.custom.hint'
+}
+
+export function getProviderLabel(id: LlmProviderId): string {
+  return t(PROVIDER_LABEL_KEYS[id])
+}
+
+export function getProviderHint(id: LlmProviderId): string {
+  return t(PROVIDER_HINT_KEYS[id])
 }
 
 export const LLM_PROVIDERS: LlmProviderDefinition[] = [
   {
     id: 'openai',
-    label: 'OpenAI',
     apiBaseUrl: 'https://api.openai.com/v1',
     requiresApiKey: true,
     models: ['gpt-4o-mini', 'gpt-4o', 'gpt-4.1-mini', 'gpt-4.1', 'o4-mini'],
-    defaultModel: 'gpt-4o-mini',
-    hint: '公式 OpenAI API'
+    defaultModel: 'gpt-4o-mini'
   },
   {
     id: 'google',
-    label: 'Google Gemini',
     apiBaseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai/',
     requiresApiKey: true,
     models: ['gemini-2.0-flash', 'gemini-2.5-flash', 'gemini-2.5-pro'],
-    defaultModel: 'gemini-2.0-flash',
-    hint: 'Gemini の OpenAI 互換エンドポイント'
+    defaultModel: 'gemini-2.0-flash'
   },
   {
     id: 'deepseek',
-    label: 'DeepSeek',
     apiBaseUrl: 'https://api.deepseek.com',
     requiresApiKey: true,
     models: ['deepseek-chat', 'deepseek-reasoner'],
-    defaultModel: 'deepseek-chat',
-    hint: 'DeepSeek Chat / Reasoner'
+    defaultModel: 'deepseek-chat'
   },
   {
     id: 'groq',
-    label: 'Groq',
     apiBaseUrl: 'https://api.groq.com/openai/v1',
     requiresApiKey: true,
     models: ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant', 'qwen/qwen3-32b'],
-    defaultModel: 'llama-3.3-70b-versatile',
-    hint: '高速なオープンモデル推論'
+    defaultModel: 'llama-3.3-70b-versatile'
   },
   {
     id: 'openrouter',
-    label: 'OpenRouter',
     apiBaseUrl: 'https://openrouter.ai/api/v1',
     requiresApiKey: true,
     models: [
@@ -59,26 +76,21 @@ export const LLM_PROVIDERS: LlmProviderDefinition[] = [
       'google/gemini-2.0-flash-001',
       'deepseek/deepseek-chat'
     ],
-    defaultModel: 'openai/gpt-4o-mini',
-    hint: '複数ベンダーのモデルを一括利用（Claude 含む）'
+    defaultModel: 'openai/gpt-4o-mini'
   },
   {
     id: 'ollama',
-    label: 'Ollama（ローカル）',
     apiBaseUrl: 'http://localhost:11434/v1',
     requiresApiKey: false,
     models: ['llama3.2', 'codellama', 'qwen2.5-coder', 'mistral', 'deepseek-coder-v2'],
-    defaultModel: 'llama3.2',
-    hint: 'ローカル実行。API Key は不要です'
+    defaultModel: 'llama3.2'
   },
   {
     id: 'custom',
-    label: 'カスタム（OpenAI互換）',
     apiBaseUrl: '',
     requiresApiKey: true,
     models: [],
-    defaultModel: '',
-    hint: 'LiteLLM / Azure / 自前ゲートウェイなど'
+    defaultModel: ''
   }
 ]
 

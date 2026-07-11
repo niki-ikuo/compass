@@ -5,8 +5,10 @@ import { FILE_ENCODINGS, getEncodingLabel } from '@/utils/file-encoding'
 import { buildWorkspaceIndex } from '@/utils/project-index'
 import { getLlmProvider } from '@/utils/llm-providers'
 import type { FileEncoding } from '@/types'
+import { useI18n, type MessageKey } from '@/i18n'
 
 export function StatusBar() {
+  const { t } = useI18n()
   const activeFilePath = useAppStore((s) => s.activeFilePath)
   const openFiles = useAppStore((s) => s.openFiles)
   const cursorPosition = useAppStore((s) => s.cursorPosition)
@@ -25,6 +27,7 @@ export function StatusBar() {
   const language = activeFilePath ? getLanguageFromPath(activeFilePath) : ''
   const encodingLabel = activeFile ? getEncodingLabel(activeFile.encoding) : ''
   const provider = getLlmProvider(settings.providerId)
+  const providerLabel = t(`provider.${provider.id}.label` as MessageKey)
 
   useEffect(() => {
     if (!menuOpen) return
@@ -38,18 +41,18 @@ export function StatusBar() {
   }, [menuOpen])
 
   const connectionStatus = () => {
-    if (provider.requiresApiKey && !settings.apiKey) return 'API未設定'
-    if (apiConnected === true) return '接続済み'
-    return '待機中'
+    if (provider.requiresApiKey && !settings.apiKey) return t('status.apiUnset')
+    if (apiConnected === true) return t('status.connected')
+    return t('status.idle')
   }
 
   const indexStatusLabel = () => {
-    if (indexStatus === 'indexing') return 'インデックス更新中...'
+    if (indexStatus === 'indexing') return t('status.indexing')
     if (indexStatus === 'ready' && indexMeta) {
-      return `Index: ${indexMeta.fileCount}ファイル`
+      return t('status.indexFiles', { count: indexMeta.fileCount })
     }
-    if (indexStatus === 'error') return 'Index: エラー（再試行）'
-    return workspaceRoot ? 'Index: 未作成' : ''
+    if (indexStatus === 'error') return t('status.indexError')
+    return workspaceRoot ? t('status.indexMissing') : ''
   }
 
   const handleRebuildIndex = (): void => {
@@ -60,9 +63,7 @@ export function StatusBar() {
   const handleReopen = async (encoding: FileEncoding): Promise<void> => {
     if (!activeFile || activeFile.isPreview) return
     if (activeFile.isDirty) {
-      const ok = window.confirm(
-        '未保存の変更があります。別の文字コードで開き直すと破棄されます。続行しますか？'
-      )
+      const ok = window.confirm(t('status.encodingConfirm'))
       if (!ok) return
     }
     setMenuOpen(false)
@@ -82,7 +83,7 @@ export function StatusBar() {
   return (
     <div className="status-bar">
       <span className="status-item">
-        {activeFilePath ? getFileName(activeFilePath) : 'ファイルなし'}
+        {activeFilePath ? getFileName(activeFilePath) : t('status.noFile')}
       </span>
       <span className="status-item">
         Ln {cursorPosition.line}, Col {cursorPosition.column}
@@ -95,13 +96,13 @@ export function StatusBar() {
             className="status-encoding-button"
             onClick={() => setMenuOpen((open) => !open)}
             disabled={activeFile.isPreview}
-            title="文字コード"
+            title={t('status.encoding')}
           >
             {encodingLabel}
           </button>
           {menuOpen && (
             <div className="status-encoding-menu">
-              <div className="status-encoding-section">エンコード付きで再度開く</div>
+              <div className="status-encoding-section">{t('status.reopenWithEncoding')}</div>
               {FILE_ENCODINGS.map((item) => (
                 <button
                   key={`reopen-${item.id}`}
@@ -116,7 +117,7 @@ export function StatusBar() {
                   {item.label}
                 </button>
               ))}
-              <div className="status-encoding-section">エンコードして保存</div>
+              <div className="status-encoding-section">{t('status.saveWithEncoding')}</div>
               {FILE_ENCODINGS.map((item) => (
                 <button
                   key={`save-${item.id}`}
@@ -141,16 +142,16 @@ export function StatusBar() {
           className="status-item status-index-button"
           onClick={handleRebuildIndex}
           disabled={!workspaceRoot || indexStatus === 'indexing'}
-          title="クリックでインデックスを再構築"
+          title={t('status.rebuildIndex')}
         >
           {indexLabel}
         </button>
       )}
       <span
         className="status-item status-llm"
-        title={`${provider.label} / ${settings.model}`}
+        title={`${providerLabel} / ${settings.model}`}
       >
-        {provider.label}: {settings.model}
+        {providerLabel}: {settings.model}
       </span>
       <span className="status-item status-right">{connectionStatus()}</span>
     </div>

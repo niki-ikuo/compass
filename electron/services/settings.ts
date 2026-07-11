@@ -11,6 +11,7 @@ import {
   isLlmProviderId,
   resolveModelForProvider
 } from '../../src/utils/llm-providers'
+import { isLocaleId, setLocale, type LocaleId } from '../../src/i18n/runtime'
 
 interface StoredSettings {
   providerId?: LlmProviderId
@@ -21,12 +22,17 @@ interface StoredSettings {
   temperature: number
   maxTokens: number
   colorTheme: ColorThemeId
+  locale: LocaleId
   lastWorkspaceRoot: string | null
   recentWorkspaceRoots: string[]
 }
 
 function resolveColorTheme(value: unknown): ColorThemeId {
   return isColorThemeId(value) ? value : DEFAULT_SETTINGS.colorTheme
+}
+
+function resolveLocale(value: unknown): LocaleId {
+  return isLocaleId(value) ? value : DEFAULT_SETTINGS.locale
 }
 
 function resolveProviderId(value: unknown, apiBaseUrl: string): LlmProviderId {
@@ -100,6 +106,7 @@ async function readStoredSettings(): Promise<StoredSettings> {
       temperature: stored.temperature ?? DEFAULT_SETTINGS.temperature,
       maxTokens: stored.maxTokens ?? DEFAULT_SETTINGS.maxTokens,
       colorTheme: resolveColorTheme(stored.colorTheme),
+      locale: resolveLocale(stored.locale),
       lastWorkspaceRoot: stored.lastWorkspaceRoot ?? null,
       recentWorkspaceRoots:
         stored.recentWorkspaceRoots ??
@@ -115,6 +122,7 @@ async function readStoredSettings(): Promise<StoredSettings> {
       temperature: DEFAULT_SETTINGS.temperature,
       maxTokens: DEFAULT_SETTINGS.maxTokens,
       colorTheme: DEFAULT_SETTINGS.colorTheme,
+      locale: DEFAULT_SETTINGS.locale,
       lastWorkspaceRoot: null,
       recentWorkspaceRoots: []
     }
@@ -152,13 +160,16 @@ function toAppSettings(stored: StoredSettings): AppSettings {
     model: resolveModelForProvider(providerId, stored.model),
     temperature: stored.temperature,
     maxTokens: stored.maxTokens,
-    colorTheme: stored.colorTheme
+    colorTheme: stored.colorTheme,
+    locale: stored.locale
   }
 }
 
 export async function getSettings(): Promise<AppSettings> {
   const stored = await readStoredSettings()
-  return toAppSettings(stored)
+  const settings = toAppSettings(stored)
+  setLocale(settings.locale)
+  return settings
 }
 
 export async function setSettings(settings: AppSettings): Promise<void> {
@@ -179,6 +190,7 @@ export async function setSettings(settings: AppSettings): Promise<void> {
 
   const encryptedProviderKeys = encryptProviderKeys(providerKeys)
   const activeEncrypted = encryptApiKey(settings.apiKey)
+  const locale = resolveLocale(settings.locale)
 
   await writeStoredSettings({
     ...stored,
@@ -189,8 +201,10 @@ export async function setSettings(settings: AppSettings): Promise<void> {
     model: settings.model,
     temperature: settings.temperature,
     maxTokens: settings.maxTokens,
-    colorTheme: resolveColorTheme(settings.colorTheme)
+    colorTheme: resolveColorTheme(settings.colorTheme),
+    locale
   })
+  setLocale(locale)
 }
 
 export async function getLastWorkspaceRoot(): Promise<string | null> {

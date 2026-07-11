@@ -1,4 +1,5 @@
 import { computeLineDiff } from '@/utils/code-blocks'
+import { useI18n } from '@/i18n'
 
 interface DiffPreviewProps {
   oldText: string
@@ -9,19 +10,20 @@ interface DiffPreviewProps {
 }
 
 export function DiffPreview({ oldText, newText, title, onApply, onReject }: DiffPreviewProps) {
+  const { t } = useI18n()
   const diff = computeLineDiff(oldText, newText)
   const isNew = oldText === ''
 
   return (
     <div className="diff-preview">
       <div className="diff-header">
-        <span>{title ?? (isNew ? '新規ファイル' : '変更プレビュー')}</span>
+        <span>{title ?? (isNew ? t('diff.newFile') : t('diff.changePreview'))}</span>
         <div className="diff-actions">
           <button className="btn-apply" onClick={onApply}>
-            適用
+            {t('diff.apply')}
           </button>
           <button className="btn-reject" onClick={onReject}>
-            拒否
+            {t('editor.reject')}
           </button>
         </div>
       </div>

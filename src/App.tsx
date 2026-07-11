@@ -11,6 +11,7 @@ import { EditorCenter } from './components/EditorCenter'
 import { buildWorkspaceIndex } from '@/utils/project-index'
 import { applyColorTheme } from '@/utils/color-theme'
 import { getLlmProvider } from '@/utils/llm-providers'
+import { setLocale } from '@/i18n'
 
 export function App() {
   const showFileTree = useAppStore((s) => s.showFileTree)
@@ -34,6 +35,7 @@ export function App() {
   const setSettings = useAppStore((s) => s.setSettings)
   const setApiConnected = useAppStore((s) => s.setApiConnected)
   const colorTheme = useAppStore((s) => s.settings.colorTheme)
+  const locale = useAppStore((s) => s.settings.locale)
   const getActiveFile = useAppStore((s) => s.getActiveFile)
   const markFileSaved = useAppStore((s) => s.markFileSaved)
 
@@ -95,10 +97,15 @@ export function App() {
   }, [colorTheme])
 
   useEffect(() => {
+    setLocale(locale)
+  }, [locale])
+
+  useEffect(() => {
     const loadSettings = async () => {
       const settings = await window.compass.settings.get()
       setSettings(settings)
       applyColorTheme(settings.colorTheme)
+      setLocale(settings.locale)
       const provider = getLlmProvider(settings.providerId)
       setApiConnected(
         provider.requiresApiKey ? (settings.apiKey ? true : null) : true

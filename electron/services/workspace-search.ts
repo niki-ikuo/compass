@@ -1,5 +1,6 @@
 import { readdir, readFile, stat, writeFile } from 'fs/promises'
 import { join, relative, resolve, sep } from 'path'
+import { t } from '../../src/i18n/runtime'
 import type {
   WorkspaceReplaceOptions,
   WorkspaceReplaceResult,
@@ -41,7 +42,7 @@ function resolveSearchRoot(workspaceRoot: string, rootPath?: string): string {
     if (normalizeSlashes(absolute).toLowerCase() === normalizeSlashes(workspace).toLowerCase()) {
       return workspace
     }
-    throw new Error('検索範囲はワークスペース内である必要があります')
+    throw new Error(t('search.scopeOutside'))
   }
   return absolute
 }
@@ -62,7 +63,7 @@ function buildMatcher(
   query: string,
   options: Pick<WorkspaceSearchOptions, 'caseSensitive' | 'wholeWord' | 'useRegex'>
 ): RegExp {
-  if (!query) throw new Error('検索文字列を入力してください')
+  if (!query) throw new Error(t('search.queryRequired'))
 
   let source = options.useRegex ? query : escapeRegExp(query)
   if (options.wholeWord) {
@@ -72,7 +73,7 @@ function buildMatcher(
   try {
     return new RegExp(source, options.caseSensitive ? 'g' : 'gi')
   } catch {
-    throw new Error('正規表現が不正です')
+    throw new Error(t('search.invalidRegex'))
   }
 }
 
@@ -302,7 +303,7 @@ export async function replaceInWorkspace(
     } catch (error) {
       errors.push({
         path: filePath,
-        message: error instanceof Error ? error.message : '読み込みに失敗しました'
+        message: error instanceof Error ? error.message : t('search.readFailed')
       })
       continue
     }
@@ -321,7 +322,7 @@ export async function replaceInWorkspace(
     } catch (error) {
       errors.push({
         path: filePath,
-        message: error instanceof Error ? error.message : '書き込みに失敗しました'
+        message: error instanceof Error ? error.message : t('search.writeFailed')
       })
     }
   }

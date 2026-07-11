@@ -8,6 +8,7 @@ import {
   type InlineChatPart
 } from '@/utils/chat-content'
 import { stripAllCompassActionsContent } from '@/utils/workspace-actions'
+import { useI18n } from '@/i18n'
 
 interface ChatMessageContentProps {
   content: string
@@ -73,6 +74,7 @@ function CodeAccordion({
   isActions?: boolean
   streaming?: boolean
 }) {
+  const { t } = useI18n()
   const [open, setOpen] = useState(false)
 
   if (isActions) {
@@ -83,7 +85,7 @@ function CodeAccordion({
           <span className="chat-code-label">{label}</span>
           <span className="chat-code-meta">{meta}</span>
         </div>
-        <p className="chat-actions-hint">中央エディタで差分を確認し、採用/拒否を選んでください。</p>
+        <p className="chat-actions-hint">{t('chat.actionsHint')}</p>
       </div>
     )
   }
@@ -120,6 +122,8 @@ function CodeAccordion({
 }
 
 export function ChatMessageContent({ content, isStreaming }: ChatMessageContentProps) {
+  const { t } = useI18n()
+
   if (!content) {
     return (
       <span className="chat-streaming">
@@ -142,7 +146,7 @@ export function ChatMessageContent({ content, isStreaming }: ChatMessageContentP
     if (!sanitized.trim()) {
       return (
         <span className="chat-streaming">
-          {isStreaming ? <AnimatedStatus label="変更を準備しています" /> : null}
+          {isStreaming ? <AnimatedStatus label={t('chat.preparingChangesShort')} /> : null}
         </span>
       )
     }
@@ -176,7 +180,7 @@ export function ChatMessageContent({ content, isStreaming }: ChatMessageContentP
       {streamingCode && streamingCode.language.toLowerCase() !== 'compass-actions' && (
         <CodeAccordion
           label={getCodeLabel(streamingCode.language, streamingCode.code).label}
-          meta={<AnimatedStatus label="生成中" />}
+          meta={<AnimatedStatus label={t('chat.generating')} />}
           code={streamingCode.code}
           streaming
         />

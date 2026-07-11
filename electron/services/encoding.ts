@@ -1,4 +1,5 @@
 import iconv from 'iconv-lite'
+import { t } from '../../src/i18n/runtime'
 
 export type FileEncoding =
   | 'utf8'
@@ -107,14 +108,14 @@ function scoreDecodedText(text: string): number {
 export function decodeBuffer(buffer: Buffer, encoding: FileEncoding): string {
   const payload = stripBom(buffer, encoding)
   if (!iconv.encodingExists(ICONV_NAMES[encoding])) {
-    throw new Error(`未対応の文字コードです: ${encoding}`)
+    throw new Error(t('encoding.unsupported', { encoding }))
   }
   return iconv.decode(payload, ICONV_NAMES[encoding])
 }
 
 export function encodeContent(content: string, encoding: FileEncoding): Buffer {
   if (!iconv.encodingExists(ICONV_NAMES[encoding])) {
-    throw new Error(`未対応の文字コードです: ${encoding}`)
+    throw new Error(t('encoding.unsupported', { encoding }))
   }
 
   const body = iconv.encode(content, ICONV_NAMES[encoding])

@@ -14,6 +14,7 @@ import {
   parseFileMovePaths,
   serializeFileMovePaths
 } from '@/utils/file-move-drag'
+import { useI18n } from '@/i18n'
 
 type InputMode = 'create-file' | 'create-folder' | 'rename'
 
@@ -186,6 +187,7 @@ function FileTreeItem({
   onRenameSubmit,
   onRenameCancel
 }: FileTreeItemProps) {
+  const { t } = useI18n()
   const normalizedPath = normalizeNodePath(node.path)
   const isExpanded = expandedDirs.has(normalizedPath)
   const isSelected = selectedPaths.has(normalizedPath)
@@ -241,7 +243,7 @@ function FileTreeItem({
               {node.name}
               {node.isPreview && (
                 <span className="file-tree-preview-badge">
-                  {node.previewKind === 'deleted' ? '削除' : '新規'}
+                  {node.previewKind === 'deleted' ? t('common.delete') : t('common.new')}
                 </span>
               )}
             </span>
@@ -315,10 +317,10 @@ function FileTreeItem({
           {node.isPreview && (
             <span className="file-tree-preview-badge">
               {node.previewKind === 'new-file'
-                ? '新規'
+                ? t('common.new')
                 : node.previewKind === 'deleted'
-                  ? '削除'
-                  : '変更'}
+                  ? t('common.delete')
+                  : t('common.modified')}
             </span>
           )}
         </span>
@@ -328,6 +330,7 @@ function FileTreeItem({
 }
 
 export function FileTree() {
+  const { t } = useI18n()
   const fileTree = useAppStore((s) => s.fileTree)
   const workspaceRoot = useAppStore((s) => s.workspaceRoot)
   const pendingWorkspacePreview = useAppStore((s) => s.pendingWorkspacePreview)
@@ -504,10 +507,14 @@ export function FileTree() {
       const targets = getDeleteTargets(contextNode)
       if (targets.length === 0) return
 
+      const target = targets[0]
       const message =
         targets.length === 1
-          ? `「${targets[0].name}」${targets[0].isDirectory ? 'フォルダ' : 'ファイル'}を削除しますか？`
-          : `選択した ${targets.length} 件の項目を削除しますか？`
+          ? t('explorer.deleteConfirmOne', {
+              name: target.name,
+              kind: target.isDirectory ? t('common.folder') : t('common.file')
+            })
+          : t('explorer.deleteConfirmMany', { count: targets.length })
 
       if (!window.confirm(message)) return
 
@@ -533,11 +540,11 @@ export function FileTree() {
         await refreshTree()
         setError(null)
       } catch (err) {
-        setError(err instanceof Error ? err.message : '削除に失敗しました')
+        setError(err instanceof Error ? err.message : t('explorer.deleteFailed'))
         await refreshTree()
       }
     },
-    [getDeleteTargets, removePaths, refreshTree]
+    [getDeleteTargets, removePaths, refreshTree, t]
   )
 
   const handleNodeDragStart = useCallback(
@@ -631,11 +638,11 @@ export function FileTree() {
         }
         setError(null)
       } catch (err) {
-        setError(err instanceof Error ? err.message : '移動に失敗しました')
+        setError(err instanceof Error ? err.message : t('explorer.moveFailed'))
         await refreshTree()
       }
     },
-    [renameOpenFile, refreshTree]
+    [renameOpenFile, refreshTree, t]
   )
 
   const startCreate = (mode: 'create-file' | 'create-folder', parentDir: string) => {
@@ -643,7 +650,7 @@ export function FileTree() {
     setInlineInput({
       mode,
       parentDir,
-      defaultName: mode === 'create-file' ? 'untitled.txt' : '新しいフォルダ'
+      defaultName: mode === 'create-file' ? 'untitled.txt' : t('explorer.defaultNewFolder')
     })
     setError(null)
   }
@@ -669,7 +676,7 @@ export function FileTree() {
       setInlineInput(null)
       setError(null)
     } catch (err) {
-      setError(err instanceof Error ? err.message : '作成に失敗しました')
+      setError(err instanceof Error ? err.message : t('explorer.createFailed'))
     }
   }
 
@@ -681,7 +688,7 @@ export function FileTree() {
       setRenamingPath(null)
       setError(null)
     } catch (err) {
-      setError(err instanceof Error ? err.message : '名前の変更に失敗しました')
+      setError(err instanceof Error ? err.message : t('explorer.renameFailed'))
     }
   }
 
@@ -730,8 +737,8 @@ export function FileTree() {
   if (!workspaceRoot) {
     return (
       <div className="file-tree-empty">
-        <p>フォルダが開かれていません</p>
-        <p className="hint">メニューから「フォルダを開く」を選択</p>
+        <p>{t('explorer.noFolder')}</p>
+        <p className="hint">{t('explorer.openFolderHint')}</p>
       </div>
     )
   }
@@ -747,29 +754,29 @@ export function FileTree() {
   return (
     <div className="file-tree">
       <div className="panel-header file-tree-header">
-        <span>エクスプローラー</span>
+        <span>{t('explorer.title')}</span>
         <div className="file-tree-toolbar">
-          <button className="btn-icon" title="すべて展開" onClick={handleExpandAll}>
+          <button className="btn-icon" title={t('explorer.expandAll')} onClick={handleExpandAll}>
             ⊞
           </button>
-          <button className="btn-icon" title="すべて折りたたむ" onClick={handleCollapseAll}>
+          <button className="btn-icon" title={t('explorer.collapseAll')} onClick={handleCollapseAll}>
             ⊟
           </button>
           <button
             className="btn-icon"
-            title="新規ファイル"
+            title={t('explorer.newFile')}
             onClick={() => startCreate('create-file', workspaceRoot)}
           >
             📄+
           </button>
           <button
             className="btn-icon"
-            title="新規フォルダ"
+            title={t('explorer.newFolder')}
             onClick={() => startCreate('create-folder', workspaceRoot)}
           >
             📁+
           </button>
-          <button className="btn-icon" title="更新" onClick={() => void refreshTree()}>
+          <button className="btn-icon" title={t('explorer.refresh')} onClick={() => void refreshTree()}>
             ↻
           </button>
         </div>
@@ -788,10 +795,10 @@ export function FileTree() {
         {inlineInput && (
           <div className="file-tree-create-bar" onClick={(e) => e.stopPropagation()}>
             <span className="file-tree-create-label">
-              {inlineInput.mode === 'create-file' ? '新規ファイル' : '新規フォルダ'}
+              {inlineInput.mode === 'create-file' ? t('explorer.newFile') : t('explorer.newFolder')}
               {' · '}
               {inlineInput.parentDir === workspaceRoot
-                ? 'ルート'
+                ? t('common.root')
                 : inlineInput.parentDir.replace(workspaceRoot, '').replace(/^[/\\]/, '')}
             </span>
             <div className="file-tree-item creating" style={{ paddingLeft: 8 }}>
@@ -838,8 +845,12 @@ export function FileTree() {
           style={{ left: contextMenu.x, top: contextMenu.y }}
           onClick={(e) => e.stopPropagation()}
         >
-          <button onClick={() => startCreate('create-file', parentDir)}>新規ファイル</button>
-          <button onClick={() => startCreate('create-folder', parentDir)}>新規フォルダ</button>
+          <button onClick={() => startCreate('create-file', parentDir)}>
+            {t('explorer.newFile')}
+          </button>
+          <button onClick={() => startCreate('create-folder', parentDir)}>
+            {t('explorer.newFolder')}
+          </button>
           {contextMenu.node && (
             <>
               <div className="context-menu-separator" />
@@ -851,15 +862,19 @@ export function FileTree() {
                     useAppStore.getState().openSearchPanel({ rootPath: path, replace: false })
                   }}
                 >
-                  フォルダ内を検索
+                  {t('explorer.searchInFolder')}
                 </button>
               )}
               {canRename && (
-                <button onClick={() => startRename(contextMenu.node!)}>名前の変更</button>
+                <button onClick={() => startRename(contextMenu.node!)}>
+                  {t('explorer.rename')}
+                </button>
               )}
               {canDelete && (
                 <button className="danger" onClick={() => void handleDelete(contextMenu.node)}>
-                  {deleteTargets.length > 1 ? `${deleteTargets.length} 件を削除` : '削除'}
+                  {deleteTargets.length > 1
+                    ? t('explorer.deleteMany', { count: deleteTargets.length })
+                    : t('common.delete')}
                 </button>
               )}
             </>

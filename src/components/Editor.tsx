@@ -13,6 +13,7 @@ import {
   toChatSelectionRef,
   writeSelectionClipboard
 } from '@/utils/chat-selection-drag'
+import { useI18n } from '@/i18n'
 
 type MarkdownViewMode = 'edit' | 'preview' | 'split'
 
@@ -27,6 +28,7 @@ const editorOptions: editor.IStandaloneEditorConstructionOptions = {
 }
 
 export function CodeEditor() {
+  const { t } = useI18n()
   const activeFilePath = useAppStore((s) => s.activeFilePath)
   const openFiles = useAppStore((s) => s.openFiles)
   const workspaceRoot = useAppStore((s) => s.workspaceRoot)
@@ -125,7 +127,7 @@ export function CodeEditor() {
 
       ed.addAction({
         id: 'compass.addSelectionToChat',
-        label: 'チャットに追加',
+        label: t('editor.addToChat'),
         contextMenuGroupId: '9_cutcopypaste',
         contextMenuOrder: 1.6,
         keybindings: [KeyMod.CtrlCmd | KeyMod.Shift | KeyCode.KeyL],
@@ -137,7 +139,7 @@ export function CodeEditor() {
 
       ed.addAction({
         id: 'compass.copySelectionChatRef',
-        label: 'チャット参照をコピー',
+        label: t('editor.copyChatRef'),
         contextMenuGroupId: '9_cutcopypaste',
         contextMenuOrder: 1.7,
         precondition: 'editorHasSelection',
@@ -192,7 +194,7 @@ export function CodeEditor() {
         domNode?.removeEventListener('copy', onCopy)
       })
     },
-    [setCursorPosition, setEditorSelection, addSelectionToChat, copySelectionChatRef]
+    [setCursorPosition, setEditorSelection, addSelectionToChat, copySelectionChatRef, t]
   )
 
   useEffect(() => {
@@ -287,7 +289,7 @@ export function CodeEditor() {
     return (
       <div className="editor-empty">
         <div className="editor-empty-content">
-          <p>ファイルを選択してください</p>
+          <p>{t('editor.selectFile')}</p>
         </div>
       </div>
     )
@@ -299,14 +301,14 @@ export function CodeEditor() {
         <div className="editor-diff-header">
           <div className="editor-diff-header-left">
             <span className="editor-diff-badge">
-              {activeFile.isNewPreview ? '新規ファイル（プレビュー）' : '変更プレビュー'}
+              {activeFile.isNewPreview ? t('editor.newFilePreview') : t('editor.changePreview')}
             </span>
             <span className="editor-diff-filename" title={activeFile.path}>
               {workspaceRoot
                 ? toWorkspaceRelativePath(workspaceRoot, activeFile.path)
                 : activeFile.path.replace(/\\/g, '/')}
             </span>
-            <span className="editor-diff-hint">左: 現在 · 右: 提案</span>
+            <span className="editor-diff-hint">{t('editor.diffHint')}</span>
           </div>
 
           <div className="editor-diff-header-right">
@@ -317,7 +319,7 @@ export function CodeEditor() {
                   className="btn-secondary btn-compact"
                   onClick={() => goToPreview(-1)}
                   disabled={isApplying}
-                  title="前の変更"
+                  title={t('editor.prevChange')}
                 >
                   ←
                 </button>
@@ -329,7 +331,7 @@ export function CodeEditor() {
                   className="btn-secondary btn-compact"
                   onClick={() => goToPreview(1)}
                   disabled={isApplying}
-                  title="次の変更"
+                  title={t('editor.nextChange')}
                 >
                   →
                 </button>
@@ -341,7 +343,7 @@ export function CodeEditor() {
               onClick={handleRejectCurrent}
               disabled={isApplying}
             >
-              拒否
+              {t('editor.reject')}
             </button>
             <button
               type="button"
@@ -349,14 +351,14 @@ export function CodeEditor() {
               onClick={() => void handleApplyCurrent()}
               disabled={isApplying}
             >
-              {isApplying ? '適用中...' : '採用'}
+              {isApplying ? t('editor.applying') : t('editor.accept')}
             </button>
           </div>
         </div>
 
         {pendingWorkspacePreview && previewFiles.length > 1 && (
           <div className="editor-preview-bulk-bar">
-            <span>他 {previewFiles.length - 1} 件の変更があります</span>
+            <span>{t('editor.otherChanges', { count: previewFiles.length - 1 })}</span>
             <div className="editor-preview-bulk-actions">
               <button
                 type="button"
@@ -364,7 +366,7 @@ export function CodeEditor() {
                 onClick={handleRejectAll}
                 disabled={isApplying}
               >
-                すべて拒否
+                {t('editor.rejectAll')}
               </button>
               <button
                 type="button"
@@ -372,7 +374,7 @@ export function CodeEditor() {
                 onClick={() => void handleApplyAll()}
                 disabled={isApplying}
               >
-                すべて採用
+                {t('editor.acceptAll')}
               </button>
             </div>
           </div>
@@ -408,19 +410,19 @@ export function CodeEditor() {
             className={markdownViewMode === 'edit' ? 'active' : ''}
             onClick={() => setMarkdownViewMode('edit')}
           >
-            編集
+            {t('editor.editTab')}
           </button>
           <button
             className={markdownViewMode === 'preview' ? 'active' : ''}
             onClick={() => setMarkdownViewMode('preview')}
           >
-            プレビュー
+            {t('editor.previewTab')}
           </button>
           <button
             className={markdownViewMode === 'split' ? 'active' : ''}
             onClick={() => setMarkdownViewMode('split')}
           >
-            分割
+            {t('editor.splitTab')}
           </button>
         </div>
       )}

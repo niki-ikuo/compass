@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { basename } from '@/utils/path'
+import { useI18n } from '@/i18n'
 
 interface WorkspaceWelcomeProps {
   onOpenFolder: () => void
@@ -7,6 +8,7 @@ interface WorkspaceWelcomeProps {
 }
 
 export function WorkspaceWelcome({ onOpenFolder, onOpenRecent }: WorkspaceWelcomeProps) {
+  const { t } = useI18n()
   const [recentFolders, setRecentFolders] = useState<string[]>([])
   const [openingPath, setOpeningPath] = useState<string | null>(null)
 
@@ -37,16 +39,16 @@ export function WorkspaceWelcome({ onOpenFolder, onOpenRecent }: WorkspaceWelcom
       <div className="workspace-welcome-content">
         <img className="workspace-welcome-icon" src="/icon.svg" alt="" width={64} height={64} />
         <h2>Compass</h2>
-        <p className="workspace-welcome-lead">フォルダを開いてコード編集を始めましょう</p>
+        <p className="workspace-welcome-lead">{t('welcome.lead')}</p>
 
         <button type="button" className="workspace-welcome-open-btn" onClick={onOpenFolder}>
-          新しいフォルダを開く
+          {t('welcome.openFolder')}
         </button>
         <p className="workspace-welcome-shortcut">Ctrl+O</p>
 
         {recentFolders.length > 0 && (
           <section className="workspace-welcome-recent">
-            <h3>最近開いたフォルダ</h3>
+            <h3>{t('welcome.recent')}</h3>
             <ul className="workspace-welcome-list">
               {recentFolders.map((folder) => (
                 <li key={folder}>

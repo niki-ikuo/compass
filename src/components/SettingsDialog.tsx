@@ -2,13 +2,20 @@ import { useState, useEffect } from 'react'
 import { useAppStore } from '@/stores/app-store'
 import type { AppSettings, ColorThemeId, LlmProviderId } from '@/types'
 import { DEFAULT_SETTINGS } from '@/types'
-import { COLOR_THEMES } from '@/utils/color-theme'
+import { COLOR_THEMES, getColorThemeLabel } from '@/utils/color-theme'
 import {
   LLM_PROVIDERS,
   getLlmProvider,
   getModelOptions,
   resolveModelForProvider
 } from '@/utils/llm-providers'
+import {
+  useI18n,
+  setLocale,
+  LOCALE_OPTIONS,
+  type LocaleId,
+  type MessageKey
+} from '@/i18n'
 
 function switchProvider(form: AppSettings, nextId: LlmProviderId): AppSettings {
   if (form.providerId === nextId) return form
@@ -36,6 +43,7 @@ function switchProvider(form: AppSettings, nextId: LlmProviderId): AppSettings {
 }
 
 export function SettingsDialog() {
+  const { t } = useI18n()
   const settingsOpen = useAppStore((s) => s.settingsOpen)
   const settings = useAppStore((s) => s.settings)
   const setSettingsOpen = useAppStore((s) => s.setSettingsOpen)
@@ -95,11 +103,12 @@ export function SettingsDialog() {
       }
       await window.compass.settings.set(toSave)
       setSettings(toSave)
+      setLocale(toSave.locale)
       const provider = getLlmProvider(toSave.providerId)
       setApiConnected(provider.requiresApiKey ? (toSave.apiKey ? true : null) : true)
       setSettingsOpen(false)
     } catch {
-      setMessage('保存に失敗しました')
+      setMessage(t('settings.saveFailed'))
     } finally {
       setSaving(false)
     }
@@ -118,24 +127,43 @@ export function SettingsDialog() {
     <div className="modal-overlay">
       <div className="modal modal-wide" role="dialog" aria-modal="true" aria-labelledby="settings-dialog-title">
         <div className="modal-header">
-          <h2 id="settings-dialog-title">設定</h2>
-          <button className="btn-icon" onClick={handleClose} title="閉じる" aria-label="閉じる">
+          <h2 id="settings-dialog-title">{t('settings.title')}</h2>
+          <button
+            className="btn-icon"
+            onClick={handleClose}
+            title={t('common.close')}
+            aria-label={t('common.close')}
+          >
             ×
           </button>
         </div>
 
         <div className="modal-body">
-          <p className="modal-section-title">外観</p>
+          <p className="modal-section-title">{t('settings.appearance')}</p>
 
           <label>
-            配色テーマ
+            {t('settings.language')}
+            <select
+              value={form.locale}
+              onChange={(e) => setForm({ ...form, locale: e.target.value as LocaleId })}
+            >
+              {LOCALE_OPTIONS.map((opt) => (
+                <option key={opt.id} value={opt.id}>
+                  {opt.nativeLabel}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label>
+            {t('settings.colorTheme')}
             <select
               value={form.colorTheme}
               onChange={(e) => previewColorTheme(e.target.value as ColorThemeId)}
             >
               {COLOR_THEMES.map((theme) => (
                 <option key={theme.id} value={theme.id}>
-                  {theme.label}
+                  {getColorThemeLabel(theme.id)}
                 </option>
               ))}
             </select>
@@ -155,10 +183,10 @@ export function SettingsDialog() {
             </span>
           </label>
 
-          <p className="modal-section-title">LLM</p>
+          <p className="modal-section-title">{t('settings.llm')}</p>
 
           <label>
-            プロバイダ
+            {t('settings.provider')}
             <select
               value={form.providerId}
               onChange={(e) =>
@@ -167,15 +195,17 @@ export function SettingsDialog() {
             >
               {LLM_PROVIDERS.map((provider) => (
                 <option key={provider.id} value={provider.id}>
-                  {provider.label}
+                  {t(`provider.${provider.id}.label` as MessageKey)}
                 </option>
               ))}
             </select>
-            <span className="field-hint">{activeProvider.hint}</span>
+            <span className="field-hint">
+              {t(`provider.${activeProvider.id}.hint` as MessageKey)}
+            </span>
           </label>
 
           <label>
-            API Base URL
+            {t('settings.apiBaseUrl')}
             <input
               type="text"
               value={form.apiBaseUrl}
@@ -185,25 +215,25 @@ export function SettingsDialog() {
               className={isCustomProvider ? undefined : 'input-readonly'}
             />
             {!isCustomProvider && (
-              <span className="field-hint">プロバイダ選択で自動設定されます（カスタム時のみ編集可）</span>
+              <span className="field-hint">{t('settings.apiBaseUrlHint')}</span>
             )}
           </label>
 
           <label>
-            API Key
+            {t('settings.apiKey')}
             <input
               type="password"
               value={form.apiKey}
               onChange={(e) => setForm({ ...form, apiKey: e.target.value })}
-              placeholder={activeProvider.requiresApiKey ? 'sk-...' : '（任意）'}
+              placeholder={activeProvider.requiresApiKey ? 'sk-...' : t('common.optional')}
             />
             {!activeProvider.requiresApiKey && (
-              <span className="field-hint">このプロバイダでは API Key は必須ではありません</span>
+              <span className="field-hint">{t('settings.apiKeyOptionalHint')}</span>
             )}
           </label>
 
           <label>
-            モデル
+            {t('settings.model')}
             {modelOptions.length > 0 ? (
               <>
                 <input
@@ -227,12 +257,12 @@ export function SettingsDialog() {
                 placeholder="model-id"
               />
             )}
-            <span className="field-hint">一覧から選ぶか、任意のモデル ID を入力できます</span>
+            <span className="field-hint">{t('settings.modelHint')}</span>
           </label>
 
           <div className="form-row">
             <label>
-              温度
+              {t('settings.temperature')}
               <input
                 type="number"
                 min={0}
@@ -244,7 +274,7 @@ export function SettingsDialog() {
             </label>
 
             <label>
-              Max Tokens
+              {t('settings.maxTokens')}
               <input
                 type="number"
                 min={256}
@@ -261,10 +291,10 @@ export function SettingsDialog() {
 
         <div className="modal-footer">
           <button className="btn-secondary" onClick={handleReset}>
-            リセット
+            {t('common.reset')}
           </button>
           <button className="btn-primary" onClick={handleSave} disabled={saving}>
-            {saving ? '保存中...' : '保存'}
+            {saving ? t('common.saving') : t('common.save')}
           </button>
         </div>
       </div>

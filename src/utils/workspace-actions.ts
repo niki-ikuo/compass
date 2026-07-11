@@ -1,6 +1,7 @@
 import type { WorkspaceAction } from '@/types'
 import { CODE_FENCE_REGEX, COMPASS_ACTIONS_REGEX, BARE_COMPASS_ACTIONS_REGEX } from './code-fence'
 import type { CodeBlock } from '@/types'
+import { t } from '../i18n/runtime'
 
 function extractCodeBlocksLocal(content: string): CodeBlock[] {
   const blocks: CodeBlock[] = []
@@ -188,25 +189,29 @@ export function getWorkspaceActionsLabel(code: string): { label: string; meta: s
     const deletePaths = deleteActions.map((action) => action.path.replace(/\\/g, '/'))
 
     if (filePaths.length === 1 && dirPaths.length === 0 && deletePaths.length === 0) {
-      return { label: filePaths[0], meta: '変更提案' }
+      return { label: filePaths[0], meta: t('actions.changeProposal') }
     }
     if (dirPaths.length === 1 && filePaths.length === 0 && deletePaths.length === 0) {
-      return { label: dirPaths[0], meta: 'フォルダ作成' }
+      return { label: dirPaths[0], meta: t('actions.mkdir') }
     }
     if (deletePaths.length === 1 && filePaths.length === 0 && dirPaths.length === 0) {
       return {
         label: deletePaths[0],
-        meta: deleteActions[0].type === 'deleteDir' ? 'フォルダ削除' : 'ファイル削除'
+        meta:
+          deleteActions[0].type === 'deleteDir' ? t('actions.deleteDir') : t('actions.deleteFile')
       }
     }
 
     const parts: string[] = []
-    if (dirPaths.length > 0) parts.push(`フォルダ作成 ${dirPaths.length}件`)
-    if (filePaths.length > 0) parts.push(`ファイル ${filePaths.length}件`)
-    if (deletePaths.length > 0) parts.push(`削除 ${deletePaths.length}件`)
-    return { label: 'ワークスペース操作', meta: parts.join(' · ') || `${actions.length}件` }
+    if (dirPaths.length > 0) parts.push(t('preview.mkdir', { count: dirPaths.length }))
+    if (filePaths.length > 0) parts.push(t('preview.files', { count: filePaths.length }))
+    if (deletePaths.length > 0) parts.push(t('preview.delete', { count: deletePaths.length }))
+    return {
+      label: t('actions.workspaceOps'),
+      meta: parts.join(' · ') || t('common.countItems', { count: actions.length })
+    }
   } catch {
-    return { label: 'ファイル操作', meta: 'JSON' }
+    return { label: t('actions.fileOps'), meta: 'JSON' }
   }
 }
 

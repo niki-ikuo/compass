@@ -1,3 +1,6 @@
+import type { LocaleId } from '../i18n/types'
+export type { LocaleId } from '../i18n/types'
+
 export type FileEncoding =
   | 'utf8'
   | 'utf8bom'
@@ -115,6 +118,8 @@ export interface AppSettings {
   temperature: number
   maxTokens: number
   colorTheme: ColorThemeId
+  /** UI / AI 応答の表示言語 */
+  locale: LocaleId
 }
 
 export interface ChatRequest {
@@ -375,5 +380,6 @@ export const DEFAULT_SETTINGS: AppSettings = {
   model: 'gpt-4o-mini',
   temperature: 0.2,
   maxTokens: 4096,
-  colorTheme: 'dark'
+  colorTheme: 'dark',
+  locale: 'ja'
 }

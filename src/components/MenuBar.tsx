@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { SettingsIcon, ExplorerIcon, ChatIcon, TerminalIcon, SearchIcon } from './icons/ToolbarIcons'
 import { useAppStore } from '@/stores/app-store'
 import type { LeftSidebarView } from '@/types'
+import { useI18n } from '@/i18n'
 
 interface MenuBarProps {
   showFileTree: boolean
@@ -99,6 +100,7 @@ export function MenuBar({
   onCloseFolder,
   onSave
 }: MenuBarProps) {
+  const { t } = useI18n()
   const [openMenu, setOpenMenu] = useState<MenuId | null>(null)
   const barRef = useRef<HTMLDivElement>(null)
   const workspaceRoot = useAppStore((s) => s.workspaceRoot)
@@ -128,41 +130,41 @@ export function MenuBar({
   }, [openMenu, closeMenu])
 
   const fileItems: MenuItem[] = [
-    { label: 'フォルダを開く', shortcut: 'Ctrl+O', action: onOpenFolder },
-    { label: 'フォルダを閉じる', shortcut: 'Ctrl+Shift+W', action: onCloseFolder },
-    { label: '保存', shortcut: 'Ctrl+S', action: onSave },
+    { label: t('menu.openFolder'), shortcut: 'Ctrl+O', action: onOpenFolder },
+    { label: t('menu.closeFolder'), shortcut: 'Ctrl+Shift+W', action: onCloseFolder },
+    { label: t('menu.save'), shortcut: 'Ctrl+S', action: onSave },
     { separator: true, label: '', action: () => {} },
-    { label: '設定', shortcut: 'Ctrl+,', action: onOpenSettings },
+    { label: t('menu.settings'), shortcut: 'Ctrl+,', action: onOpenSettings },
     { separator: true, label: '', action: () => {} },
-    { label: '終了', shortcut: 'Alt+F4', action: () => void window.compass.shell.quit() }
+    { label: t('menu.quit'), shortcut: 'Alt+F4', action: () => void window.compass.shell.quit() }
   ]
 
   const editItems: MenuItem[] = [
-    { label: '元に戻す', shortcut: 'Ctrl+Z', action: () => void window.compass.shell.edit('undo') },
-    { label: 'やり直し', shortcut: 'Ctrl+Y', action: () => void window.compass.shell.edit('redo') },
+    { label: t('menu.undo'), shortcut: 'Ctrl+Z', action: () => void window.compass.shell.edit('undo') },
+    { label: t('menu.redo'), shortcut: 'Ctrl+Y', action: () => void window.compass.shell.edit('redo') },
     { separator: true, label: '', action: () => {} },
-    { label: '切り取り', shortcut: 'Ctrl+X', action: () => void window.compass.shell.edit('cut') },
-    { label: 'コピー', shortcut: 'Ctrl+C', action: () => void window.compass.shell.edit('copy') },
-    { label: '貼り付け', shortcut: 'Ctrl+V', action: () => void window.compass.shell.edit('paste') },
+    { label: t('menu.cut'), shortcut: 'Ctrl+X', action: () => void window.compass.shell.edit('cut') },
+    { label: t('menu.copy'), shortcut: 'Ctrl+C', action: () => void window.compass.shell.edit('copy') },
+    { label: t('menu.paste'), shortcut: 'Ctrl+V', action: () => void window.compass.shell.edit('paste') },
     { separator: true, label: '', action: () => {} },
     {
-      label: 'すべて選択',
+      label: t('menu.selectAll'),
       shortcut: 'Ctrl+A',
       action: () => void window.compass.shell.edit('selectAll')
     },
     { separator: true, label: '', action: () => {} },
     {
-      label: 'ファイル内検索',
+      label: t('menu.findInFile'),
       shortcut: 'Ctrl+F',
       action: () => window.dispatchEvent(new CustomEvent('compass:find-in-file'))
     },
     {
-      label: 'ファイル内置換',
+      label: t('menu.replaceInFile'),
       shortcut: 'Ctrl+H',
       action: () => window.dispatchEvent(new CustomEvent('compass:replace-in-file'))
     },
     {
-      label: 'フォルダ内を検索',
+      label: t('menu.findInFiles'),
       shortcut: 'Ctrl+Shift+F',
       action: () => {
         if (!workspaceRoot) return
@@ -170,7 +172,7 @@ export function MenuBar({
       }
     },
     {
-      label: 'フォルダ内を置換',
+      label: t('menu.replaceInFiles'),
       shortcut: 'Ctrl+Shift+H',
       action: () => {
         if (!workspaceRoot) return
@@ -180,26 +182,26 @@ export function MenuBar({
   ]
 
   const viewItems: MenuItem[] = [
-    { label: '再読み込み', shortcut: 'Ctrl+R', action: () => void window.compass.shell.view('reload') },
+    { label: t('menu.reload'), shortcut: 'Ctrl+R', action: () => void window.compass.shell.view('reload') },
     {
-      label: '開発者ツール',
+      label: t('menu.toggleDevTools'),
       shortcut: 'F12',
       action: () => void window.compass.shell.view('toggleDevTools')
     },
     { separator: true, label: '', action: () => {} },
     {
-      label: 'ズームリセット',
+      label: t('menu.resetZoom'),
       shortcut: 'Ctrl+0',
       action: () => void window.compass.shell.view('resetZoom')
     },
-    { label: '拡大', shortcut: 'Ctrl+=', action: () => void window.compass.shell.view('zoomIn') },
-    { label: '縮小', shortcut: 'Ctrl+-', action: () => void window.compass.shell.view('zoomOut') },
+    { label: t('menu.zoomIn'), shortcut: 'Ctrl+=', action: () => void window.compass.shell.view('zoomIn') },
+    { label: t('menu.zoomOut'), shortcut: 'Ctrl+-', action: () => void window.compass.shell.view('zoomOut') },
     { separator: true, label: '', action: () => {} },
-    { label: 'ターミナル', shortcut: 'Ctrl+`', action: workspaceRoot ? onToggleTerminal : () => {} }
+    { label: t('menu.terminal'), shortcut: 'Ctrl+`', action: workspaceRoot ? onToggleTerminal : () => {} }
   ]
 
   const helpItems: MenuItem[] = [
-    { label: 'バージョン情報', action: () => void window.compass.shell.showAbout() }
+    { label: t('menu.about'), action: () => void window.compass.shell.showAbout() }
   ]
 
   const explorerActive = showFileTree && leftSidebarView === 'explorer'
@@ -210,7 +212,7 @@ export function MenuBar({
       <div className="menu-bar-menus">
         <MenuDropdown
           id="file"
-          label="ファイル"
+          label={t('menu.file')}
           items={fileItems}
           openMenu={openMenu}
           onOpen={setOpenMenu}
@@ -218,7 +220,7 @@ export function MenuBar({
         />
         <MenuDropdown
           id="edit"
-          label="編集"
+          label={t('menu.edit')}
           items={editItems}
           openMenu={openMenu}
           onOpen={setOpenMenu}
@@ -226,7 +228,7 @@ export function MenuBar({
         />
         <MenuDropdown
           id="view"
-          label="表示"
+          label={t('menu.view')}
           items={viewItems}
           openMenu={openMenu}
           onOpen={setOpenMenu}
@@ -234,7 +236,7 @@ export function MenuBar({
         />
         <MenuDropdown
           id="help"
-          label="ヘルプ"
+          label={t('menu.help')}
           items={helpItems}
           openMenu={openMenu}
           onOpen={setOpenMenu}
@@ -247,8 +249,8 @@ export function MenuBar({
           type="button"
           className="menu-bar-btn"
           onClick={onOpenSettings}
-          title="設定"
-          aria-label="設定"
+          title={t('menu.settings')}
+          aria-label={t('menu.settings')}
         >
           <SettingsIcon />
         </button>
@@ -256,8 +258,8 @@ export function MenuBar({
           type="button"
           className={`menu-bar-btn${explorerActive ? ' active' : ''}`}
           onClick={onToggleFileTree}
-          title="エクスプローラの開閉"
-          aria-label="エクスプローラの開閉"
+          title={t('menu.toggleExplorer')}
+          aria-label={t('menu.toggleExplorer')}
         >
           <ExplorerIcon />
         </button>
@@ -266,8 +268,8 @@ export function MenuBar({
           className={`menu-bar-btn${searchActive ? ' active' : ''}`}
           onClick={onOpenSearch}
           disabled={!workspaceRoot}
-          title={workspaceRoot ? '検索 (Ctrl+Shift+F)' : 'フォルダを開くと検索が利用できます'}
-          aria-label="検索"
+          title={workspaceRoot ? t('menu.searchShortcut') : t('menu.searchDisabled')}
+          aria-label={t('menu.toggleSearch')}
         >
           <SearchIcon />
         </button>
@@ -276,8 +278,8 @@ export function MenuBar({
           className={`menu-bar-btn${showTerminal ? ' active' : ''}`}
           onClick={onToggleTerminal}
           disabled={!workspaceRoot}
-          title={workspaceRoot ? 'ターミナルの開閉' : 'フォルダを開くとターミナルが利用できます'}
-          aria-label="ターミナルの開閉"
+          title={workspaceRoot ? t('menu.toggleTerminal') : t('menu.terminalDisabled')}
+          aria-label={t('menu.toggleTerminal')}
         >
           <TerminalIcon />
         </button>
@@ -285,8 +287,8 @@ export function MenuBar({
           type="button"
           className={`menu-bar-btn${showChat ? ' active' : ''}`}
           onClick={onToggleChat}
-          title="チャットの開閉"
-          aria-label="チャットの開閉"
+          title={t('menu.toggleChat')}
+          aria-label={t('menu.toggleChat')}
         >
           <ChatIcon />
         </button>

@@ -3,6 +3,7 @@ import { useAppStore } from '@/stores/app-store'
 import { toWorkspaceRelativePath } from '@/utils/workspace-actions'
 import { buildWorkspaceIndex } from '@/utils/project-index'
 import type { WorkspaceSearchFileResult, WorkspaceSearchMatch } from '@/types'
+import { useI18n } from '@/i18n'
 
 function ToggleChip({
   label,
@@ -95,6 +96,7 @@ function FileResultGroup({
 }
 
 export function SearchPanel() {
+  const { t } = useI18n()
   const workspaceRoot = useAppStore((s) => s.workspaceRoot)
   const searchQuery = useAppStore((s) => s.searchQuery)
   const searchReplace = useAppStore((s) => s.searchReplace)
@@ -152,10 +154,10 @@ export function SearchPanel() {
   }, [searchReplaceOpen, searchQuery])
 
   const scopeLabel = useMemo(() => {
-    if (!workspaceRoot) return 'ワークスペース'
-    if (!searchRootPath) return 'ワークスペース全体'
+    if (!workspaceRoot) return t('search.workspace')
+    if (!searchRootPath) return t('search.entireWorkspace')
     return toWorkspaceRelativePath(workspaceRoot, searchRootPath) || searchRootPath
-  }, [workspaceRoot, searchRootPath])
+  }, [workspaceRoot, searchRootPath, t])
 
   const runSearch = useCallback(async () => {
     if (!workspaceRoot) return
@@ -186,7 +188,7 @@ export function SearchPanel() {
     } catch (error) {
       if (token !== searchTokenRef.current) return
       setSearchResults(null)
-      setSearchError(error instanceof Error ? error.message : '検索に失敗しました')
+      setSearchError(error instanceof Error ? error.message : t('search.failed'))
     } finally {
       if (token === searchTokenRef.current) {
         setSearchSearching(false)
@@ -203,7 +205,8 @@ export function SearchPanel() {
     searchRootPath,
     setSearchResults,
     setSearchSearching,
-    setSearchError
+    setSearchError,
+    t
   ])
 
   useEffect(() => {
@@ -244,8 +247,8 @@ export function SearchPanel() {
     const total = searchResults?.totalMatches ?? 0
     const message =
       total > 0
-        ? `${total} 件を置換しますか？この操作は元に戻せません。`
-        : '一致する箇所をすべて置換しますか？この操作は元に戻せません。'
+        ? t('search.replaceConfirmCount', { count: total })
+        : t('search.replaceConfirm')
     if (!window.confirm(message)) return
 
     const dirtyInScope = openFiles.filter((file) => {
@@ -256,9 +259,7 @@ export function SearchPanel() {
       return norm === root || norm.startsWith(`${root}/`)
     })
     if (dirtyInScope.length > 0) {
-      const proceed = window.confirm(
-        `未保存のファイルが ${dirtyInScope.length} 件あります。ディスク上の内容で置換すると未保存の変更が失われる可能性があります。続行しますか？`
-      )
+      const proceed = window.confirm(t('search.dirtyWarning', { count: dirtyInScope.length }))
       if (!proceed) return
     }
 
@@ -282,11 +283,14 @@ export function SearchPanel() {
       await runSearch()
       if (result.errors.length > 0) {
         setSearchError(
-          `${result.replacements} 件を置換しましたが、${result.errors.length} 件でエラーがありました`
+          t('search.replacePartial', {
+            replacements: result.replacements,
+            errors: result.errors.length
+          })
         )
       }
     } catch (error) {
-      setSearchError(error instanceof Error ? error.message : '置換に失敗しました')
+      setSearchError(error instanceof Error ? error.message : t('search.replaceFailed'))
     } finally {
       setIsReplacing(false)
     }
@@ -306,7 +310,8 @@ export function SearchPanel() {
     syncOpenFileContents,
     setFileTree,
     runSearch,
-    setSearchError
+    setSearchError,
+    t
   ])
 
   const toggleFile = (path: string) => {
@@ -322,16 +327,16 @@ export function SearchPanel() {
     return (
       <div className="search-panel">
         <div className="panel-header">
-          <span>検索</span>
+          <span>{t('search.placeholder')}</span>
           <button
             type="button"
             className="search-panel-back"
             onClick={() => setLeftSidebarView('explorer')}
           >
-            エクスプローラ
+            {t('search.explorer')}
           </button>
         </div>
-        <div className="search-empty">フォルダを開いてから検索できます</div>
+        <div className="search-empty">{t('search.needFolder')}</div>
       </div>
     )
   }
@@ -339,15 +344,15 @@ export function SearchPanel() {
   return (
     <div className="search-panel">
       <div className="panel-header">
-        <span>検索</span>
+        <span>{t('search.placeholder')}</span>
         <div className="search-panel-header-actions">
           <button
             type="button"
             className="search-panel-back"
             onClick={() => setLeftSidebarView('explorer')}
-            title="エクスプローラに戻る"
+            title={t('search.backToExplorer')}
           >
-            エクスプローラ
+            {t('search.explorer')}
           </button>
         </div>
       </div>
@@ -357,7 +362,7 @@ export function SearchPanel() {
           <button
             type="button"
             className={`search-expand-btn${searchReplaceOpen ? ' open' : ''}`}
-            title={searchReplaceOpen ? '置換を隠す' : '置換を表示'}
+            title={searchReplaceOpen ? t('search.hideReplace') : t('search.showReplace')}
             aria-expanded={searchReplaceOpen}
             onClick={() => setSearchReplaceOpen(!searchReplaceOpen)}
           >
@@ -368,7 +373,7 @@ export function SearchPanel() {
             className="search-input"
             type="text"
             value={searchQuery}
-            placeholder="検索"
+            placeholder={t('search.placeholder')}
             onChange={(e) => setSearchQuery(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
@@ -387,7 +392,7 @@ export function SearchPanel() {
               className="search-input"
               type="text"
               value={searchReplace}
-              placeholder="置換"
+              placeholder={t('search.replacePlaceholder')}
               onChange={(e) => setSearchReplace(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
@@ -401,9 +406,9 @@ export function SearchPanel() {
               className="search-action-btn"
               disabled={!searchQuery.trim() || isReplacing || searchSearching}
               onClick={() => void handleReplaceAll()}
-              title="すべて置換"
+              title={t('search.replaceAll')}
             >
-              すべて置換
+              {t('search.replaceAll')}
             </button>
           </div>
         )}
@@ -411,29 +416,29 @@ export function SearchPanel() {
         <div className="search-options">
           <ToggleChip
             label="Aa"
-            title="大文字と小文字を区別する"
+            title={t('search.matchCase')}
             active={searchCaseSensitive}
             onClick={() => setSearchCaseSensitive(!searchCaseSensitive)}
           />
           <ToggleChip
             label="ab"
-            title="単語単位で一致"
+            title={t('search.wholeWord')}
             active={searchWholeWord}
             onClick={() => setSearchWholeWord(!searchWholeWord)}
           />
           <ToggleChip
             label=".*"
-            title="正規表現を使用する"
+            title={t('search.useRegex')}
             active={searchUseRegex}
             onClick={() => setSearchUseRegex(!searchUseRegex)}
           />
           <button
             type="button"
             className={`search-toggle${showFilters ? ' active' : ''}`}
-            title="ファイルを含める / 除外"
+            title={t('search.includeExclude')}
             onClick={() => setShowFilters(!showFilters)}
           >
-            フィルタ
+            {t('search.filter')}
           </button>
         </div>
 
@@ -443,21 +448,21 @@ export function SearchPanel() {
               className="search-input"
               type="text"
               value={searchInclude}
-              placeholder="含めるファイル (例: *.ts, src/**)"
+              placeholder={t('search.includePlaceholder')}
               onChange={(e) => setSearchInclude(e.target.value)}
             />
             <input
               className="search-input"
               type="text"
               value={searchExclude}
-              placeholder="除外するファイル"
+              placeholder={t('search.excludePlaceholder')}
               onChange={(e) => setSearchExclude(e.target.value)}
             />
           </div>
         )}
 
         <div className="search-scope">
-          <span className="search-scope-label">範囲:</span>
+          <span className="search-scope-label">{t('search.scopeLabel')}</span>
           <span className="search-scope-value" title={searchRootPath ?? workspaceRoot}>
             {scopeLabel}
           </span>
@@ -467,24 +472,26 @@ export function SearchPanel() {
               className="search-scope-clear"
               onClick={() => setSearchRootPath(null)}
             >
-              全体に戻す
+              {t('search.clearScope')}
             </button>
           )}
         </div>
       </div>
 
       <div className="search-status">
-        {searchSearching && <span>検索中…</span>}
+        {searchSearching && <span>{t('search.searching')}</span>}
         {!searchSearching && searchError && <span className="search-error">{searchError}</span>}
         {!searchSearching && !searchError && searchResults && (
           <span>
-            {searchResults.totalMatches} 件
-            {searchResults.files.length > 0 ? ` / ${searchResults.files.length} ファイル` : ''}
-            {searchResults.truncated ? '（上限に達しました）' : ''}
+            {t('search.results', { count: searchResults.totalMatches })}
+            {searchResults.files.length > 0
+              ? t('search.filesSuffix', { count: searchResults.files.length })
+              : ''}
+            {searchResults.truncated ? t('search.truncated') : ''}
           </span>
         )}
         {!searchSearching && !searchError && !searchResults && searchQuery.trim() === '' && (
-          <span>検索文字列を入力してください</span>
+          <span>{t('search.queryRequired')}</span>
         )}
       </div>
 
@@ -499,7 +506,7 @@ export function SearchPanel() {
           />
         ))}
         {!searchSearching && searchResults && searchResults.files.length === 0 && searchQuery.trim() && (
-          <div className="search-empty">一致する結果はありません</div>
+          <div className="search-empty">{t('search.noResults')}</div>
         )}
       </div>
     </div>

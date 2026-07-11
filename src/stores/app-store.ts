@@ -20,12 +20,13 @@ import { DEFAULT_SETTINGS, normalizeChatMode } from '@/types'
 import { getLanguageFromPath } from '@/utils/language'
 import { generateId } from '@/utils/code-blocks'
 import { loadPanelLayout, savePanelLayout } from '@/utils/panel-layout'
+import { t, isDefaultChatTitle } from '@/i18n'
 
 function createEmptyChatSession(): ChatSession {
   const now = Date.now()
   return {
     id: generateId(),
-    title: '新しいチャット',
+    title: t('chat.newChat'),
     messages: [],
     contextRefs: [],
     createdAt: now,
@@ -431,7 +432,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     const dirtyFiles = state.openFiles.filter((file) => file.isDirty && !file.isPreview)
     if (dirtyFiles.length > 0) {
       const confirmed = window.confirm(
-        `未保存の変更があるファイルが ${dirtyFiles.length} 件あります。フォルダを閉じてもよろしいですか？`
+        t('workspace.closeDirtyConfirm', { count: dirtyFiles.length })
       )
       if (!confirmed) return false
     }
@@ -731,7 +732,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           }
         ]
         let title = session.title
-        if (role === 'user' && session.title === '新しいチャット' && content.trim()) {
+        if (role === 'user' && isDefaultChatTitle(session.title) && content.trim()) {
           const trimmed = content.trim()
           title = trimmed.length > 24 ? `${trimmed.slice(0, 24)}…` : trimmed
         }
@@ -766,7 +767,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         ...session,
         messages: [],
         contextRefs: [],
-        title: '新しいチャット',
+        title: t('chat.newChat'),
         updatedAt: Date.now()
       }))
     }))

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { ActionPreviewItem, WorkspaceAction } from '@/types'
 import { computeLineDiff } from '@/utils/code-blocks'
+import { useI18n, t } from '@/i18n'
 
 interface WorkspaceActionPreviewProps {
   items: ActionPreviewItem[]
@@ -16,10 +17,11 @@ function ActionItemPreview({
   item: ActionPreviewItem
   onSelect?: (item: ActionPreviewItem) => void
 }) {
+  const { t } = useI18n()
   const [expanded, setExpanded] = useState(false)
 
   if (item.type === 'mkdir') {
-    const meta = item.alreadyExists ? 'フォルダ（既存）' : '新規フォルダ'
+    const meta = item.alreadyExists ? t('preview.folderExisting') : t('preview.folderNew')
     return (
       <div className="action-preview-item mkdir">
         <div className="action-preview-header">
@@ -38,11 +40,11 @@ function ActionItemPreview({
   if (item.type === 'deleteFile' || item.type === 'deleteDir') {
     const meta = !item.exists
       ? item.type === 'deleteDir'
-        ? 'フォルダ削除（存在しません）'
-        : 'ファイル削除（存在しません）'
+        ? t('preview.deleteDirMissing')
+        : t('preview.deleteFileMissing')
       : item.type === 'deleteDir'
-        ? 'フォルダ削除'
-        : 'ファイル削除'
+        ? t('preview.deleteDir')
+        : t('preview.deleteFile')
 
     return (
       <div className="action-preview-item delete">
@@ -59,8 +61,10 @@ function ActionItemPreview({
     )
   }
 
+  if (item.type !== 'writeFile') return null
+
   const diff = computeLineDiff(item.oldContent, item.newContent)
-  const meta = item.isNew ? '新規ファイル' : 'ファイル更新'
+  const meta = item.isNew ? t('preview.fileNew') : t('preview.fileUpdate')
 
   return (
     <div className="action-preview-item write">
@@ -104,9 +108,9 @@ function summarizePreviewItems(items: ActionPreviewItem[]): string {
     (i) => i.type === 'deleteFile' || i.type === 'deleteDir'
   ).length
   const parts: string[] = []
-  if (fileCount > 0) parts.push(`ファイル ${fileCount}件`)
-  if (dirCount > 0) parts.push(`フォルダ作成 ${dirCount}件`)
-  if (deleteCount > 0) parts.push(`削除 ${deleteCount}件`)
+  if (fileCount > 0) parts.push(t('preview.files', { count: fileCount }))
+  if (dirCount > 0) parts.push(t('preview.mkdir', { count: dirCount }))
+  if (deleteCount > 0) parts.push(t('preview.delete', { count: deleteCount }))
   return parts.join(' · ')
 }
 
@@ -116,22 +120,23 @@ export function WorkspaceActionPreview({
   onReject,
   onSelectItem
 }: WorkspaceActionPreviewProps) {
+  const { t } = useI18n()
   const summary = summarizePreviewItems(items)
 
   return (
     <div className="workspace-action-preview">
       <div className="diff-header">
-        <span>AIの変更提案 ({summary})</span>
+        <span>{t('preview.proposalTitle', { summary })}</span>
         <div className="diff-actions">
           <button className="btn-apply" onClick={onApply}>
-            すべて適用
+            {t('preview.applyAll')}
           </button>
           <button className="btn-reject" onClick={onReject}>
-            拒否
+            {t('editor.reject')}
           </button>
         </div>
       </div>
-      <p className="action-preview-hint">クリックでエディタの差分表示を開きます</p>
+      <p className="action-preview-hint">{t('preview.openDiffHint')}</p>
       <div className="action-preview-list">
         {items.map((item, index) => (
           <ActionItemPreview

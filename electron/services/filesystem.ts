@@ -12,6 +12,7 @@ import type {
   ActionPreviewItem,
   DecodedFileContent
 } from '../../src/types'
+import { t } from '../../src/i18n/runtime'
 import { normalizeWorkspaceActionPath } from '../../src/utils/workspace-actions'
 import { decodeFileBuffer, encodeContent } from './encoding'
 
@@ -61,15 +62,15 @@ export async function writeFileContent(
 }
 
 function validateName(name: string): void {
-  if (!name.trim()) throw new Error('名前を入力してください')
-  if (/[<>:"/\\|?*]/.test(name)) throw new Error('名前に使えない文字が含まれています')
+  if (!name.trim()) throw new Error(t('fs.nameRequired'))
+  if (/[<>:"/\\|?*]/.test(name)) throw new Error(t('fs.invalidChars'))
 }
 
 function resolveInsideWorkspace(workspaceRoot: string, targetPath: string): string {
   const absolutePath = resolve(workspaceRoot, targetPath)
   const rel = relative(workspaceRoot, absolutePath)
   if (rel.startsWith('..') || rel === '') {
-    throw new Error(`ワークスペース外のパスは許可されていません: ${targetPath}`)
+    throw new Error(t('fs.outsideWorkspace', { path: targetPath }))
   }
   return absolutePath
 }
@@ -78,7 +79,7 @@ export async function createFile(parentDir: string, name: string): Promise<strin
   validateName(name)
   const filePath = join(parentDir, name)
   if (await fileExists(filePath)) {
-    throw new Error('同じ名前のファイルが既に存在します')
+    throw new Error(t('fs.fileExists'))
   }
   await writeFile(filePath, '', 'utf-8')
   return filePath
@@ -88,7 +89,7 @@ export async function createDirectory(parentDir: string, name: string): Promise<
   validateName(name)
   const dirPath = join(parentDir, name)
   if (await fileExists(dirPath)) {
-    throw new Error('同じ名前のフォルダが既に存在します')
+    throw new Error(t('fs.folderExists'))
   }
   await mkdir(dirPath)
   return dirPath
@@ -100,7 +101,7 @@ export async function renamePath(targetPath: string, newName: string): Promise<s
   const newPath = join(parentDir, newName)
   if (newPath === targetPath) return targetPath
   if (await fileExists(newPath)) {
-    throw new Error('同じ名前の項目が既に存在します')
+    throw new Error(t('fs.itemExists'))
   }
   await rename(targetPath, newPath)
   return newPath
@@ -115,7 +116,7 @@ export async function movePath(sourcePath: string, destDir: string): Promise<str
   const destResolved = resolve(destDir)
   const destInfo = await stat(destResolved)
   if (!destInfo.isDirectory()) {
-    throw new Error('移動先はフォルダである必要があります')
+    throw new Error(t('fs.destMustBeFolder'))
   }
 
   const sourceNorm = normalizeComparePath(sourceResolved)
@@ -124,12 +125,12 @@ export async function movePath(sourcePath: string, destDir: string): Promise<str
 
   if (destNorm === parentNorm) return sourcePath
   if (destNorm === sourceNorm || destNorm.startsWith(`${sourceNorm}/`)) {
-    throw new Error('フォルダを自分自身またはその中には移動できません')
+    throw new Error(t('fs.cannotMoveIntoSelf'))
   }
 
   const newPath = join(destResolved, basename(sourceResolved))
   if (await fileExists(newPath)) {
-    throw new Error('同じ名前の項目が既に存在します')
+    throw new Error(t('fs.itemExists'))
   }
 
   await rename(sourceResolved, newPath)
@@ -191,10 +192,10 @@ export async function applyWorkspaceActions(
       if (await fileExists(targetPath)) {
         const info = await stat(targetPath)
         if (action.type === 'deleteFile' && info.isDirectory()) {
-          throw new Error(`ファイルではありません: ${action.path}`)
+          throw new Error(t('fs.notAFile', { path: action.path }))
         }
         if (action.type === 'deleteDir' && !info.isDirectory()) {
-          throw new Error(`フォルダではありません: ${action.path}`)
+          throw new Error(t('fs.notAFolder', { path: action.path }))
         }
         await deletePath(targetPath)
       }

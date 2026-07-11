@@ -1,6 +1,7 @@
 import { CODE_FENCE_REGEX } from './code-fence'
 import { getWorkspaceActionsLabel } from '@/utils/workspace-actions'
 import { detectMentionKind, isStructuredMention } from '@/utils/chat-mentions'
+import { t } from '../i18n/runtime'
 
 export interface ChatTextSegment {
   type: 'text'
@@ -47,10 +48,10 @@ function getCodeLabel(language: string, code: string): { label: string; meta: st
   const langLabel = language.split(':')[0] || 'code'
 
   if (filePath) {
-    return { label: filePath, meta: `${langLabel} · ${lines}行` }
+    return { label: filePath, meta: `${langLabel} · ${t('common.lines', { count: lines })}` }
   }
 
-  return { label: langLabel, meta: `${lines}行` }
+  return { label: langLabel, meta: t('common.lines', { count: lines }) }
 }
 
 export function parseChatSegments(content: string): ChatSegment[] {

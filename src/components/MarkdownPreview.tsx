@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import { marked } from 'marked'
+import { useI18n } from '@/i18n'
 
 marked.setOptions({
   gfm: true,
@@ -11,13 +12,14 @@ interface MarkdownPreviewProps {
 }
 
 export function MarkdownPreview({ content }: MarkdownPreviewProps) {
+  const { t } = useI18n()
   const html = useMemo(() => {
     try {
       return marked.parse(content) as string
     } catch {
-      return '<p>プレビューの生成に失敗しました</p>'
+      return t('markdown.previewFailed')
     }
-  }, [content])
+  }, [content, t])
 
   return (
     <div className="markdown-preview">
