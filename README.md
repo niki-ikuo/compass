@@ -2,6 +2,8 @@
 
 **English** | [日本語](README.ja.md)
 
+![Compass — AI code editor with Edit mode diff preview](docs/assets/screenshot.png)
+
 An AI code editor for Windows. Edit local code and work with AI to write and fix it.
 
 Open a folder → edit files → ask the AI → apply suggestions.

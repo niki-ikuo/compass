@@ -2,6 +2,8 @@
 
 [English](README.md) | **日本語**
 
+![Compass — Edit モードの差分プレビュー](docs/assets/screenshot.png)
+
 Windows 向けの AI コードエディタです。ローカルのコードを編集しながら、AI と対話して書く・直すことができます。
 
 フォルダを開く → ファイルを編集する → AI に質問する → 提案を適用する、という一連の流れをサポートします。
