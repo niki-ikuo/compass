@@ -1,9 +1,14 @@
-# Compass ドキュメント
+# Compass documentation
 
-プログラム開発・仕様確認に使うドキュメントです。利用者向けの概要やインストール手順はリポジトリルートの [README.md](../README.md) を参照してください。
+**English** | [日本語](ja/README.md)
 
-| ドキュメント | 内容 |
-|--------------|------|
-| [SPEC.md](./SPEC.md) | 製品仕様（MVP 範囲、画面構成、機能要件） |
-| [ARCHITECTURE.md](./ARCHITECTURE.md) | プロセス構成、IPC、ディレクトリ役割 |
-| [DEVELOPMENT.md](./DEVELOPMENT.md) | 開発環境、コマンド、実装時の注意点 |
+Developer docs for Compass. For product overview and install steps, see the root [README.md](../README.md).
+
+| Document | Contents |
+|----------|----------|
+| [SPEC.md](./SPEC.md) | Product spec (MVP scope, UI layout, requirements) |
+| [ARCHITECTURE.md](./ARCHITECTURE.md) | Process model, IPC, directory roles |
+| [DEVELOPMENT.md](./DEVELOPMENT.md) | Dev environment, commands, implementation notes |
+| [Contributing](../CONTRIBUTING.md) | How to contribute |
+
+English is the source of truth for these docs. Japanese translations live under [ja/](ja/README.md).

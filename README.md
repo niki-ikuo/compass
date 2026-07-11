@@ -1,23 +1,25 @@
 # Compass
 
-Windows 向けの AI コードエディタです。ローカルのコードを編集しながら、AI と対話して書く・直すことができます。
+**English** | [日本語](README.ja.md)
 
-フォルダを開く → ファイルを編集する → AI に質問する → 提案を適用する、という一連の流れをサポートします。
+An AI code editor for Windows. Edit local code and work with AI to write and fix it.
+
+Open a folder → edit files → ask the AI → apply suggestions.
 
 ## Features
 
-- Monaco Editor によるコード編集（シンタックスハイライト）
-- ワークスペース単位のファイルツリー
-- AI チャット（ストリーミング）— **Ask**（説明のみ）/ **Edit**（ファイル変更の提案 → プレビュー適用）
-- プロジェクト構造索引（`.compass/`）を AI コンテキストに利用
-- AI 提案の差分プレビューと適用
-- 統合ターミナル（xterm.js）
-- OpenAI 互換 API への接続設定（マルチ LLM: OpenAI / Gemini / DeepSeek / Groq / OpenRouter / Ollama / カスタム）
+- Monaco Editor with syntax highlighting
+- Workspace file tree
+- AI chat (streaming) — **Ask** (explain only) / **Edit** (propose file changes → preview & apply)
+- Project structure index (`.compass/`) for AI context
+- Diff preview and apply for AI suggestions
+- Integrated terminal (xterm.js)
+- OpenAI-compatible API settings (multi-LLM: OpenAI / Gemini / DeepSeek / Groq / OpenRouter / Ollama / custom)
 
 ## Requirements
 
-- Windows 10 / 11（x64）
-- [Node.js](https://nodejs.org/) 18 以上
+- Windows 10 / 11 (x64)
+- [Node.js](https://nodejs.org/) 18+
 - npm
 
 ## Installation
@@ -28,9 +30,9 @@ cd compass
 npm install
 ```
 
-`npm install` 時に Electron バイナリのセットアップが自動で実行されます。
+`npm install` runs Electron binary setup automatically.
 
-ネイティブモジュール（`node-pty`）のビルドに失敗する場合は、次を実行してください。
+If the native module (`node-pty`) fails to build:
 
 ```bash
 npm run rebuild-native
@@ -38,71 +40,77 @@ npm run rebuild-native
 
 ## Usage
 
-### 開発モードで起動
+### Development
 
 ```bash
 npm run dev
 ```
 
-### 本番ビルド
+### Production build
 
 ```bash
 npm run build
 ```
 
-### インストーラの作成
+### Installer
 
 ```bash
 npm run dist
 ```
 
-成果物は `release/` に出力されます（NSIS インストーラ）。
+Artifacts are written to `release/` (NSIS installer).
 
-### 初回セットアップ
+### First-time setup
 
-1. アプリを起動する
-2. **設定** で LLM プロバイダ・API Key・モデルを選ぶ
-3. **フォルダを開く** でワークスペースを選択する
-4. ファイルを編集し、サイドパネルの AI チャットで質問・提案の適用を行う
+1. Launch the app
+2. In **Settings**, choose an LLM provider, API key, and model
+3. **Open Folder** to select a workspace
+4. Edit files and use the side-panel AI chat to ask questions or apply suggestions
 
 ## Scripts
 
-| コマンド | 説明 |
-|----------|------|
-| `npm run dev` | 開発サーバー起動（electron-vite） |
-| `npm run build` | 本番用ビルド |
-| `npm run preview` | ビルド結果のプレビュー |
-| `npm run dist` | ビルド + NSIS インストーラ作成 |
-| `npm run rebuild-native` | `node-pty` のネイティブ再ビルド |
+| Command | Description |
+|---------|-------------|
+| `npm run dev` | Start the dev server (electron-vite) |
+| `npm run build` | Production build |
+| `npm run preview` | Preview the build |
+| `npm run dist` | Build + create NSIS installer |
+| `npm run rebuild-native` | Rebuild `node-pty` for Electron |
 
 ## Tech Stack
 
-- **Electron** — デスクトップシェル
+- **Electron** — desktop shell
 - **React** + **TypeScript** — UI
-- **Monaco Editor** — コードエディタ
-- **Zustand** — 状態管理
-- **electron-vite** — ビルド
-- **electron-builder** — パッケージング
+- **Monaco Editor** — code editor
+- **Zustand** — state management
+- **electron-vite** — build
+- **electron-builder** — packaging
 
 ## Project Structure
 
 ```
 compass/
-├── electron/       # メインプロセス・プリロード・サービス
-├── src/            # レンダラー（React UI）
-├── docs/           # 仕様・アーキテクチャなど開発ドキュメント
-├── scripts/        # セットアップスクリプト
-└── resources/      # アプリアイコンなど
+├── electron/       # Main process, preload, services
+├── src/            # Renderer (React UI)
+├── docs/           # Spec, architecture, development guides
+├── scripts/        # Setup scripts
+└── resources/      # App icons, etc.
 ```
 
 ## Documentation
 
-開発に必要な詳細情報は [`docs/`](docs/) を参照してください。
+- [Docs index](docs/README.md)
+- [Product spec](docs/SPEC.md)
+- [Architecture](docs/ARCHITECTURE.md)
+- [Development guide](docs/DEVELOPMENT.md)
+- [Contributing](CONTRIBUTING.md)
 
-- [ドキュメント一覧](docs/README.md)
-- [製品仕様](docs/SPEC.md)
-- [アーキテクチャ](docs/ARCHITECTURE.md)
-- [開発ガイド](docs/DEVELOPMENT.md)
+Japanese versions: [docs/ja/](docs/ja/README.md)
+
+## Contributing
+
+Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md).  
+Issues and PRs in **English** are preferred; Japanese is also fine.
 
 ## License
 

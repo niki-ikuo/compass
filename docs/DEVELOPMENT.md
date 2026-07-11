@@ -1,108 +1,115 @@
-# 開発ガイド
+# Development guide
 
-## 環境
+**English** | [日本語](ja/DEVELOPMENT.md)
 
-- Windows 10 / 11（x64）
-- Node.js 18 以上
+## Environment
+
+- Windows 10 / 11 (x64)
+- Node.js 18+
 - npm
-- Visual Studio Build Tools（`node-pty` のネイティブビルド用。未導入だと `rebuild-native` が失敗することがある）
+- Visual Studio Build Tools (for `node-pty` native builds; without them `rebuild-native` may fail)
 
-## セットアップ
+## Setup
 
 ```bash
 npm install
 ```
 
-`postinstall` で `scripts/setup-electron.js` が走り、Electron バイナリが無ければ取得します。
+`postinstall` runs `scripts/setup-electron.js` and fetches the Electron binary if missing.
 
-`node-pty` 周りでエラーが出る場合:
+If you hit `node-pty` errors:
 
 ```bash
 npm run rebuild-native
 ```
 
-## 日常の開発フロー
+## Day-to-day workflow
 
 ```bash
 npm run dev
 ```
 
-- メイン / プリロード / レンダラーは electron-vite が監視・ホットリロードします
-- UI 変更は主に `src/`
-- IPC・FS・AI・ターミナルは `electron/`
+- Main / preload / renderer are watched and hot-reloaded by electron-vite
+- UI changes: mostly `src/`
+- IPC, FS, AI, terminal: `electron/`
 
-### よく触る場所
+### Where to look
 
-| 変更したいこと | 見る場所 |
-|----------------|----------|
-| 画面レイアウト・パネル | `src/App.tsx`, `src/components/` |
-| アプリ状態 | `src/stores/app-store.ts` |
-| 共有型 | `src/types/index.ts` |
-| IPC 公開 API | `electron/preload.ts` |
-| IPC ハンドラ | `electron/main.ts` |
-| ファイル操作 | `electron/services/filesystem.ts` |
-| AI 通信 | `electron/services/ai-client.ts` |
-| LLM プロバイダ定義 | `src/utils/llm-providers.ts` |
-| 設定保存 | `electron/services/settings.ts` |
+| You want to change… | Look at |
+|---------------------|---------|
+| Layout / panels | `src/App.tsx`, `src/components/` |
+| App state | `src/stores/app-store.ts` |
+| Shared types | `src/types/index.ts` |
+| IPC public API | `electron/preload.ts` |
+| IPC handlers | `electron/main.ts` |
+| File ops | `electron/services/filesystem.ts` |
+| AI networking | `electron/services/ai-client.ts` |
+| LLM provider presets | `src/utils/llm-providers.ts` |
+| Settings persistence | `electron/services/settings.ts` |
+| UI strings / i18n | `src/i18n/` |
 
-## コマンド一覧
+## Commands
 
-| コマンド | 説明 |
-|----------|------|
-| `npm run dev` | 開発起動 |
-| `npm run build` | `out/` へ本番ビルド |
-| `npm run preview` | ビルド結果のプレビュー |
-| `npm run dist` | ビルド後に electron-builder（NSIS） |
-| `npm run rebuild-native` | `node-pty` を Electron 向けに再ビルド |
+| Command | Description |
+|---------|-------------|
+| `npm run dev` | Dev launch |
+| `npm run build` | Production build to `out/` |
+| `npm run preview` | Preview the build |
+| `npm run dist` | Build then electron-builder (NSIS) |
+| `npm run rebuild-native` | Rebuild `node-pty` for Electron |
 
-## パスエイリアス
+## Path alias
 
-レンダラーでは `@` → `src/` です（`electron.vite.config.ts`）。
+In the renderer, `@` → `src/` (`electron.vite.config.ts`).
 
 ```ts
 import { useAppStore } from '@/stores/app-store'
 ```
 
-## 実装上の注意
+## Implementation notes
 
-1. **特権処理は Main に置く**  
-   FS・ネットワーク・PTY・設定の永続化は Renderer から直接行わない。
+1. **Keep privileged work in Main**  
+   FS, network, PTY, and settings persistence must not run directly in the renderer.
 
-2. **IPC を追加するとき**  
-   `main.ts` の `ipcMain.handle` / `on` と `preload.ts` の `window.compass` をセットで更新する。型は `src/types` に寄せる。
+2. **When adding IPC**  
+   Update `ipcMain.handle` / `on` in `main.ts` and `window.compass` in `preload.ts` together. Prefer types in `src/types`.
 
-3. **AI ストリーミング**  
-   応答本体は invoke の戻り値ではなく、`ai:chunk` / `ai:done` / `ai:error` イベントで運ぶ。
+3. **AI streaming**  
+   Response body arrives via `ai:chunk` / `ai:done` / `ai:error` events, not as the invoke return value.
 
-4. **ワークスペース索引（`.compass/`）**  
-   フォルダオープン時に構造索引の構築・監視が走る。成果物はワークスペースの `.compass/`（`files.json` / `graph.json` 等）。関連は `project-indexer.ts` / `index-watcher.ts`。意味検索（RAG）ではない。
+4. **Workspace index (`.compass/`)**  
+   Opening a folder builds and watches a structure index under `.compass/` (`files.json`, `graph.json`, etc.). See `project-indexer.ts` / `index-watcher.ts`. Not semantic search (RAG).
 
 5. **Ask / Edit**  
-   Ask は説明のみ。Edit は `compass-actions` による変更提案＋ユーザー承認。コマンド実行や複数ステップの自律ループ（SPEC 上の「Agent 自律実行」）とは別。
+   Ask is explain-only. Edit proposes changes via `compass-actions` and requires user approval. Separate from an autonomous Agent tool loop (see SPEC).
 
-6. **マルチ LLM**  
-   OpenAI 互換エンドポイント前提。プロバイダ切替は `src/utils/llm-providers.ts` のプリセットを使う。API Key はプロバイダ別に暗号化保存される。Claude など非互換 API は OpenRouter 経由で利用する。
+6. **Multi-LLM**  
+   Assumes OpenAI-compatible endpoints. Provider presets live in `src/utils/llm-providers.ts`. API keys are encrypted per provider. Non-compatible APIs (e.g. Claude) go through OpenRouter.
 
-6. **文字コード**  
-   読み書きは encoding サービス経由。UI 側の補助は `src/utils/file-encoding.ts`。
+7. **Encoding**  
+   Read/write goes through the encoding service. UI helpers: `src/utils/file-encoding.ts`.
 
-## デバッグ
+8. **i18n**  
+   UI locales are `ja` (default) and `en` under `src/i18n/`. Docs: English at `docs/`, Japanese at `docs/ja/`.
 
-- メニューまたはショートカットから DevTools を開ける（`shell:view` の `toggleDevTools`）
-- Main プロセスのログは起動ターミナル側に出る
-- Renderer のログは DevTools Console
+## Debugging
 
-## 配布前チェック
+- Open DevTools from the menu or shortcut (`shell:view` → `toggleDevTools`)
+- Main process logs go to the launch terminal
+- Renderer logs go to the DevTools Console
+
+## Pre-release checks
 
 ```bash
 npm run build
 npm run dist
 ```
 
-- 出力先: `release/`
-- Windows ターゲット: NSIS（`package.json` の `build` 設定）
+- Output: `release/`
+- Windows target: NSIS (`build` in `package.json`)
 
-## 関連ドキュメント
+## Related docs
 
-- [製品仕様](./SPEC.md)
-- [アーキテクチャ](./ARCHITECTURE.md)
+- [Product spec](./SPEC.md)
+- [Architecture](./ARCHITECTURE.md)
+- [Contributing](../CONTRIBUTING.md)
