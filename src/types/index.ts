@@ -1,4 +1,4 @@
-import type { LocaleId } from '../i18n/types'
+import { DEFAULT_LOCALE, type LocaleId } from '../i18n/types'
 export type { LocaleId } from '../i18n/types'
 
 export type FileEncoding =
@@ -381,5 +381,5 @@ export const DEFAULT_SETTINGS: AppSettings = {
   temperature: 0.2,
   maxTokens: 4096,
   colorTheme: 'dark',
-  locale: 'ja'
+  locale: DEFAULT_LOCALE
 }

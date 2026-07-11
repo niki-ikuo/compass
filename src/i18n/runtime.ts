@@ -41,8 +41,8 @@ function interpolate(template: string, params?: Params): string {
 }
 
 export function t(key: MessageKey, params?: Params, locale: LocaleId = currentLocale): string {
-  const dict = messages[locale] ?? messages.ja
-  const fallback = messages.ja
+  const dict = messages[locale] ?? messages[DEFAULT_LOCALE]
+  const fallback = messages[DEFAULT_LOCALE]
   return interpolate(dict[key] ?? fallback[key] ?? key, params)
 }
 

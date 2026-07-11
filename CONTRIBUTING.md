@@ -32,7 +32,7 @@ If `node-pty` fails to build, run `npm run rebuild-native` (Visual Studio Build 
 |------|------|
 | UI | `src/` |
 | Main process / IPC | `electron/` |
-| UI i18n | `src/i18n/` (`ja` default, `en`) |
+| UI i18n | `src/i18n/` (`en` default, `ja`) |
 | Docs (EN) | `docs/` |
 | Docs (JA) | `docs/ja/` |
 

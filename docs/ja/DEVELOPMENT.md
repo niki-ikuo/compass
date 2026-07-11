@@ -90,7 +90,7 @@ import { useAppStore } from '@/stores/app-store'
    読み書きは encoding サービス経由。UI 側の補助は `src/utils/file-encoding.ts`。
 
 8. **i18n**  
-   UI のロケールは `ja`（デフォルト）と `en`（`src/i18n/`）。ドキュメントは英語が `docs/`、日本語が `docs/ja/`。
+   UI のロケールは `en`（デフォルト）と `ja`（`src/i18n/`）。ドキュメントは英語が `docs/`、日本語が `docs/ja/`。
 
 ## デバッグ
 

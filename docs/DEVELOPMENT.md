@@ -90,7 +90,7 @@ import { useAppStore } from '@/stores/app-store'
    Read/write goes through the encoding service. UI helpers: `src/utils/file-encoding.ts`.
 
 8. **i18n**  
-   UI locales are `ja` (default) and `en` under `src/i18n/`. Docs: English at `docs/`, Japanese at `docs/ja/`.
+   UI locales are `en` (default) and `ja` under `src/i18n/`. Docs: English at `docs/`, Japanese at `docs/ja/`.
 
 ## Debugging
 

@@ -11,7 +11,7 @@ export const LOCALE_OPTIONS: LocaleOption[] = [
   { id: 'en', nativeLabel: 'English' }
 ]
 
-export const DEFAULT_LOCALE: LocaleId = 'ja'
+export const DEFAULT_LOCALE: LocaleId = 'en'
 
 export function isLocaleId(value: unknown): value is LocaleId {
   return value === 'ja' || value === 'en'
