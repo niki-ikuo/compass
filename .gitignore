@@ -3,5 +3,6 @@ dist
 out
 release
 *.log
+*.tsbuildinfo
 .DS_Store
 Thumbs.db
