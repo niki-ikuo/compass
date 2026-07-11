@@ -1,0 +1,55 @@
+{
+  "name": "compass",
+  "version": "0.1.0",
+  "description": "AI-powered code editor for Windows",
+  "main": "./out/main/index.js",
+  "scripts": {
+    "postinstall": "node scripts/setup-electron.js",
+    "rebuild-native": "electron-rebuild -f -w node-pty",
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "preview": "electron-vite preview",
+    "dist": "npm run build && electron-builder"
+  },
+  "dependencies": {
+    "@monaco-editor/react": "^4.7.0",
+    "@xterm/addon-fit": "^0.11.0",
+    "@xterm/xterm": "^6.0.0",
+    "iconv-lite": "^0.7.3",
+    "marked": "^18.0.5",
+    "monaco-editor": "^0.52.2",
+    "node-pty": "^1.1.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "zustand": "^5.0.3"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.1",
+    "@types/react": "^19.0.10",
+    "@types/react-dom": "^19.0.4",
+    "@vitejs/plugin-react": "^4.3.4",
+    "electron": "^34.5.8",
+    "electron-builder": "^25.1.8",
+    "electron-rebuild": "^3.2.9",
+    "electron-vite": "^3.0.0",
+    "typescript": "^5.8.2",
+    "vite": "^6.2.0"
+  },
+  "build": {
+    "appId": "com.compass.editor",
+    "productName": "Compass",
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "win": {
+      "target": "nsis",
+      "icon": "build/icon.ico",
+      "signAndEditExecutable": false
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  }
+}

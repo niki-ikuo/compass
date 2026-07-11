@@ -1,0 +1,109 @@
+# Compass
+
+Windows 向けの AI コードエディタです。ローカルのコードを編集しながら、AI と対話して書く・直すことができます。
+
+フォルダを開く → ファイルを編集する → AI に質問する → 提案を適用する、という一連の流れをサポートします。
+
+## Features
+
+- Monaco Editor によるコード編集（シンタックスハイライト）
+- ワークスペース単位のファイルツリー
+- AI チャット（ストリーミング）— **Ask**（説明のみ）/ **Edit**（ファイル変更の提案 → プレビュー適用）
+- プロジェクト構造索引（`.compass/`）を AI コンテキストに利用
+- AI 提案の差分プレビューと適用
+- 統合ターミナル（xterm.js）
+- OpenAI 互換 API への接続設定
+
+## Requirements
+
+- Windows 10 / 11（x64）
+- [Node.js](https://nodejs.org/) 18 以上
+- npm
+
+## Installation
+
+```bash
+git clone https://github.com/<your-org>/compass.git
+cd compass
+npm install
+```
+
+`npm install` 時に Electron バイナリのセットアップが自動で実行されます。
+
+ネイティブモジュール（`node-pty`）のビルドに失敗する場合は、次を実行してください。
+
+```bash
+npm run rebuild-native
+```
+
+## Usage
+
+### 開発モードで起動
+
+```bash
+npm run dev
+```
+
+### 本番ビルド
+
+```bash
+npm run build
+```
+
+### インストーラの作成
+
+```bash
+npm run dist
+```
+
+成果物は `release/` に出力されます（NSIS インストーラ）。
+
+### 初回セットアップ
+
+1. アプリを起動する
+2. **設定** で API Base URL と API Key を入力する
+3. **フォルダを開く** でワークスペースを選択する
+4. ファイルを編集し、サイドパネルの AI チャットで質問・提案の適用を行う
+
+## Scripts
+
+| コマンド | 説明 |
+|----------|------|
+| `npm run dev` | 開発サーバー起動（electron-vite） |
+| `npm run build` | 本番用ビルド |
+| `npm run preview` | ビルド結果のプレビュー |
+| `npm run dist` | ビルド + NSIS インストーラ作成 |
+| `npm run rebuild-native` | `node-pty` のネイティブ再ビルド |
+
+## Tech Stack
+
+- **Electron** — デスクトップシェル
+- **React** + **TypeScript** — UI
+- **Monaco Editor** — コードエディタ
+- **Zustand** — 状態管理
+- **electron-vite** — ビルド
+- **electron-builder** — パッケージング
+
+## Project Structure
+
+```
+compass/
+├── electron/       # メインプロセス・プリロード・サービス
+├── src/            # レンダラー（React UI）
+├── docs/           # 仕様・アーキテクチャなど開発ドキュメント
+├── scripts/        # セットアップスクリプト
+└── resources/      # アプリアイコンなど
+```
+
+## Documentation
+
+開発に必要な詳細情報は [`docs/`](docs/) を参照してください。
+
+- [ドキュメント一覧](docs/README.md)
+- [製品仕様](docs/SPEC.md)
+- [アーキテクチャ](docs/ARCHITECTURE.md)
+- [開発ガイド](docs/DEVELOPMENT.md)
+
+## License
+
+Private / Unpublished
