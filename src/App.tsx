@@ -10,6 +10,7 @@ import { MenuBar } from './components/MenuBar'
 import { EditorCenter } from './components/EditorCenter'
 import { buildWorkspaceIndex } from '@/utils/project-index'
 import { applyColorTheme } from '@/utils/color-theme'
+import { getLlmProvider } from '@/utils/llm-providers'
 
 export function App() {
   const showFileTree = useAppStore((s) => s.showFileTree)
@@ -98,7 +99,10 @@ export function App() {
       const settings = await window.compass.settings.get()
       setSettings(settings)
       applyColorTheme(settings.colorTheme)
-      setApiConnected(settings.apiKey ? true : null)
+      const provider = getLlmProvider(settings.providerId)
+      setApiConnected(
+        provider.requiresApiKey ? (settings.apiKey ? true : null) : true
+      )
 
       const lastWorkspace = await window.compass.workspace.getLast()
       if (!lastWorkspace) return

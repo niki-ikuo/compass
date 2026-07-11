@@ -33,6 +33,7 @@ import {
   toChatSelectionRef
 } from '@/utils/chat-selection-drag'
 import { buildWorkspaceIndex, ensureWorkspaceIndex } from '@/utils/project-index'
+import { getLlmProvider, getModelOptions } from '@/utils/llm-providers'
 
 function formatContextLabel(path: string, workspaceRoot: string | null): string {
   if (!workspaceRoot) return path
@@ -106,6 +107,9 @@ export function ChatPanel() {
   const deleteChatSession = useAppStore((s) => s.deleteChatSession)
   const chatComposerInsertRequest = useAppStore((s) => s.chatComposerInsertRequest)
   const clearChatComposerInsertRequest = useAppStore((s) => s.clearChatComposerInsertRequest)
+  const settings = useAppStore((s) => s.settings)
+  const setSettings = useAppStore((s) => s.setSettings)
+  const setApiConnected = useAppStore((s) => s.setApiConnected)
 
   const openChatSessions = chatSessions.filter((session) => session.isOpen)
   const historySessions = [...chatSessions]
@@ -497,12 +501,49 @@ export function ChatPanel() {
   }
 
   const activeFile = getActiveFile()
+  const provider = getLlmProvider(settings.providerId)
+  const modelOptions = getModelOptions(settings.providerId, settings.model)
+
+  const handleModelChange = async (model: string): Promise<void> => {
+    const next = {
+      ...settings,
+      model,
+      providerKeys: {
+        ...settings.providerKeys,
+        [settings.providerId]: settings.apiKey
+      }
+    }
+    setSettings(next)
+    try {
+      await window.compass.settings.set(next)
+      setApiConnected(
+        getLlmProvider(next.providerId).requiresApiKey ? (next.apiKey ? true : null) : true
+      )
+    } catch {
+      // ストアは更新済み。永続化失敗時は次回起動で戻る
+    }
+  }
 
   return (
     <div className="chat-panel">
       <div className="panel-header chat-panel-header">
         <span>AI チャット</span>
         <div className="chat-header-actions">
+          <label className="chat-model-select" title={`${provider.label} のモデル`}>
+            <span className="chat-model-select-label">{provider.label}</span>
+            <select
+              value={settings.model}
+              onChange={(e) => void handleModelChange(e.target.value)}
+              disabled={isChatLoading}
+              aria-label="LLMモデル"
+            >
+              {modelOptions.map((model) => (
+                <option key={model} value={model}>
+                  {model}
+                </option>
+              ))}
+            </select>
+          </label>
           <div className="chat-history-menu" ref={historyRef}>
             <button
               ref={historyButtonRef}

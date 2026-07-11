@@ -920,8 +920,40 @@ body:has(.monaco-editor .find-widget.visible) .workbench-hover-container .action
 
 .chat-header-actions {
   display: flex;
-  gap: 4px;
+  align-items: center;
+  gap: 6px;
   position: relative;
+  min-width: 0;
+}
+
+.chat-model-select {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: min(220px, 48vw);
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.chat-model-select-label {
+  flex-shrink: 0;
+  max-width: 72px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-model-select select {
+  min-width: 0;
+  flex: 1;
+  max-width: 100%;
+  padding: 2px 6px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 11px;
 }
 
 .chat-history-menu {
@@ -2039,6 +2071,13 @@ body:has(.monaco-editor .find-widget.visible) .workbench-hover-container .action
   background: var(--bg-hover);
 }
 
+.status-llm {
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .status-right {
   margin-left: auto;
 }
@@ -2063,6 +2102,10 @@ body:has(.monaco-editor .find-widget.visible) .workbench-hover-container .action
   box-shadow: 0 8px 32px var(--shadow);
 }
 
+.modal.modal-wide {
+  width: 540px;
+}
+
 .modal-header {
   display: flex;
   align-items: center;
@@ -2081,6 +2124,8 @@ body:has(.monaco-editor .find-widget.visible) .workbench-hover-container .action
   display: flex;
   flex-direction: column;
   gap: 16px;
+  max-height: min(70vh, 640px);
+  overflow-y: auto;
 }
 
 .modal-body label {
@@ -2105,6 +2150,17 @@ body:has(.monaco-editor .find-widget.visible) .workbench-hover-container .action
 .modal-body select:focus {
   outline: none;
   border-color: var(--accent);
+}
+
+.modal-body input.input-readonly {
+  opacity: 0.75;
+  cursor: default;
+}
+
+.field-hint {
+  font-size: 11px;
+  color: var(--text-secondary);
+  line-height: 1.4;
 }
 
 .modal-section-title {

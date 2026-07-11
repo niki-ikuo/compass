@@ -3,6 +3,7 @@ import type { ChatRequest } from '../../src/types'
 import { getSettings } from './settings'
 import { ensureProjectIndex, getProjectIndexContext } from './project-indexer'
 import { resolveChatContext } from './filesystem'
+import { getLlmProvider } from '../../src/utils/llm-providers'
 
 const EDIT_SYSTEM_PROMPT =
   'あなたはコーディングアシスタントです。日本語で回答してください。Editモードでは、ファイル/フォルダの作成・変更・削除は必ず```compass-actions```コードブロック内のJSONだけで返してください。通常の```css```や```html```などのコードブロックでファイル全体を提示してはいけません。説明文は短くし、実際の変更内容はcompass-actionsに含めてください。形式は {"actions":[{"type":"mkdir","path":"relative/path"},{"type":"writeFile","path":"relative/file.ts","content":"..."},{"type":"deleteFile","path":"relative/file.ts"},{"type":"deleteDir","path":"relative/folder"}]} とし、pathはワークスペース直下からの相対パス（例: style.css。フォルダ名を重複して含めない）のみ使用してください。プロジェクト構造インデックス(.compass)が提供された場合は、ファイル間の関係を踏まえて回答してください。'
@@ -155,8 +156,17 @@ export async function streamChat(
       return
     }
 
-    if (!settings.apiKey) {
-      webContents.send('ai:error', 'APIキーが設定されていません。設定画面から入力してください。')
+    const provider = getLlmProvider(settings.providerId)
+    if (provider.requiresApiKey && !settings.apiKey) {
+      webContents.send(
+        'ai:error',
+        `${provider.label} の APIキーが設定されていません。設定画面から入力してください。`
+      )
+      return
+    }
+
+    if (!settings.apiBaseUrl.trim()) {
+      webContents.send('ai:error', 'API Base URL が設定されていません。設定画面から入力してください。')
       return
     }
 
@@ -177,13 +187,21 @@ export async function streamChat(
     }
 
     const url = `${settings.apiBaseUrl.replace(/\/$/, '')}/chat/completions`
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json'
+    }
+    if (settings.apiKey) {
+      headers.Authorization = `Bearer ${settings.apiKey}`
+    }
+    // OpenRouter 推奨ヘッダ（未設定でも動作するが、ランキング表示などに利用される）
+    if (settings.providerId === 'openrouter') {
+      headers['HTTP-Referer'] = 'https://github.com/compass-editor'
+      headers['X-Title'] = 'Compass'
+    }
 
     const response = await fetch(url, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${settings.apiKey}`
-      },
+      headers,
       body: JSON.stringify({
         model: settings.model,
         messages: apiMessages,

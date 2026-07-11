@@ -94,9 +94,23 @@ export interface ChatSession {
 
 export type ColorThemeId = 'dark' | 'light' | 'midnight' | 'high-contrast'
 
+export type LlmProviderId =
+  | 'openai'
+  | 'google'
+  | 'deepseek'
+  | 'groq'
+  | 'openrouter'
+  | 'ollama'
+  | 'custom'
+
 export interface AppSettings {
+  /** 選択中の LLM プロバイダ */
+  providerId: LlmProviderId
   apiBaseUrl: string
+  /** 現在のプロバイダ向け API Key */
   apiKey: string
+  /** プロバイダごとの API Key（切替時に復元） */
+  providerKeys: Partial<Record<LlmProviderId, string>>
   model: string
   temperature: number
   maxTokens: number
@@ -354,8 +368,10 @@ declare global {
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
+  providerId: 'openai',
   apiBaseUrl: 'https://api.openai.com/v1',
   apiKey: '',
+  providerKeys: {},
   model: 'gpt-4o-mini',
   temperature: 0.2,
   maxTokens: 4096,

@@ -3,6 +3,7 @@ import { useAppStore } from '@/stores/app-store'
 import { getFileName, getLanguageFromPath } from '@/utils/language'
 import { FILE_ENCODINGS, getEncodingLabel } from '@/utils/file-encoding'
 import { buildWorkspaceIndex } from '@/utils/project-index'
+import { getLlmProvider } from '@/utils/llm-providers'
 import type { FileEncoding } from '@/types'
 
 export function StatusBar() {
@@ -23,6 +24,7 @@ export function StatusBar() {
   const activeFile = openFiles.find((f) => f.path === activeFilePath) ?? null
   const language = activeFilePath ? getLanguageFromPath(activeFilePath) : ''
   const encodingLabel = activeFile ? getEncodingLabel(activeFile.encoding) : ''
+  const provider = getLlmProvider(settings.providerId)
 
   useEffect(() => {
     if (!menuOpen) return
@@ -36,7 +38,7 @@ export function StatusBar() {
   }, [menuOpen])
 
   const connectionStatus = () => {
-    if (!settings.apiKey) return 'API未設定'
+    if (provider.requiresApiKey && !settings.apiKey) return 'API未設定'
     if (apiConnected === true) return '接続済み'
     return '待機中'
   }
@@ -144,6 +146,12 @@ export function StatusBar() {
           {indexLabel}
         </button>
       )}
+      <span
+        className="status-item status-llm"
+        title={`${provider.label} / ${settings.model}`}
+      >
+        {provider.label}: {settings.model}
+      </span>
       <span className="status-item status-right">{connectionStatus()}</span>
     </div>
   )

@@ -42,6 +42,7 @@ npm run dev
 | IPC ハンドラ | `electron/main.ts` |
 | ファイル操作 | `electron/services/filesystem.ts` |
 | AI 通信 | `electron/services/ai-client.ts` |
+| LLM プロバイダ定義 | `src/utils/llm-providers.ts` |
 | 設定保存 | `electron/services/settings.ts` |
 
 ## コマンド一覧
@@ -78,6 +79,9 @@ import { useAppStore } from '@/stores/app-store'
 
 5. **Ask / Edit**  
    Ask は説明のみ。Edit は `compass-actions` による変更提案＋ユーザー承認。コマンド実行や複数ステップの自律ループ（SPEC 上の「Agent 自律実行」）とは別。
+
+6. **マルチ LLM**  
+   OpenAI 互換エンドポイント前提。プロバイダ切替は `src/utils/llm-providers.ts` のプリセットを使う。API Key はプロバイダ別に暗号化保存される。Claude など非互換 API は OpenRouter 経由で利用する。
 
 6. **文字コード**  
    読み書きは encoding サービス経由。UI 側の補助は `src/utils/file-encoding.ts`。

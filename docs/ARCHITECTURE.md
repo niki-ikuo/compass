@@ -87,6 +87,19 @@ Renderer からは `window.compass.*` を呼び出します。実装の正は `e
 
 チャット時に関連部分をコンテキストへ載せる。埋め込みベクトルによる RAG 検索ではない。
 
+## マルチ LLM
+
+設定の `providerId` で OpenAI 互換プロバイダを切り替える（`src/utils/llm-providers.ts`）。
+
+| 項目 | 内容 |
+|------|------|
+| プリセット | OpenAI / Google Gemini / DeepSeek / Groq / OpenRouter / Ollama / カスタム |
+| API Key | プロバイダ別に暗号化保存し、切替時に復元 |
+| モデル | 設定画面またはチャットヘッダから切替（自由入力可） |
+| 通信 | Main の `ai-client` が `/chat/completions` SSE で接続 |
+
+Claude など OpenAI 非互換のネイティブ API は未対応。OpenRouter 経由で利用する。
+
 ## セキュリティ方針
 
 - API キーは Renderer から直接外部 API を叩かない（Main 経由）
