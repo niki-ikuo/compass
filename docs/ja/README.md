@@ -10,5 +10,6 @@
 | [ARCHITECTURE.md](./ARCHITECTURE.md) | プロセス構成、IPC、ディレクトリ役割 |
 | [DEVELOPMENT.md](./DEVELOPMENT.md) | 開発環境、コマンド、実装時の注意点 |
 | [Contributing](../../CONTRIBUTING.ja.md) | コントリビューション案内（英語版: [CONTRIBUTING.md](../../CONTRIBUTING.md)） |
+| [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md) | 行動規範（英語版: [CODE_OF_CONDUCT.md](../../CODE_OF_CONDUCT.md)） |
 
 英語版（正本）は [docs/](../README.md) にあります。

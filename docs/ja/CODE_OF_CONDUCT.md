@@ -1,6 +1,6 @@
 # コントリビューター行動規範
 
-[English](CODE_OF_CONDUCT.md) | **日本語**
+[English](../../CODE_OF_CONDUCT.md) | **日本語**
 
 ## 私たちの約束
 

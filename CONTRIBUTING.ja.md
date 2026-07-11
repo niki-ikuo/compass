@@ -49,4 +49,4 @@ npm run dev
 
 敬意を持ち、建設的であること。善意を前提とし、明確で実行可能なフィードバックを好みます。
 
-詳細は [CODE_OF_CONDUCT.ja.md](CODE_OF_CONDUCT.ja.md)（英語版: [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)）を参照してください。
+詳細は [docs/ja/CODE_OF_CONDUCT.md](docs/ja/CODE_OF_CONDUCT.md)（英語版: [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)）を参照してください。

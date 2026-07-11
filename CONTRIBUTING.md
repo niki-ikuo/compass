@@ -49,4 +49,4 @@ If `node-pty` fails to build, run `npm run rebuild-native` (Visual Studio Build 
 
 Be respectful and constructive. We assume good intent and prefer clear, actionable feedback.
 
-See [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) ([日本語](CODE_OF_CONDUCT.ja.md)) for the full policy.
+See [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) ([日本語](docs/ja/CODE_OF_CONDUCT.md)) for the full policy.

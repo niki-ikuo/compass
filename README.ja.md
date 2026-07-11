@@ -112,7 +112,7 @@ compass/
 コントリビューション歓迎です。[CONTRIBUTING.ja.md](CONTRIBUTING.ja.md) を参照してください。  
 Issue / PR は **英語** を推奨しますが、日本語でも問題ありません。
 
-[行動規範](CODE_OF_CONDUCT.ja.md)（英語版: [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)）に従ってください。
+[行動規範](docs/ja/CODE_OF_CONDUCT.md)（英語版: [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)）に従ってください。
 
 ## License
 

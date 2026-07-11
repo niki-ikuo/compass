@@ -1,6 +1,6 @@
 # Contributor Covenant Code of Conduct
 
-**English** | [日本語](CODE_OF_CONDUCT.ja.md)
+**English** | [日本語](docs/ja/CODE_OF_CONDUCT.md)
 
 ## Our Pledge
 
