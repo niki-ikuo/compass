@@ -39,6 +39,7 @@
   "build": {
     "appId": "com.compass.editor",
     "productName": "Compass",
+    "npmRebuild": false,
     "directories": {
       "output": "release",
       "buildResources": "build"
