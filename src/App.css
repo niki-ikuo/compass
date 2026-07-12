@@ -918,12 +918,18 @@ body:has(.monaco-editor .find-widget.visible) .workbench-hover-container .action
   gap: 8px;
 }
 
+.chat-panel-header > span {
+  flex-shrink: 0;
+}
+
 .chat-header-actions {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 6px;
   position: relative;
   min-width: 0;
+  flex: 1;
 }
 
 .chat-model-select {
@@ -931,22 +937,23 @@ body:has(.monaco-editor .find-widget.visible) .workbench-hover-container .action
   align-items: center;
   gap: 6px;
   min-width: 0;
-  max-width: min(220px, 48vw);
+  flex: 1;
+  max-width: 100%;
   font-size: 11px;
   color: var(--text-secondary);
 }
 
 .chat-model-select-label {
-  flex-shrink: 0;
-  max-width: 72px;
+  flex: 0 1 auto;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .chat-model-select select {
-  min-width: 0;
-  flex: 1;
+  min-width: 4.5em;
+  flex: 1 1 0;
   max-width: 100%;
   padding: 2px 6px;
   border: 1px solid var(--border);
@@ -958,6 +965,7 @@ body:has(.monaco-editor .find-widget.visible) .workbench-hover-container .action
 
 .chat-history-menu {
   position: relative;
+  flex-shrink: 0;
 }
 
 .chat-history-dropdown {
