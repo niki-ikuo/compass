@@ -15,6 +15,8 @@ import {
   serializeFileMovePaths
 } from '@/utils/file-move-drag'
 import { useI18n } from '@/i18n'
+import { ConfirmDialog } from './ConfirmDialog'
+import { restoreWorkbenchFocus } from '@/utils/workbench-focus'
 
 type InputMode = 'create-file' | 'create-folder' | 'rename'
 
@@ -348,6 +350,7 @@ export function FileTree() {
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
   const [inlineInput, setInlineInput] = useState<InlineInputState | null>(null)
   const [renamingPath, setRenamingPath] = useState<string | null>(null)
+  const [pendingDeleteTargets, setPendingDeleteTargets] = useState<FileTreeNode[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [expandedDirs, setExpandedDirs] = useState<Set<string>>(() => new Set())
   const [selectedPaths, setSelectedPaths] = useState<Set<string>>(() => new Set())
@@ -501,51 +504,57 @@ export function FileTree() {
     [selectedPaths, visibleNodes]
   )
 
-  const handleDelete = useCallback(
-    async (contextNode: FileTreeNode | null) => {
+  const requestDelete = useCallback(
+    (contextNode: FileTreeNode | null) => {
       setContextMenu(null)
       const targets = getDeleteTargets(contextNode)
       if (targets.length === 0) return
+      setPendingDeleteTargets(targets)
+    },
+    [getDeleteTargets]
+  )
 
-      const target = targets[0]
-      const message =
-        targets.length === 1
-          ? t('explorer.deleteConfirmOne', {
-              name: target.name,
-              kind: target.isDirectory ? t('common.folder') : t('common.file')
-            })
-          : t('explorer.deleteConfirmMany', { count: targets.length })
+  const cancelPendingDelete = useCallback(() => {
+    setPendingDeleteTargets(null)
+    restoreWorkbenchFocus()
+  }, [])
 
-      if (!window.confirm(message)) return
+  const confirmPendingDelete = useCallback(async () => {
+    const targets = pendingDeleteTargets
+    setPendingDeleteTargets(null)
+    if (!targets || targets.length === 0) {
+      restoreWorkbenchFocus()
+      return
+    }
 
-      try {
+    try {
+      for (const target of targets) {
+        await window.compass.fs.delete(target.path)
+        removePaths(target.path)
+      }
+      setSelectedPaths(new Set())
+      lastSelectedPathRef.current = null
+      setExpandedDirs((prev) => {
+        const next = new Set(prev)
         for (const target of targets) {
-          await window.compass.fs.delete(target.path)
-          removePaths(target.path)
-        }
-        setSelectedPaths(new Set())
-        lastSelectedPathRef.current = null
-        setExpandedDirs((prev) => {
-          const next = new Set(prev)
-          for (const target of targets) {
-            const normalized = normalizeNodePath(target.path)
-            for (const path of [...next]) {
-              if (path === normalized || path.startsWith(`${normalized}/`)) {
-                next.delete(path)
-              }
+          const normalized = normalizeNodePath(target.path)
+          for (const path of [...next]) {
+            if (path === normalized || path.startsWith(`${normalized}/`)) {
+              next.delete(path)
             }
           }
-          return next
-        })
-        await refreshTree()
-        setError(null)
-      } catch (err) {
-        setError(err instanceof Error ? err.message : t('explorer.deleteFailed'))
-        await refreshTree()
-      }
-    },
-    [getDeleteTargets, removePaths, refreshTree, t]
-  )
+        }
+        return next
+      })
+      await refreshTree()
+      setError(null)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t('explorer.deleteFailed'))
+      await refreshTree()
+    } finally {
+      restoreWorkbenchFocus()
+    }
+  }, [pendingDeleteTargets, removePaths, refreshTree, t])
 
   const handleNodeDragStart = useCallback(
     (e: React.DragEvent, node: FileTreeNode) => {
@@ -722,17 +731,17 @@ export function FileTree() {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key !== 'Delete' || selectedPaths.size === 0) return
+      if (e.key !== 'Delete' || selectedPaths.size === 0 || pendingDeleteTargets) return
       const target = e.target as HTMLElement
       if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
         return
       }
       e.preventDefault()
-      void handleDelete(null)
+      requestDelete(null)
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [selectedPaths, handleDelete])
+  }, [selectedPaths, requestDelete, pendingDeleteTargets])
 
   if (!workspaceRoot) {
     return (
@@ -871,7 +880,7 @@ export function FileTree() {
                 </button>
               )}
               {canDelete && (
-                <button className="danger" onClick={() => void handleDelete(contextMenu.node)}>
+                <button className="danger" onClick={() => requestDelete(contextMenu.node)}>
                   {deleteTargets.length > 1
                     ? t('explorer.deleteMany', { count: deleteTargets.length })
                     : t('common.delete')}
@@ -881,6 +890,25 @@ export function FileTree() {
           )}
         </div>
       )}
+
+      <ConfirmDialog
+        open={pendingDeleteTargets !== null && pendingDeleteTargets.length > 0}
+        title={t('common.delete')}
+        message={
+          pendingDeleteTargets && pendingDeleteTargets.length === 1
+            ? t('explorer.deleteConfirmOne', {
+                name: pendingDeleteTargets[0].name,
+                kind: pendingDeleteTargets[0].isDirectory ? t('common.folder') : t('common.file')
+              })
+            : t('explorer.deleteConfirmMany', {
+                count: pendingDeleteTargets?.length ?? 0
+              })
+        }
+        confirmLabel={t('common.delete')}
+        danger
+        onConfirm={() => void confirmPendingDelete()}
+        onCancel={cancelPendingDelete}
+      />
     </div>
   )
 }

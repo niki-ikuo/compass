@@ -77,9 +77,23 @@ function encodeTerminalKey(event: KeyboardEvent): string | null {
 
 function shouldIgnoreTerminalKeyTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false
+  if (target.isContentEditable || Boolean(target.closest('[contenteditable="true"]'))) {
+    return true
+  }
   return Boolean(
     target.closest(
-      '.chat-input, .chat-panel textarea, .modal, .modal-body input, .file-tree input, .search-panel input, .terminal-tab, .terminal-shell-select, .menu-bar'
+      [
+        '.monaco-editor',
+        '.chat-input',
+        '.chat-panel textarea',
+        '.modal',
+        '.modal-body input',
+        '.file-tree',
+        '.search-panel',
+        '.terminal-tab',
+        '.terminal-shell-select',
+        '.menu-bar'
+      ].join(', ')
     )
   )
 }
@@ -349,9 +363,12 @@ function TerminalInstance({
         inputArmedRef.current = true
         return
       }
-      if (target instanceof HTMLElement && target.closest('.monaco-editor, .chat-panel')) {
-        inputArmedRef.current = false
+      // Keep arming when interacting with terminal chrome (tabs, shell select, etc.).
+      if (target instanceof HTMLElement && target.closest('.terminal-panel')) {
+        return
       }
+      // Any click outside the terminal panel yields input to the rest of the UI.
+      inputArmedRef.current = false
     }
 
     /**
@@ -649,7 +666,7 @@ export function TerminalPanel() {
             tabId={tab.id}
             shellId={tab.shellId}
             cwd={workspaceRoot}
-            active={activeTabId === tab.id}
+            active={showTerminal && activeTabId === tab.id}
             focusToken={focusToken}
             onTitle={(title) => updateTabTitle(tab.id, title)}
             onExited={() => closeTab(tab.id, { hidePanelWhenEmpty: true })}
