@@ -8,6 +8,12 @@ An AI code editor for Windows. Edit local code and work with AI to write and fix
 
 Open a folder → edit files → ask the AI → apply suggestions.
 
+## Download
+
+[Download for Windows (latest)](https://github.com/niki-ikuo/compass/releases/latest)
+
+Installer: `Compass Setup x.y.z.exe` (Windows 10/11 x64)
+
 ## Features
 
 - Monaco Editor with syntax highlighting
@@ -27,7 +33,7 @@ Open a folder → edit files → ask the AI → apply suggestions.
 ## Installation
 
 ```bash
-git clone https://github.com/<your-org>/compass.git
+git clone https://github.com/niki-ikuo/compass.git
 cd compass
 npm install
 ```
