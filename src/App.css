@@ -2192,6 +2192,28 @@ body:has(.monaco-editor .find-widget.visible) .workbench-hover-container .action
   line-height: 1.4;
 }
 
+.settings-checkbox-label {
+  flex-direction: row !important;
+  align-items: flex-start;
+  gap: 10px !important;
+  cursor: pointer;
+}
+
+.settings-checkbox-label input[type='checkbox'] {
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+  flex-shrink: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.settings-checkbox-label > span {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
 .modal-section-title {
   margin: 4px 0 -4px;
   font-size: 13px;

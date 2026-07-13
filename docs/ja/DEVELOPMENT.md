@@ -44,6 +44,7 @@ npm run dev
 | IPC ハンドラ | `electron/main.ts` |
 | ファイル操作 | `electron/services/filesystem.ts` |
 | AI 通信 | `electron/services/ai-client.ts` |
+| インライン補完 | `src/utils/inline-completions.ts`、`ai:complete` / `ai:cancelComplete` |
 | LLM プロバイダ定義 | `src/utils/llm-providers.ts` |
 | 設定保存 | `electron/services/settings.ts` |
 | UI 文言 / i18n | `src/i18n/` |
@@ -77,19 +78,22 @@ import { useAppStore } from '@/stores/app-store'
 3. **AI ストリーミング**  
    応答本体は invoke の戻り値ではなく、`ai:chunk` / `ai:done` / `ai:error` イベントで運ぶ。
 
-4. **ワークスペース索引（`.compass/`）**  
+4. **インライン補完**  
+   Monaco の `InlineCompletionsProvider`（`src/utils/inline-completions.ts`）が `ai:complete`（invoke・非ストリーム）を呼ぶ。設定は `inlineCompletionsEnabled`。プロンプトは UI 言語に合わせ `messages.ts` の `ai.inlineCompletion*` を使う。重複リクエストは新しい `complete` 開始時に abort。明示停止は `ai:cancelComplete`（設定 OFF・プロバイダ差し替え時）。Monaco の `CancellationToken` ごとに abort しない（空返りしやすい）。
+
+5. **ワークスペース索引（`.compass/`）**  
    フォルダオープン時に構造索引の構築・監視が走る。成果物はワークスペースの `.compass/`（`files.json` / `graph.json` 等）。関連は `project-indexer.ts` / `index-watcher.ts`。意味検索（RAG）ではない。
 
-5. **Ask / Edit**  
+6. **Ask / Edit**  
    Ask は説明のみ。Edit は `compass-actions` による変更提案＋ユーザー承認。コマンド実行や複数ステップの自律ループ（SPEC 上の「Agent 自律実行」）とは別。
 
-6. **マルチ LLM**  
+7. **マルチ LLM**  
    OpenAI 互換エンドポイント前提。プロバイダ切替は `src/utils/llm-providers.ts` のプリセットを使う。API Key はプロバイダ別に暗号化保存される。Claude など非互換 API は OpenRouter 経由で利用する。
 
-7. **文字コード**  
+8. **文字コード**  
    読み書きは encoding サービス経由。UI 側の補助は `src/utils/file-encoding.ts`。
 
-8. **i18n**  
+9. **i18n**  
    UI のロケールは `en`（デフォルト）と `ja`（`src/i18n/`）。ドキュメントは英語が `docs/`、日本語が `docs/ja/`。
 
 ## デバッグ

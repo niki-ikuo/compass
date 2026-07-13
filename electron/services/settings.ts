@@ -23,6 +23,7 @@ interface StoredSettings {
   maxTokens: number
   colorTheme: ColorThemeId
   locale: LocaleId
+  inlineCompletionsEnabled: boolean
   lastWorkspaceRoot: string | null
   recentWorkspaceRoots: string[]
 }
@@ -33,6 +34,10 @@ function resolveColorTheme(value: unknown): ColorThemeId {
 
 function resolveLocale(value: unknown): LocaleId {
   return isLocaleId(value) ? value : DEFAULT_SETTINGS.locale
+}
+
+function resolveInlineCompletionsEnabled(value: unknown): boolean {
+  return typeof value === 'boolean' ? value : DEFAULT_SETTINGS.inlineCompletionsEnabled
 }
 
 function resolveProviderId(value: unknown, apiBaseUrl: string): LlmProviderId {
@@ -107,6 +112,7 @@ async function readStoredSettings(): Promise<StoredSettings> {
       maxTokens: stored.maxTokens ?? DEFAULT_SETTINGS.maxTokens,
       colorTheme: resolveColorTheme(stored.colorTheme),
       locale: resolveLocale(stored.locale),
+      inlineCompletionsEnabled: resolveInlineCompletionsEnabled(stored.inlineCompletionsEnabled),
       lastWorkspaceRoot: stored.lastWorkspaceRoot ?? null,
       recentWorkspaceRoots:
         stored.recentWorkspaceRoots ??
@@ -123,6 +129,7 @@ async function readStoredSettings(): Promise<StoredSettings> {
       maxTokens: DEFAULT_SETTINGS.maxTokens,
       colorTheme: DEFAULT_SETTINGS.colorTheme,
       locale: DEFAULT_SETTINGS.locale,
+      inlineCompletionsEnabled: DEFAULT_SETTINGS.inlineCompletionsEnabled,
       lastWorkspaceRoot: null,
       recentWorkspaceRoots: []
     }
@@ -161,7 +168,8 @@ function toAppSettings(stored: StoredSettings): AppSettings {
     temperature: stored.temperature,
     maxTokens: stored.maxTokens,
     colorTheme: stored.colorTheme,
-    locale: stored.locale
+    locale: stored.locale,
+    inlineCompletionsEnabled: stored.inlineCompletionsEnabled
   }
 }
 
@@ -202,7 +210,8 @@ export async function setSettings(settings: AppSettings): Promise<void> {
     temperature: settings.temperature,
     maxTokens: settings.maxTokens,
     colorTheme: resolveColorTheme(settings.colorTheme),
-    locale
+    locale,
+    inlineCompletionsEnabled: resolveInlineCompletionsEnabled(settings.inlineCompletionsEnabled)
   })
   setLocale(locale)
 }

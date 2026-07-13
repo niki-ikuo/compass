@@ -26,12 +26,12 @@
 - Settings (API keys, etc.)
 - Integrated terminal (xterm.js + node-pty)
 - Codebase structure index (workspace `.compass/` — file list, import graph, etc. for AI context)
+- Inline completions (ghost text / Tab accept; toggle in Settings)
 
 ### Deferred (v2+)
 
 - **Agent (autonomous)** — different from Edit. Tool-call loops, command execution, multi-step automation are not implemented (Edit stops at propose + human apply)
 - Vector search / RAG (`.compass` is a structure index, not embedding search)
-- Inline completions
 - MCP
 - Git integration
 
@@ -250,11 +250,10 @@ interface AppSettings {
 ## 10. Roadmap (v2+)
 
 ```
-Now (terminal / .compass structure index / Ask·Edit / multi-LLM)
- └─ v1.x: inline completions (Tab)
-     └─ v2.0: Agent autonomy (tool loop, commands, multi-step)
-         └─ v2.1: semantic codebase search (RAG / embeddings)
-             └─ v3.0: MCP, plugins, native non–OpenAI APIs
+Now (terminal / .compass structure index / Ask·Edit / multi-LLM / inline completions)
+ └─ v2.0: Agent autonomy (tool loop, commands, multi-step)
+     └─ v2.1: semantic codebase search (RAG / embeddings)
+         └─ v3.0: MCP, plugins, native non–OpenAI APIs
 ```
 
 **Terminology**
@@ -306,4 +305,4 @@ MVP rests on four pillars:
 3. **Contextual AI chat** — dialogue that understands the current file
 4. **Apply suggestions** — put AI output into the editor
 
-Cursor’s core is “editor + contextual AI + apply changes.” Structure index and Edit (propose/apply) are shipped; autonomous Agent loops, RAG, and inline completions come later.
+Cursor’s core is “editor + contextual AI + apply changes.” Structure index, Edit (propose/apply), and inline completions are shipped; autonomous Agent loops and RAG come later.

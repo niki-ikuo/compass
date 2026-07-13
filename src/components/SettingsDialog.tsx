@@ -58,8 +58,10 @@ export function SettingsDialog() {
   useEffect(() => {
     if (settingsOpen) {
       const snapshot = {
+        ...DEFAULT_SETTINGS,
         ...settings,
-        providerKeys: { ...settings.providerKeys }
+        providerKeys: { ...settings.providerKeys },
+        inlineCompletionsEnabled: settings.inlineCompletionsEnabled !== false
       }
       setForm(snapshot)
       setOpenSnapshot(snapshot)
@@ -285,6 +287,18 @@ export function SettingsDialog() {
               />
             </label>
           </div>
+
+          <label className="settings-checkbox-label">
+            <input
+              type="checkbox"
+              checked={form.inlineCompletionsEnabled}
+              onChange={(e) => setForm({ ...form, inlineCompletionsEnabled: e.target.checked })}
+            />
+            <span>
+              {t('settings.inlineCompletions')}
+              <span className="field-hint">{t('settings.inlineCompletionsHint')}</span>
+            </span>
+          </label>
 
           {message && <p className="form-message">{message}</p>}
         </div>
