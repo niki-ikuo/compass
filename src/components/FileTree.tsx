@@ -461,11 +461,13 @@ export function FileTree() {
       setSelectedPaths(new Set([normalized]))
       lastSelectedPathRef.current = normalized
 
-      if (!node.isDirectory) {
+      if (node.isDirectory) {
+        handleToggleExpand(node.path)
+      } else {
         void handleOpenFile(node.path)
       }
     },
-    [visibleNodes]
+    [handleToggleExpand, visibleNodes]
   )
 
   const getDeleteTargets = useCallback(
