@@ -1,10 +1,15 @@
 import { useRef, useCallback, useState, useMemo, useEffect } from 'react'
 import Editor, { DiffEditor } from '@monaco-editor/react'
 import { KeyCode, KeyMod, type editor } from 'monaco-editor'
+import type { Monaco } from '@monaco-editor/react'
 import { useAppStore } from '@/stores/app-store'
 import { isMarkdownFile } from '@/utils/language'
 import { toWorkspaceRelativePath } from '@/utils/workspace-actions'
 import { getColorTheme } from '@/utils/color-theme'
+import {
+  cancelPendingInlineCompletion,
+  ensureInlineCompletionsRegistered
+} from '@/utils/inline-completions'
 import { MarkdownPreview } from './MarkdownPreview'
 import { buildWorkspaceIndex } from '@/utils/project-index'
 import {
@@ -17,14 +22,31 @@ import { useI18n } from '@/i18n'
 
 type MarkdownViewMode = 'edit' | 'preview' | 'split'
 
-const editorOptions: editor.IStandaloneEditorConstructionOptions = {
+const editorOptionsBase: editor.IStandaloneEditorConstructionOptions = {
   fontSize: 14,
   fontFamily: "'Cascadia Code', 'Consolas', 'Monaco', monospace",
   scrollBeyondLastLine: false,
   automaticLayout: true,
   tabSize: 2,
   renderWhitespace: 'selection',
-  bracketPairColorization: { enabled: true }
+  bracketPairColorization: { enabled: true },
+  // インライン補完表示中に Suggest ウィジェットが勝つとゴーストが消えるため、自動サジェストは抑止
+  quickSuggestions: false,
+  suggestOnTriggerCharacters: false,
+  wordBasedSuggestions: 'off',
+  parameterHints: { enabled: true },
+  suggest: {
+    preview: false,
+    showInlineDetails: false
+  },
+  inlineSuggest: {
+    enabled: true,
+    mode: 'prefix',
+    showToolbar: 'onHover',
+    suppressSuggestions: true,
+    // DevTools や他パネルにフォーカスが移ってもゴーストを消さない
+    keepOnBlur: true
+  }
 }
 
 export function CodeEditor() {
@@ -34,6 +56,7 @@ export function CodeEditor() {
   const workspaceRoot = useAppStore((s) => s.workspaceRoot)
   const pendingWorkspacePreview = useAppStore((s) => s.pendingWorkspacePreview)
   const monacoTheme = useAppStore((s) => getColorTheme(s.settings.colorTheme).monacoTheme)
+  const inlineCompletionsEnabled = useAppStore((s) => s.settings.inlineCompletionsEnabled)
   const updateFileContent = useAppStore((s) => s.updateFileContent)
   const setEditorSelection = useAppStore((s) => s.setEditorSelection)
   const setCursorPosition = useAppStore((s) => s.setCursorPosition)
@@ -72,6 +95,25 @@ export function CodeEditor() {
     })
   }, [editorSelection, activeFilePath, isPreview, workspaceRoot])
 
+  const mergedEditorOptions = useMemo(
+    () => ({
+      ...editorOptionsBase,
+      inlineSuggest: {
+        ...editorOptionsBase.inlineSuggest,
+        enabled: inlineCompletionsEnabled !== false
+      },
+      minimap: { enabled: !isMarkdown || markdownViewMode !== 'split' },
+      wordWrap: (isMarkdown ? 'on' : 'off') as 'on' | 'off'
+    }),
+    [inlineCompletionsEnabled, isMarkdown, markdownViewMode]
+  )
+
+  useEffect(() => {
+    if (inlineCompletionsEnabled === false) {
+      cancelPendingInlineCompletion()
+    }
+  }, [inlineCompletionsEnabled])
+
   selectionPayloadRef.current = activeSelectionPayload
 
   const addSelectionToChat = useCallback(() => {
@@ -98,9 +140,24 @@ export function CodeEditor() {
     void buildWorkspaceIndex(workspaceRoot)
   }
 
+  const handleEditorBeforeMount = useCallback((monaco: Monaco) => {
+    ensureInlineCompletionsRegistered(monaco)
+  }, [])
+
   const handleEditorMount = useCallback(
-    (ed: editor.IStandaloneCodeEditor) => {
+    (ed: editor.IStandaloneCodeEditor, monaco: Monaco) => {
       editorRef.current = ed
+      ensureInlineCompletionsRegistered(monaco)
+
+      // 手動トリガー（Alt+\）— 自動補完が遅い/出ないときの確認用
+      ed.addAction({
+        id: 'compass.triggerInlineSuggest',
+        label: t('editor.triggerInlineSuggest'),
+        keybindings: [KeyMod.Alt | KeyCode.Backslash],
+        run: () => {
+          void ed.getAction('editor.action.inlineSuggest.trigger')?.run()
+        }
+      })
 
       ed.onDidChangeCursorPosition((e) => {
         setCursorPosition(e.position.lineNumber, e.position.column)
@@ -388,7 +445,7 @@ export function CodeEditor() {
             modified={activeFile.content}
             theme={monacoTheme}
             options={{
-              ...editorOptions,
+              ...mergedEditorOptions,
               readOnly: true,
               renderSideBySide: true,
               minimap: { enabled: true }
@@ -436,12 +493,9 @@ export function CodeEditor() {
               value={activeFile.content}
               theme={monacoTheme}
               onChange={handleChange}
+              beforeMount={handleEditorBeforeMount}
               onMount={handleEditorMount}
-              options={{
-                ...editorOptions,
-                minimap: { enabled: markdownViewMode !== 'split' },
-                wordWrap: isMarkdown ? 'on' : 'off'
-              }}
+              options={mergedEditorOptions}
             />
           </div>
         )}

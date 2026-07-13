@@ -17,7 +17,7 @@ import {
   previewWorkspaceActions,
   writeFileContent
 } from './services/filesystem'
-import { cancelChat, streamChat } from './services/ai-client'
+import { cancelChat, cancelInlineCompletion, completeInline, streamChat } from './services/ai-client'
 import {
   getSettings,
   setSettings,
@@ -50,6 +50,7 @@ import type {
   ChatContextRef,
   ChatRequest,
   ChatSession,
+  InlineCompletionRequest,
   WorkspaceAction,
   WorkspaceReplaceOptions,
   WorkspaceSearchOptions
@@ -372,6 +373,14 @@ function registerIpcHandlers(): void {
 
   ipcMain.handle('ai:cancel', () => {
     return cancelChat()
+  })
+
+  ipcMain.handle('ai:complete', async (_event, request: InlineCompletionRequest) => {
+    return completeInline(request)
+  })
+
+  ipcMain.handle('ai:cancelComplete', () => {
+    return cancelInlineCompletion()
   })
 
   ipcMain.handle('index:build', async (event, workspaceRoot: string) => {

@@ -57,7 +57,7 @@ The renderer calls `window.compass.*`. The source of truth is `electron/preload.
 | Namespace | Purpose |
 |-----------|---------|
 | `fs:*` | Folder pick, read/write, create/move/delete, apply actions |
-| `ai:*` | Chat send, chunk / done / error events |
+| `ai:*` | Chat send, chunk / done / error events, inline completions |
 | `settings:*` | Get / save settings |
 | `workspace:*` | Recent workspace / recently opened folders |
 | `index:*` | Build / watch project index |

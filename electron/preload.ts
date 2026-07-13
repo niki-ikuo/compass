@@ -18,7 +18,9 @@ import type {
   WorkspaceReplaceOptions,
   WorkspaceReplaceResult,
   ChatSession,
-  TerminalShell
+  TerminalShell,
+  InlineCompletionRequest,
+  InlineCompletionResult
 } from '../src/types'
 
 const compassAPI = {
@@ -66,6 +68,9 @@ const compassAPI = {
   ai: {
     chat: (request: ChatRequest): Promise<void> => ipcRenderer.invoke('ai:chat', request),
     cancel: (): Promise<boolean> => ipcRenderer.invoke('ai:cancel'),
+    complete: (request: InlineCompletionRequest): Promise<InlineCompletionResult> =>
+      ipcRenderer.invoke('ai:complete', request),
+    cancelComplete: (): Promise<boolean> => ipcRenderer.invoke('ai:cancelComplete'),
     onChunk: (callback: (chunk: string) => void): (() => void) => {
       const handler = (_event: Electron.IpcRendererEvent, chunk: string): void => callback(chunk)
       ipcRenderer.on('ai:chunk', handler)

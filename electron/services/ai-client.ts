@@ -1,5 +1,5 @@
 import type { WebContents } from 'electron'
-import type { ChatRequest } from '../../src/types'
+import type { ChatRequest, InlineCompletionRequest, InlineCompletionResult } from '../../src/types'
 import { t } from '../../src/i18n/runtime'
 import { getSettings } from './settings'
 import { ensureProjectIndex, getProjectIndexContext } from './project-indexer'
@@ -8,6 +8,93 @@ import { getLlmProvider, getProviderLabel } from '../../src/utils/llm-providers'
 
 function getSystemPrompt(mode: ChatRequest['mode']): string {
   return mode === 'ask' ? t('ai.askSystemPrompt') : t('ai.editSystemPrompt')
+}
+
+const INLINE_COMPLETION_MAX_TOKENS = 96
+/** 推論モデルは reasoning にもトークンを使うため余裕を持たせる */
+const INLINE_COMPLETION_REASONING_MAX_TOKENS = 2048
+
+function isReasoningModel(model: string): boolean {
+  const m = model.toLowerCase()
+  return (
+    m.startsWith('o1') ||
+    m.startsWith('o3') ||
+    m.startsWith('o4') ||
+    m.startsWith('gpt-5') ||
+    m.includes('reason')
+  )
+}
+
+function buildInlineCompletionUserMessage(request: InlineCompletionRequest): string {
+  const meta: string[] = []
+  if (request.filePath) {
+    meta.push(t('ai.inlineCompletionFile', { path: request.filePath }))
+  }
+  if (request.language) {
+    meta.push(t('ai.inlineCompletionLanguage', { language: request.language }))
+  }
+
+  return [
+    meta.length > 0 ? meta.join('\n') : null,
+    t('ai.inlineCompletionIntro'),
+    '',
+    request.prefix + '<|cursor|>' + request.suffix,
+    t('ai.inlineCompletionOutro')
+  ]
+    .filter((line) => line !== null)
+    .join('\n')
+}
+
+function buildInlineCompletionMessages(
+  request: InlineCompletionRequest
+): Array<{ role: 'system' | 'user' | 'assistant'; content: string }> {
+  // few-shot なし（例文コピーや Chat デバッグ時の混乱を避ける）
+  // プロンプト文言は getSettings() → setLocale 後に t() で UI 言語に合わせる
+  return [
+    { role: 'system', content: t('ai.inlineCompletionSystemPrompt') },
+    { role: 'user', content: buildInlineCompletionUserMessage(request) }
+  ]
+}
+
+/**
+ * モデルが付けがちな説明・フェンス・ゴミ応答を除去する。
+ * 改行・インデントは補完本体になり得るので trim しない。
+ */
+export function sanitizeInlineCompletion(raw: string): string {
+  let text = raw.replace(/\r\n/g, '\n')
+  if (text.length === 0) return ''
+
+  const fenced = text.match(/^```(?:\w+)?\n([\s\S]*?)\n```[ \t]*$/)
+  if (fenced) {
+    text = fenced[1]
+  } else if (/^```/.test(text.trimStart())) {
+    text = text.replace(/^[ \t]*```(?:\w+)?\n?/, '').replace(/\n?[ \t]*```[ \t]*$/, '')
+  }
+
+  text = text.replace(/<\|cursor\|>/g, '')
+
+  const compact = text.trim()
+  if (
+    compact.length > 0 &&
+    /^(gpt|chatgpt|claude|ok|okay|sure|yes|no|done|sorry|here( you go)?|当然|はい|いいえ)[.!。]*$/i.test(
+      compact
+    )
+  ) {
+    return ''
+  }
+
+  const lines = text.split('\n')
+  if (
+    lines.length > 1 &&
+    compact.length > 0 &&
+    !/^[ \t]*(?:[{}()[\];,.<>/*+\-|&!?=`'"@#]|\/\/|\/\*|#|<!--)/.test(lines[0]) &&
+    /[.。:：]$/.test(lines[0].trim()) &&
+    lines[0].trim().split(/\s+/).length > 3
+  ) {
+    text = lines.slice(1).join('\n')
+  }
+
+  return text
 }
 
 async function buildUserMessage(request: ChatRequest): Promise<string> {
@@ -123,6 +210,7 @@ async function buildUserMessage(request: ChatRequest): Promise<string> {
 }
 
 let activeAbortController: AbortController | null = null
+let activeCompleteAbortController: AbortController | null = null
 
 export function cancelChat(): boolean {
   if (!activeAbortController) return false
@@ -130,8 +218,156 @@ export function cancelChat(): boolean {
   return true
 }
 
+export function cancelInlineCompletion(): boolean {
+  if (!activeCompleteAbortController) return false
+  activeCompleteAbortController.abort()
+  return true
+}
+
 function isAbortError(err: unknown): boolean {
   return err instanceof Error && err.name === 'AbortError'
+}
+
+function buildApiHeaders(settings: Awaited<ReturnType<typeof getSettings>>): Record<string, string> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json'
+  }
+  if (settings.apiKey) {
+    headers.Authorization = `Bearer ${settings.apiKey}`
+  }
+  if (settings.providerId === 'openrouter') {
+    headers['HTTP-Referer'] = 'https://github.com/compass-editor'
+    headers['X-Title'] = 'Compass'
+  }
+  return headers
+}
+
+export async function completeInline(
+  request: InlineCompletionRequest
+): Promise<InlineCompletionResult> {
+  activeCompleteAbortController?.abort()
+  const abortController = new AbortController()
+  activeCompleteAbortController = abortController
+  const { signal } = abortController
+
+  try {
+    if (!request.prefix.trim() && !request.suffix.trim()) {
+      return { text: '' }
+    }
+
+    const settings = await getSettings()
+    if (signal.aborted) return { text: '', cancelled: true }
+
+    const provider = getLlmProvider(settings.providerId)
+    if (provider.requiresApiKey && !settings.apiKey) {
+      return {
+        text: '',
+        error: t('ai.missingApiKey', { provider: getProviderLabel(provider.id) })
+      }
+    }
+    if (!settings.apiBaseUrl.trim()) {
+      return { text: '', error: t('ai.missingBaseUrl') }
+    }
+
+    const url = `${settings.apiBaseUrl.replace(/\/$/, '')}/chat/completions`
+    const reasoning = isReasoningModel(settings.model)
+    const body: Record<string, unknown> = {
+      model: settings.model,
+      messages: buildInlineCompletionMessages(request),
+      stream: false
+    }
+
+    if (reasoning) {
+      // gpt-5 / o 系: max_tokens だと推論で枠を使い切り content が空になる
+      body.max_completion_tokens = INLINE_COMPLETION_REASONING_MAX_TOKENS
+      body.reasoning_effort = 'minimal'
+    } else {
+      body.max_tokens = INLINE_COMPLETION_MAX_TOKENS
+      body.temperature = 0.2
+    }
+
+    const doFetch = (payload: Record<string, unknown>): Promise<Response> =>
+      fetch(url, {
+        method: 'POST',
+        headers: buildApiHeaders(settings),
+        body: JSON.stringify(payload),
+        signal
+      })
+
+    let response = await doFetch(body)
+
+    // 一部ゲートウェイは reasoning_effort / max_completion_tokens 未対応
+    if (!response.ok && reasoning) {
+      const retryBody: Record<string, unknown> = {
+        model: settings.model,
+        messages: body.messages,
+        stream: false,
+        max_tokens: INLINE_COMPLETION_REASONING_MAX_TOKENS
+      }
+      response = await doFetch(retryBody)
+      if (!response.ok) {
+        const retryError = await response.text()
+        return {
+          text: '',
+          error: t('ai.apiError', { status: response.status, body: retryError })
+        }
+      }
+    } else if (!response.ok) {
+      const errorText = await response.text()
+      return {
+        text: '',
+        error: t('ai.apiError', { status: response.status, body: errorText })
+      }
+    }
+
+    const data = (await response.json()) as {
+      choices?: Array<{
+        message?: {
+          content?: string | Array<{ type?: string; text?: string }>
+          reasoning?: unknown
+          reasoning_content?: string
+        }
+        text?: string
+        finish_reason?: string
+      }>
+      usage?: {
+        completion_tokens?: number
+        completion_tokens_details?: { reasoning_tokens?: number }
+      }
+      error?: { message?: string }
+    }
+    if (signal.aborted) return { text: '', cancelled: true }
+
+    if (data.error?.message) {
+      return { text: '', error: data.error.message }
+    }
+
+    const choice = data.choices?.[0]
+    const content = choice?.message?.content
+    let raw = ''
+    if (typeof content === 'string') {
+      raw = content
+    } else if (Array.isArray(content)) {
+      raw = content.map((part) => (typeof part?.text === 'string' ? part.text : '')).join('')
+    } else if (typeof choice?.text === 'string') {
+      raw = choice.text
+    } else if (typeof choice?.message?.reasoning_content === 'string') {
+      // 一部ゲートウェイ互換
+      raw = choice.message.reasoning_content
+    }
+
+    return { text: sanitizeInlineCompletion(raw) }
+  } catch (err) {
+    if (isAbortError(err) || signal.aborted) {
+      return { text: '', cancelled: true }
+    }
+    const message = err instanceof Error ? err.message : t('common.unknownError')
+    return { text: '', error: message }
+  } finally {
+    if (activeCompleteAbortController === abortController) {
+      activeCompleteAbortController = null
+    }
+  }
 }
 
 export async function streamChat(
@@ -179,21 +415,10 @@ export async function streamChat(
     }
 
     const url = `${settings.apiBaseUrl.replace(/\/$/, '')}/chat/completions`
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json'
-    }
-    if (settings.apiKey) {
-      headers.Authorization = `Bearer ${settings.apiKey}`
-    }
-    // OpenRouter 推奨ヘッダ（未設定でも動作するが、ランキング表示などに利用される）
-    if (settings.providerId === 'openrouter') {
-      headers['HTTP-Referer'] = 'https://github.com/compass-editor'
-      headers['X-Title'] = 'Compass'
-    }
 
     const response = await fetch(url, {
       method: 'POST',
-      headers,
+      headers: buildApiHeaders(settings),
       body: JSON.stringify({
         model: settings.model,
         messages: apiMessages,

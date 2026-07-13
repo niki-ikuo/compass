@@ -120,6 +120,8 @@ export interface AppSettings {
   colorTheme: ColorThemeId
   /** UI / AI 応答の表示言語 */
   locale: LocaleId
+  /** エディタのインライン補完（ゴーストテキスト） */
+  inlineCompletionsEnabled: boolean
 }
 
 export interface ChatRequest {
@@ -134,6 +136,20 @@ export interface ChatRequest {
     selections?: ChatSelectionRef[]
     references?: ChatContextRef[]
   }
+}
+
+/** インライン補完リクエスト（カーソル前後の抜粋のみ） */
+export interface InlineCompletionRequest {
+  filePath?: string
+  language?: string
+  prefix: string
+  suffix: string
+}
+
+export interface InlineCompletionResult {
+  text: string
+  cancelled?: boolean
+  error?: string
 }
 
 export type WorkspaceAction =
@@ -290,6 +306,8 @@ export interface CompassAPI {
   ai: {
     chat: (request: ChatRequest) => Promise<void>
     cancel: () => Promise<boolean>
+    complete: (request: InlineCompletionRequest) => Promise<InlineCompletionResult>
+    cancelComplete: () => Promise<boolean>
     onChunk: (callback: (chunk: string) => void) => () => void
     onDone: (callback: () => void) => () => void
     onAborted: (callback: () => void) => () => void
@@ -381,5 +399,6 @@ export const DEFAULT_SETTINGS: AppSettings = {
   temperature: 0.2,
   maxTokens: 4096,
   colorTheme: 'dark',
-  locale: DEFAULT_LOCALE
+  locale: DEFAULT_LOCALE,
+  inlineCompletionsEnabled: true
 }

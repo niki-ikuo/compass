@@ -44,6 +44,7 @@ npm run dev
 | IPC handlers | `electron/main.ts` |
 | File ops | `electron/services/filesystem.ts` |
 | AI networking | `electron/services/ai-client.ts` |
+| Inline completions | `src/utils/inline-completions.ts`, `ai:complete` / `ai:cancelComplete` |
 | LLM provider presets | `src/utils/llm-providers.ts` |
 | Settings persistence | `electron/services/settings.ts` |
 | UI strings / i18n | `src/i18n/` |
@@ -77,19 +78,22 @@ import { useAppStore } from '@/stores/app-store'
 3. **AI streaming**  
    Response body arrives via `ai:chunk` / `ai:done` / `ai:error` events, not as the invoke return value.
 
-4. **Workspace index (`.compass/`)**  
+4. **Inline completions**  
+   Monaco `InlineCompletionsProvider` (`src/utils/inline-completions.ts`) calls `ai:complete` (invoke, non-streaming). Setting: `inlineCompletionsEnabled`. Prompts follow UI locale via `ai.inlineCompletion*` in `messages.ts`. Overlapping requests are aborted when a new `complete` starts; explicit stop uses `ai:cancelComplete` (settings OFF / provider re-register). Do not abort on every Monaco `CancellationToken` (empty results).
+
+5. **Workspace index (`.compass/`)**  
    Opening a folder builds and watches a structure index under `.compass/` (`files.json`, `graph.json`, etc.). See `project-indexer.ts` / `index-watcher.ts`. Not semantic search (RAG).
 
-5. **Ask / Edit**  
+6. **Ask / Edit**  
    Ask is explain-only. Edit proposes changes via `compass-actions` and requires user approval. Separate from an autonomous Agent tool loop (see SPEC).
 
-6. **Multi-LLM**  
+7. **Multi-LLM**  
    Assumes OpenAI-compatible endpoints. Provider presets live in `src/utils/llm-providers.ts`. API keys are encrypted per provider. Non-compatible APIs (e.g. Claude) go through OpenRouter.
 
-7. **Encoding**  
+8. **Encoding**  
    Read/write goes through the encoding service. UI helpers: `src/utils/file-encoding.ts`.
 
-8. **i18n**  
+9. **i18n**  
    UI locales are `en` (default) and `ja` under `src/i18n/`. Docs: English at `docs/`, Japanese at `docs/ja/`.
 
 ## Debugging

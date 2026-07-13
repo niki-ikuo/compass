@@ -19,6 +19,7 @@ Installer: `Compass Setup x.y.z.exe` (Windows 10/11 x64)
 - Monaco Editor with syntax highlighting
 - Workspace file tree
 - AI chat (streaming) — **Ask** (explain only) / **Edit** (propose file changes → preview & apply)
+- Inline completions (ghost text; Tab to accept)
 - Project structure index (`.compass/`) for AI context
 - Diff preview and apply for AI suggestions
 - Integrated terminal (xterm.js)

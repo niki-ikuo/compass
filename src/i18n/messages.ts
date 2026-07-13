@@ -32,6 +32,9 @@ export const ja = {
   'settings.modelHint': '一覧から選ぶか、任意のモデル ID を入力できます',
   'settings.temperature': '温度',
   'settings.maxTokens': 'Max Tokens',
+  'settings.inlineCompletions': 'インライン補完',
+  'settings.inlineCompletionsHint':
+    '入力停止後に AI がゴーストテキストで続きを提案します（Tab で確定）。API を消費します。',
   'settings.saveFailed': '保存に失敗しました',
 
   // themes
@@ -211,6 +214,7 @@ export const ja = {
   'editor.splitTab': '分割',
   'editor.addToChat': 'チャットに追加',
   'editor.copyChatRef': 'チャット参照をコピー',
+  'editor.triggerInlineSuggest': 'インライン補完をトリガー',
 
   // status
   'status.apiUnset': 'API未設定',
@@ -316,7 +320,13 @@ export const ja = {
   'ai.apiError': 'APIエラー ({status}): {body}',
   'ai.noResponseBody': 'レスポンスボディがありません',
   'ai.indexHeader': '[プロジェクト構造インデックス (.compass)]',
-  'ai.indexLines': '{count}行'
+  'ai.indexLines': '{count}行',
+  'ai.inlineCompletionSystemPrompt':
+    'あなたは fill-in-the-middle のコード補完エンジンです。ユーザーはカーソルを <|cursor|> で示します。<|cursor|> に挿入すべきコードだけを返してください。説明・markdown・コードフェンス・引用符・ラベルは付けないでください。<|cursor|> の前後に既にあるテキストは繰り返さないでください。短く（数トークン〜数行）。改行とインデントは可。',
+  'ai.inlineCompletionFile': 'ファイル: {path}',
+  'ai.inlineCompletionLanguage': '言語: {language}',
+  'ai.inlineCompletionIntro': '次のコードで <|cursor|> がカーソル位置です。ここから挿入するテキストだけを出力してください:',
+  'ai.inlineCompletionOutro': '挿入テキストのみを出力（説明禁止）:'
 } as const
 
 export type MessageKey = keyof typeof ja
@@ -353,6 +363,9 @@ export const en: Record<MessageKey, string> = {
   'settings.modelHint': 'Pick from the list or enter any model ID',
   'settings.temperature': 'Temperature',
   'settings.maxTokens': 'Max Tokens',
+  'settings.inlineCompletions': 'Inline completions',
+  'settings.inlineCompletionsHint':
+    'After you pause typing, AI suggests ghost text (Tab to accept). Uses your API.',
   'settings.saveFailed': 'Failed to save settings',
 
   'theme.dark': 'Dark',
@@ -524,6 +537,7 @@ export const en: Record<MessageKey, string> = {
   'editor.splitTab': 'Split',
   'editor.addToChat': 'Add to Chat',
   'editor.copyChatRef': 'Copy Chat Reference',
+  'editor.triggerInlineSuggest': 'Trigger inline suggestion',
 
   'status.apiUnset': 'API not set',
   'status.connected': 'Connected',
@@ -622,7 +636,14 @@ export const en: Record<MessageKey, string> = {
   'ai.apiError': 'API error ({status}): {body}',
   'ai.noResponseBody': 'No response body',
   'ai.indexHeader': '[Project structure index (.compass)]',
-  'ai.indexLines': '{count} lines'
+  'ai.indexLines': '{count} lines',
+  'ai.inlineCompletionSystemPrompt':
+    'You are a fill-in-the-middle code completion engine. The user marks the cursor with <|cursor|>. Respond with ONLY the code that should be inserted at <|cursor|>. No explanations, markdown, fences, quotes, or labels. Do not repeat text already before or after <|cursor|>. Keep it short (tokens to a few lines). Newlines/indentation are allowed.',
+  'ai.inlineCompletionFile': 'File: {path}',
+  'ai.inlineCompletionLanguage': 'Language: {language}',
+  'ai.inlineCompletionIntro':
+    'In the following code, <|cursor|> marks the cursor. Output only the text to insert there:',
+  'ai.inlineCompletionOutro': 'Output only the insertion text (no explanation):'
 }
 
 export const messages: Record<'ja' | 'en', Record<MessageKey, string>> = {
