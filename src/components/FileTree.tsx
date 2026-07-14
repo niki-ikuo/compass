@@ -15,6 +15,7 @@ import {
   serializeFileMovePaths
 } from '@/utils/file-move-drag'
 import { useI18n } from '@/i18n'
+import { basename } from '@/utils/path'
 import { ConfirmDialog } from './ConfirmDialog'
 import { restoreWorkbenchFocus } from '@/utils/workbench-focus'
 
@@ -347,6 +348,24 @@ export function FileTree() {
     return mergePreviewIntoTree(fileTree, pendingWorkspacePreview.items, workspaceRoot)
   }, [fileTree, pendingWorkspacePreview, workspaceRoot])
 
+  const rootedTree = useMemo((): FileTreeNode[] => {
+    if (!workspaceRoot) return displayTree
+    return [
+      {
+        name: basename(workspaceRoot),
+        path: workspaceRoot,
+        isDirectory: true,
+        children: displayTree
+      }
+    ]
+  }, [workspaceRoot, displayTree])
+
+  const isWorkspaceRootPath = useCallback(
+    (path: string) =>
+      !!workspaceRoot && normalizeNodePath(path) === normalizeNodePath(workspaceRoot),
+    [workspaceRoot]
+  )
+
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
   const [inlineInput, setInlineInput] = useState<InlineInputState | null>(null)
   const [renamingPath, setRenamingPath] = useState<string | null>(null)
@@ -369,14 +388,21 @@ export function FileTree() {
   }, [workspaceRoot])
 
   useEffect(() => {
-    if (!workspaceRoot || treeInitializedRef.current || displayTree.length === 0) return
-    setExpandedDirs(getDefaultExpandedDirs(displayTree))
+    if (!workspaceRoot || treeInitializedRef.current) return
+    if (displayTree.length === 0) {
+      // Loading or empty workspace: still show the root folder expanded.
+      setExpandedDirs(new Set([normalizeNodePath(workspaceRoot)]))
+      return
+    }
+    const defaults = getDefaultExpandedDirs(displayTree)
+    defaults.add(normalizeNodePath(workspaceRoot))
+    setExpandedDirs(defaults)
     treeInitializedRef.current = true
   }, [workspaceRoot, displayTree])
 
   const visibleNodes = useMemo(
-    () => collectVisibleNodes(displayTree, expandedDirs),
-    [displayTree, expandedDirs]
+    () => collectVisibleNodes(rootedTree, expandedDirs),
+    [rootedTree, expandedDirs]
   )
 
   const refreshTree = useCallback(async () => {
@@ -423,7 +449,7 @@ export function FileTree() {
   }, [])
 
   const handleExpandAll = () => {
-    setExpandedDirs(new Set(collectDirectoryPaths(displayTree)))
+    setExpandedDirs(new Set(collectDirectoryPaths(rootedTree)))
   }
 
   const handleCollapseAll = () => {
@@ -478,21 +504,30 @@ export function FileTree() {
         )
         const topLevelPaths = filterTopLevelPaths([...selectedPaths])
         return selectedNodes.filter(
-          (n) => topLevelPaths.includes(normalizeNodePath(n.path)) && !n.isPreview
+          (n) =>
+            topLevelPaths.includes(normalizeNodePath(n.path)) &&
+            !n.isPreview &&
+            !isWorkspaceRootPath(n.path)
         )
       }
-      if (contextNode && !contextNode.isPreview) return [contextNode]
+      if (contextNode && !contextNode.isPreview && !isWorkspaceRootPath(contextNode.path)) {
+        return [contextNode]
+      }
       return []
     },
-    [selectedPaths, visibleNodes]
+    [selectedPaths, visibleNodes, isWorkspaceRootPath]
   )
 
   const getMoveSourcePaths = useCallback(
     (dragNode: FileTreeNode): string[] => {
+      if (isWorkspaceRootPath(dragNode.path)) return []
       const normalized = normalizeNodePath(dragNode.path)
       if (selectedPaths.has(normalized) && selectedPaths.size > 1) {
         const selectedNodes = visibleNodes.filter(
-          (n) => selectedPaths.has(normalizeNodePath(n.path)) && !n.isPreview
+          (n) =>
+            selectedPaths.has(normalizeNodePath(n.path)) &&
+            !n.isPreview &&
+            !isWorkspaceRootPath(n.path)
         )
         const topLevelPaths = filterTopLevelPaths(
           selectedNodes.map((n) => normalizeNodePath(n.path))
@@ -503,7 +538,7 @@ export function FileTree() {
       }
       return [dragNode.path]
     },
-    [selectedPaths, visibleNodes]
+    [selectedPaths, visibleNodes, isWorkspaceRootPath]
   )
 
   const requestDelete = useCallback(
@@ -565,15 +600,28 @@ export function FileTree() {
         return
       }
 
-      const movePaths = getMoveSourcePaths(node)
-      draggingPathsRef.current = movePaths
-
       const ref = toChatContextRef(node)
       e.dataTransfer.setData(CHAT_CONTEXT_DRAG_MIME, serializeChatContextRef(ref))
+
+      // Workspace root can be attached to chat, but must not be moved in the tree.
+      if (isWorkspaceRootPath(node.path)) {
+        draggingPathsRef.current = null
+        e.dataTransfer.effectAllowed = 'copy'
+        return
+      }
+
+      const movePaths = getMoveSourcePaths(node)
+      if (movePaths.length === 0) {
+        draggingPathsRef.current = null
+        e.dataTransfer.effectAllowed = 'copy'
+        return
+      }
+
+      draggingPathsRef.current = movePaths
       e.dataTransfer.setData(FILE_MOVE_DRAG_MIME, serializeFileMovePaths(movePaths))
       e.dataTransfer.effectAllowed = 'copyMove'
     },
-    [getMoveSourcePaths]
+    [getMoveSourcePaths, isWorkspaceRootPath]
   )
 
   const handleNodeDragEnd = useCallback(() => {
@@ -758,9 +806,14 @@ export function FileTree() {
     contextMenu?.node?.isDirectory ? contextMenu.node.path : workspaceRoot
 
   const deleteTargets = contextMenu ? getDeleteTargets(contextMenu.node) : []
-  const canRename = contextMenu?.node && deleteTargets.length === 1 && !contextMenu.node.isPreview
+  const canRename =
+    contextMenu?.node &&
+    deleteTargets.length === 1 &&
+    !contextMenu.node.isPreview &&
+    !isWorkspaceRootPath(contextMenu.node.path)
   const canDelete = deleteTargets.length > 0 && deleteTargets.every((n) => !n.isPreview)
   const isRootDropTarget = dropTargetPath === normalizeNodePath(workspaceRoot)
+  const workspaceName = basename(workspaceRoot)
 
   return (
     <div className="file-tree">
@@ -809,7 +862,7 @@ export function FileTree() {
               {inlineInput.mode === 'create-file' ? t('explorer.newFile') : t('explorer.newFolder')}
               {' · '}
               {inlineInput.parentDir === workspaceRoot
-                ? t('common.root')
+                ? workspaceName
                 : inlineInput.parentDir.replace(workspaceRoot, '').replace(/^[/\\]/, '')}
             </span>
             <div className="file-tree-item creating" style={{ paddingLeft: 8 }}>
@@ -826,7 +879,7 @@ export function FileTree() {
           </div>
         )}
 
-        {displayTree.map((node) => (
+        {rootedTree.map((node) => (
           <div key={node.path} onClick={(e) => e.stopPropagation()}>
             <FileTreeItem
               node={node}
