@@ -18,12 +18,9 @@ import {
 } from '@/utils/workspace-actions'
 import {
   hasChatContextDrag,
-  parseChatContextRef
+  parseChatContextRefs
 } from '@/utils/chat-context-drag'
-import {
-  formatFileMention,
-  formatFolderMention
-} from '@/utils/chat-mentions'
+import { formatContextMention } from '@/utils/chat-mentions'
 import {
   buildSelectionMention,
   hasChatSelectionDrag,
@@ -34,31 +31,7 @@ import {
 } from '@/utils/chat-selection-drag'
 import { buildWorkspaceIndex, ensureWorkspaceIndex } from '@/utils/project-index'
 import { getLlmProvider, getModelOptions, getProviderLabel } from '@/utils/llm-providers'
-import { basename } from '@/utils/path'
 import { useI18n, getDateLocale } from '@/i18n'
-
-function formatContextLabel(path: string, workspaceRoot: string | null): string {
-  if (!workspaceRoot) return path
-  const root = workspaceRoot.replace(/\\/g, '/')
-  const normalized = path.replace(/\\/g, '/')
-  if (normalized === root || normalized === `${root}/`) {
-    return basename(workspaceRoot)
-  }
-  if (normalized.startsWith(root)) {
-    return normalized.slice(root.length).replace(/^\//, '') || basename(path)
-  }
-  return path
-}
-
-/** 指示文に埋め込むパス表記（フォルダは末尾 `/`） */
-function formatContextMention(
-  path: string,
-  isDirectory: boolean,
-  workspaceRoot: string | null
-): string {
-  const label = formatContextLabel(path, workspaceRoot)
-  return isDirectory ? formatFolderMention(label) : formatFileMention(label)
-}
 
 function selectionRefKey(ref: ChatSelectionRef): string {
   return `${ref.path.replace(/\\/g, '/')}:${ref.startLine}-${ref.endLine}`
@@ -105,7 +78,7 @@ export function ChatPanel() {
   const applyWorkspacePreview = useAppStore((s) => s.applyWorkspacePreview)
   const revertWorkspacePreview = useAppStore((s) => s.revertWorkspacePreview)
   const setFileTree = useAppStore((s) => s.setFileTree)
-  const addChatContextRef = useAppStore((s) => s.addChatContextRef)
+  const addChatContextRefs = useAppStore((s) => s.addChatContextRefs)
   const createChatSession = useAppStore((s) => s.createChatSession)
   const setActiveChatSession = useAppStore((s) => s.setActiveChatSession)
   const closeChatSession = useAppStore((s) => s.closeChatSession)
@@ -386,11 +359,13 @@ export function ChatPanel() {
 
   useEffect(() => {
     if (!chatComposerInsertRequest) return
-    const { mention, selection } = chatComposerInsertRequest
+    const { mentions, selection } = chatComposerInsertRequest
     if (selection) {
-      pinSelectionAndInsert(selection, mention)
+      pinSelectionAndInsert(selection, mentions[0])
     } else {
-      insertMentionAtCursor(mention)
+      for (const mention of mentions) {
+        insertMentionAtCursor(mention)
+      }
     }
     clearChatComposerInsertRequest()
     // pinSelectionAndInsert / insertMentionAtCursor は毎レンダー新しい参照なので request id のみ監視
@@ -417,10 +392,12 @@ export function ChatPanel() {
     e.preventDefault()
     setIsDragOver(false)
 
-    const fileRef = parseChatContextRef(e.dataTransfer)
-    if (fileRef) {
-      addChatContextRef(fileRef)
-      insertContextMentionIntoInput(fileRef)
+    const fileRefs = parseChatContextRefs(e.dataTransfer)
+    if (fileRefs.length > 0) {
+      addChatContextRefs(fileRefs)
+      for (const fileRef of fileRefs) {
+        insertContextMentionIntoInput(fileRef)
+      }
       return
     }
 

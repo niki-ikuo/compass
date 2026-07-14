@@ -280,7 +280,7 @@ interface AppState {
   /** エディタなどからチャット入力へメンション挿入するリクエスト */
   chatComposerInsertRequest: {
     id: number
-    mention: string
+    mentions: string[]
     selection?: ChatSelectionRef
   } | null
   panelLayout: { fileTreeWidth: number; chatWidth: number; terminalHeight: number }
@@ -344,9 +344,13 @@ interface AppState {
   applyPreviewFile: (filePath: string) => Promise<void>
   rejectPreviewFile: (filePath: string) => void
   addChatContextRef: (ref: ChatContextRef) => void
+  addChatContextRefs: (refs: ChatContextRef[]) => void
   removeChatContextRef: (path: string) => void
   clearChatContextRefs: () => void
-  requestChatComposerInsert: (mention: string, selection?: ChatSelectionRef) => void
+  requestChatComposerInsert: (
+    mentionOrMentions: string | string[],
+    selection?: ChatSelectionRef
+  ) => void
   clearChatComposerInsertRequest: () => void
   setFileTreeWidth: (width: number) => void
   setChatPanelWidth: (width: number) => void
@@ -1009,15 +1013,29 @@ export const useAppStore = create<AppState>((set, get) => ({
     }),
 
   addChatContextRef: (ref) => {
+    get().addChatContextRefs([ref])
+  },
+
+  addChatContextRefs: (refs) => {
+    if (refs.length === 0) return
     set((state) => ({
       chatSessions: updateActiveSession(state.chatSessions, state.activeChatId, (session) => {
-        const normalized = ref.path.replace(/\\/g, '/')
-        if (session.contextRefs.some((r) => r.path.replace(/\\/g, '/') === normalized)) {
-          return session
+        const existing = new Set(
+          session.contextRefs.map((r) => r.path.replace(/\\/g, '/'))
+        )
+        const next = [...session.contextRefs]
+        let changed = false
+        for (const ref of refs) {
+          const normalized = ref.path.replace(/\\/g, '/')
+          if (existing.has(normalized)) continue
+          existing.add(normalized)
+          next.push(ref)
+          changed = true
         }
+        if (!changed) return session
         return {
           ...session,
-          contextRefs: [...session.contextRefs, ref],
+          contextRefs: next,
           updatedAt: Date.now()
         }
       })
@@ -1052,12 +1070,18 @@ export const useAppStore = create<AppState>((set, get) => ({
     scheduleChatHistorySave(get().workspaceRoot)
   },
 
-  requestChatComposerInsert: (mention, selection) => {
+  requestChatComposerInsert: (mentionOrMentions, selection) => {
+    const mentions = Array.isArray(mentionOrMentions)
+      ? mentionOrMentions.filter((m) => m.length > 0)
+      : mentionOrMentions
+        ? [mentionOrMentions]
+        : []
+    if (mentions.length === 0 && !selection) return
     set((state) => ({
       showChat: true,
       chatComposerInsertRequest: {
         id: (state.chatComposerInsertRequest?.id ?? 0) + 1,
-        mention,
+        mentions,
         selection
       }
     }))

@@ -5,7 +5,7 @@ import { buildWorkspaceIndex } from '@/utils/project-index'
 import { mergePreviewIntoTree } from '@/utils/preview-tree'
 import {
   CHAT_CONTEXT_DRAG_MIME,
-  serializeChatContextRef,
+  serializeChatContextRefs,
   toChatContextRef
 } from '@/utils/chat-context-drag'
 import {
@@ -14,6 +14,7 @@ import {
   parseFileMovePaths,
   serializeFileMovePaths
 } from '@/utils/file-move-drag'
+import { formatContextMention } from '@/utils/chat-mentions'
 import { useI18n } from '@/i18n'
 import { basename } from '@/utils/path'
 import { ConfirmDialog } from './ConfirmDialog'
@@ -518,6 +519,28 @@ export function FileTree() {
     [selectedPaths, visibleNodes, isWorkspaceRootPath]
   )
 
+  const getChatAttachTargets = useCallback(
+    (contextNode: FileTreeNode | null): FileTreeNode[] => {
+      if (selectedPaths.size > 0) {
+        const selectedNodes = visibleNodes.filter(
+          (n) => selectedPaths.has(normalizeNodePath(n.path)) && !n.isPreview
+        )
+        if (selectedNodes.length === 0) return []
+        const topLevelPaths = filterTopLevelPaths(
+          selectedNodes.map((n) => normalizeNodePath(n.path))
+        )
+        return selectedNodes.filter((n) =>
+          topLevelPaths.includes(normalizeNodePath(n.path))
+        )
+      }
+      if (contextNode && !contextNode.isPreview) {
+        return [contextNode]
+      }
+      return []
+    },
+    [selectedPaths, visibleNodes]
+  )
+
   const getMoveSourcePaths = useCallback(
     (dragNode: FileTreeNode): string[] => {
       if (isWorkspaceRootPath(dragNode.path)) return []
@@ -549,6 +572,24 @@ export function FileTree() {
       setPendingDeleteTargets(targets)
     },
     [getDeleteTargets]
+  )
+
+  const addTargetsToChat = useCallback(
+    (contextNode: FileTreeNode | null) => {
+      setContextMenu(null)
+      const targets = getChatAttachTargets(contextNode)
+      if (targets.length === 0) return
+
+      const refs = targets.map(toChatContextRef)
+      const store = useAppStore.getState()
+      store.addChatContextRefs(refs)
+      store.requestChatComposerInsert(
+        refs.map((ref) =>
+          formatContextMention(ref.path, ref.isDirectory, store.workspaceRoot)
+        )
+      )
+    },
+    [getChatAttachTargets]
   )
 
   const cancelPendingDelete = useCallback(() => {
@@ -600,8 +641,15 @@ export function FileTree() {
         return
       }
 
-      const ref = toChatContextRef(node)
-      e.dataTransfer.setData(CHAT_CONTEXT_DRAG_MIME, serializeChatContextRef(ref))
+      const normalized = normalizeNodePath(node.path)
+      const chatTargets =
+        selectedPaths.has(normalized) && selectedPaths.size > 1
+          ? getChatAttachTargets(node)
+          : [node]
+      e.dataTransfer.setData(
+        CHAT_CONTEXT_DRAG_MIME,
+        serializeChatContextRefs(chatTargets.map(toChatContextRef))
+      )
 
       // Workspace root can be attached to chat, but must not be moved in the tree.
       if (isWorkspaceRootPath(node.path)) {
@@ -621,7 +669,7 @@ export function FileTree() {
       e.dataTransfer.setData(FILE_MOVE_DRAG_MIME, serializeFileMovePaths(movePaths))
       e.dataTransfer.effectAllowed = 'copyMove'
     },
-    [getMoveSourcePaths, isWorkspaceRootPath]
+    [getChatAttachTargets, getMoveSourcePaths, isWorkspaceRootPath, selectedPaths]
   )
 
   const handleNodeDragEnd = useCallback(() => {
@@ -806,12 +854,14 @@ export function FileTree() {
     contextMenu?.node?.isDirectory ? contextMenu.node.path : workspaceRoot
 
   const deleteTargets = contextMenu ? getDeleteTargets(contextMenu.node) : []
+  const chatAttachTargets = contextMenu ? getChatAttachTargets(contextMenu.node) : []
   const canRename =
     contextMenu?.node &&
     deleteTargets.length === 1 &&
     !contextMenu.node.isPreview &&
     !isWorkspaceRootPath(contextMenu.node.path)
   const canDelete = deleteTargets.length > 0 && deleteTargets.every((n) => !n.isPreview)
+  const canAddToChat = chatAttachTargets.length > 0
   const isRootDropTarget = dropTargetPath === normalizeNodePath(workspaceRoot)
   const workspaceName = basename(workspaceRoot)
 
@@ -918,6 +968,13 @@ export function FileTree() {
           {contextMenu.node && (
             <>
               <div className="context-menu-separator" />
+              {canAddToChat && (
+                <button onClick={() => addTargetsToChat(contextMenu.node)}>
+                  {chatAttachTargets.length > 1
+                    ? t('explorer.addToChatMany', { count: chatAttachTargets.length })
+                    : t('explorer.addToChat')}
+                </button>
+              )}
               {contextMenu.node.isDirectory && !contextMenu.node.isPreview && (
                 <button
                   onClick={() => {

@@ -14,27 +14,39 @@ export function toChatContextRef(node: {
   }
 }
 
+function isChatContextRef(value: unknown): value is ChatContextRef {
+  if (!value || typeof value !== 'object') return false
+  const ref = value as ChatContextRef
+  return (
+    typeof ref.path === 'string' &&
+    typeof ref.name === 'string' &&
+    typeof ref.isDirectory === 'boolean'
+  )
+}
+
+export function serializeChatContextRefs(refs: ChatContextRef[]): string {
+  return JSON.stringify(refs)
+}
+
 export function serializeChatContextRef(ref: ChatContextRef): string {
-  return JSON.stringify(ref)
+  return serializeChatContextRefs([ref])
+}
+
+export function parseChatContextRefs(dataTransfer: DataTransfer): ChatContextRef[] {
+  const raw = dataTransfer.getData(CHAT_CONTEXT_DRAG_MIME)
+  if (!raw) return []
+
+  try {
+    const parsed: unknown = JSON.parse(raw)
+    const items = Array.isArray(parsed) ? parsed : [parsed]
+    return items.filter(isChatContextRef)
+  } catch {
+    return []
+  }
 }
 
 export function parseChatContextRef(dataTransfer: DataTransfer): ChatContextRef | null {
-  const raw = dataTransfer.getData(CHAT_CONTEXT_DRAG_MIME)
-  if (!raw) return null
-
-  try {
-    const parsed = JSON.parse(raw) as ChatContextRef
-    if (
-      typeof parsed.path === 'string' &&
-      typeof parsed.name === 'string' &&
-      typeof parsed.isDirectory === 'boolean'
-    ) {
-      return parsed
-    }
-  } catch {
-    // ignore
-  }
-  return null
+  return parseChatContextRefs(dataTransfer)[0] ?? null
 }
 
 export function hasChatContextDrag(dataTransfer: DataTransfer): boolean {
