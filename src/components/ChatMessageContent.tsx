@@ -13,6 +13,8 @@ import { useI18n } from '@/i18n'
 interface ChatMessageContentProps {
   content: string
   isStreaming?: boolean
+  /** When true, skip the bare "…" placeholder (e.g. Agent already shows a status line). */
+  hideStreamingPlaceholder?: boolean
 }
 
 function pathMentionIcon(kind: 'file' | 'folder' | 'selection'): string {
@@ -121,13 +123,18 @@ function CodeAccordion({
   )
 }
 
-export function ChatMessageContent({ content, isStreaming }: ChatMessageContentProps) {
+export function ChatMessageContent({
+  content,
+  isStreaming,
+  hideStreamingPlaceholder
+}: ChatMessageContentProps) {
   const { t } = useI18n()
 
   if (!content) {
+    if (!isStreaming || hideStreamingPlaceholder) return null
     return (
       <span className="chat-streaming">
-        {isStreaming ? <AnimatedEllipsis /> : null}
+        <AnimatedEllipsis />
       </span>
     )
   }
@@ -144,9 +151,10 @@ export function ChatMessageContent({ content, isStreaming }: ChatMessageContentP
 
   if (segments.length === 0 && !streamingCode) {
     if (!sanitized.trim()) {
+      if (!isStreaming || hideStreamingPlaceholder) return null
       return (
         <span className="chat-streaming">
-          {isStreaming ? <AnimatedStatus label={t('chat.preparingChangesShort')} /> : null}
+          <AnimatedStatus label={t('chat.preparingChangesShort')} />
         </span>
       )
     }

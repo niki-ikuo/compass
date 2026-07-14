@@ -1,5 +1,5 @@
 import { mkdir, readdir, readFile, rename, rm, stat, writeFile } from 'fs/promises'
-import { resolve, relative, dirname, join, basename } from 'path'
+import { resolve, relative, dirname, join, basename, isAbsolute } from 'path'
 import type {
   FileEncoding,
   FileTreeNode,
@@ -66,10 +66,19 @@ function validateName(name: string): void {
   if (/[<>:"/\\|?*]/.test(name)) throw new Error(t('fs.invalidChars'))
 }
 
-function resolveInsideWorkspace(workspaceRoot: string, targetPath: string): string {
-  const absolutePath = resolve(workspaceRoot, targetPath)
-  const rel = relative(workspaceRoot, absolutePath)
-  if (rel.startsWith('..') || rel === '') {
+/** ワークスペース内パスへ解決。`allowRoot` でワークスペース直下自体を許可（listDir 用） */
+export function resolveInsideWorkspace(
+  workspaceRoot: string,
+  targetPath: string,
+  options?: { allowRoot?: boolean }
+): string {
+  const root = resolve(workspaceRoot)
+  const absolutePath = resolve(root, targetPath)
+  const rel = relative(root, absolutePath)
+  if (rel.startsWith('..') || isAbsolute(rel)) {
+    throw new Error(t('fs.outsideWorkspace', { path: targetPath }))
+  }
+  if (rel === '' && !options?.allowRoot) {
     throw new Error(t('fs.outsideWorkspace', { path: targetPath }))
   }
   return absolutePath
@@ -348,7 +357,7 @@ export async function resolveChatContext(
       }
 
       folders.push({
-        relativePath: toRelativePath(workspaceRoot, ref.path) || basename(ref.path),
+        relativePath: toRelativePath(workspaceRoot, ref.path) || '.',
         structure,
         files: folderFiles,
         truncated

@@ -8,7 +8,9 @@ import {
   ChatInputComposer,
   type ChatInputComposerHandle
 } from './ChatInputComposer'
-import type { ActionPreviewItem, ChatMode, ChatSelectionRef } from '@/types'
+import type { ActionPreviewItem, AgentToolStep, ChatMode, ChatSelectionRef } from '@/types'
+import { AgentStepTimeline } from './AgentStepTimeline'
+import { AnimatedStatus } from './AnimatedEllipsis'
 import {
   buildDisplayContentForActions,
   inferWorkspaceActionsFromCodeBlocks,
@@ -41,10 +43,19 @@ function parseWorkspaceActions(raw: string) {
   return parseWorkspaceActionsFromContent(raw)
 }
 
+const CHAT_MODE_OPTIONS: { id: ChatMode; label: string; titleKey: 'chat.askModeTitle' | 'chat.editModeTitle' | 'chat.agentModeTitle' }[] =
+  [
+    { id: 'ask', label: 'Ask', titleKey: 'chat.askModeTitle' },
+    { id: 'edit', label: 'Edit', titleKey: 'chat.editModeTitle' },
+    { id: 'agent', label: 'Agent', titleKey: 'chat.agentModeTitle' }
+  ]
+
 export function ChatPanel() {
   const { t } = useI18n()
   const [input, setInput] = useState('')
   const [sendMode, setSendMode] = useState<ChatMode>('edit')
+  const [modeMenuOpen, setModeMenuOpen] = useState(false)
+  const [agentStreamStatus, setAgentStreamStatus] = useState<string | null>(null)
   const [pendingCode, setPendingCode] = useState<{ code: string; language: string } | null>(null)
   const [isDragOver, setIsDragOver] = useState(false)
   const [pinnedSelections, setPinnedSelections] = useState<ChatSelectionRef[]>([])
@@ -57,6 +68,7 @@ export function ChatPanel() {
   const historyRef = useRef<HTMLDivElement>(null)
   const historyButtonRef = useRef<HTMLButtonElement>(null)
   const historyDropdownRef = useRef<HTMLDivElement>(null)
+  const modePickerRef = useRef<HTMLDivElement>(null)
   const stopRequestedRef = useRef(false)
   const lastSentModeRef = useRef<ChatMode>('edit')
 
@@ -74,6 +86,7 @@ export function ChatPanel() {
   const activeFilePath = useAppStore((s) => s.activeFilePath)
   const workspaceRoot = useAppStore((s) => s.workspaceRoot)
   const setPendingWorkspacePreview = useAppStore((s) => s.setPendingWorkspacePreview)
+  const setPendingAgentApprovalId = useAppStore((s) => s.setPendingAgentApprovalId)
   const openPreviewFile = useAppStore((s) => s.openPreviewFile)
   const applyWorkspacePreview = useAppStore((s) => s.applyWorkspacePreview)
   const revertWorkspacePreview = useAppStore((s) => s.revertWorkspacePreview)
@@ -98,7 +111,10 @@ export function ChatPanel() {
   const chatMessages = activeChat?.messages ?? []
   const chatContextRefs = activeChat?.contextRefs ?? []
   const isEditSendMode = sendMode === 'edit'
+  const isAskSendMode = sendMode === 'ask'
   const isActiveChatPreview = pendingWorkspacePreview?.chatId === activeChatId
+  const activeModeOption =
+    CHAT_MODE_OPTIONS.find((option) => option.id === sendMode) ?? CHAT_MODE_OPTIONS[0]
 
   useEffect(() => {
     setPendingCode(null)
@@ -107,7 +123,7 @@ export function ChatPanel() {
     const lastUser = [...(session?.messages ?? [])]
       .reverse()
       .find((message) => message.role === 'user')
-    if (lastUser?.mode === 'ask' || lastUser?.mode === 'edit') {
+    if (lastUser?.mode === 'ask' || lastUser?.mode === 'edit' || lastUser?.mode === 'agent') {
       setSendMode(lastUser.mode)
     } else {
       // 新規チャットなど履歴がない場合は、直前の送信モードを引き継ぐ
@@ -160,6 +176,30 @@ export function ChatPanel() {
     }
   }, [historyOpen])
 
+  useEffect(() => {
+    if (!modeMenuOpen) return
+
+    const handlePointerDown = (event: MouseEvent) => {
+      const target = event.target as Node
+      if (modePickerRef.current?.contains(target)) return
+      setModeMenuOpen(false)
+    }
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setModeMenuOpen(false)
+    }
+
+    document.addEventListener('mousedown', handlePointerDown)
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown)
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [modeMenuOpen])
+
+  useEffect(() => {
+    if (isChatLoading) setModeMenuOpen(false)
+  }, [isChatLoading])
+
   const formatHistoryTime = (timestamp: number) => {
     try {
       return new Intl.DateTimeFormat(getDateLocale(), {
@@ -179,6 +219,7 @@ export function ChatPanel() {
 
     const messageMode = sendMode
     const isEditMessage = messageMode === 'edit'
+    const isAgentMessage = messageMode === 'agent'
     const selectionsForRequest = buildSelectionsForRequest()
 
     lastSentModeRef.current = messageMode
@@ -195,6 +236,7 @@ export function ChatPanel() {
     addChatMessage('user', text, messageMode)
     addChatMessage('assistant', '')
     stopRequestedRef.current = false
+    setAgentStreamStatus(null)
     setChatLoading(true)
 
     const activeFile = getActiveFile()
@@ -210,10 +252,15 @@ export function ChatPanel() {
     }
 
     let accumulated = ''
+    let agentSteps: AgentToolStep[] = []
     let unsubChunk: (() => void) | undefined
     let unsubDone: (() => void) | undefined
     let unsubAborted: (() => void) | undefined
     let unsubError: (() => void) | undefined
+    let unsubToolStart: (() => void) | undefined
+    let unsubToolResult: (() => void) | undefined
+    let unsubNeedApproval: (() => void) | undefined
+    let unsubStep: (() => void) | undefined
     let settled = false
 
     const cleanup = () => {
@@ -221,24 +268,83 @@ export function ChatPanel() {
       unsubDone?.()
       unsubAborted?.()
       unsubError?.()
+      unsubToolStart?.()
+      unsubToolResult?.()
+      unsubNeedApproval?.()
+      unsubStep?.()
     }
 
     const finish = () => {
       if (settled) return
       settled = true
       cleanup()
+      setAgentStreamStatus(null)
       setChatLoading(false)
+    }
+
+    const syncAssistant = (content: string, steps = agentSteps) => {
+      updateLastAssistantMessage(content, steps.length > 0 ? { agentSteps: steps } : undefined)
     }
 
     unsubChunk = window.compass.ai.onChunk((chunk) => {
       accumulated += chunk
       if (isEditMessage) {
         const display = stripAllCompassActionsContent(accumulated)
-        updateLastAssistantMessage(display || t('chat.preparingChanges'))
+        syncAssistant(display || t('chat.preparingChanges'))
       } else {
-        updateLastAssistantMessage(accumulated)
+        syncAssistant(accumulated)
       }
     })
+
+    if (isAgentMessage) {
+      unsubToolStart = window.compass.ai.onToolStart((event) => {
+        agentSteps = [
+          ...agentSteps.filter((s) => s.id !== event.id),
+          {
+            id: event.id,
+            name: event.name,
+            args: event.args,
+            status: 'running'
+          }
+        ]
+        syncAssistant(accumulated || t('chat.generating'))
+      })
+
+      unsubToolResult = window.compass.ai.onToolResult((event) => {
+        agentSteps = agentSteps.map((step) =>
+          step.id === event.id
+            ? {
+                ...step,
+                status: event.ok ? 'done' : 'error',
+                ok: event.ok,
+                summary: event.summary
+              }
+            : step
+        )
+        syncAssistant(accumulated || t('chat.generating'))
+      })
+
+      unsubNeedApproval = window.compass.ai.onNeedApproval((event) => {
+        setPendingAgentApprovalId(event.id)
+        setPendingWorkspacePreview({ actions: event.actions, items: event.items })
+        setAgentStreamStatus(t('chat.agentWaitingApproval'))
+        agentSteps = agentSteps.map((step) =>
+          step.id === event.id
+            ? {
+                ...step,
+                status: 'waiting_approval',
+                summary: t('chat.agentWaitingApproval')
+              }
+            : step
+        )
+        syncAssistant(accumulated.trim() || t('chat.reviewProposal'))
+      })
+
+      unsubStep = window.compass.ai.onStep((event) => {
+        setAgentStreamStatus(event.label)
+        syncAssistant(accumulated)
+      })
+    }
 
     unsubDone = window.compass.ai.onDone(async () => {
       finish()
@@ -274,6 +380,8 @@ export function ChatPanel() {
         } else if (displayContent !== accumulated.trim()) {
           updateLastAssistantMessage(displayContent)
         }
+      } else if (isAgentMessage) {
+        syncAssistant(accumulated.trim())
       }
     })
 
@@ -282,6 +390,18 @@ export function ChatPanel() {
       if (isEditMessage) {
         const display = stripAllCompassActionsContent(accumulated).trim()
         updateLastAssistantMessage(display || t('chat.aborted'))
+      } else if (isAgentMessage) {
+        const approvalId = useAppStore.getState().pendingAgentApprovalId
+        if (approvalId) {
+          setPendingAgentApprovalId(null)
+          revertWorkspacePreview()
+        }
+        agentSteps = agentSteps.map((step) =>
+          step.status === 'running' || step.status === 'waiting_approval'
+            ? { ...step, status: 'error', ok: false, summary: step.summary || t('chat.aborted') }
+            : step
+        )
+        syncAssistant(accumulated.trim() || t('chat.aborted'))
       } else {
         updateLastAssistantMessage(accumulated.trim() || t('chat.aborted'))
       }
@@ -289,7 +409,16 @@ export function ChatPanel() {
 
     unsubError = window.compass.ai.onError((error) => {
       finish()
-      updateLastAssistantMessage(t('chat.errorPrefix', { error }))
+      if (isAgentMessage) {
+        agentSteps = agentSteps.map((step) =>
+          step.status === 'running' || step.status === 'waiting_approval'
+            ? { ...step, status: 'error', ok: false, summary: error }
+            : step
+        )
+        syncAssistant(t('chat.errorPrefix', { error }))
+      } else {
+        updateLastAssistantMessage(t('chat.errorPrefix', { error }))
+      }
     })
 
     const history = [
@@ -660,12 +789,24 @@ export function ChatPanel() {
                 <span>{msg.role === 'user' ? t('chat.you') : t('chat.ai')}</span>
                 {msg.role === 'user' && msg.mode && (
                   <span className={`chat-message-mode ${msg.mode}`}>
-                    {msg.mode === 'edit' ? 'Edit' : 'Ask'}
+                    {msg.mode === 'edit' ? 'Edit' : msg.mode === 'agent' ? 'Agent' : 'Ask'}
                   </span>
                 )}
               </div>
               <div className="chat-content">
-                <ChatMessageContent content={msg.content} isStreaming={isStreaming} />
+                {msg.role === 'assistant' && msg.agentSteps && msg.agentSteps.length > 0 && (
+                  <AgentStepTimeline steps={msg.agentSteps} />
+                )}
+                <ChatMessageContent
+                  content={msg.content}
+                  isStreaming={isStreaming}
+                  hideStreamingPlaceholder={Boolean(agentStreamStatus)}
+                />
+                {isStreaming && agentStreamStatus ? (
+                  <div className="chat-agent-stream-status">
+                    <AnimatedStatus label={agentStreamStatus} />
+                  </div>
+                ) : null}
               </div>
             </div>
           )
@@ -682,7 +823,7 @@ export function ChatPanel() {
         />
       )}
 
-      {!isEditSendMode && pendingCode && activeFile && (
+      {isAskSendMode && pendingCode && activeFile && (
         <DiffPreview
           oldText={activeFile.content}
           newText={pendingCode.code}
@@ -692,7 +833,7 @@ export function ChatPanel() {
         />
       )}
 
-      {!isEditSendMode && pendingCode && activeFile && (
+      {isAskSendMode && pendingCode && activeFile && (
         <div className="apply-options">
           <button className="btn-secondary" onClick={handleInsert}>
             {t('chat.insertAtCursor')}
@@ -714,32 +855,63 @@ export function ChatPanel() {
             onSubmit={() => void handleSend()}
             onPasteSelection={handlePasteSelection}
             placeholder={
-              isEditSendMode ? t('chat.placeholderEdit') : t('chat.placeholderAsk')
+              isEditSendMode
+                ? t('chat.placeholderEdit')
+                : sendMode === 'agent'
+                  ? t('chat.placeholderAgent')
+                  : t('chat.placeholderAsk')
             }
             disabled={isChatLoading}
           />
           <div className="chat-input-footer">
-            <div className="chat-mode-switch" role="group" aria-label={t('chat.sendMode')}>
+            <div className="chat-mode-picker" ref={modePickerRef}>
               <button
                 type="button"
-                aria-pressed={sendMode === 'edit'}
-                className={sendMode === 'edit' ? 'active' : ''}
-                onClick={() => setSendMode('edit')}
+                className={`chat-mode-trigger mode-${sendMode}`}
+                onClick={() => setModeMenuOpen((open) => !open)}
                 disabled={isChatLoading}
-                title={t('chat.editModeTitle')}
+                title={t(activeModeOption.titleKey)}
+                aria-label={t('chat.sendMode')}
+                aria-haspopup="listbox"
+                aria-expanded={modeMenuOpen}
               >
-                Edit
+                <span className="chat-mode-dot" aria-hidden="true" />
+                <span className="chat-mode-trigger-label">{activeModeOption.label}</span>
+                <span className="chat-mode-chevron" aria-hidden="true">
+                  ▾
+                </span>
               </button>
-              <button
-                type="button"
-                aria-pressed={sendMode === 'ask'}
-                className={sendMode === 'ask' ? 'active' : ''}
-                onClick={() => setSendMode('ask')}
-                disabled={isChatLoading}
-                title={t('chat.askModeTitle')}
-              >
-                Ask
-              </button>
+              {modeMenuOpen ? (
+                <div className="chat-mode-menu" role="listbox" aria-label={t('chat.sendMode')}>
+                  {CHAT_MODE_OPTIONS.map((option) => {
+                    const selected = option.id === sendMode
+                    return (
+                      <button
+                        key={option.id}
+                        type="button"
+                        role="option"
+                        aria-selected={selected}
+                        className={`chat-mode-menu-item mode-${option.id}${
+                          selected ? ' selected' : ''
+                        }`}
+                        title={t(option.titleKey)}
+                        onClick={() => {
+                          setSendMode(option.id)
+                          setModeMenuOpen(false)
+                        }}
+                      >
+                        <span className="chat-mode-dot" aria-hidden="true" />
+                        <span>{option.label}</span>
+                        {selected ? (
+                          <span className="chat-mode-menu-check" aria-hidden="true">
+                            ✓
+                          </span>
+                        ) : null}
+                      </button>
+                    )
+                  })}
+                </div>
+              ) : null}
             </div>
             {isChatLoading ? (
               <button

@@ -3,6 +3,7 @@ import {
   useImperativeHandle,
   useLayoutEffect,
   useRef,
+  useState,
   type KeyboardEvent as ReactKeyboardEvent
 } from 'react'
 import { detectMentionKind, isStructuredMention, type ChatMentionKind } from '@/utils/chat-mentions'
@@ -189,6 +190,7 @@ export const ChatInputComposer = forwardRef<ChatInputComposerHandle, ChatInputCo
     const editorRef = useRef<HTMLDivElement>(null)
     const emittingRef = useRef(false)
     const composingRef = useRef(false)
+    const [isComposing, setIsComposing] = useState(false)
 
     const emitChange = () => {
       const editor = editorRef.current
@@ -259,7 +261,7 @@ export const ChatInputComposer = forwardRef<ChatInputComposerHandle, ChatInputCo
       }
     }
 
-    const isEmpty = value.trim().length === 0
+    const isEmpty = value.trim().length === 0 && !isComposing
 
     return (
       <div
@@ -285,9 +287,11 @@ export const ChatInputComposer = forwardRef<ChatInputComposerHandle, ChatInputCo
         }}
         onCompositionStart={() => {
           composingRef.current = true
+          setIsComposing(true)
         }}
         onCompositionEnd={() => {
           composingRef.current = false
+          setIsComposing(false)
           emitChange()
         }}
         onKeyDown={handleKeyDown}

@@ -16,7 +16,7 @@ Compass uses Electron’s three-layer model: main, preload, and renderer. Privil
                       │ IPC (preload / contextBridge)
 ┌─────────────────────┴───────────────────────────┐
 │                  Main Process                   │
-│  filesystem / ai-client / settings / terminal   │
+│  filesystem / ai-client / agent-runner / settings / terminal   │
 │  project-indexer / chat-history …               │
 └─────────────────────────────────────────────────┘
 ```
@@ -35,7 +35,9 @@ electron/
 ├── preload.ts              # Renderer-facing API
 └── services/
     ├── filesystem.ts       # Directory / file ops
-    ├── ai-client.ts        # OpenAI-compatible API / SSE
+    ├── ai-client.ts        # OpenAI-compatible API / SSE (Ask / Edit)
+    ├── agent-runner.ts     # Agent tool loop (Phase 1–4)
+    ├── agent-exec.ts       # Restricted Agent command execution
     ├── settings.ts         # Settings read/write
     ├── project-indexer.ts  # Workspace index
     ├── index-watcher.ts    # Index file watching
@@ -57,7 +59,7 @@ The renderer calls `window.compass.*`. The source of truth is `electron/preload.
 | Namespace | Purpose |
 |-----------|---------|
 | `fs:*` | Folder pick, read/write, create/move/delete, apply actions |
-| `ai:*` | Chat send, chunk / done / error events, inline completions |
+| `ai:*` | Chat send, chunk / done / error / tool events, inline completions |
 | `settings:*` | Get / save settings |
 | `workspace:*` | Recent workspace / recently opened folders |
 | `index:*` | Build / watch project index |
@@ -67,14 +69,17 @@ The renderer calls `window.compass.*`. The source of truth is `electron/preload.
 
 ## Data flow (AI chat)
 
-1. Renderer builds context from the current file, selection, and references (Ask / Edit)
+1. Renderer builds context from the current file, selection, and references (Ask / Edit / Agent)
 2. Main ensures the `.compass` structure index and attaches it for the AI
 3. Renderer sends `ai:chat` to Main
-4. Main `ai-client` opens an SSE connection to an OpenAI-compatible API
-5. Tokens stream back via `ai:chunk`
-6. Completion: `ai:done`; failure: `ai:error`
+4. Main routes by mode:
+   - **Ask / Edit**: `ai-client` SSE streaming (`delta.content` only)
+   - **Agent**: `agent-runner` tool loop (OpenAI-compatible `tools` + SSE)
+5. Tokens stream back via `ai:chunk`; Agent also emits `ai:toolStart` / `ai:toolResult` / `ai:step`
+6. Completion: `ai:done`; failure: `ai:error`; cancel: `ai:aborted`
 7. **Ask**: explanation only (no file-change actions)
 8. **Edit**: parse `compass-actions` → preview → apply after user approval (not an autonomous tool loop)
+9. **Agent (Phase 1–4)**: read tools, `proposeActions` (pause → preview → approval, including partial resolve), restricted `exec`, turn/payload limits, secret redaction, tools-unsupported errors, `waiting_approval` UI
 
 ## `.compass` index
 

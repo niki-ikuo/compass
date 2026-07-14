@@ -168,7 +168,7 @@ export const ja = {
   'chat.closeTab': 'タブを閉じる（履歴は残ります）',
   'chat.emptyLead': 'コードについて質問したり、実装や変更を依頼できます',
   'chat.emptyModes':
-    '送信前に Ask / Edit を選べます。Ask は説明のみ、Edit はファイル変更を提案します',
+    '送信前に Ask / Edit / Agent を選べます。Ask は説明のみ、Edit はファイル変更を提案、Agent はツールで調査・変更提案（承認後に適用）します',
   'chat.emptyContext': '現在のファイルが自動的にコンテキストに含まれます',
   'chat.emptyPasteHint':
     'エディタでコピーした選択行をチャットに貼ると、自動で参照カプセルになります',
@@ -178,9 +178,17 @@ export const ja = {
   'chat.llmModel': 'LLMモデル',
   'chat.placeholderEdit': '実装や変更を依頼... (Enterで送信, Shift+Enterで改行)',
   'chat.placeholderAsk': '質問を入力... (Enterで送信, Shift+Enterで改行)',
+  'chat.placeholderAgent': 'コードベースを調査・説明... (Enterで送信, Shift+Enterで改行)',
   'chat.sendMode': '送信モード',
   'chat.editModeTitle': 'このメッセージを Edit モードで送信（ファイルの作成・変更を提案）',
   'chat.askModeTitle': 'このメッセージを Ask モードで送信（質問への回答のみ）',
+  'chat.agentModeTitle':
+    'このメッセージを Agent モードで送信（調査・変更提案・制限付きコマンド）',
+  'chat.agentSteps': 'ツール',
+  'chat.agentToolRunning': '実行中…',
+  'chat.agentToolOk': '成功',
+  'chat.agentToolError': '失敗',
+  'chat.agentWaitingApproval': '承認待ち（プレビューを確認してください）',
   'chat.stop': '停止',
   'chat.stopTitle': 'AIの応答を中断',
   'chat.send': '送信',
@@ -305,6 +313,8 @@ export const ja = {
     'あなたはコーディングアシスタントです。日本語で回答してください。Editモードでは、ファイル/フォルダの作成・変更・削除は必ず```compass-actions```コードブロック内のJSONだけで返してください。通常の```css```や```html```などのコードブロックでファイル全体を提示してはいけません。説明文は短くし、実際の変更内容はcompass-actionsに含めてください。形式は {"actions":[{"type":"mkdir","path":"relative/path"},{"type":"writeFile","path":"relative/file.ts","content":"..."},{"type":"deleteFile","path":"relative/file.ts"},{"type":"deleteDir","path":"relative/folder"}]} とし、pathはワークスペース直下からの相対パス（例: style.css。フォルダ名を重複して含めない）のみ使用してください。プロジェクト構造インデックス(.compass)が提供された場合は、ファイル間の関係を踏まえて回答してください。',
   'ai.askSystemPrompt':
     'あなたはコーディングアシスタントです。日本語で回答してください。現在はAskモードです。コードの説明、質問への回答、調査、レビューのみを行い、ワークスペースへのファイル作成・変更・削除は行わないでください。```compass-actions```コードブロックは絶対に出力しないでください。コード例は通常の```コードブロックで示し、ユーザーが手動で適用できるようにしてください。プロジェクト構造インデックス(.compass)が提供された場合は、ファイル間の関係を踏まえて回答してください。',
+  'ai.agentSystemPrompt':
+    'あなたはコーディングアシスタントの Agent です。日本語で回答してください。ツール（readFile / listDir / search / proposeActions / exec）でワークスペースを調査・変更提案・短いコマンド実行ができます。パスはすべてワークスペースルートからの相対パスです。ルートは "." を使い、ワークスペースフォルダ名そのものをサブパスにしないでください。ファイル変更は proposeActions でまとめて提案し、ユーザーがプレビュー承認するまで適用されません。exec はテスト・lint・ビルドなど短命な非対話コマンド向けで、危険なコマンドは拒否され、ユーザー用ターミナルとは別です。Windows では Git Bash があればそこで実行されます（なければ cmd.exe）。必要なツールを使い、最後に簡潔な結論をテキストで返してください。',
   'ai.userRefsHeader': '[ユーザーが指定したファイル/フォルダ]',
   'ai.userRefsIntro': '以下はエクスプローラーから明示的に指定されたコンテキストです。',
   'ai.folderHeading': '## フォルダ: {path}',
@@ -316,11 +326,20 @@ export const ja = {
   'ai.selectionText': '選択テキスト',
   'ai.editModeReminder':
     '[Editモード] ファイル変更は通常のコードブロックではなく、必ず```compass-actions```のJSONのみで返してください。',
+  'ai.agentModeReminder':
+    '[Agentモード] readFile / listDir / search で調査、変更は proposeActions、検証は exec（短命・ワークスペース内）。パスは相対、ルートは "."。',
   'ai.userQuestion': '[ユーザーの質問]',
   'ai.missingApiKey': '{provider} の APIキーが設定されていません。設定画面から入力してください。',
   'ai.missingBaseUrl': 'API Base URL が設定されていません。設定画面から入力してください。',
   'ai.apiError': 'APIエラー ({status}): {body}',
   'ai.noResponseBody': 'レスポンスボディがありません',
+  'ai.agentNeedsWorkspace': 'Agent モードではフォルダを開いてください。',
+  'ai.agentToolLimit': 'ツール呼び出し回数の上限に達しました。',
+  'ai.agentTurnLimit': 'Agent のターン数上限に達しました。',
+  'ai.agentStepThinking': '思考中（ターン {turn}）',
+  'ai.agentStepWaitingApproval': '変更提案の承認待ち',
+  'ai.agentToolsUnsupported':
+    'このモデル/プロバイダはツール呼び出し（Agent）に対応していません。Edit モードを使うか、tools 対応のモデルに切り替えてください。',
   'ai.indexHeader': '[プロジェクト構造インデックス (.compass)]',
   'ai.indexLines': '{count}行',
   'ai.inlineCompletionSystemPrompt':
@@ -494,7 +513,7 @@ export const en: Record<MessageKey, string> = {
   'chat.closeTab': 'Close tab (keeps history)',
   'chat.emptyLead': 'Ask about code, or request implementations and changes',
   'chat.emptyModes':
-    'Choose Ask / Edit before sending. Ask explains only; Edit proposes file changes',
+    'Choose Ask / Edit / Agent before sending. Ask explains; Edit proposes file changes; Agent inspects with tools and proposes changes (apply after approval)',
   'chat.emptyContext': 'The current file is included as context automatically',
   'chat.emptyPasteHint':
     'Paste a selection copied from the editor to create a reference chip',
@@ -504,9 +523,17 @@ export const en: Record<MessageKey, string> = {
   'chat.llmModel': 'LLM model',
   'chat.placeholderEdit': 'Ask for implementations or changes... (Enter to send, Shift+Enter for newline)',
   'chat.placeholderAsk': 'Ask a question... (Enter to send, Shift+Enter for newline)',
+  'chat.placeholderAgent': 'Explore or explain the codebase... (Enter to send, Shift+Enter for newline)',
   'chat.sendMode': 'Send mode',
   'chat.editModeTitle': 'Send in Edit mode (propose create/update files)',
   'chat.askModeTitle': 'Send in Ask mode (answers only)',
+  'chat.agentModeTitle':
+    'Send in Agent mode (inspect, propose changes, restricted commands)',
+  'chat.agentSteps': 'Tools',
+  'chat.agentToolRunning': 'Running…',
+  'chat.agentToolOk': 'ok',
+  'chat.agentToolError': 'failed',
+  'chat.agentWaitingApproval': 'Waiting for approval (review the preview)',
   'chat.stop': 'Stop',
   'chat.stopTitle': 'Stop AI response',
   'chat.send': 'Send',
@@ -623,6 +650,8 @@ export const en: Record<MessageKey, string> = {
     'You are a coding assistant. Respond in English. In Edit mode, create/update/delete files and folders only via a ```compass-actions``` JSON code block. Do not present full file contents in normal ```css``` / ```html``` (etc.) code blocks. Keep explanations short; put the actual changes in compass-actions. Format: {"actions":[{"type":"mkdir","path":"relative/path"},{"type":"writeFile","path":"relative/file.ts","content":"..."},{"type":"deleteFile","path":"relative/file.ts"},{"type":"deleteDir","path":"relative/folder"}]}. Paths must be relative to the workspace root (e.g. style.css; do not duplicate folder names). If a project structure index (.compass) is provided, use file relationships in your answer.',
   'ai.askSystemPrompt':
     'You are a coding assistant. Respond in English. You are in Ask mode. Only explain code, answer questions, investigate, and review. Do not create, modify, or delete workspace files. Never output a ```compass-actions``` block. Show code examples in normal ``` code blocks so the user can apply them manually. If a project structure index (.compass) is provided, use file relationships in your answer.',
+  'ai.agentSystemPrompt':
+    'You are a coding Agent. Respond in English. Use tools (readFile / listDir / search / proposeActions / exec) to inspect the workspace, propose changes, and run short commands. Paths are relative to the workspace root. Use "." for the root; do not use the workspace folder name as a nested subpath. File changes must go through proposeActions and are not applied until the user approves the preview. Use exec for short non-interactive commands (tests, lint, build); dangerous commands are blocked; this is separate from the user terminal. On Windows, exec uses Git Bash when available (otherwise cmd.exe). Use tools as needed, then return a concise final answer in text.',
   'ai.userRefsHeader': '[User-specified files/folders]',
   'ai.userRefsIntro': 'The following context was explicitly selected from the explorer.',
   'ai.folderHeading': '## Folder: {path}',
@@ -634,11 +663,20 @@ export const en: Record<MessageKey, string> = {
   'ai.selectionText': 'Selected text',
   'ai.editModeReminder':
     '[Edit mode] Return file changes only as ```compass-actions``` JSON, not as normal code blocks.',
+  'ai.agentModeReminder':
+    '[Agent mode] Inspect with readFile / listDir / search; propose changes with proposeActions; verify with exec (short-lived, inside workspace). Paths are relative; root is ".".',
   'ai.userQuestion': "[User's question]",
   'ai.missingApiKey': '{provider} API key is not set. Enter it in Settings.',
   'ai.missingBaseUrl': 'API Base URL is not set. Enter it in Settings.',
   'ai.apiError': 'API error ({status}): {body}',
   'ai.noResponseBody': 'No response body',
+  'ai.agentNeedsWorkspace': 'Open a folder to use Agent mode.',
+  'ai.agentToolLimit': 'Agent tool-call limit reached.',
+  'ai.agentTurnLimit': 'Agent turn limit reached.',
+  'ai.agentStepThinking': 'Thinking (turn {turn})',
+  'ai.agentStepWaitingApproval': 'Waiting for change approval',
+  'ai.agentToolsUnsupported':
+    'This model/provider does not support tool calling (Agent). Use Edit mode or switch to a tools-capable model.',
   'ai.indexHeader': '[Project structure index (.compass)]',
   'ai.indexLines': '{count} lines',
   'ai.inlineCompletionSystemPrompt':

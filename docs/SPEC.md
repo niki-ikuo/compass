@@ -19,7 +19,7 @@
 
 - Text editor
 - File tree
-- AI chat (side panel) — **Ask** (explain only) / **Edit** (propose file changes)
+- AI chat (side panel) — **Ask** (explain only) / **Edit** (propose file changes) / **Agent** (read-only tool loop; writes & commands come later — see [AGENT_PLAN.md](./AGENT_PLAN.md))
 - Current file sent as context
 - Diff preview & apply for AI suggestions (Edit: `compass-actions` → preview → user approval)
 - OpenAI-compatible API (multi-LLM: provider presets, per-provider API keys, model selection)
@@ -30,7 +30,7 @@
 
 ### Deferred (v2+)
 
-- **Agent (autonomous)** — different from Edit. Tool-call loops, command execution, multi-step automation are not implemented (Edit stops at propose + human apply)
+- **Agent follow-ups** — Phase 4 UX/guardrails are implemented; deferred: retry UI, auto Edit fallback for tools-less providers — see [AGENT_PLAN.md](./AGENT_PLAN.md)
 - Vector search / RAG (`.compass` is a structure index, not embedding search)
 - MCP
 - Git integration
@@ -256,13 +256,15 @@ Now (terminal / .compass structure index / Ask·Edit / multi-LLM / inline comple
          └─ v3.0: MCP, plugins, native non–OpenAI APIs
 ```
 
+Phased build checklist for v2.0 Agent: [AGENT_PLAN.md](./AGENT_PLAN.md).
+
 **Terminology**
 
 | Name | Meaning |
 |------|---------|
 | Ask mode | Explain / review only; no workspace change proposals |
 | Edit mode | Propose create/change/delete as JSON; user previews and applies |
-| Agent (autonomous, not shipped) | Cursor Agent–style tool loops and command execution |
+| Agent | Tool-call loop. Phase 1–3: read tools, `proposeActions` (preview approval), restricted `exec` — see [AGENT_PLAN.md](./AGENT_PLAN.md) |
 
 ---
 

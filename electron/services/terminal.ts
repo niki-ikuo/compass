@@ -33,7 +33,8 @@ function fileExists(path: string): boolean {
   }
 }
 
-function detectGitBash(): string | null {
+/** Detect Git Bash for the integrated terminal and Agent `exec`. */
+export function detectGitBash(): string | null {
   const candidates = [
     process.env.ProgramFiles && join(process.env.ProgramFiles, 'Git', 'bin', 'bash.exe'),
     process.env['ProgramFiles(x86)'] &&

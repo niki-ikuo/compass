@@ -25,6 +25,9 @@
   --overlay: rgba(0, 0, 0, 0.6);
   --shadow: rgba(0, 0, 0, 0.35);
   --menu-hover-fg: #ffffff;
+  --chat-mode-ask: #dcdcaa;
+  --chat-mode-edit: #4ec9b0;
+  --chat-mode-agent: #3794ff;
   --font-mono: 'Cascadia Code', 'Consolas', 'Monaco', monospace;
   --font-ui: 'Segoe UI', system-ui, sans-serif;
 }
@@ -47,6 +50,9 @@
   --overlay: rgba(0, 0, 0, 0.35);
   --shadow: rgba(0, 0, 0, 0.18);
   --menu-hover-fg: #ffffff;
+  --chat-mode-ask: #8a6d00;
+  --chat-mode-edit: #0e7a5f;
+  --chat-mode-agent: #0078d4;
 }
 
 [data-theme='midnight'] {
@@ -67,6 +73,9 @@
   --overlay: rgba(1, 4, 9, 0.72);
   --shadow: rgba(1, 4, 9, 0.55);
   --menu-hover-fg: #ffffff;
+  --chat-mode-ask: #d29922;
+  --chat-mode-edit: #3fb950;
+  --chat-mode-agent: #58a6ff;
 }
 
 [data-theme='high-contrast'] {
@@ -87,6 +96,9 @@
   --overlay: rgba(0, 0, 0, 0.8);
   --shadow: rgba(255, 255, 255, 0.2);
   --menu-hover-fg: #000000;
+  --chat-mode-ask: #00ffff;
+  --chat-mode-edit: #00ff00;
+  --chat-mode-agent: #ffff00;
 }
 
 html,
@@ -1158,40 +1170,140 @@ body:has(.monaco-editor .find-widget.visible) .workbench-hover-container .action
   min-width: 0;
 }
 
-.chat-mode-switch {
-  display: inline-flex;
-  padding: 2px;
-  border-radius: 6px;
-  background: var(--bg-primary);
-  border: 1px solid var(--border);
+.chat-mode-picker {
+  position: relative;
+  flex-shrink: 0;
 }
 
-.chat-mode-switch button {
-  padding: 3px 10px;
-  border: none;
-  border-radius: 4px;
-  background: transparent;
-  color: var(--text-secondary);
+.chat-mode-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
   font-size: 11px;
-  font-weight: 600;
-  text-transform: none;
-  letter-spacing: 0;
+  font-weight: 700;
+  letter-spacing: 0.02em;
   cursor: pointer;
 }
 
-.chat-mode-switch button:hover:not(:disabled) {
-  color: var(--text-primary);
+.chat-mode-trigger:hover:not(:disabled) {
   background: var(--bg-hover);
 }
 
-.chat-mode-switch button.active {
-  background: var(--accent);
-  color: white;
-}
-
-.chat-mode-switch button:disabled {
+.chat-mode-trigger:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.chat-mode-trigger[aria-expanded='true'] {
+  background: var(--bg-hover);
+}
+
+.chat-mode-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: currentColor;
+  box-shadow: 0 0 0 1px color-mix(in srgb, currentColor 35%, transparent);
+}
+
+.chat-mode-trigger-label {
+  line-height: 1;
+}
+
+.chat-mode-chevron {
+  font-size: 9px;
+  color: var(--text-secondary);
+  line-height: 1;
+}
+
+.chat-mode-trigger.mode-ask {
+  color: var(--chat-mode-ask);
+  border-color: color-mix(in srgb, var(--chat-mode-ask) 55%, var(--border));
+  background: color-mix(in srgb, var(--chat-mode-ask) 14%, var(--bg-tertiary));
+}
+
+.chat-mode-trigger.mode-edit {
+  color: var(--chat-mode-edit);
+  border-color: color-mix(in srgb, var(--chat-mode-edit) 55%, var(--border));
+  background: color-mix(in srgb, var(--chat-mode-edit) 14%, var(--bg-tertiary));
+}
+
+.chat-mode-trigger.mode-agent {
+  color: var(--chat-mode-agent);
+  border-color: color-mix(in srgb, var(--chat-mode-agent) 55%, var(--border));
+  background: color-mix(in srgb, var(--chat-mode-agent) 14%, var(--bg-tertiary));
+}
+
+.chat-mode-menu {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 4px);
+  z-index: 40;
+  min-width: 132px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-primary);
+  box-shadow: 0 8px 24px var(--shadow);
+}
+
+.chat-mode-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 8px;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.chat-mode-menu-item:hover {
+  background: var(--bg-hover);
+}
+
+.chat-mode-menu-item.selected {
+  background: color-mix(in srgb, currentColor 14%, var(--bg-hover));
+}
+
+.chat-mode-menu-item.mode-ask {
+  color: var(--chat-mode-ask);
+}
+
+.chat-mode-menu-item.mode-edit {
+  color: var(--chat-mode-edit);
+}
+
+.chat-mode-menu-item.mode-agent {
+  color: var(--chat-mode-agent);
+}
+
+.chat-mode-menu-check {
+  margin-left: auto;
+  font-size: 11px;
+  opacity: 0.9;
+}
+
+[data-theme='high-contrast'] .chat-mode-trigger.mode-ask,
+[data-theme='high-contrast'] .chat-mode-trigger.mode-edit,
+[data-theme='high-contrast'] .chat-mode-trigger.mode-agent {
+  background: #000;
+  border-width: 2px;
+}
+
+[data-theme='high-contrast'] .chat-mode-menu {
+  border-width: 2px;
 }
 
 .chat-code-block.actions .chat-code-header.static {
@@ -1250,11 +1362,60 @@ body:has(.monaco-editor .find-widget.visible) .workbench-hover-container .action
 }
 
 .chat-message-mode.edit {
-  color: var(--success);
+  color: var(--chat-mode-edit);
 }
 
 .chat-message-mode.ask {
-  color: var(--warning);
+  color: var(--chat-mode-ask);
+}
+
+.chat-message-mode.agent {
+  color: var(--chat-mode-agent);
+}
+
+.chat-agent-stream-status {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.agent-step-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.agent-step-block {
+  border-left-width: 2px;
+  border-left-style: solid;
+  border-left-color: var(--border);
+}
+
+.agent-step-block.agent-step-running {
+  border-left-color: var(--accent);
+}
+
+.agent-step-block.agent-step-waiting_approval {
+  border-left-color: var(--warning, #c9a227);
+}
+
+.agent-step-block.agent-step-done {
+  border-left-color: var(--success);
+}
+
+.agent-step-block.agent-step-error,
+.agent-step-block.agent-step-failed {
+  border-left-color: var(--error, #e05252);
+}
+
+.agent-step-block .chat-code-label {
+  font-family: var(--font-mono, ui-monospace, monospace);
+}
+
+.agent-step-block .chat-code-body {
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .chat-content {
@@ -1568,12 +1729,8 @@ body:has(.monaco-editor .find-widget.visible) .workbench-hover-container .action
   padding: 6px 8px 8px;
 }
 
-.chat-input-footer .chat-mode-switch {
+.chat-input-footer .chat-mode-picker {
   flex-shrink: 0;
-}
-
-.chat-input-box .chat-mode-switch {
-  background: var(--bg-tertiary);
 }
 
 .btn-send {
