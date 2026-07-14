@@ -194,7 +194,7 @@ export function MenuBar({
       shortcut: 'Ctrl+0',
       action: () => void window.compass.shell.view('resetZoom')
     },
-    { label: t('menu.zoomIn'), shortcut: 'Ctrl+=', action: () => void window.compass.shell.view('zoomIn') },
+    { label: t('menu.zoomIn'), shortcut: 'Ctrl++', action: () => void window.compass.shell.view('zoomIn') },
     { label: t('menu.zoomOut'), shortcut: 'Ctrl+-', action: () => void window.compass.shell.view('zoomOut') },
     { separator: true, label: '', action: () => {} },
     { label: t('menu.terminal'), shortcut: 'Ctrl+`', action: workspaceRoot ? onToggleTerminal : () => {} }
