@@ -18,6 +18,7 @@ import {
   writeFileContent
 } from './services/filesystem'
 import { cancelChat, cancelInlineCompletion, completeInline, streamChat } from './services/ai-client'
+import { runAgent } from './services/agent-runner'
 import {
   getSettings,
   setSettings,
@@ -373,6 +374,10 @@ function registerIpcHandlers(): void {
   })
 
   ipcMain.handle('ai:chat', async (event, request: ChatRequest) => {
+    if (request.mode === 'agent') {
+      await runAgent(event.sender, request)
+      return
+    }
     await streamChat(event.sender, request)
   })
 

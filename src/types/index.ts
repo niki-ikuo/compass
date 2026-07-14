@@ -67,13 +67,83 @@ export interface ResolvedChatContext {
   folders: ResolvedFolderContext[]
 }
 
-export type ChatMode = 'edit' | 'ask'
+export type ChatMode = 'edit' | 'ask' | 'agent'
 
-/** 旧履歴の `agent` を `edit` に正規化する */
+/** Agent ランの概念的ライフサイクル（UI / ランナー共有） */
+export type AgentRunState =
+  | 'idle'
+  | 'thinking'
+  | 'tool_call'
+  | 'waiting_approval'
+  | 'applying'
+  | 'done'
+  | 'error'
+  | 'aborted'
+
+export type AgentToolName = 'readFile' | 'listDir' | 'search'
+
+export type AgentToolStepStatus = 'running' | 'done' | 'error'
+
+/** チャット履歴に載せるツールステップ（アシスタントメッセージに埋め込む） */
+export interface AgentToolStep {
+  id: string
+  name: string
+  args: Record<string, unknown>
+  status: AgentToolStepStatus
+  ok?: boolean
+  summary?: string
+}
+
+export interface AgentToolStartEvent {
+  id: string
+  name: string
+  args: Record<string, unknown>
+}
+
+export interface AgentToolResultEvent {
+  id: string
+  name: string
+  ok: boolean
+  summary: string
+}
+
+export interface AgentStepEvent {
+  label: string
+}
+
 export function normalizeChatMode(mode: unknown): ChatMode | undefined {
-  if (mode === 'ask') return 'ask'
-  if (mode === 'edit' || mode === 'agent') return 'edit'
+  if (mode === 'ask' || mode === 'edit' || mode === 'agent') return mode
   return undefined
+}
+
+export function normalizeAgentSteps(raw: unknown): AgentToolStep[] | undefined {
+  if (!Array.isArray(raw) || raw.length === 0) return undefined
+  const steps: AgentToolStep[] = []
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue
+    const s = item as Partial<AgentToolStep>
+    if (typeof s.id !== 'string' || typeof s.name !== 'string') continue
+    const status: AgentToolStepStatus =
+      s.status === 'running' || s.status === 'error' || s.status === 'done' ? s.status : 'done'
+    steps.push({
+      id: s.id,
+      name: s.name,
+      args:
+        s.args && typeof s.args === 'object' && !Array.isArray(s.args)
+          ? (s.args as Record<string, unknown>)
+          : {},
+      // 途中保存の running は履歴読込時に error 扱い
+      status: status === 'running' ? 'error' : status,
+      ok: typeof s.ok === 'boolean' ? s.ok : status === 'done',
+      summary:
+        typeof s.summary === 'string'
+          ? s.summary
+          : status === 'running'
+            ? 'interrupted'
+            : undefined
+    })
+  }
+  return steps.length > 0 ? steps : undefined
 }
 
 export interface ChatMessage {
@@ -82,6 +152,8 @@ export interface ChatMessage {
   content: string
   timestamp: number
   mode?: ChatMode
+  /** Agent モード時のツールステップ（永続化） */
+  agentSteps?: AgentToolStep[]
 }
 
 export interface ChatSession {
@@ -312,6 +384,9 @@ export interface CompassAPI {
     onDone: (callback: () => void) => () => void
     onAborted: (callback: () => void) => () => void
     onError: (callback: (error: string) => void) => () => void
+    onToolStart: (callback: (event: AgentToolStartEvent) => void) => () => void
+    onToolResult: (callback: (event: AgentToolResultEvent) => void) => () => void
+    onStep: (callback: (event: AgentStepEvent) => void) => () => void
   }
   settings: {
     get: () => Promise<AppSettings>

@@ -7,7 +7,9 @@ import { resolveChatContext } from './filesystem'
 import { getLlmProvider, getProviderLabel } from '../../src/utils/llm-providers'
 
 function getSystemPrompt(mode: ChatRequest['mode']): string {
-  return mode === 'ask' ? t('ai.askSystemPrompt') : t('ai.editSystemPrompt')
+  if (mode === 'ask') return t('ai.askSystemPrompt')
+  if (mode === 'agent') return t('ai.agentSystemPrompt')
+  return t('ai.editSystemPrompt')
 }
 
 const INLINE_COMPLETION_MAX_TOKENS = 96
@@ -97,7 +99,7 @@ export function sanitizeInlineCompletion(raw: string): string {
   return text
 }
 
-async function buildUserMessage(request: ChatRequest): Promise<string> {
+export async function buildUserMessage(request: ChatRequest): Promise<string> {
   const parts: string[] = []
 
   if (request.workspaceRoot) {
@@ -200,6 +202,11 @@ async function buildUserMessage(request: ChatRequest): Promise<string> {
     parts.push('')
   }
 
+  if (request.mode === 'agent') {
+    parts.push(t('ai.agentModeReminder'))
+    parts.push('')
+  }
+
   const lastUser = [...request.messages].reverse().find((m) => m.role === 'user')
   if (lastUser) {
     parts.push(t('ai.userQuestion'))
@@ -218,17 +225,30 @@ export function cancelChat(): boolean {
   return true
 }
 
+export function acquireChatAbortController(): AbortController {
+  activeAbortController?.abort()
+  const controller = new AbortController()
+  activeAbortController = controller
+  return controller
+}
+
+export function releaseChatAbortController(controller: AbortController): void {
+  if (activeAbortController === controller) {
+    activeAbortController = null
+  }
+}
+
 export function cancelInlineCompletion(): boolean {
   if (!activeCompleteAbortController) return false
   activeCompleteAbortController.abort()
   return true
 }
 
-function isAbortError(err: unknown): boolean {
+export function isAbortError(err: unknown): boolean {
   return err instanceof Error && err.name === 'AbortError'
 }
 
-function buildApiHeaders(settings: Awaited<ReturnType<typeof getSettings>>): Record<string, string> {
+export function buildApiHeaders(settings: Awaited<ReturnType<typeof getSettings>>): Record<string, string> {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json'
   }
@@ -374,9 +394,7 @@ export async function streamChat(
   webContents: WebContents,
   request: ChatRequest
 ): Promise<void> {
-  activeAbortController?.abort()
-  const abortController = new AbortController()
-  activeAbortController = abortController
+  const abortController = acquireChatAbortController()
   const { signal } = abortController
 
   try {
@@ -496,8 +514,6 @@ export async function streamChat(
     const message = err instanceof Error ? err.message : t('common.unknownError')
     webContents.send('ai:error', message)
   } finally {
-    if (activeAbortController === abortController) {
-      activeAbortController = null
-    }
+    releaseChatAbortController(abortController)
   }
 }

@@ -1167,7 +1167,7 @@ body:has(.monaco-editor .find-widget.visible) .workbench-hover-container .action
 }
 
 .chat-mode-switch button {
-  padding: 3px 10px;
+  padding: 3px 8px;
   border: none;
   border-radius: 4px;
   background: transparent;
@@ -1255,6 +1255,64 @@ body:has(.monaco-editor .find-widget.visible) .workbench-hover-container .action
 
 .chat-message-mode.ask {
   color: var(--warning);
+}
+
+.chat-message-mode.agent {
+  color: var(--accent);
+}
+
+.agent-step-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.agent-step {
+  padding: 6px 8px;
+  border-radius: 4px;
+  background: var(--bg-tertiary);
+  border-left: 2px solid var(--border);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.agent-step-running {
+  border-left-color: var(--accent);
+}
+
+.agent-step-done {
+  border-left-color: var(--success);
+}
+
+.agent-step-error,
+.agent-step-failed {
+  border-left-color: var(--error, #e05252);
+}
+
+.agent-step-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.agent-step-name {
+  font-weight: 600;
+  color: var(--text-primary);
+  font-family: var(--font-mono, ui-monospace, monospace);
+}
+
+.agent-step-status {
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.agent-step-args,
+.agent-step-summary {
+  margin-top: 2px;
+  color: var(--text-secondary);
+  word-break: break-word;
 }
 
 .chat-content {

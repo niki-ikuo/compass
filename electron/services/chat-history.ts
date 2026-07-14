@@ -1,6 +1,6 @@
 import { mkdir, readFile, writeFile } from 'fs/promises'
 import { join } from 'path'
-import { normalizeChatMode, type ChatMessage, type ChatSession } from '../../src/types'
+import { normalizeChatMode, normalizeAgentSteps, type ChatMessage, type ChatSession } from '../../src/types'
 
 const COMPASS_DIR = '.compass'
 const CHAT_HISTORY_FILE = 'chat-history.json'
@@ -35,7 +35,12 @@ function isValidSession(session: unknown): session is ChatSession {
 
 function normalizeMessage(message: ChatMessage): ChatMessage {
   const mode = normalizeChatMode(message.mode)
-  return mode ? { ...message, mode } : { ...message, mode: undefined }
+  const agentSteps = normalizeAgentSteps(message.agentSteps)
+  return {
+    ...message,
+    mode: mode || undefined,
+    ...(agentSteps ? { agentSteps } : { agentSteps: undefined })
+  }
 }
 
 function normalizeSession(session: ChatSession): ChatSession {

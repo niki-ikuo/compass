@@ -20,7 +20,10 @@ import type {
   ChatSession,
   TerminalShell,
   InlineCompletionRequest,
-  InlineCompletionResult
+  InlineCompletionResult,
+  AgentToolStartEvent,
+  AgentToolResultEvent,
+  AgentStepEvent
 } from '../src/types'
 
 const compassAPI = {
@@ -90,6 +93,24 @@ const compassAPI = {
       const handler = (_event: Electron.IpcRendererEvent, error: string): void => callback(error)
       ipcRenderer.on('ai:error', handler)
       return () => ipcRenderer.removeListener('ai:error', handler)
+    },
+    onToolStart: (callback: (event: AgentToolStartEvent) => void): (() => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, payload: AgentToolStartEvent): void =>
+        callback(payload)
+      ipcRenderer.on('ai:toolStart', handler)
+      return () => ipcRenderer.removeListener('ai:toolStart', handler)
+    },
+    onToolResult: (callback: (event: AgentToolResultEvent) => void): (() => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, payload: AgentToolResultEvent): void =>
+        callback(payload)
+      ipcRenderer.on('ai:toolResult', handler)
+      return () => ipcRenderer.removeListener('ai:toolResult', handler)
+    },
+    onStep: (callback: (event: AgentStepEvent) => void): (() => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, payload: AgentStepEvent): void =>
+        callback(payload)
+      ipcRenderer.on('ai:step', handler)
+      return () => ipcRenderer.removeListener('ai:step', handler)
     }
   },
   settings: {

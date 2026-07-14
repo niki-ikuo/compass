@@ -19,7 +19,7 @@
 
 - テキストエディタ
 - ファイルツリー
-- AIチャット（サイドパネル）— **Ask**（説明のみ）/ **Edit**（ファイル変更の提案）
+- AIチャット（サイドパネル）— **Ask**（説明のみ）/ **Edit**（ファイル変更の提案）/ **Agent**（読取専用ツールループ。書き込み・コマンドは後続 — [AGENT_PLAN.md](./AGENT_PLAN.md)）
 - 現在ファイルをコンテキスト送信
 - AI提案の差分プレビュー＆適用（Edit は `compass-actions` → プレビュー → ユーザー承認）
 - OpenAI互換API接続（マルチ LLM 切替: プロバイダプリセット・プロバイダ別 API Key・モデル選択）
@@ -30,7 +30,7 @@
 
 ### 後回し（v2以降）
 
-- **Agent（自律実行）** — Edit モードとは別物。ツール呼び出しループ・コマンド実行・複数ステップの自動反復は未実装（現状の Edit は提案＋人間の適用承認まで）
+- **Agent の書き込み・コマンド** — [AGENT_PLAN.md](./AGENT_PLAN.md) の Phase 2 以降（preview/apply 書き込み、制限付き exec）。Phase 0–1（契約 + 読取専用ツール）は `feature/ai-chat-agent` で進行中
 - ベクトル検索 / RAG による意味検索（現状の `.compass` は構造索引であり埋め込み検索ではない）
 - MCP連携
 - Git統合
@@ -256,13 +256,15 @@ interface AppSettings {
          └─ v3.0: MCP、プラグイン、非 OpenAI 互換ネイティブ API
 ```
 
+v2.0 Agent の段階的実装チェックリスト: [AGENT_PLAN.md](./AGENT_PLAN.md)。
+
 **用語の区別**
 
 | 名称 | 意味 |
 |------|------|
 | Ask モード | 説明・レビューのみ。ワークスペース変更は提案しない |
 | Edit モード | ファイル作成・変更・削除を JSON で提案し、ユーザーがプレビュー承認して適用 |
-| Agent（自律実行・未実装） | コマンド実行や複数回のツール呼び出しをエージェントが回す Cursor Agent 相当 |
+| Agent | ツール呼び出しループ。Phase 1: 読取専用（`readFile` / `listDir` / `search`）。書き込み・コマンドは後続 — [AGENT_PLAN.md](./AGENT_PLAN.md) |
 
 ---
 

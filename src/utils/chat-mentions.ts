@@ -1,7 +1,5 @@
 /** チャット指示文に埋め込むファイル/フォルダ/選択行のメンション */
 
-import { basename } from '@/utils/path'
-
 export type ChatMentionKind = 'file' | 'folder' | 'selection'
 
 export function formatFileMention(label: string): string {
@@ -18,11 +16,12 @@ export function formatContextLabel(path: string, workspaceRoot: string | null): 
   if (!workspaceRoot) return path
   const root = workspaceRoot.replace(/\\/g, '/')
   const normalized = path.replace(/\\/g, '/')
+  // ワークスペース直下そのものは相対 "."（フォルダ名だと Agent がサブパスと誤認する）
   if (normalized === root || normalized === `${root}/`) {
-    return basename(workspaceRoot)
+    return '.'
   }
   if (normalized.startsWith(root)) {
-    return normalized.slice(root.length).replace(/^\//, '') || basename(path)
+    return normalized.slice(root.length).replace(/^\//, '') || '.'
   }
   return path
 }

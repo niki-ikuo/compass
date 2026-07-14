@@ -44,6 +44,7 @@ npm run dev
 | IPC handlers | `electron/main.ts` |
 | File ops | `electron/services/filesystem.ts` |
 | AI networking | `electron/services/ai-client.ts` |
+| Agent tool loop | `electron/services/agent-runner.ts`, [AGENT_PLAN.md](./AGENT_PLAN.md) |
 | Inline completions | `src/utils/inline-completions.ts`, `ai:complete` / `ai:cancelComplete` |
 | LLM provider presets | `src/utils/llm-providers.ts` |
 | Settings persistence | `electron/services/settings.ts` |

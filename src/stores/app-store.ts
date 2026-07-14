@@ -14,9 +14,10 @@ import type {
   FileEncoding,
   LeftSidebarView,
   EditorRevealRequest,
-  WorkspaceSearchResult
+  WorkspaceSearchResult,
+  AgentToolStep
 } from '@/types'
-import { DEFAULT_SETTINGS, normalizeChatMode } from '@/types'
+import { DEFAULT_SETTINGS, normalizeAgentSteps, normalizeChatMode } from '@/types'
 import { getLanguageFromPath } from '@/utils/language'
 import { generateId } from '@/utils/code-blocks'
 import { loadPanelLayout, savePanelLayout } from '@/utils/panel-layout'
@@ -43,7 +44,12 @@ function normalizeChatSession(session: ChatSession): ChatSession {
     messages: Array.isArray(session.messages)
       ? session.messages.map((message) => {
           const mode = normalizeChatMode(message.mode)
-          return mode ? { ...message, mode } : { ...message, mode: undefined }
+          const agentSteps = normalizeAgentSteps(message.agentSteps)
+          return {
+            ...message,
+            mode: mode || undefined,
+            ...(agentSteps ? { agentSteps } : {})
+          }
         })
       : []
   }
@@ -305,7 +311,7 @@ interface AppState {
   reopenChatSession: (id: string) => void
   deleteChatSession: (id: string) => void
   addChatMessage: (role: 'user' | 'assistant', content: string, mode?: ChatMode) => void
-  updateLastAssistantMessage: (content: string) => void
+  updateLastAssistantMessage: (content: string, patch?: { agentSteps?: AgentToolStep[] }) => void
   setChatLoading: (loading: boolean) => void
   clearChat: () => void
   setSettings: (settings: AppSettings) => void
@@ -746,13 +752,17 @@ export const useAppStore = create<AppState>((set, get) => ({
     scheduleChatHistorySave(get().workspaceRoot)
   },
 
-  updateLastAssistantMessage: (content) => {
+  updateLastAssistantMessage: (content, patch) => {
     set((state) => ({
       chatSessions: updateActiveSession(state.chatSessions, state.activeChatId, (session) => {
         const messages = [...session.messages]
         const lastIdx = messages.length - 1
         if (lastIdx >= 0 && messages[lastIdx].role === 'assistant') {
-          messages[lastIdx] = { ...messages[lastIdx], content }
+          messages[lastIdx] = {
+            ...messages[lastIdx],
+            content,
+            ...(patch?.agentSteps !== undefined ? { agentSteps: patch.agentSteps } : {})
+          }
         }
         return { ...session, messages, updatedAt: Date.now() }
       })

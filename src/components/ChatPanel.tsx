@@ -8,7 +8,8 @@ import {
   ChatInputComposer,
   type ChatInputComposerHandle
 } from './ChatInputComposer'
-import type { ActionPreviewItem, ChatMode, ChatSelectionRef } from '@/types'
+import type { ActionPreviewItem, AgentToolStep, ChatMode, ChatSelectionRef } from '@/types'
+import { AgentStepTimeline } from './AgentStepTimeline'
 import {
   buildDisplayContentForActions,
   inferWorkspaceActionsFromCodeBlocks,
@@ -98,6 +99,7 @@ export function ChatPanel() {
   const chatMessages = activeChat?.messages ?? []
   const chatContextRefs = activeChat?.contextRefs ?? []
   const isEditSendMode = sendMode === 'edit'
+  const isAskSendMode = sendMode === 'ask'
   const isActiveChatPreview = pendingWorkspacePreview?.chatId === activeChatId
 
   useEffect(() => {
@@ -107,7 +109,7 @@ export function ChatPanel() {
     const lastUser = [...(session?.messages ?? [])]
       .reverse()
       .find((message) => message.role === 'user')
-    if (lastUser?.mode === 'ask' || lastUser?.mode === 'edit') {
+    if (lastUser?.mode === 'ask' || lastUser?.mode === 'edit' || lastUser?.mode === 'agent') {
       setSendMode(lastUser.mode)
     } else {
       // 新規チャットなど履歴がない場合は、直前の送信モードを引き継ぐ
@@ -179,6 +181,7 @@ export function ChatPanel() {
 
     const messageMode = sendMode
     const isEditMessage = messageMode === 'edit'
+    const isAgentMessage = messageMode === 'agent'
     const selectionsForRequest = buildSelectionsForRequest()
 
     lastSentModeRef.current = messageMode
@@ -210,10 +213,13 @@ export function ChatPanel() {
     }
 
     let accumulated = ''
+    let agentSteps: AgentToolStep[] = []
     let unsubChunk: (() => void) | undefined
     let unsubDone: (() => void) | undefined
     let unsubAborted: (() => void) | undefined
     let unsubError: (() => void) | undefined
+    let unsubToolStart: (() => void) | undefined
+    let unsubToolResult: (() => void) | undefined
     let settled = false
 
     const cleanup = () => {
@@ -221,6 +227,8 @@ export function ChatPanel() {
       unsubDone?.()
       unsubAborted?.()
       unsubError?.()
+      unsubToolStart?.()
+      unsubToolResult?.()
     }
 
     const finish = () => {
@@ -230,15 +238,48 @@ export function ChatPanel() {
       setChatLoading(false)
     }
 
+    const syncAssistant = (content: string, steps = agentSteps) => {
+      updateLastAssistantMessage(content, steps.length > 0 ? { agentSteps: steps } : undefined)
+    }
+
     unsubChunk = window.compass.ai.onChunk((chunk) => {
       accumulated += chunk
       if (isEditMessage) {
         const display = stripAllCompassActionsContent(accumulated)
-        updateLastAssistantMessage(display || t('chat.preparingChanges'))
+        syncAssistant(display || t('chat.preparingChanges'))
       } else {
-        updateLastAssistantMessage(accumulated)
+        syncAssistant(accumulated)
       }
     })
+
+    if (isAgentMessage) {
+      unsubToolStart = window.compass.ai.onToolStart((event) => {
+        agentSteps = [
+          ...agentSteps.filter((s) => s.id !== event.id),
+          {
+            id: event.id,
+            name: event.name,
+            args: event.args,
+            status: 'running'
+          }
+        ]
+        syncAssistant(accumulated || t('chat.generating'))
+      })
+
+      unsubToolResult = window.compass.ai.onToolResult((event) => {
+        agentSteps = agentSteps.map((step) =>
+          step.id === event.id
+            ? {
+                ...step,
+                status: event.ok ? 'done' : 'error',
+                ok: event.ok,
+                summary: event.summary
+              }
+            : step
+        )
+        syncAssistant(accumulated || t('chat.generating'))
+      })
+    }
 
     unsubDone = window.compass.ai.onDone(async () => {
       finish()
@@ -274,6 +315,8 @@ export function ChatPanel() {
         } else if (displayContent !== accumulated.trim()) {
           updateLastAssistantMessage(displayContent)
         }
+      } else if (isAgentMessage) {
+        syncAssistant(accumulated.trim())
       }
     })
 
@@ -282,6 +325,13 @@ export function ChatPanel() {
       if (isEditMessage) {
         const display = stripAllCompassActionsContent(accumulated).trim()
         updateLastAssistantMessage(display || t('chat.aborted'))
+      } else if (isAgentMessage) {
+        agentSteps = agentSteps.map((step) =>
+          step.status === 'running'
+            ? { ...step, status: 'error', ok: false, summary: step.summary || t('chat.aborted') }
+            : step
+        )
+        syncAssistant(accumulated.trim() || t('chat.aborted'))
       } else {
         updateLastAssistantMessage(accumulated.trim() || t('chat.aborted'))
       }
@@ -289,7 +339,16 @@ export function ChatPanel() {
 
     unsubError = window.compass.ai.onError((error) => {
       finish()
-      updateLastAssistantMessage(t('chat.errorPrefix', { error }))
+      if (isAgentMessage) {
+        agentSteps = agentSteps.map((step) =>
+          step.status === 'running'
+            ? { ...step, status: 'error', ok: false, summary: error }
+            : step
+        )
+        syncAssistant(t('chat.errorPrefix', { error }))
+      } else {
+        updateLastAssistantMessage(t('chat.errorPrefix', { error }))
+      }
     })
 
     const history = [
@@ -660,11 +719,14 @@ export function ChatPanel() {
                 <span>{msg.role === 'user' ? t('chat.you') : t('chat.ai')}</span>
                 {msg.role === 'user' && msg.mode && (
                   <span className={`chat-message-mode ${msg.mode}`}>
-                    {msg.mode === 'edit' ? 'Edit' : 'Ask'}
+                    {msg.mode === 'edit' ? 'Edit' : msg.mode === 'agent' ? 'Agent' : 'Ask'}
                   </span>
                 )}
               </div>
               <div className="chat-content">
+                {msg.role === 'assistant' && msg.agentSteps && msg.agentSteps.length > 0 && (
+                  <AgentStepTimeline steps={msg.agentSteps} />
+                )}
                 <ChatMessageContent content={msg.content} isStreaming={isStreaming} />
               </div>
             </div>
@@ -682,7 +744,7 @@ export function ChatPanel() {
         />
       )}
 
-      {!isEditSendMode && pendingCode && activeFile && (
+      {isAskSendMode && pendingCode && activeFile && (
         <DiffPreview
           oldText={activeFile.content}
           newText={pendingCode.code}
@@ -692,7 +754,7 @@ export function ChatPanel() {
         />
       )}
 
-      {!isEditSendMode && pendingCode && activeFile && (
+      {isAskSendMode && pendingCode && activeFile && (
         <div className="apply-options">
           <button className="btn-secondary" onClick={handleInsert}>
             {t('chat.insertAtCursor')}
@@ -714,7 +776,11 @@ export function ChatPanel() {
             onSubmit={() => void handleSend()}
             onPasteSelection={handlePasteSelection}
             placeholder={
-              isEditSendMode ? t('chat.placeholderEdit') : t('chat.placeholderAsk')
+              isEditSendMode
+                ? t('chat.placeholderEdit')
+                : sendMode === 'agent'
+                  ? t('chat.placeholderAgent')
+                  : t('chat.placeholderAsk')
             }
             disabled={isChatLoading}
           />
@@ -739,6 +805,16 @@ export function ChatPanel() {
                 title={t('chat.askModeTitle')}
               >
                 Ask
+              </button>
+              <button
+                type="button"
+                aria-pressed={sendMode === 'agent'}
+                className={sendMode === 'agent' ? 'active' : ''}
+                onClick={() => setSendMode('agent')}
+                disabled={isChatLoading}
+                title={t('chat.agentModeTitle')}
+              >
+                Agent
               </button>
             </div>
             {isChatLoading ? (
