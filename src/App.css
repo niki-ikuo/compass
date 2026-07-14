@@ -493,7 +493,12 @@ body.is-resizing-panels * {
 
 .file-tree-icon {
   flex-shrink: 0;
-  font-size: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  line-height: 0;
 }
 
 .file-tree-empty {

@@ -18,6 +18,7 @@ import { formatContextMention } from '@/utils/chat-mentions'
 import { useI18n } from '@/i18n'
 import { basename } from '@/utils/path'
 import { ConfirmDialog } from './ConfirmDialog'
+import { FileTreeNodeIcon } from './icons/FileTypeIcons'
 import { restoreWorkbenchFocus } from '@/utils/workbench-focus'
 
 type InputMode = 'create-file' | 'create-folder' | 'rename'
@@ -235,7 +236,9 @@ function FileTreeItem({
           <span className="file-tree-expand" onClick={handleExpandClick}>
             {isExpanded ? '▾' : '▸'}
           </span>
-          <span className="file-tree-icon">{isExpanded ? '📂' : '📁'}</span>
+          <span className="file-tree-icon">
+            <FileTreeNodeIcon name={node.name} isDirectory isExpanded={isExpanded} />
+          </span>
           {isRenaming ? (
             <InlineNameInput
               defaultName={node.name}
@@ -308,7 +311,9 @@ function FileTreeItem({
       onContextMenu={(e) => onContextMenu(e, node)}
     >
       <span className="file-tree-expand file-tree-expand-spacer" />
-      <span className="file-tree-icon">📄</span>
+      <span className="file-tree-icon">
+        <FileTreeNodeIcon name={node.name} />
+      </span>
       {isRenaming ? (
         <InlineNameInput
           defaultName={node.name}
@@ -918,7 +923,10 @@ export function FileTree() {
             <div className="file-tree-item creating" style={{ paddingLeft: 8 }}>
               <span className="file-tree-expand file-tree-expand-spacer" />
               <span className="file-tree-icon">
-                {inlineInput.mode === 'create-file' ? '📄' : '📁'}
+                <FileTreeNodeIcon
+                  name={inlineInput.defaultName}
+                  isDirectory={inlineInput.mode === 'create-folder'}
+                />
               </span>
               <InlineNameInput
                 defaultName={inlineInput.defaultName}
