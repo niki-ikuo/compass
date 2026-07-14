@@ -1,5 +1,7 @@
 /** チャット指示文に埋め込むファイル/フォルダ/選択行のメンション */
 
+import { basename } from '@/utils/path'
+
 export type ChatMentionKind = 'file' | 'folder' | 'selection'
 
 export function formatFileMention(label: string): string {
@@ -10,6 +12,29 @@ export function formatFolderMention(label: string): string {
   const normalized = label.replace(/\\/g, '/')
   const withSlash = normalized.endsWith('/') ? normalized : `${normalized}/`
   return `@[${withSlash}]`
+}
+
+export function formatContextLabel(path: string, workspaceRoot: string | null): string {
+  if (!workspaceRoot) return path
+  const root = workspaceRoot.replace(/\\/g, '/')
+  const normalized = path.replace(/\\/g, '/')
+  if (normalized === root || normalized === `${root}/`) {
+    return basename(workspaceRoot)
+  }
+  if (normalized.startsWith(root)) {
+    return normalized.slice(root.length).replace(/^\//, '') || basename(path)
+  }
+  return path
+}
+
+/** 指示文に埋め込むパス表記（フォルダは末尾 `/`） */
+export function formatContextMention(
+  path: string,
+  isDirectory: boolean,
+  workspaceRoot: string | null
+): string {
+  const label = formatContextLabel(path, workspaceRoot)
+  return isDirectory ? formatFolderMention(label) : formatFileMention(label)
 }
 
 export function formatSelectionMentionLabel(
