@@ -101,13 +101,14 @@ const AGENT_TOOLS = [
     function: {
       name: 'proposeActions',
       description:
-        'Propose workspace file/folder changes for the user to preview and approve. Paths must be relative to the workspace root. Changes are NOT applied until the user approves. Batch related changes into one call.',
+        'Propose workspace file/folder changes for the user to preview and approve. Paths must be relative to the workspace root. Changes are NOT applied until the user approves. Pass `actions` as a real JSON array (never a stringified JSON blob). Prefer one writeFile per file; for large rewrites, split into separate proposeActions calls instead of one huge payload.',
       parameters: {
         type: 'object',
         properties: {
           actions: {
             type: 'array',
-            description: 'List of mkdir / writeFile / deleteFile / deleteDir actions',
+            description:
+              'Array of mkdir / writeFile / deleteFile / deleteDir objects. Must be an array, not a JSON string.',
             items: {
               type: 'object',
               properties: {
@@ -121,7 +122,8 @@ const AGENT_TOOLS = [
                 },
                 content: {
                   type: 'string',
-                  description: 'File contents (required for writeFile)'
+                  description:
+                    'File contents (required for writeFile). Keep each write reasonably sized; split large files across multiple proposeActions calls.'
                 }
               },
               required: ['type', 'path']
@@ -211,7 +213,11 @@ function parseProposeActions(
   args: Record<string, unknown>
 ): { actions: WorkspaceAction[] } | { error: string } {
   if (!Array.isArray(args.actions) || args.actions.length === 0) {
-    return { error: 'actions must be a non-empty array' }
+    return {
+      error: t('ai.agentProposeActionsFormatError', {
+        reason: 'actions must be a non-empty array'
+      })
+    }
   }
 
   const actions: WorkspaceAction[] = []
@@ -230,7 +236,11 @@ function parseProposeActions(
   }
 
   if (actions.length === 0) {
-    return { error: 'no valid actions in proposeActions' }
+    return {
+      error: t('ai.agentProposeActionsFormatError', {
+        reason: 'no valid actions in proposeActions'
+      })
+    }
   }
   return { actions }
 }
@@ -343,15 +353,111 @@ async function resolveAgentToolPath(
   return { relativePath, absolutePath }
 }
 
+function buildJsonParseAttempts(raw: string): string[] {
+  const trimmed = raw.trim()
+  const attempts: string[] = []
+  const pushUnique = (value: string) => {
+    const v = value.trim()
+    if (!v || attempts.includes(v)) return
+    attempts.push(v)
+  }
+
+  pushUnique(trimmed)
+
+  const fence = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i)
+  if (fence?.[1]) pushUnique(fence[1])
+
+  const start = trimmed.indexOf('{')
+  const end = trimmed.lastIndexOf('}')
+  if (start >= 0 && end > start) {
+    pushUnique(trimmed.slice(start, end + 1))
+  }
+
+  const arrayStart = trimmed.indexOf('[')
+  const arrayEnd = trimmed.lastIndexOf(']')
+  if (arrayStart >= 0 && arrayEnd > arrayStart) {
+    pushUnique(trimmed.slice(arrayStart, arrayEnd + 1))
+  }
+
+  return attempts
+}
+
+function tryParseJsonValue(raw: string): unknown | undefined {
+  for (const attempt of buildJsonParseAttempts(raw)) {
+    try {
+      let parsed: unknown = JSON.parse(attempt)
+      // 二重エンコード: "\"{...}\"" → object
+      if (typeof parsed === 'string') {
+        try {
+          parsed = JSON.parse(parsed)
+        } catch {
+          // keep string
+        }
+      }
+      return parsed
+    } catch {
+      // try next
+    }
+  }
+  return undefined
+}
+
+/**
+ * LLM が actions を文字列化したり、壊れた JSON を _raw に落とした場合の回復。
+ */
+function coerceProposeActionsArgs(args: Record<string, unknown>): Record<string, unknown> {
+  if (Array.isArray(args.actions) && args.actions.length > 0) {
+    return args
+  }
+
+  const tryFromUnknown = (value: unknown): Record<string, unknown> | null => {
+    if (Array.isArray(value) && value.length > 0) {
+      return { actions: value }
+    }
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+      const obj = value as Record<string, unknown>
+      if (Array.isArray(obj.actions) && obj.actions.length > 0) {
+        return obj
+      }
+      if (typeof obj.actions === 'string') {
+        const nested = tryParseJsonValue(obj.actions)
+        if (Array.isArray(nested) && nested.length > 0) {
+          return { ...obj, actions: nested }
+        }
+      }
+    }
+    if (typeof value === 'string') {
+      const nested = tryParseJsonValue(value)
+      return nested === undefined ? null : tryFromUnknown(nested)
+    }
+    return null
+  }
+
+  if ('actions' in args) {
+    const recovered = tryFromUnknown(args.actions)
+    if (recovered) return recovered
+  }
+
+  if (typeof args._raw === 'string') {
+    const recovered = tryFromUnknown(args._raw)
+    if (recovered) return recovered
+  }
+
+  for (const value of Object.values(args)) {
+    if (typeof value !== 'string') continue
+    if (!value.includes('actions') && !value.includes('writeFile')) continue
+    const recovered = tryFromUnknown(value)
+    if (recovered) return recovered
+  }
+
+  return args
+}
+
 function parseToolArgs(raw: string): Record<string, unknown> {
   if (!raw.trim()) return {}
-  try {
-    const parsed = JSON.parse(raw) as unknown
-    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-      return parsed as Record<string, unknown>
-    }
-  } catch {
-    // fall through
+  const parsed = tryParseJsonValue(raw)
+  if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+    return parsed as Record<string, unknown>
   }
   return { _raw: raw }
 }
@@ -535,7 +641,11 @@ async function executeProposeActions(
 ): Promise<{ ok: boolean; summary: string; content: string }> {
   const parsed = parseProposeActions(args)
   if ('error' in parsed) {
-    return { ok: false, summary: parsed.error, content: `Error: ${parsed.error}` }
+    return {
+      ok: false,
+      summary: parsed.error,
+      content: parsed.error.startsWith('Error:') ? parsed.error : `Error: ${parsed.error}`
+    }
   }
 
   let normalized: WorkspaceAction[]
@@ -549,8 +659,12 @@ async function executeProposeActions(
   if (normalized.length === 0) {
     return {
       ok: false,
-      summary: 'no valid actions after normalization',
-      content: 'Error: no valid actions after path normalization'
+      summary: t('ai.agentProposeActionsFormatError', {
+        reason: 'no valid actions after normalization'
+      }),
+      content: t('ai.agentProposeActionsFormatError', {
+        reason: 'no valid actions after path normalization'
+      })
     }
   }
 
@@ -885,7 +999,10 @@ export async function runAgent(webContents: WebContents, request: ChatRequest): 
         }
 
         toolCallsUsed++
-        const rawArgs = parseToolArgs(call.function.arguments)
+        let rawArgs = parseToolArgs(call.function.arguments)
+        if (call.function.name === 'proposeActions') {
+          rawArgs = coerceProposeActionsArgs(rawArgs)
+        }
         const args = await normalizeToolArgsForCall(
           request.workspaceRoot,
           call.function.name,
