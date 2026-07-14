@@ -212,6 +212,8 @@ export interface AppSettings {
   locale: LocaleId
   /** エディタのインライン補完（ゴーストテキスト） */
   inlineCompletionsEnabled: boolean
+  /** 新しいターミナルを開くときの初期シェル（powershell / cmd / bash / wsl） */
+  defaultShellId: string
 }
 
 export interface ChatRequest {
@@ -495,5 +497,6 @@ export const DEFAULT_SETTINGS: AppSettings = {
   maxTokens: 4096,
   colorTheme: 'dark',
   locale: DEFAULT_LOCALE,
-  inlineCompletionsEnabled: true
+  inlineCompletionsEnabled: true,
+  defaultShellId: 'powershell'
 }

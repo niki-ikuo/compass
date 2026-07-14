@@ -125,6 +125,8 @@ MVP: whole-file replace or insert at cursor only.
 | Model | `gpt-4o-mini` (provider suggestions + free input) |
 | Temperature | 0.2 |
 | Max tokens | 4096 |
+| Inline completions | ON |
+| Default shell | `powershell` (PowerShell / cmd / Git Bash / WSL) |
 
 ---
 

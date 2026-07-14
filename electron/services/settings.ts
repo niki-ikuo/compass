@@ -24,6 +24,7 @@ interface StoredSettings {
   colorTheme: ColorThemeId
   locale: LocaleId
   inlineCompletionsEnabled: boolean
+  defaultShellId: string
   lastWorkspaceRoot: string | null
   recentWorkspaceRoots: string[]
 }
@@ -38,6 +39,10 @@ function resolveLocale(value: unknown): LocaleId {
 
 function resolveInlineCompletionsEnabled(value: unknown): boolean {
   return typeof value === 'boolean' ? value : DEFAULT_SETTINGS.inlineCompletionsEnabled
+}
+
+function resolveDefaultShellId(value: unknown): string {
+  return typeof value === 'string' && value.trim() ? value.trim() : DEFAULT_SETTINGS.defaultShellId
 }
 
 function resolveProviderId(value: unknown, apiBaseUrl: string): LlmProviderId {
@@ -113,6 +118,7 @@ async function readStoredSettings(): Promise<StoredSettings> {
       colorTheme: resolveColorTheme(stored.colorTheme),
       locale: resolveLocale(stored.locale),
       inlineCompletionsEnabled: resolveInlineCompletionsEnabled(stored.inlineCompletionsEnabled),
+      defaultShellId: resolveDefaultShellId(stored.defaultShellId),
       lastWorkspaceRoot: stored.lastWorkspaceRoot ?? null,
       recentWorkspaceRoots:
         stored.recentWorkspaceRoots ??
@@ -130,6 +136,7 @@ async function readStoredSettings(): Promise<StoredSettings> {
       colorTheme: DEFAULT_SETTINGS.colorTheme,
       locale: DEFAULT_SETTINGS.locale,
       inlineCompletionsEnabled: DEFAULT_SETTINGS.inlineCompletionsEnabled,
+      defaultShellId: DEFAULT_SETTINGS.defaultShellId,
       lastWorkspaceRoot: null,
       recentWorkspaceRoots: []
     }
@@ -169,7 +176,8 @@ function toAppSettings(stored: StoredSettings): AppSettings {
     maxTokens: stored.maxTokens,
     colorTheme: stored.colorTheme,
     locale: stored.locale,
-    inlineCompletionsEnabled: stored.inlineCompletionsEnabled
+    inlineCompletionsEnabled: stored.inlineCompletionsEnabled,
+    defaultShellId: stored.defaultShellId
   }
 }
 
@@ -211,7 +219,8 @@ export async function setSettings(settings: AppSettings): Promise<void> {
     maxTokens: settings.maxTokens,
     colorTheme: resolveColorTheme(settings.colorTheme),
     locale,
-    inlineCompletionsEnabled: resolveInlineCompletionsEnabled(settings.inlineCompletionsEnabled)
+    inlineCompletionsEnabled: resolveInlineCompletionsEnabled(settings.inlineCompletionsEnabled),
+    defaultShellId: resolveDefaultShellId(settings.defaultShellId)
   })
   setLocale(locale)
 }
