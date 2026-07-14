@@ -8,7 +8,13 @@ import {
   ChatInputComposer,
   type ChatInputComposerHandle
 } from './ChatInputComposer'
-import type { ActionPreviewItem, AgentToolStep, ChatMode, ChatSelectionRef } from '@/types'
+import type {
+  ActionPreviewItem,
+  AgentNeedContinueEvent,
+  AgentToolStep,
+  ChatMode,
+  ChatSelectionRef
+} from '@/types'
 import { AgentStepTimeline } from './AgentStepTimeline'
 import { AnimatedStatus } from './AnimatedEllipsis'
 import {
@@ -56,6 +62,7 @@ export function ChatPanel() {
   const [sendMode, setSendMode] = useState<ChatMode>('edit')
   const [modeMenuOpen, setModeMenuOpen] = useState(false)
   const [agentStreamStatus, setAgentStreamStatus] = useState<string | null>(null)
+  const [pendingContinue, setPendingContinue] = useState<AgentNeedContinueEvent | null>(null)
   const [pendingCode, setPendingCode] = useState<{ code: string; language: string } | null>(null)
   const [isDragOver, setIsDragOver] = useState(false)
   const [pinnedSelections, setPinnedSelections] = useState<ChatSelectionRef[]>([])
@@ -77,6 +84,7 @@ export function ChatPanel() {
   const activeChat = useAppStore((s) => s.getActiveChatSession())
   const isChatLoading = useAppStore((s) => s.isChatLoading)
   const pendingWorkspacePreview = useAppStore((s) => s.pendingWorkspacePreview)
+  const lastApplyError = useAppStore((s) => s.lastApplyError)
   const addChatMessage = useAppStore((s) => s.addChatMessage)
   const updateLastAssistantMessage = useAppStore((s) => s.updateLastAssistantMessage)
   const setChatLoading = useAppStore((s) => s.setChatLoading)
@@ -237,6 +245,7 @@ export function ChatPanel() {
     addChatMessage('assistant', '')
     stopRequestedRef.current = false
     setAgentStreamStatus(null)
+    setPendingContinue(null)
     setChatLoading(true)
 
     const activeFile = getActiveFile()
@@ -260,6 +269,7 @@ export function ChatPanel() {
     let unsubToolStart: (() => void) | undefined
     let unsubToolResult: (() => void) | undefined
     let unsubNeedApproval: (() => void) | undefined
+    let unsubNeedContinue: (() => void) | undefined
     let unsubStep: (() => void) | undefined
     let settled = false
 
@@ -271,6 +281,7 @@ export function ChatPanel() {
       unsubToolStart?.()
       unsubToolResult?.()
       unsubNeedApproval?.()
+      unsubNeedContinue?.()
       unsubStep?.()
     }
 
@@ -279,6 +290,7 @@ export function ChatPanel() {
       settled = true
       cleanup()
       setAgentStreamStatus(null)
+      setPendingContinue(null)
       setChatLoading(false)
     }
 
@@ -317,7 +329,8 @@ export function ChatPanel() {
                 ...step,
                 status: event.ok ? 'done' : 'error',
                 ok: event.ok,
-                summary: event.summary
+                summary: event.summary,
+                observation: event.observation
               }
             : step
         )
@@ -325,6 +338,7 @@ export function ChatPanel() {
       })
 
       unsubNeedApproval = window.compass.ai.onNeedApproval((event) => {
+        setPendingContinue(null)
         setPendingAgentApprovalId(event.id)
         setPendingWorkspacePreview({ actions: event.actions, items: event.items })
         setAgentStreamStatus(t('chat.agentWaitingApproval'))
@@ -338,6 +352,22 @@ export function ChatPanel() {
             : step
         )
         syncAssistant(accumulated.trim() || t('chat.reviewProposal'))
+      })
+
+      unsubNeedContinue = window.compass.ai.onNeedContinue((event) => {
+        setPendingContinue(event)
+        const status =
+          event.reason === 'tools'
+            ? t('chat.agentNeedContinueTools', {
+                turns: String(event.turnsUsed),
+                tools: String(event.toolsUsed)
+              })
+            : t('chat.agentNeedContinueTurns', {
+                turns: String(event.turnsUsed),
+                tools: String(event.toolsUsed)
+              })
+        setAgentStreamStatus(status)
+        syncAssistant(accumulated.trim() || status)
       })
 
       unsubStep = window.compass.ai.onStep((event) => {
@@ -396,8 +426,11 @@ export function ChatPanel() {
           setPendingAgentApprovalId(null)
           revertWorkspacePreview()
         }
+        setPendingContinue(null)
         agentSteps = agentSteps.map((step) =>
-          step.status === 'running' || step.status === 'waiting_approval'
+          step.status === 'running' ||
+          step.status === 'waiting_approval' ||
+          step.status === 'waiting_continue'
             ? { ...step, status: 'error', ok: false, summary: step.summary || t('chat.aborted') }
             : step
         )
@@ -411,7 +444,9 @@ export function ChatPanel() {
       finish()
       if (isAgentMessage) {
         agentSteps = agentSteps.map((step) =>
-          step.status === 'running' || step.status === 'waiting_approval'
+          step.status === 'running' ||
+          step.status === 'waiting_approval' ||
+          step.status === 'waiting_continue'
             ? { ...step, status: 'error', ok: false, summary: error }
             : step
         )
@@ -422,7 +457,13 @@ export function ChatPanel() {
     })
 
     const history = [
-      ...chatMessages.map((m) => ({ role: m.role, content: m.content })),
+      ...chatMessages.map((m) => ({
+        role: m.role,
+        content: m.content,
+        ...(isAgentMessage && m.agentSteps && m.agentSteps.length > 0
+          ? { agentSteps: m.agentSteps }
+          : {})
+      })),
       { role: 'user' as const, content: text }
     ]
 
@@ -608,8 +649,25 @@ export function ChatPanel() {
       appendAssistantNote(t('chat.applied', { count: itemCount }))
     } catch (error) {
       const message = error instanceof Error ? error.message : t('chat.applyFailed')
-      appendAssistantNote(t('chat.fileOpError', { message }))
+      appendAssistantNote(
+        `${t('chat.fileOpError', { message })}\n${t('chat.applyRetryHint')}`
+      )
     }
+  }
+
+  const handleAgentContinue = () => {
+    const event = pendingContinue
+    if (!event) return
+    setPendingContinue(null)
+    setAgentStreamStatus(t('chat.generating'))
+    void window.compass.ai.resolveContinue({ id: event.id, continue: true })
+  }
+
+  const handleAgentStopContinue = () => {
+    const event = pendingContinue
+    if (!event) return
+    setPendingContinue(null)
+    void window.compass.ai.resolveContinue({ id: event.id, continue: false })
   }
 
   const activeFile = getActiveFile()
@@ -817,10 +875,35 @@ export function ChatPanel() {
       {isActiveChatPreview && pendingWorkspacePreview && (
         <WorkspaceActionPreview
           items={pendingWorkspacePreview.items}
+          applyError={lastApplyError}
           onApply={() => void handleApplyActions()}
           onReject={() => revertWorkspacePreview()}
           onSelectItem={handleSelectPreviewItem}
         />
+      )}
+
+      {pendingContinue && (
+        <div className="agent-continue-bar">
+          <div className="agent-continue-info">
+            {pendingContinue.reason === 'tools'
+              ? t('chat.agentNeedContinueTools', {
+                  turns: String(pendingContinue.turnsUsed),
+                  tools: String(pendingContinue.toolsUsed)
+                })
+              : t('chat.agentNeedContinueTurns', {
+                  turns: String(pendingContinue.turnsUsed),
+                  tools: String(pendingContinue.toolsUsed)
+                })}
+          </div>
+          <div className="agent-continue-actions">
+            <button type="button" className="btn-apply" onClick={handleAgentContinue}>
+              {t('chat.agentContinue')}
+            </button>
+            <button type="button" className="btn-reject" onClick={handleAgentStopContinue}>
+              {t('chat.agentStopContinue')}
+            </button>
+          </div>
+        </div>
       )}
 
       {isAskSendMode && pendingCode && activeFile && (

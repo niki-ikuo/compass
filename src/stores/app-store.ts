@@ -324,6 +324,8 @@ interface AppState {
   pendingAgentApprovalId: string | null
   /** 部分適用/却下のトレース（pending 消化時に resolve へ載せる） */
   agentApprovalTrace: { applied: string[]; rejected: string[] } | null
+  /** 直近の適用失敗（プレビューを残してリトライ可能にする） */
+  lastApplyError: string | null
   /** エディタなどからチャット入力へメンション挿入するリクエスト */
   chatComposerInsertRequest: {
     id: number
@@ -385,6 +387,7 @@ interface AppState {
     preview: { actions: WorkspaceAction[]; items: ActionPreviewItem[] } | null
   ) => void
   setPendingAgentApprovalId: (id: string | null) => void
+  clearLastApplyError: () => void
   activateWorkspacePreview: (items: ActionPreviewItem[]) => void
   openPreviewFile: (path: string, newContent: string, originalContent: string, isNew: boolean) => void
   revertWorkspacePreview: () => void
@@ -444,6 +447,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   pendingWorkspacePreview: null,
   pendingAgentApprovalId: null,
   agentApprovalTrace: null,
+  lastApplyError: null,
   chatComposerInsertRequest: null,
   panelLayout: loadPanelLayout(),
 
@@ -883,7 +887,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     const chatId = get().activeChatId
     if (!chatId) return
     set({
-      pendingWorkspacePreview: { chatId, actions: preview.actions, items: preview.items }
+      pendingWorkspacePreview: { chatId, actions: preview.actions, items: preview.items },
+      lastApplyError: null
     })
     get().activateWorkspacePreview(preview.items)
   },
@@ -893,6 +898,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       pendingAgentApprovalId: id,
       agentApprovalTrace: id ? { applied: [], rejected: [] } : null
     }),
+
+  clearLastApplyError: () => set({ lastApplyError: null }),
 
   openPreviewFile: (path, newContent, originalContent, isNew) =>
     set((state) => {
@@ -983,7 +990,8 @@ export const useAppStore = create<AppState>((set, get) => ({
         activeFilePath,
         pendingWorkspacePreview: null,
         pendingAgentApprovalId: null,
-        agentApprovalTrace: null
+        agentApprovalTrace: null,
+        lastApplyError: null
       }
     })
     if (approvalId && typeof window !== 'undefined' && window.compass?.ai?.resolveApproval) {
@@ -1016,15 +1024,9 @@ export const useAppStore = create<AppState>((set, get) => ({
         state.pendingWorkspacePreview.actions
       )
     } catch (error) {
-      if (approvalId && typeof window !== 'undefined' && window.compass?.ai?.resolveApproval) {
-        set({ pendingAgentApprovalId: null, agentApprovalTrace: null })
-        const message = error instanceof Error ? error.message : 'apply failed'
-        void window.compass.ai.resolveApproval({
-          id: approvalId,
-          approved: false,
-          detail: `Apply failed: ${message}`
-        })
-      }
+      // Keep preview + Agent approval pending so the user can retry apply.
+      const message = error instanceof Error ? error.message : 'apply failed'
+      set({ lastApplyError: message })
       throw error
     }
 
@@ -1060,7 +1062,8 @@ export const useAppStore = create<AppState>((set, get) => ({
         activeFilePath,
         pendingWorkspacePreview: null,
         pendingAgentApprovalId: null,
-        agentApprovalTrace: null
+        agentApprovalTrace: null,
+        lastApplyError: null
       }
     })
 
@@ -1090,7 +1093,13 @@ export const useAppStore = create<AppState>((set, get) => ({
     )
     if (actionsToApply.length === 0) return
 
-    await window.compass.fs.applyActions(state.workspaceRoot, actionsToApply)
+    try {
+      await window.compass.fs.applyActions(state.workspaceRoot, actionsToApply)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'apply failed'
+      set({ lastApplyError: message })
+      throw error
+    }
 
     const appliedLabel = writeItem.relativePath.replace(/\\/g, '/')
     set((s) => {
@@ -1108,7 +1117,12 @@ export const useAppStore = create<AppState>((set, get) => ({
         : s.pendingAgentApprovalId
           ? { applied: [appliedLabel], rejected: [] }
           : null
-      return { openFiles, pendingWorkspacePreview, agentApprovalTrace: trace }
+      return {
+        openFiles,
+        pendingWorkspacePreview,
+        agentApprovalTrace: trace,
+        lastApplyError: null
+      }
     })
     resolveAgentApprovalIfPreviewCleared(get, set)
   },
@@ -1144,7 +1158,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           ? { applied: [], rejected: [rejectedLabel] }
           : null
 
-      return { openFiles, activeFilePath, pendingWorkspacePreview, agentApprovalTrace: trace }
+      return { openFiles, activeFilePath, pendingWorkspacePreview, agentApprovalTrace: trace, lastApplyError: null }
     })
     resolveAgentApprovalIfPreviewCleared(get, set)
   },

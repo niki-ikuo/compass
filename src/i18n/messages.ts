@@ -192,6 +192,13 @@ export const ja = {
   'chat.agentToolOk': '成功',
   'chat.agentToolError': '失敗',
   'chat.agentWaitingApproval': '承認待ち（プレビューを確認してください）',
+  'chat.agentNeedContinueTurns':
+    'ターン数の上限に達しました（{turns} ターン / ツール {tools} 回）。続行しますか？',
+  'chat.agentNeedContinueTools':
+    'ツール呼び出しの上限に達しました（{turns} ターン / ツール {tools} 回）。続行しますか？',
+  'chat.agentContinue': '続行',
+  'chat.agentStopContinue': 'ここで終了',
+  'chat.agentContinueStep': '上限到達 — 続行待ち',
   'chat.stop': '停止',
   'chat.stopTitle': 'AIの応答を中断',
   'chat.send': '送信',
@@ -204,6 +211,8 @@ export const ja = {
   'chat.errorPrefix': 'エラー: {error}',
   'chat.applied': '✅ {count} 件の変更を適用しました。',
   'chat.applyFailed': '適用に失敗しました',
+  'chat.applyRetryHint': 'プレビューは残っています。修正するか、再試行してください。',
+  'chat.retryApply': '再試行して適用',
   'chat.fileOpError': '⚠️ ファイル操作エラー: {message}',
   'chat.generating': '生成中',
   'chat.preparingChangesShort': '変更を準備しています',
@@ -341,6 +350,8 @@ export const ja = {
   'ai.agentTurnLimit': 'Agent のターン数上限に達しました。',
   'ai.agentStepThinking': '思考中（ターン {turn}）',
   'ai.agentStepWaitingApproval': '変更提案の承認待ち',
+  'ai.agentStepNeedContinueTurns': 'ターン上限 — 続行の確認待ち',
+  'ai.agentStepNeedContinueTools': 'ツール上限 — 続行の確認待ち',
   'ai.agentProposeActionsFormatError':
     'proposeActions の形式ミスです（{reason}）。actions は JSON 配列として直接渡し、文字列化しないでください。正しい形式で再提案してください。大きなファイルは分割して提案してください。',
   'ai.agentToolsUnsupported':
@@ -542,6 +553,13 @@ export const en: Record<MessageKey, string> = {
   'chat.agentToolOk': 'ok',
   'chat.agentToolError': 'failed',
   'chat.agentWaitingApproval': 'Waiting for approval (review the preview)',
+  'chat.agentNeedContinueTurns':
+    'Turn limit reached ({turns} turns / {tools} tools). Continue?',
+  'chat.agentNeedContinueTools':
+    'Tool-call limit reached ({turns} turns / {tools} tools). Continue?',
+  'chat.agentContinue': 'Continue',
+  'chat.agentStopContinue': 'Stop here',
+  'chat.agentContinueStep': 'Limit reached — waiting to continue',
   'chat.stop': 'Stop',
   'chat.stopTitle': 'Stop AI response',
   'chat.send': 'Send',
@@ -554,6 +572,8 @@ export const en: Record<MessageKey, string> = {
   'chat.errorPrefix': 'Error: {error}',
   'chat.applied': '✅ Applied {count} change(s).',
   'chat.applyFailed': 'Failed to apply',
+  'chat.applyRetryHint': 'Preview is still open. Fix the issue or retry.',
+  'chat.retryApply': 'Retry apply',
   'chat.fileOpError': '⚠️ File operation error: {message}',
   'chat.generating': 'Generating',
   'chat.preparingChangesShort': 'Preparing changes',
@@ -683,6 +703,8 @@ export const en: Record<MessageKey, string> = {
   'ai.agentTurnLimit': 'Agent turn limit reached.',
   'ai.agentStepThinking': 'Thinking (turn {turn})',
   'ai.agentStepWaitingApproval': 'Waiting for change approval',
+  'ai.agentStepNeedContinueTurns': 'Turn limit — waiting to continue',
+  'ai.agentStepNeedContinueTools': 'Tool limit — waiting to continue',
   'ai.agentProposeActionsFormatError':
     'Invalid proposeActions format ({reason}). Pass `actions` as a JSON array directly—do not stringify it. Re-propose correctly. Split large files across multiple proposals.',
   'ai.agentToolsUnsupported':
