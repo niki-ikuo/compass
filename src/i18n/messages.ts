@@ -35,6 +35,9 @@ export const ja = {
   'settings.inlineCompletions': 'インライン補完',
   'settings.inlineCompletionsHint':
     '入力停止後に AI がゴーストテキストで続きを提案します（Tab で確定）。API を消費します。',
+  'settings.terminal': 'ターミナル',
+  'settings.defaultShell': '初期シェル',
+  'settings.defaultShellHint': '新しいターミナルを開くときに使うシェルです',
   'settings.saveFailed': '保存に失敗しました',
 
   // themes
@@ -389,6 +392,9 @@ export const en: Record<MessageKey, string> = {
   'settings.inlineCompletions': 'Inline completions',
   'settings.inlineCompletionsHint':
     'After you pause typing, AI suggests ghost text (Tab to accept). Uses your API.',
+  'settings.terminal': 'Terminal',
+  'settings.defaultShell': 'Default shell',
+  'settings.defaultShellHint': 'Shell used when opening a new terminal',
   'settings.saveFailed': 'Failed to save settings',
 
   'theme.dark': 'Dark',

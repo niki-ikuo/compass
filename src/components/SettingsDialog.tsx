@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useAppStore } from '@/stores/app-store'
-import type { AppSettings, ColorThemeId, LlmProviderId } from '@/types'
+import type { AppSettings, ColorThemeId, LlmProviderId, TerminalShell } from '@/types'
 import { DEFAULT_SETTINGS } from '@/types'
 import { COLOR_THEMES, getColorThemeLabel } from '@/utils/color-theme'
 import {
@@ -54,6 +54,7 @@ export function SettingsDialog() {
   const [openSnapshot, setOpenSnapshot] = useState<AppSettings>({ ...DEFAULT_SETTINGS })
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
+  const [shells, setShells] = useState<TerminalShell[]>([])
 
   useEffect(() => {
     if (settingsOpen) {
@@ -61,11 +62,13 @@ export function SettingsDialog() {
         ...DEFAULT_SETTINGS,
         ...settings,
         providerKeys: { ...settings.providerKeys },
-        inlineCompletionsEnabled: settings.inlineCompletionsEnabled !== false
+        inlineCompletionsEnabled: settings.inlineCompletionsEnabled !== false,
+        defaultShellId: settings.defaultShellId || DEFAULT_SETTINGS.defaultShellId
       }
       setForm(snapshot)
       setOpenSnapshot(snapshot)
       setMessage('')
+      void window.compass.terminal.listShells().then(setShells)
     }
     // ダイアログを開いた時点の設定だけを取り込む
     // eslint-disable-next-line react-hooks/exhaustive-deps -- open snapshot only
@@ -77,6 +80,13 @@ export function SettingsDialog() {
   const modelOptions = getModelOptions(form.providerId, form.model)
   const isCustomProvider = form.providerId === 'custom'
   const selectedTheme = COLOR_THEMES.find((theme) => theme.id === form.colorTheme) ?? COLOR_THEMES[0]
+  const shellOptions =
+    shells.length > 0
+      ? shells
+      : [{ id: form.defaultShellId || DEFAULT_SETTINGS.defaultShellId, label: form.defaultShellId }]
+  const defaultShellValue = shellOptions.some((shell) => shell.id === form.defaultShellId)
+    ? form.defaultShellId
+    : shellOptions[0].id
 
   const previewColorTheme = (colorTheme: ColorThemeId) => {
     setForm((prev) => ({ ...prev, colorTheme }))
@@ -98,6 +108,7 @@ export function SettingsDialog() {
     try {
       const toSave: AppSettings = {
         ...form,
+        defaultShellId: defaultShellValue,
         providerKeys: {
           ...form.providerKeys,
           [form.providerId]: form.apiKey
@@ -182,6 +193,26 @@ export function SettingsDialog() {
                 className="theme-swatch"
                 style={{ background: selectedTheme.terminal.selectionBackground }}
               />
+            </span>
+          </label>
+
+          <p className="modal-section-title">{t('settings.terminal')}</p>
+
+          <label>
+            {t('settings.defaultShell')}
+            <select
+              value={defaultShellValue}
+              onChange={(e) => setForm({ ...form, defaultShellId: e.target.value })}
+              disabled={shells.length === 0}
+            >
+              {shellOptions.map((shell) => (
+                <option key={shell.id} value={shell.id}>
+                  {shell.label}
+                </option>
+              ))}
+            </select>
+            <span className="field-hint">
+              {shells.length === 0 ? t('terminal.noShell') : t('settings.defaultShellHint')}
             </span>
           </label>
 

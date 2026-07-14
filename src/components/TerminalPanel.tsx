@@ -469,6 +469,7 @@ export function TerminalPanel() {
   const terminalHeight = useAppStore((s) => s.panelLayout.terminalHeight)
   const setTerminalHeight = useAppStore((s) => s.setTerminalHeight)
   const setShowTerminal = useAppStore((s) => s.setShowTerminal)
+  const defaultShellId = useAppStore((s) => s.settings.defaultShellId)
 
   const [focusToken, setFocusToken] = useState(0)
   const [shells, setShells] = useState<TerminalShell[]>([])
@@ -487,27 +488,39 @@ export function TerminalPanel() {
   useEffect(() => {
     void window.compass.terminal.listShells().then((available) => {
       setShells(available)
-      if (available.length > 0) {
-        setSelectedShellId((current) => current || available[0].id)
-      }
+      if (available.length === 0) return
+      setSelectedShellId((current) => {
+        if (defaultShellId && available.some((shell) => shell.id === defaultShellId)) {
+          return defaultShellId
+        }
+        if (current && available.some((shell) => shell.id === current)) return current
+        return available[0].id
+      })
     })
-  }, [])
+  }, [defaultShellId])
 
   const createTab = useCallback(
     (shellId?: string) => {
       if (!workspaceRoot) return
       tabCounterRef.current += 1
       const id = generateId()
-      const shell = shellId ?? selectedShellId ?? shells[0]?.id ?? 'powershell'
+      const preferred =
+        shellId ??
+        selectedShellId ??
+        (defaultShellId && shells.some((shell) => shell.id === defaultShellId)
+          ? defaultShellId
+          : undefined) ??
+        shells[0]?.id ??
+        'powershell'
       const tab: TerminalTab = {
         id,
         title: t('terminal.tabTitle', { n: tabCounterRef.current }),
-        shellId: shell
+        shellId: preferred
       }
       setTabs((prev) => [...prev, tab])
       setActiveTabId(id)
     },
-    [workspaceRoot, selectedShellId, shells, t]
+    [workspaceRoot, selectedShellId, defaultShellId, shells, t]
   )
 
   useEffect(() => {
@@ -530,10 +543,12 @@ export function TerminalPanel() {
       autoCreateRequestedRef.current = false
       return
     }
+    // 初期シェル設定を反映するため、シェル一覧と選択状態が揃うまで待つ
+    if (shells.length === 0 || !selectedShellId) return
     if (autoCreateRequestedRef.current) return
     autoCreateRequestedRef.current = true
     createTab()
-  }, [workspaceRoot, tabs.length, createTab])
+  }, [workspaceRoot, tabs.length, createTab, shells.length, selectedShellId])
 
   const closeTab = useCallback(
     (tabId: string, options?: { hidePanelWhenEmpty?: boolean }) => {
