@@ -348,7 +348,7 @@ export async function resolveChatContext(
       }
 
       folders.push({
-        relativePath: toRelativePath(workspaceRoot, ref.path),
+        relativePath: toRelativePath(workspaceRoot, ref.path) || basename(ref.path),
         structure,
         files: folderFiles,
         truncated

@@ -34,14 +34,18 @@ import {
 } from '@/utils/chat-selection-drag'
 import { buildWorkspaceIndex, ensureWorkspaceIndex } from '@/utils/project-index'
 import { getLlmProvider, getModelOptions, getProviderLabel } from '@/utils/llm-providers'
+import { basename } from '@/utils/path'
 import { useI18n, getDateLocale } from '@/i18n'
 
 function formatContextLabel(path: string, workspaceRoot: string | null): string {
   if (!workspaceRoot) return path
   const root = workspaceRoot.replace(/\\/g, '/')
   const normalized = path.replace(/\\/g, '/')
+  if (normalized === root || normalized === `${root}/`) {
+    return basename(workspaceRoot)
+  }
   if (normalized.startsWith(root)) {
-    return normalized.slice(root.length).replace(/^\//, '') || path
+    return normalized.slice(root.length).replace(/^\//, '') || basename(path)
   }
   return path
 }
