@@ -160,8 +160,13 @@ function createMenu(): void {
         { role: 'toggleDevTools', label: t('menu.toggleDevTools') },
         { type: 'separator' },
         { role: 'resetZoom', label: t('menu.resetZoom') },
-        { role: 'zoomIn', label: t('menu.zoomIn') },
+        { role: 'resetZoom', accelerator: 'CmdOrCtrl+num0', visible: false },
+        // Show Ctrl++; also bind Ctrl+= and numpad (default Plus alone often needs Shift on Win/Linux).
+        { role: 'zoomIn', label: t('menu.zoomIn'), accelerator: 'CmdOrCtrl+Plus' },
+        { role: 'zoomIn', accelerator: 'CmdOrCtrl+=', visible: false },
+        { role: 'zoomIn', accelerator: 'CmdOrCtrl+numadd', visible: false },
         { role: 'zoomOut', label: t('menu.zoomOut') },
+        { role: 'zoomOut', accelerator: 'CmdOrCtrl+numsub', visible: false },
         { type: 'separator' },
         {
           label: t('menu.terminal'),
