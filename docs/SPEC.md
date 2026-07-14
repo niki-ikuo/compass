@@ -30,7 +30,7 @@
 
 ### Deferred (v2+)
 
-- **Agent writes & commands** — Phase 2+ of [AGENT_PLAN.md](./AGENT_PLAN.md) (preview/apply writes, restricted exec). Phase 0–1 (contract + read-only tools) are in progress on `feature/ai-chat-agent`
+- **Agent follow-ups** — Phase 4 UX/guardrails are implemented; deferred: retry UI, auto Edit fallback for tools-less providers — see [AGENT_PLAN.md](./AGENT_PLAN.md)
 - Vector search / RAG (`.compass` is a structure index, not embedding search)
 - MCP
 - Git integration
@@ -264,7 +264,7 @@ Phased build checklist for v2.0 Agent: [AGENT_PLAN.md](./AGENT_PLAN.md).
 |------|---------|
 | Ask mode | Explain / review only; no workspace change proposals |
 | Edit mode | Propose create/change/delete as JSON; user previews and applies |
-| Agent | Tool-call loop. Phase 1: read-only (`readFile` / `listDir` / `search`). Writes and commands are later phases — see [AGENT_PLAN.md](./AGENT_PLAN.md) |
+| Agent | Tool-call loop. Phase 1–3: read tools, `proposeActions` (preview approval), restricted `exec` — see [AGENT_PLAN.md](./AGENT_PLAN.md) |
 
 ---
 

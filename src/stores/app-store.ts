@@ -187,6 +187,43 @@ function removeFileFromPendingPreview(
   return { ...preview, actions: remainingActions, items: remainingItems }
 }
 
+function resolveAgentApprovalIfPreviewCleared(
+  getState: () => {
+    pendingWorkspacePreview: unknown
+    pendingAgentApprovalId: string | null
+    agentApprovalTrace: { applied: string[]; rejected: string[] } | null
+  },
+  setState: (
+    partial: Partial<{
+      pendingAgentApprovalId: string | null
+      agentApprovalTrace: { applied: string[]; rejected: string[] } | null
+    }>
+  ) => void
+): void {
+  const state = getState()
+  if (state.pendingWorkspacePreview || !state.pendingAgentApprovalId) return
+
+  const id = state.pendingAgentApprovalId
+  const applied = state.agentApprovalTrace?.applied ?? []
+  const rejected = state.agentApprovalTrace?.rejected ?? []
+  setState({ pendingAgentApprovalId: null, agentApprovalTrace: null })
+
+  if (typeof window === 'undefined' || !window.compass?.ai?.resolveApproval) return
+
+  const approved = applied.length > 0
+  const detail = approved
+    ? [
+        'User partially resolved the proposed workspace actions.',
+        applied.length > 0 ? `Applied:\n${applied.map((p) => `- ${p}`).join('\n')}` : null,
+        rejected.length > 0 ? `Rejected:\n${rejected.map((p) => `- ${p}`).join('\n')}` : null
+      ]
+        .filter(Boolean)
+        .join('\n')
+    : 'User rejected the proposed file changes (partial). Remaining items were cleared without apply.'
+
+  void window.compass.ai.resolveApproval({ id, approved, detail })
+}
+
 function finalizePreviewFileInOpenFiles(openFiles: OpenFile[], filePath: string): OpenFile[] {
   const normalized = normalizePath(filePath)
   return openFiles.map((file) => {
@@ -283,6 +320,10 @@ interface AppState {
     actions: WorkspaceAction[]
     items: ActionPreviewItem[]
   } | null
+  /** Agent proposeActions の承認待ち ID（Edit プレビューと共有） */
+  pendingAgentApprovalId: string | null
+  /** 部分適用/却下のトレース（pending 消化時に resolve へ載せる） */
+  agentApprovalTrace: { applied: string[]; rejected: string[] } | null
   /** エディタなどからチャット入力へメンション挿入するリクエスト */
   chatComposerInsertRequest: {
     id: number
@@ -343,6 +384,7 @@ interface AppState {
   setPendingWorkspacePreview: (
     preview: { actions: WorkspaceAction[]; items: ActionPreviewItem[] } | null
   ) => void
+  setPendingAgentApprovalId: (id: string | null) => void
   activateWorkspacePreview: (items: ActionPreviewItem[]) => void
   openPreviewFile: (path: string, newContent: string, originalContent: string, isNew: boolean) => void
   revertWorkspacePreview: () => void
@@ -400,6 +442,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   indexStatus: 'idle',
   indexMeta: null,
   pendingWorkspacePreview: null,
+  pendingAgentApprovalId: null,
+  agentApprovalTrace: null,
   chatComposerInsertRequest: null,
   panelLayout: loadPanelLayout(),
 
@@ -844,6 +888,12 @@ export const useAppStore = create<AppState>((set, get) => ({
     get().activateWorkspacePreview(preview.items)
   },
 
+  setPendingAgentApprovalId: (id) =>
+    set({
+      pendingAgentApprovalId: id,
+      agentApprovalTrace: id ? { applied: [], rejected: [] } : null
+    }),
+
   openPreviewFile: (path, newContent, originalContent, isNew) =>
     set((state) => {
       const existingEncoding =
@@ -899,7 +949,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     })
   },
 
-  revertWorkspacePreview: () =>
+  revertWorkspacePreview: () => {
+    const approvalId = get().pendingAgentApprovalId
     set((state) => {
       const openFiles: OpenFile[] = []
       let activeFilePath = state.activeFilePath
@@ -927,22 +978,55 @@ export const useAppStore = create<AppState>((set, get) => ({
         activeFilePath = openFiles[openFiles.length - 1].path
       }
 
-      return { openFiles, activeFilePath, pendingWorkspacePreview: null }
-    }),
+      return {
+        openFiles,
+        activeFilePath,
+        pendingWorkspacePreview: null,
+        pendingAgentApprovalId: null,
+        agentApprovalTrace: null
+      }
+    })
+    if (approvalId && typeof window !== 'undefined' && window.compass?.ai?.resolveApproval) {
+      void window.compass.ai.resolveApproval({
+        id: approvalId,
+        approved: false,
+        detail: 'User rejected the proposed workspace actions'
+      })
+    }
+  },
 
   applyWorkspacePreview: async () => {
     const state = get()
     if (!state.pendingWorkspacePreview || !state.workspaceRoot) return
+
+    const approvalId = state.pendingAgentApprovalId
+    const actionCount = state.pendingWorkspacePreview.actions.length
+    const actionSummary = state.pendingWorkspacePreview.actions
+      .map((a) => `- ${a.type}: ${a.path}`)
+      .join('\n')
 
     const deleteItems = state.pendingWorkspacePreview.items.filter(
       (item): item is Extract<ActionPreviewItem, { type: 'deleteFile' | 'deleteDir' }> =>
         item.type === 'deleteFile' || item.type === 'deleteDir'
     )
 
-    await window.compass.fs.applyActions(
-      state.workspaceRoot,
-      state.pendingWorkspacePreview.actions
-    )
+    try {
+      await window.compass.fs.applyActions(
+        state.workspaceRoot,
+        state.pendingWorkspacePreview.actions
+      )
+    } catch (error) {
+      if (approvalId && typeof window !== 'undefined' && window.compass?.ai?.resolveApproval) {
+        set({ pendingAgentApprovalId: null, agentApprovalTrace: null })
+        const message = error instanceof Error ? error.message : 'apply failed'
+        void window.compass.ai.resolveApproval({
+          id: approvalId,
+          approved: false,
+          detail: `Apply failed: ${message}`
+        })
+      }
+      throw error
+    }
 
     set((s) => {
       let openFiles = s.openFiles.map((f) => {
@@ -971,8 +1055,22 @@ export const useAppStore = create<AppState>((set, get) => ({
         }
       }
 
-      return { openFiles, activeFilePath, pendingWorkspacePreview: null }
+      return {
+        openFiles,
+        activeFilePath,
+        pendingWorkspacePreview: null,
+        pendingAgentApprovalId: null,
+        agentApprovalTrace: null
+      }
     })
+
+    if (approvalId && typeof window !== 'undefined' && window.compass?.ai?.resolveApproval) {
+      void window.compass.ai.resolveApproval({
+        id: approvalId,
+        approved: true,
+        detail: `User approved and applied ${actionCount} workspace action(s):\n${actionSummary}`
+      })
+    }
   },
 
   applyPreviewFile: async (filePath) => {
@@ -994,6 +1092,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
     await window.compass.fs.applyActions(state.workspaceRoot, actionsToApply)
 
+    const appliedLabel = writeItem.relativePath.replace(/\\/g, '/')
     set((s) => {
       if (!s.pendingWorkspacePreview) return s
       const openFiles = finalizePreviewFileInOpenFiles(s.openFiles, filePath)
@@ -1001,26 +1100,54 @@ export const useAppStore = create<AppState>((set, get) => ({
         s.pendingWorkspacePreview,
         filePath
       )
-      return { openFiles, pendingWorkspacePreview }
+      const trace = s.agentApprovalTrace
+        ? {
+            applied: [...s.agentApprovalTrace.applied, appliedLabel],
+            rejected: s.agentApprovalTrace.rejected
+          }
+        : s.pendingAgentApprovalId
+          ? { applied: [appliedLabel], rejected: [] }
+          : null
+      return { openFiles, pendingWorkspacePreview, agentApprovalTrace: trace }
     })
+    resolveAgentApprovalIfPreviewCleared(get, set)
   },
 
-  rejectPreviewFile: (filePath) =>
-    set((state) => {
-      if (!state.pendingWorkspacePreview) return state
+  rejectPreviewFile: (filePath) => {
+    const state = get()
+    if (!state.pendingWorkspacePreview) return
+
+    const writeItem = state.pendingWorkspacePreview.items.find(
+      (item): item is Extract<ActionPreviewItem, { type: 'writeFile' }> =>
+        item.type === 'writeFile' && normalizePath(item.path) === normalizePath(filePath)
+    )
+    const rejectedLabel = writeItem?.relativePath.replace(/\\/g, '/') ?? normalizePath(filePath)
+
+    set((s) => {
+      if (!s.pendingWorkspacePreview) return s
 
       const { openFiles, activeFilePath } = revertPreviewFileInOpenFiles(
-        state.openFiles,
-        state.activeFilePath,
+        s.openFiles,
+        s.activeFilePath,
         filePath
       )
       const pendingWorkspacePreview = removeFileFromPendingPreview(
-        state.pendingWorkspacePreview,
+        s.pendingWorkspacePreview,
         filePath
       )
+      const trace = s.agentApprovalTrace
+        ? {
+            applied: s.agentApprovalTrace.applied,
+            rejected: [...s.agentApprovalTrace.rejected, rejectedLabel]
+          }
+        : s.pendingAgentApprovalId
+          ? { applied: [], rejected: [rejectedLabel] }
+          : null
 
-      return { openFiles, activeFilePath, pendingWorkspacePreview }
-    }),
+      return { openFiles, activeFilePath, pendingWorkspacePreview, agentApprovalTrace: trace }
+    })
+    resolveAgentApprovalIfPreviewCleared(get, set)
+  },
 
   addChatContextRef: (ref) => {
     get().addChatContextRefs([ref])

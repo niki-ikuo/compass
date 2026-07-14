@@ -1,12 +1,89 @@
+import { useState } from 'react'
 import type { AgentToolStep } from '@/types'
 import { useI18n } from '@/i18n'
 
 function formatArgs(args: Record<string, unknown>): string {
   const entries = Object.entries(args)
   if (entries.length === 0) return ''
-  return entries
-    .map(([key, value]) => `${key}=${typeof value === 'string' ? value : String(value)}`)
-    .join(', ')
+  try {
+    return JSON.stringify(args, null, 2)
+  } catch {
+    return entries
+      .map(([key, value]) => `${key}=${typeof value === 'string' ? value : String(value)}`)
+      .join('\n')
+  }
+}
+
+function toolIcon(name: string): string {
+  switch (name) {
+    case 'listDir':
+      return '📁'
+    case 'readFile':
+      return '📄'
+    case 'search':
+      return '🔎'
+    case 'exec':
+      return '⌨️'
+    case 'proposeActions':
+      return '✏️'
+    default:
+      return '🔧'
+  }
+}
+
+function AgentStepAccordion({ step }: { step: AgentToolStep }) {
+  const { t } = useI18n()
+  const [open, setOpen] = useState(false)
+
+  const statusLabel =
+    step.status === 'waiting_approval'
+      ? t('chat.agentWaitingApproval')
+      : step.status === 'running'
+        ? t('chat.agentToolRunning')
+        : step.ok === false || step.status === 'error'
+          ? t('chat.agentToolError')
+          : t('chat.agentToolOk')
+
+  const argsText = formatArgs(step.args)
+  const bodyParts = [
+    argsText ? argsText : null,
+    step.summary && step.status !== 'waiting_approval' ? step.summary : null
+  ].filter(Boolean) as string[]
+  const body = bodyParts.join('\n\n')
+  const canExpand = body.length > 0
+
+  const header = (
+    <>
+      <span className="chat-code-chevron">{canExpand ? (open ? '▼' : '▶') : '·'}</span>
+      <span className="chat-code-icon" aria-hidden="true">
+        {toolIcon(step.name)}
+      </span>
+      <span className="chat-code-label">{step.name}</span>
+      <span className="chat-code-meta">{statusLabel}</span>
+    </>
+  )
+
+  return (
+    <div
+      className={`chat-code-block agent-step-block agent-step-${step.status}${
+        step.ok === false ? ' agent-step-failed' : ''
+      }`}
+    >
+      {canExpand ? (
+        <button
+          type="button"
+          className="chat-code-header"
+          onClick={() => setOpen((prev) => !prev)}
+          aria-expanded={open}
+        >
+          {header}
+        </button>
+      ) : (
+        <div className="chat-code-header static">{header}</div>
+      )}
+      {open && canExpand ? <pre className="chat-code-body">{body}</pre> : null}
+    </div>
+  )
 }
 
 interface AgentStepTimelineProps {
@@ -19,31 +96,9 @@ export function AgentStepTimeline({ steps }: AgentStepTimelineProps) {
 
   return (
     <div className="agent-step-timeline" aria-label={t('chat.agentSteps')}>
-      {steps.map((step) => {
-        const statusLabel =
-          step.status === 'running'
-            ? t('chat.agentToolRunning')
-            : step.ok === false || step.status === 'error'
-              ? t('chat.agentToolError')
-              : t('chat.agentToolOk')
-        const argsText = formatArgs(step.args)
-
-        return (
-          <div
-            key={step.id}
-            className={`agent-step agent-step-${step.status}${
-              step.ok === false ? ' agent-step-failed' : ''
-            }`}
-          >
-            <div className="agent-step-header">
-              <span className="agent-step-name">{step.name}</span>
-              <span className="agent-step-status">{statusLabel}</span>
-            </div>
-            {argsText ? <div className="agent-step-args">{argsText}</div> : null}
-            {step.summary ? <div className="agent-step-summary">{step.summary}</div> : null}
-          </div>
-        )
-      })}
+      {steps.map((step) => (
+        <AgentStepAccordion key={step.id} step={step} />
+      ))}
     </div>
   )
 }

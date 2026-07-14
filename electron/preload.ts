@@ -23,7 +23,9 @@ import type {
   InlineCompletionResult,
   AgentToolStartEvent,
   AgentToolResultEvent,
-  AgentStepEvent
+  AgentStepEvent,
+  AgentNeedApprovalEvent,
+  AgentResolveApprovalRequest
 } from '../src/types'
 
 const compassAPI = {
@@ -111,7 +113,15 @@ const compassAPI = {
         callback(payload)
       ipcRenderer.on('ai:step', handler)
       return () => ipcRenderer.removeListener('ai:step', handler)
-    }
+    },
+    onNeedApproval: (callback: (event: AgentNeedApprovalEvent) => void): (() => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, payload: AgentNeedApprovalEvent): void =>
+        callback(payload)
+      ipcRenderer.on('ai:needApproval', handler)
+      return () => ipcRenderer.removeListener('ai:needApproval', handler)
+    },
+    resolveApproval: (request: AgentResolveApprovalRequest): Promise<boolean> =>
+      ipcRenderer.invoke('ai:resolveApproval', request)
   },
   settings: {
     get: (): Promise<AppSettings> => ipcRenderer.invoke('settings:get'),

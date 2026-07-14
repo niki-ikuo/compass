@@ -80,6 +80,16 @@ Exact names can change; the contract should include **enough events for a step t
 
 **Decision:** Embed tool steps on `ChatMessage.agentSteps` (assistant messages). Ask/Edit transcripts ignore the field. History reload coerces in-flight `running` steps to `error`.
 
+### Phase 2 write policy (decided)
+
+| Topic | Decision |
+|-------|----------|
+| Write tool shape | Single batched **`proposeActions`** → `WorkspaceAction[]` |
+| Apply location | Renderer `applyWorkspacePreview` / `revertWorkspacePreview` (same UX as Edit) |
+| After reject | Return observation to the model and **continue** the loop (re-propose allowed) |
+| After apply | Return applied summary and **continue** |
+| Pause IPC | `ai:needApproval` + `ai:resolveApproval` |
+
 ### Spec updates
 
 Document Ask / Edit / Agent boundaries in SPEC (and keep this plan as the build checklist).
@@ -120,9 +130,13 @@ Document Ask / Edit / Agent boundaries in SPEC (and keep this plan as the build 
 
 **Goal:** Multi-step edits with the same safety model as Edit.
 
-- Tools: `writeFile`, `mkdir`, `deleteFile`, `deleteDir` (or a single batched `proposeActions`).
-- Destructive / write tools **pause** the loop and open preview (reuse Edit UI where possible).
-- After apply or reject, continue or stop according to product rules (document the chosen policy).
+**Status:** Implemented on `feature/ai-chat-agent`.
+
+- Tool: `proposeActions({ actions: WorkspaceAction[] })`
+- Loop **pauses** and emits `ai:needApproval` with preview items
+- UI reuses Edit preview / PreviewBar; Apply or Reject calls `ai:resolveApproval`
+- Reject / apply both return an observation; the run **continues** (reject does not force-stop)
+- Ask/Edit paths unchanged
 
 **Exit criteria:** Agent can plan → read → propose → user approve → apply, across multiple steps; Ask/Edit unchanged.
 
@@ -132,9 +146,13 @@ Document Ask / Edit / Agent boundaries in SPEC (and keep this plan as the build 
 
 **Goal:** Close the feedback loop (tests, lint, build) without equating Agent to a raw shell.
 
-- Controlled `exec`: workspace cwd, timeout, stdout/stderr cap, no interactive TTY by default.
-- Deny list or always-approve for dangerous patterns.
-- Do not drive the user’s interactive PTY from the Agent loop.
+**Status:** Implemented on `feature/ai-chat-agent`.
+
+- Tool: `exec({ command, cwd?, timeoutMs? })` via `electron/services/agent-exec.ts`
+- cwd constrained to the workspace; default timeout 30s (max 120s); stdout/stderr capped (~64KB)
+- Non-interactive (`stdin` ignored); separate from the user PTY
+- **Shell:** Windows prefers Git Bash when installed (else `cmd.exe`); other platforms use `/bin/sh`
+- **Deny-list** blocks obvious dangerous patterns; cancel aborts and kills the child process when possible
 
 **Exit criteria:** Safe commands run, output returns to the model, UI shows command steps; cancel kills the child process when possible.
 
@@ -142,13 +160,17 @@ Document Ask / Edit / Agent boundaries in SPEC (and keep this plan as the build 
 
 ## 7. Phase 4 — UX and robustness
 
-- Partial apply / retry after failure
-- Long-run progress and clearer cancel semantics
-- Provider fallback when `tools` are unsupported (e.g. degrade messaging or Edit-like path)
-- History replay of tool steps without corruption
-- Guardrails: turn limits, payload size limits, redaction of secrets in tool logs
+**Status:** Implemented on `feature/ai-chat-agent`.
+
+- **Partial apply:** When the preview queue empties after per-file apply/reject, Agent approval resumes with an applied/rejected observation (full retry-after-failure UI deferred)
+- **Progress / cancel:** `ai:step` status labels; `waiting_approval` step status; abort clears approval + running/waiting steps
+- **Tools-less providers:** Clear error (`ai.agentToolsUnsupported`) directing the user to Edit or a tools-capable model (no auto Edit fallback yet)
+- **History:** `waiting_approval` / `running` steps normalize safely on load
+- **Guardrails:** Turn limits, payload truncation, secret redaction in tool args/logs (`src/utils/redact.ts`) and `exec` output
 
 **Exit criteria:** Stable enough for daily use on the primary providers Compass already supports.
+
+**Deferred:** Retry-after-failure UI; automatic Ask/Edit fallback when tools are unsupported; hide Agent toggle per provider.
 
 ---
 
@@ -200,8 +222,8 @@ Record choices here as implementation proceeds:
 
 | Topic | Options / notes | Decision |
 |-------|-----------------|----------|
-| Approval policy after reject | Stop run vs continue without write | _TBD_ (Phase 2) |
-| Batched vs per-file write tools | One `proposeActions` vs many tools | _TBD_ (Phase 2) |
-| Tools-less providers | Hide Agent / warn / fallback | _TBD_ (Phase 4) |
+| Approval policy after reject | Stop run vs continue without write | **Continue with rejection observation** |
+| Batched vs per-file write tools | One `proposeActions` vs many tools | **`proposeActions` batch** |
+| Tools-less providers | Hide Agent / warn / fallback | **Warn with clear error** (Edit / switch model); hide-toggle & auto-fallback deferred |
 | Step persistence shape | On message vs separate run record | **On `ChatMessage.agentSteps`** |
-| Exec allow list | Allow-list vs deny-list first | _TBD_ (Phase 3) |
+| Exec allow list | Allow-list vs deny-list first | **Deny-list first** (`agent-exec.ts`) |

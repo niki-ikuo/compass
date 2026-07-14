@@ -36,7 +36,8 @@ electron/
 └── services/
     ├── filesystem.ts       # ディレクトリ・ファイル操作
     ├── ai-client.ts        # OpenAI 互換 API / SSE（Ask / Edit）
-    ├── agent-runner.ts     # Agent ツールループ（Phase 1: 読取専用）
+    ├── agent-runner.ts     # Agent ツールループ（Phase 1–4）
+    ├── agent-exec.ts       # Agent 用の制限付きコマンド実行
     ├── settings.ts         # 設定の読み書き
     ├── project-indexer.ts  # ワークスペース索引
     ├── index-watcher.ts    # 索引のファイル監視
@@ -78,7 +79,7 @@ Renderer からは `window.compass.*` を呼び出します。実装の正は `e
 6. 完了時に `ai:done`、失敗時に `ai:error`、キャンセル時に `ai:aborted`
 7. **Ask**: 説明のみ（ファイル変更アクションは出さない）
 8. **Edit**: `compass-actions` をパース → プレビュー → ユーザー承認で適用（自律ツールループではない）
-9. **Agent（Phase 1）**: 読取専用ツール（`readFile` / `listDir` / `search`）。ワークスペース変更なし
+9. **Agent（Phase 1–4）**: 読取ツール、`proposeActions`（一時停止 → プレビュー → 承認、部分適用含む）、制限付き `exec`、ターン/ペイロード上限、秘密マスキング、tools 非対応エラー、`waiting_approval` UI
 
 ## `.compass` 索引
 

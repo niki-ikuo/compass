@@ -80,9 +80,9 @@ export type AgentRunState =
   | 'error'
   | 'aborted'
 
-export type AgentToolName = 'readFile' | 'listDir' | 'search'
+export type AgentToolName = 'readFile' | 'listDir' | 'search' | 'proposeActions' | 'exec'
 
-export type AgentToolStepStatus = 'running' | 'done' | 'error'
+export type AgentToolStepStatus = 'running' | 'waiting_approval' | 'done' | 'error'
 
 /** チャット履歴に載せるツールステップ（アシスタントメッセージに埋め込む） */
 export interface AgentToolStep {
@@ -111,6 +111,19 @@ export interface AgentStepEvent {
   label: string
 }
 
+/** Agent 書き込み提案の承認待ち（Phase 2） */
+export interface AgentNeedApprovalEvent {
+  id: string
+  actions: WorkspaceAction[]
+  items: ActionPreviewItem[]
+}
+
+export interface AgentResolveApprovalRequest {
+  id: string
+  approved: boolean
+  detail?: string
+}
+
 export function normalizeChatMode(mode: unknown): ChatMode | undefined {
   if (mode === 'ask' || mode === 'edit' || mode === 'agent') return mode
   return undefined
@@ -124,7 +137,12 @@ export function normalizeAgentSteps(raw: unknown): AgentToolStep[] | undefined {
     const s = item as Partial<AgentToolStep>
     if (typeof s.id !== 'string' || typeof s.name !== 'string') continue
     const status: AgentToolStepStatus =
-      s.status === 'running' || s.status === 'error' || s.status === 'done' ? s.status : 'done'
+      s.status === 'running' ||
+      s.status === 'waiting_approval' ||
+      s.status === 'error' ||
+      s.status === 'done'
+        ? s.status
+        : 'done'
     steps.push({
       id: s.id,
       name: s.name,
@@ -132,13 +150,13 @@ export function normalizeAgentSteps(raw: unknown): AgentToolStep[] | undefined {
         s.args && typeof s.args === 'object' && !Array.isArray(s.args)
           ? (s.args as Record<string, unknown>)
           : {},
-      // 途中保存の running は履歴読込時に error 扱い
-      status: status === 'running' ? 'error' : status,
+      // 途中保存の running / waiting_approval は履歴読込時に error 扱い
+      status: status === 'running' || status === 'waiting_approval' ? 'error' : status,
       ok: typeof s.ok === 'boolean' ? s.ok : status === 'done',
       summary:
         typeof s.summary === 'string'
           ? s.summary
-          : status === 'running'
+          : status === 'running' || status === 'waiting_approval'
             ? 'interrupted'
             : undefined
     })
@@ -387,6 +405,8 @@ export interface CompassAPI {
     onToolStart: (callback: (event: AgentToolStartEvent) => void) => () => void
     onToolResult: (callback: (event: AgentToolResultEvent) => void) => () => void
     onStep: (callback: (event: AgentStepEvent) => void) => () => void
+    onNeedApproval: (callback: (event: AgentNeedApprovalEvent) => void) => () => void
+    resolveApproval: (request: AgentResolveApprovalRequest) => Promise<boolean>
   }
   settings: {
     get: () => Promise<AppSettings>

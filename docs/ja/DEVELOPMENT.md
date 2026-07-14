@@ -44,7 +44,7 @@ npm run dev
 | IPC ハンドラ | `electron/main.ts` |
 | ファイル操作 | `electron/services/filesystem.ts` |
 | AI 通信 | `electron/services/ai-client.ts` |
-| Agent ツールループ | `electron/services/agent-runner.ts`、[AGENT_PLAN.md](./AGENT_PLAN.md) |
+| Agent ツールループ | `electron/services/agent-runner.ts`、`agent-exec.ts`、[AGENT_PLAN.md](./AGENT_PLAN.md) |
 | インライン補完 | `src/utils/inline-completions.ts`、`ai:complete` / `ai:cancelComplete` |
 | LLM プロバイダ定義 | `src/utils/llm-providers.ts` |
 | 設定保存 | `electron/services/settings.ts` |

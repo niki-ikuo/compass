@@ -36,7 +36,8 @@ electron/
 └── services/
     ├── filesystem.ts       # Directory / file ops
     ├── ai-client.ts        # OpenAI-compatible API / SSE (Ask / Edit)
-    ├── agent-runner.ts     # Agent tool loop (Phase 1: read-only)
+    ├── agent-runner.ts     # Agent tool loop (Phase 1–4)
+    ├── agent-exec.ts       # Restricted Agent command execution
     ├── settings.ts         # Settings read/write
     ├── project-indexer.ts  # Workspace index
     ├── index-watcher.ts    # Index file watching
@@ -78,7 +79,7 @@ The renderer calls `window.compass.*`. The source of truth is `electron/preload.
 6. Completion: `ai:done`; failure: `ai:error`; cancel: `ai:aborted`
 7. **Ask**: explanation only (no file-change actions)
 8. **Edit**: parse `compass-actions` → preview → apply after user approval (not an autonomous tool loop)
-9. **Agent (Phase 1)**: read-only tools (`readFile` / `listDir` / `search`); no workspace mutations
+9. **Agent (Phase 1–4)**: read tools, `proposeActions` (pause → preview → approval, including partial resolve), restricted `exec`, turn/payload limits, secret redaction, tools-unsupported errors, `waiting_approval` UI
 
 ## `.compass` index
 

@@ -1,9 +1,10 @@
 import type { WebContents } from 'electron'
 import { readdir, readFile, stat } from 'fs/promises'
 import { basename, isAbsolute, join, relative, resolve } from 'path'
-import type { ChatRequest } from '../../src/types'
+import type { ChatRequest, WorkspaceAction } from '../../src/types'
 import { t } from '../../src/i18n/runtime'
 import { getLlmProvider, getProviderLabel } from '../../src/utils/llm-providers'
+import { normalizeWorkspaceActions } from '../../src/utils/workspace-actions'
 import { getSettings } from './settings'
 import {
   acquireChatAbortController,
@@ -12,8 +13,10 @@ import {
   isAbortError,
   releaseChatAbortController
 } from './ai-client'
-import { resolveInsideWorkspace } from './filesystem'
+import { previewWorkspaceActions, resolveInsideWorkspace } from './filesystem'
 import { searchWorkspace } from './workspace-search'
+import { runAgentExec } from './agent-exec'
+import { redactSecrets, redactSecretsInArgs } from '../../src/utils/redact'
 
 const MAX_AGENT_TURNS = 8
 const MAX_TOOL_CALLS = 20
@@ -92,26 +95,183 @@ const AGENT_TOOLS = [
         required: ['query']
       }
     }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'proposeActions',
+      description:
+        'Propose workspace file/folder changes for the user to preview and approve. Paths must be relative to the workspace root. Changes are NOT applied until the user approves. Batch related changes into one call.',
+      parameters: {
+        type: 'object',
+        properties: {
+          actions: {
+            type: 'array',
+            description: 'List of mkdir / writeFile / deleteFile / deleteDir actions',
+            items: {
+              type: 'object',
+              properties: {
+                type: {
+                  type: 'string',
+                  enum: ['mkdir', 'writeFile', 'deleteFile', 'deleteDir']
+                },
+                path: {
+                  type: 'string',
+                  description: 'Relative path from workspace root'
+                },
+                content: {
+                  type: 'string',
+                  description: 'File contents (required for writeFile)'
+                }
+              },
+              required: ['type', 'path']
+            }
+          }
+        },
+        required: ['actions']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'exec',
+      description:
+        'Run a short non-interactive shell command with cwd inside the workspace. Use for tests, lint, build, or similar feedback. Dangerous commands are blocked. Default timeout 30s (max 120s). Do not use for interactive programs.',
+      parameters: {
+        type: 'object',
+        properties: {
+          command: {
+            type: 'string',
+            description:
+              'Shell command to run. On Windows uses Git Bash when available (else cmd.exe); elsewhere /bin/sh. Prefer POSIX-style commands when Git Bash is available.'
+          },
+          cwd: {
+            type: 'string',
+            description: 'Working directory relative to workspace root (default ".")'
+          },
+          timeoutMs: {
+            type: 'number',
+            description: 'Timeout in milliseconds (default 30000, max 120000)'
+          }
+        },
+        required: ['command']
+      }
+    }
   }
 ] as const
 
+type ApprovalDecision = { approved: boolean; detail?: string }
+
+const pendingApprovals = new Map<
+  string,
+  {
+    resolve: (decision: ApprovalDecision) => void
+  }
+>()
+
+/** Renderer が preview 承認/却下後に呼ぶ */
+export function resolveAgentApproval(payload: {
+  id: string
+  approved: boolean
+  detail?: string
+}): boolean {
+  const pending = pendingApprovals.get(payload.id)
+  if (!pending) return false
+  pendingApprovals.delete(payload.id)
+  pending.resolve({ approved: payload.approved, detail: payload.detail })
+  return true
+}
+
+function waitForApproval(id: string, signal: AbortSignal): Promise<ApprovalDecision> {
+  return new Promise((resolve, reject) => {
+    if (signal.aborted) {
+      reject(new DOMException('Aborted', 'AbortError'))
+      return
+    }
+
+    const onAbort = (): void => {
+      pendingApprovals.delete(id)
+      signal.removeEventListener('abort', onAbort)
+      reject(new DOMException('Aborted', 'AbortError'))
+    }
+
+    signal.addEventListener('abort', onAbort)
+    pendingApprovals.set(id, {
+      resolve: (decision) => {
+        signal.removeEventListener('abort', onAbort)
+        pendingApprovals.delete(id)
+        resolve(decision)
+      }
+    })
+  })
+}
+
+function parseProposeActions(
+  args: Record<string, unknown>
+): { actions: WorkspaceAction[] } | { error: string } {
+  if (!Array.isArray(args.actions) || args.actions.length === 0) {
+    return { error: 'actions must be a non-empty array' }
+  }
+
+  const actions: WorkspaceAction[] = []
+  for (const item of args.actions) {
+    if (!item || typeof item !== 'object') continue
+    const action = item as Partial<WorkspaceAction> & { type?: string; path?: string; content?: string }
+    if (typeof action.path !== 'string' || !action.path.trim()) continue
+    if (action.type === 'mkdir') {
+      actions.push({ type: 'mkdir', path: action.path })
+    } else if (action.type === 'writeFile') {
+      if (typeof action.content !== 'string') continue
+      actions.push({ type: 'writeFile', path: action.path, content: action.content })
+    } else if (action.type === 'deleteFile' || action.type === 'deleteDir') {
+      actions.push({ type: action.type, path: action.path })
+    }
+  }
+
+  if (actions.length === 0) {
+    return { error: 'no valid actions in proposeActions' }
+  }
+  return { actions }
+}
+
+function sanitizeProposeActionsArgs(args: Record<string, unknown>): Record<string, unknown> {
+  const raw = Array.isArray(args.actions) ? args.actions : []
+  const actions = raw.slice(0, 40).map((item) => {
+    if (!item || typeof item !== 'object') return { type: 'unknown' }
+    const a = item as { type?: string; path?: string; content?: string }
+    if (a.type === 'writeFile') {
+      const len = typeof a.content === 'string' ? a.content.length : 0
+      return { type: 'writeFile', path: a.path, contentChars: len }
+    }
+    return { type: a.type, path: a.path }
+  })
+  return { actionCount: raw.length, actions }
+}
+
 function sanitizeArgs(args: Record<string, unknown>): Record<string, unknown> {
+  if (Array.isArray(args.actions)) {
+    return redactSecretsInArgs(sanitizeProposeActionsArgs(args))
+  }
   const out: Record<string, unknown> = {}
   for (const [key, value] of Object.entries(args)) {
     if (typeof value === 'string') {
-      out[key] = value.length > 200 ? `${value.slice(0, 200)}…` : value
+      const limit = key === 'command' ? 300 : 200
+      const truncated = value.length > limit ? `${value.slice(0, limit)}…` : value
+      out[key] = redactSecrets(truncated)
     } else if (typeof value === 'number' || typeof value === 'boolean' || value === null) {
       out[key] = value
     } else {
       out[key] = '[complex]'
     }
   }
-  return out
+  return redactSecretsInArgs(out)
 }
 
 function truncateForModel(text: string): string {
-  if (text.length <= MAX_TOOL_RESULT_CHARS) return text
-  return `${text.slice(0, MAX_TOOL_RESULT_CHARS)}\n…(truncated)`
+  const redacted = redactSecrets(text)
+  if (redacted.length <= MAX_TOOL_RESULT_CHARS) return redacted
+  return `${redacted.slice(0, MAX_TOOL_RESULT_CHARS)}\n…(truncated)`
 }
 
 function normalizeSlashes(path: string): string {
@@ -366,10 +526,111 @@ async function executeSearch(
   }
 }
 
+async function executeProposeActions(
+  webContents: WebContents,
+  workspaceRoot: string,
+  callId: string,
+  args: Record<string, unknown>,
+  signal: AbortSignal
+): Promise<{ ok: boolean; summary: string; content: string }> {
+  const parsed = parseProposeActions(args)
+  if ('error' in parsed) {
+    return { ok: false, summary: parsed.error, content: `Error: ${parsed.error}` }
+  }
+
+  let normalized: WorkspaceAction[]
+  try {
+    normalized = normalizeWorkspaceActions(workspaceRoot, parsed.actions)
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    return { ok: false, summary: message, content: `Error: ${message}` }
+  }
+
+  if (normalized.length === 0) {
+    return {
+      ok: false,
+      summary: 'no valid actions after normalization',
+      content: 'Error: no valid actions after path normalization'
+    }
+  }
+
+  let items
+  try {
+    items = await previewWorkspaceActions(workspaceRoot, normalized)
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    return { ok: false, summary: message, content: `Error building preview: ${message}` }
+  }
+
+  if (signal.aborted) {
+    return { ok: false, summary: 'aborted', content: 'Error: aborted before approval' }
+  }
+
+  webContents.send('ai:needApproval', {
+    id: callId,
+    actions: normalized,
+    items
+  })
+  webContents.send('ai:step', { label: t('ai.agentStepWaitingApproval') })
+
+  try {
+    const decision = await waitForApproval(callId, signal)
+    if (decision.approved) {
+      const detail =
+        decision.detail ??
+        `User approved and applied ${normalized.length} workspace action(s):\n${normalized
+          .map((a) => `- ${a.type}: ${a.path}`)
+          .join('\n')}`
+      return {
+        ok: true,
+        summary: `Applied ${normalized.length} action(s)`,
+        content: detail
+      }
+    }
+    const detail =
+      decision.detail ??
+      'User rejected the proposed workspace actions. They were not applied. You may propose a revised set of actions or continue without changes.'
+    return {
+      ok: false,
+      summary: 'User rejected',
+      content: detail
+    }
+  } catch (err) {
+    if (isAbortError(err) || signal.aborted) {
+      throw err
+    }
+    const message = err instanceof Error ? err.message : String(err)
+    return { ok: false, summary: message, content: `Error: ${message}` }
+  }
+}
+
+async function executeExec(
+  workspaceRoot: string,
+  args: Record<string, unknown>,
+  signal: AbortSignal
+): Promise<{ ok: boolean; summary: string; content: string }> {
+  const command = typeof args.command === 'string' ? args.command : ''
+  const cwd = typeof args.cwd === 'string' ? args.cwd : undefined
+  const timeoutMs = typeof args.timeoutMs === 'number' ? args.timeoutMs : undefined
+  const result = await runAgentExec({
+    workspaceRoot,
+    command,
+    cwd,
+    timeoutMs,
+    signal
+  })
+  return {
+    ok: result.ok,
+    summary: result.summary,
+    content: truncateForModel(result.content)
+  }
+}
+
 async function executeTool(
   workspaceRoot: string,
   name: string,
-  args: Record<string, unknown>
+  args: Record<string, unknown>,
+  signal: AbortSignal
 ): Promise<{ ok: boolean; summary: string; content: string }> {
   switch (name) {
     case 'readFile':
@@ -378,6 +639,8 @@ async function executeTool(
       return executeListDir(workspaceRoot, args)
     case 'search':
       return executeSearch(workspaceRoot, args)
+    case 'exec':
+      return executeExec(workspaceRoot, args, signal)
     default:
       return {
         ok: false,
@@ -385,6 +648,21 @@ async function executeTool(
         content: `Error: unknown tool "${name}"`
       }
   }
+}
+
+function isToolsUnsupportedApiError(status: number, body: string): boolean {
+  if (status !== 400 && status !== 404 && status !== 422) return false
+  const b = body.toLowerCase()
+  return (
+    /tools?(?:\s+is|\s+are)?\s+not\s+supported/.test(b) ||
+    /does not support (?:tools?|function)/.test(b) ||
+    /function(?:s|\s+calling)? (?:is|are) not supported/.test(b) ||
+    /tool_choice is not supported/.test(b) ||
+    /unknown parameter[:\s]+['"]?tools/.test(b) ||
+    /invalid parameter[:\s]+['"]?tools/.test(b) ||
+    /tools are not enabled/.test(b) ||
+    /model does not support tools/.test(b)
+  )
 }
 
 async function streamAgentTurn(
@@ -403,6 +681,9 @@ async function streamAgentTurn(
 
   if (!response.ok) {
     const errorText = await response.text()
+    if (isToolsUnsupportedApiError(response.status, errorText)) {
+      throw new Error(t('ai.agentToolsUnsupported'))
+    }
     throw new Error(t('ai.apiError', { status: response.status, body: errorText }))
   }
 
@@ -549,7 +830,9 @@ export async function runAgent(webContents: WebContents, request: ChatRequest): 
         return
       }
 
-      webContents.send('ai:step', { label: t('ai.agentStepThinking', { turn: turn + 1 }) })
+      webContents.send('ai:step', {
+        label: t('ai.agentStepThinking', { turn: String(turn + 1) })
+      })
 
       const body: Record<string, unknown> = {
         model: settings.model,
@@ -616,20 +899,39 @@ export async function runAgent(webContents: WebContents, request: ChatRequest): 
           args: sanitized
         })
 
-        const result = await executeTool(request.workspaceRoot, call.function.name, args)
+        let result: { ok: boolean; summary: string; content: string }
+        try {
+          if (call.function.name === 'proposeActions') {
+            result = await executeProposeActions(
+              webContents,
+              request.workspaceRoot,
+              call.id,
+              args,
+              signal
+            )
+          } else {
+            result = await executeTool(request.workspaceRoot, call.function.name, args, signal)
+          }
+        } catch (err) {
+          if (isAbortError(err) || signal.aborted) {
+            webContents.send('ai:aborted')
+            return
+          }
+          throw err
+        }
 
         webContents.send('ai:toolResult', {
           id: call.id,
           name: call.function.name,
           ok: result.ok,
-          summary: result.summary
+          summary: redactSecrets(result.summary)
         })
 
         apiMessages.push({
           role: 'tool',
           tool_call_id: call.id,
           name: call.function.name,
-          content: result.content
+          content: truncateForModel(result.content)
         })
       }
     }
