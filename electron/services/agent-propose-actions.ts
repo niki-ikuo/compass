@@ -33,7 +33,11 @@ export function buildJsonParseAttempts(raw: string): string[] {
   return attempts
 }
 
-/** JSON 文字列リテラル内の未エスケープ制御文字をエスケープする。 */
+/**
+ * JSON 文字列リテラル内を補正する。
+ * - 未エスケープの制御文字をエスケープ
+ * - 不正な `\'` などを JSON として合法な形へ書き換え（LLM のよくあるミス）
+ */
 export function escapeControlCharsInJsonStrings(raw: string): string {
   let out = ''
   let inString = false
@@ -48,13 +52,35 @@ export function escapeControlCharsInJsonStrings(raw: string): string {
     }
 
     if (escape) {
-      out += ch
       escape = false
+      // JSON で合法: " \ / b f n r t uXXXX
+      if (
+        ch === '"' ||
+        ch === '\\' ||
+        ch === '/' ||
+        ch === 'b' ||
+        ch === 'f' ||
+        ch === 'n' ||
+        ch === 'r' ||
+        ch === 't' ||
+        ch === 'u'
+      ) {
+        out += '\\'
+        out += ch
+        continue
+      }
+      if (ch === "'") {
+        // \' → '（シングルクオートの過剰エスケープ）
+        out += "'"
+        continue
+      }
+      // その他の不正エスケープはバックスラッシュをリテラルとして残す
+      out += '\\\\'
+      out += ch
       continue
     }
 
     if (ch === '\\') {
-      out += ch
       escape = true
       continue
     }
@@ -85,6 +111,9 @@ export function escapeControlCharsInJsonStrings(raw: string): string {
     out += ch
   }
 
+  // 末尾が単独の \ で終わっている場合は後段の closeTruncatedJson に委ねる
+  if (escape) out += '\\'
+
   return out
 }
 
@@ -92,13 +121,26 @@ export function escapeControlCharsInJsonStrings(raw: string): string {
 export function closeTruncatedJson(raw: string): string {
   let inString = false
   let escape = false
+  /** `\uXXXX` の残り桁。0 なら未着手。 */
+  let unicodeRemaining = 0
   const stack: string[] = []
 
   for (let i = 0; i < raw.length; i++) {
     const ch = raw[i]
     if (inString) {
+      if (unicodeRemaining > 0) {
+        if (/[0-9a-fA-F]/.test(ch)) {
+          unicodeRemaining--
+        } else {
+          // 不正な \u シーケンス — 残り期待を捨ててこの文字を通常処理
+          unicodeRemaining = 0
+          i--
+        }
+        continue
+      }
       if (escape) {
         escape = false
+        if (ch === 'u') unicodeRemaining = 4
         continue
       }
       if (ch === '\\') {
@@ -121,7 +163,16 @@ export function closeTruncatedJson(raw: string): string {
   }
 
   let result = raw
-  if (inString) result += '"'
+  if (inString) {
+    // トークン限界などでエスケープの途中で切れることが多い
+    if (escape) {
+      result = result.slice(0, -1)
+    } else if (unicodeRemaining > 0) {
+      const partialHex = 4 - unicodeRemaining
+      result = result.slice(0, -(2 + partialHex))
+    }
+    result += '"'
+  }
   result = result.replace(/,\s*$/, '')
   // 途中で切れたキー（`"content":` のあと値なし）は null で埋める
   if (/:\s*$/.test(result)) result += 'null'
