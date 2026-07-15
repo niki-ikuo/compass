@@ -290,6 +290,8 @@ export interface InlineCompletionResult {
 export type WorkspaceAction =
   | { type: 'mkdir'; path: string }
   | { type: 'writeFile'; path: string; content: string }
+  /** Unified-diff surgical edit; preview resolves to writeFile with final content. */
+  | { type: 'applyPatch'; path: string; patch: string }
   | { type: 'deleteFile'; path: string }
   | { type: 'deleteDir'; path: string }
 

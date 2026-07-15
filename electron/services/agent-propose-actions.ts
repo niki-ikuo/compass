@@ -2,7 +2,7 @@
  * proposeActions の引数パース／回復（LLM が actions を文字列化するケース向け）。
  */
 
-const ACTION_TYPES = new Set(['writeFile', 'mkdir', 'deleteFile', 'deleteDir'])
+const ACTION_TYPES = new Set(['writeFile', 'applyPatch', 'mkdir', 'deleteFile', 'deleteDir'])
 
 export function buildJsonParseAttempts(raw: string): string[] {
   const trimmed = raw.trim()
@@ -202,14 +202,12 @@ export function closeTruncatedJson(raw: string): string {
   return result
 }
 
-function actionsIncludeWriteFile(actions: unknown[]): boolean {
-  return actions.some(
-    (item) =>
-      !!item &&
-      typeof item === 'object' &&
-      !Array.isArray(item) &&
-      (item as { type?: unknown }).type === 'writeFile'
-  )
+function actionsIncludeContentPayload(actions: unknown[]): boolean {
+  return actions.some((item) => {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) return false
+    const type = (item as { type?: unknown }).type
+    return type === 'writeFile' || type === 'applyPatch'
+  })
 }
 
 function safeJsonParse(raw: string): unknown | undefined {
@@ -389,7 +387,7 @@ export function coerceProposeActionsArgs(args: Record<string, unknown>): Record<
         if (
           fromClosed &&
           Array.isArray(fromClosed.actions) &&
-          !actionsIncludeWriteFile(fromClosed.actions)
+          !actionsIncludeContentPayload(fromClosed.actions)
         ) {
           return fromClosed
         }
@@ -411,7 +409,13 @@ export function coerceProposeActionsArgs(args: Record<string, unknown>): Record<
 
   for (const value of Object.values(args)) {
     if (typeof value !== 'string') continue
-    if (!value.includes('actions') && !value.includes('writeFile')) continue
+    if (
+      !value.includes('actions') &&
+      !value.includes('writeFile') &&
+      !value.includes('applyPatch')
+    ) {
+      continue
+    }
     const recovered = tryFromUnknown(value)
     if (recovered) return recovered
   }

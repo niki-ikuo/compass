@@ -14,7 +14,71 @@ import type {
 } from '../../src/types'
 import { t } from '../../src/i18n/runtime'
 import { normalizeWorkspaceActionPath } from '../../src/utils/workspace-actions'
+import { ApplyPatchError, applyUnifiedDiff } from '../../src/utils/apply-patch'
 import { decodeFileBuffer, encodeContent } from './encoding'
+
+const PATHED_ACTION_TYPES = new Set([
+  'mkdir',
+  'writeFile',
+  'applyPatch',
+  'deleteFile',
+  'deleteDir'
+])
+
+function isPathedAction(
+  action: WorkspaceAction
+): action is WorkspaceAction & { path: string } {
+  return PATHED_ACTION_TYPES.has(action.type)
+}
+
+/**
+ * Resolve applyPatch → writeFile using current disk contents so preview/apply
+ * use the exact bytes the user approved.
+ */
+export async function materializeWorkspaceActions(
+  workspaceRoot: string,
+  actions: WorkspaceAction[]
+): Promise<WorkspaceAction[]> {
+  const out: WorkspaceAction[] = []
+
+  for (const action of actions) {
+    if (action.type !== 'applyPatch') {
+      out.push(action)
+      continue
+    }
+
+    const relativePath = normalizeWorkspaceActionPath(workspaceRoot, action.path)
+    if (!relativePath) {
+      throw new ApplyPatchError(t('fs.patchEmptyPath'))
+    }
+    if (typeof action.patch !== 'string' || !action.patch.trim()) {
+      throw new ApplyPatchError(t('fs.patchEmpty', { path: relativePath }))
+    }
+
+    const filePath = resolveInsideWorkspace(workspaceRoot, relativePath)
+    const exists = await fileExists(filePath)
+    let oldContent = ''
+    if (exists) {
+      const info = await stat(filePath)
+      if (!info.isFile()) {
+        throw new Error(t('fs.notAFile', { path: relativePath }))
+      }
+      oldContent = (await readFileContent(filePath)).content
+    }
+
+    try {
+      const newContent = applyUnifiedDiff(oldContent, action.patch)
+      out.push({ type: 'writeFile', path: relativePath, content: newContent })
+    } catch (err) {
+      if (err instanceof ApplyPatchError) {
+        throw new ApplyPatchError(t('fs.patchFailed', { path: relativePath, reason: err.message }))
+      }
+      throw err
+    }
+  }
+
+  return out
+}
 
 const IGNORED_DIRS = new Set(['node_modules', '.git', 'dist', 'out', 'release', '.next', '.compass'])
 const MAX_FILE_BYTES = 32 * 1024
@@ -160,13 +224,9 @@ export async function applyWorkspaceActions(
   actions: WorkspaceAction[]
 ): Promise<WorkspaceActionResult> {
   const applied: WorkspaceAction[] = []
-  const normalizedActions = actions.map((action) => {
-    if (
-      action.type === 'mkdir' ||
-      action.type === 'writeFile' ||
-      action.type === 'deleteFile' ||
-      action.type === 'deleteDir'
-    ) {
+  const materialized = await materializeWorkspaceActions(workspaceRoot, actions)
+  const normalizedActions = materialized.map((action) => {
+    if (isPathedAction(action)) {
       return { ...action, path: normalizeWorkspaceActionPath(workspaceRoot, action.path) }
     }
     return action
@@ -221,14 +281,10 @@ export async function previewWorkspaceActions(
 ): Promise<ActionPreviewItem[]> {
   const items: ActionPreviewItem[] = []
 
-  for (const action of actions) {
-    const relativeActionPath =
-      action.type === 'mkdir' ||
-      action.type === 'writeFile' ||
-      action.type === 'deleteFile' ||
-      action.type === 'deleteDir'
-        ? normalizeWorkspaceActionPath(workspaceRoot, action.path)
-        : action.path
+  const materialized = await materializeWorkspaceActions(workspaceRoot, actions)
+
+  for (const action of materialized) {
+    const relativeActionPath = normalizeWorkspaceActionPath(workspaceRoot, action.path)
 
     if (action.type === 'mkdir') {
       const dirPath = resolveInsideWorkspace(workspaceRoot, relativeActionPath)

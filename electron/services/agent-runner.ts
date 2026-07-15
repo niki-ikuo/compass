@@ -134,20 +134,20 @@ const AGENT_TOOLS = [
     function: {
       name: 'proposeActions',
       description:
-        'Propose workspace file/folder changes for the user to preview and approve. Paths must be relative to the workspace root. Changes are NOT applied until the user approves. Pass `actions` as a real JSON array (never a stringified JSON blob). Prefer one writeFile per file. Never put a whole medium/large file in one call—keep each writeFile content small (roughly under ~150 lines or split by function/section across multiple proposeActions). Truncated writeFile payloads are rejected.',
+        'Propose workspace file/folder changes for the user to preview and approve. Paths must be relative to the workspace root. Changes are NOT applied until the user approves. Pass `actions` as a real JSON array (never a stringified JSON blob). Prefer applyPatch (unified diff) for edits to existing files—send only the changed hunks, not the whole file. Use writeFile for new files or tiny full rewrites. Truncated writeFile/applyPatch payloads are rejected.',
       parameters: {
         type: 'object',
         properties: {
           actions: {
             type: 'array',
             description:
-              'Array of mkdir / writeFile / deleteFile / deleteDir objects. Must be an array, not a JSON string.',
+              'Array of mkdir / writeFile / applyPatch / deleteFile / deleteDir objects. Must be an array, not a JSON string.',
             items: {
               type: 'object',
               properties: {
                 type: {
                   type: 'string',
-                  enum: ['mkdir', 'writeFile', 'deleteFile', 'deleteDir']
+                  enum: ['mkdir', 'writeFile', 'applyPatch', 'deleteFile', 'deleteDir']
                 },
                 path: {
                   type: 'string',
@@ -156,7 +156,12 @@ const AGENT_TOOLS = [
                 content: {
                   type: 'string',
                   description:
-                    'File contents (required for writeFile). Keep each write small; for files around 200+ lines, split into multiple proposeActions (section-sized chunks), never one huge payload.'
+                    'Full file contents (required for writeFile). Prefer applyPatch for existing files instead of large rewrites.'
+                },
+                patch: {
+                  type: 'string',
+                  description:
+                    'Unified diff for applyPatch (required). Include @@ hunks with enough context lines. ---/+++ headers optional when path is set. Prefer small hunks over rewriting the whole file.'
                 }
               },
               required: ['type', 'path']
@@ -299,13 +304,21 @@ function parseProposeActions(
   const actions: WorkspaceAction[] = []
   for (const item of args.actions) {
     if (!item || typeof item !== 'object') continue
-    const action = item as Partial<WorkspaceAction> & { type?: string; path?: string; content?: string }
+    const action = item as Partial<WorkspaceAction> & {
+      type?: string
+      path?: string
+      content?: string
+      patch?: string
+    }
     if (typeof action.path !== 'string' || !action.path.trim()) continue
     if (action.type === 'mkdir') {
       actions.push({ type: 'mkdir', path: action.path })
     } else if (action.type === 'writeFile') {
       if (typeof action.content !== 'string') continue
       actions.push({ type: 'writeFile', path: action.path, content: action.content })
+    } else if (action.type === 'applyPatch') {
+      if (typeof action.patch !== 'string' || !action.patch.trim()) continue
+      actions.push({ type: 'applyPatch', path: action.path, patch: action.patch })
     } else if (action.type === 'deleteFile' || action.type === 'deleteDir') {
       actions.push({ type: action.type, path: action.path })
     }
@@ -325,10 +338,14 @@ function sanitizeProposeActionsArgs(args: Record<string, unknown>): Record<strin
   const raw = Array.isArray(args.actions) ? args.actions : []
   const actions = raw.slice(0, 40).map((item) => {
     if (!item || typeof item !== 'object') return { type: 'unknown' }
-    const a = item as { type?: string; path?: string; content?: string }
+    const a = item as { type?: string; path?: string; content?: string; patch?: string }
     if (a.type === 'writeFile') {
       const len = typeof a.content === 'string' ? a.content.length : 0
       return { type: 'writeFile', path: a.path, contentChars: len }
+    }
+    if (a.type === 'applyPatch') {
+      const len = typeof a.patch === 'string' ? a.patch.length : 0
+      return { type: 'applyPatch', path: a.path, patchChars: len }
     }
     return { type: a.type, path: a.path }
   })

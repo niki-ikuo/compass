@@ -51,6 +51,14 @@ function parseActionsJson(raw: string): WorkspaceAction[] {
         if (action.type === 'writeFile') {
           return typeof action.path === 'string' && action.path.length > 0 && typeof action.content === 'string'
         }
+        if (action.type === 'applyPatch') {
+          return (
+            typeof action.path === 'string' &&
+            action.path.length > 0 &&
+            typeof action.patch === 'string' &&
+            action.patch.trim().length > 0
+          )
+        }
         if (action.type === 'deleteFile' || action.type === 'deleteDir') {
           return typeof action.path === 'string' && action.path.length > 0
         }
@@ -119,6 +127,7 @@ export function normalizeWorkspaceActions(
       if (
         action.type === 'mkdir' ||
         action.type === 'writeFile' ||
+        action.type === 'applyPatch' ||
         action.type === 'deleteFile' ||
         action.type === 'deleteDir'
       ) {
@@ -175,7 +184,8 @@ export function getWorkspaceActionsLabel(code: string): { label: string; meta: s
     const parsed = JSON.parse(code.trim()) as { actions?: WorkspaceAction[] }
     const actions = parsed.actions ?? []
     const writeActions = actions.filter(
-      (action): action is Extract<WorkspaceAction, { type: 'writeFile' }> => action.type === 'writeFile'
+      (action): action is Extract<WorkspaceAction, { type: 'writeFile' | 'applyPatch' }> =>
+        action.type === 'writeFile' || action.type === 'applyPatch'
     )
     const mkdirActions = actions.filter(
       (action): action is Extract<WorkspaceAction, { type: 'mkdir' }> => action.type === 'mkdir'
@@ -189,7 +199,11 @@ export function getWorkspaceActionsLabel(code: string): { label: string; meta: s
     const deletePaths = deleteActions.map((action) => action.path.replace(/\\/g, '/'))
 
     if (filePaths.length === 1 && dirPaths.length === 0 && deletePaths.length === 0) {
-      return { label: filePaths[0], meta: t('actions.changeProposal') }
+      const only = writeActions[0]
+      return {
+        label: filePaths[0],
+        meta: only.type === 'applyPatch' ? t('actions.applyPatch') : t('actions.changeProposal')
+      }
     }
     if (dirPaths.length === 1 && filePaths.length === 0 && deletePaths.length === 0) {
       return { label: dirPaths[0], meta: t('actions.mkdir') }

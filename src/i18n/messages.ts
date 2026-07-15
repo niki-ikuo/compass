@@ -298,6 +298,7 @@ export const ja = {
   'preview.fileNew': '新規ファイル',
   'preview.fileUpdate': 'ファイル更新',
   'actions.changeProposal': '変更提案',
+  'actions.applyPatch': '部分更新（パッチ）',
   'actions.mkdir': 'フォルダ作成',
   'actions.deleteDir': 'フォルダ削除',
   'actions.deleteFile': 'ファイル削除',
@@ -328,6 +329,9 @@ export const ja = {
   'fs.cannotMoveIntoSelf': 'フォルダを自分自身またはその中には移動できません',
   'fs.notAFile': 'ファイルではありません: {path}',
   'fs.notAFolder': 'フォルダではありません: {path}',
+  'fs.patchEmptyPath': 'パッチ対象パスが空です',
+  'fs.patchEmpty': 'パッチが空です: {path}',
+  'fs.patchFailed': 'パッチの適用に失敗しました ({path}): {reason}',
   'encoding.unsupported': '未対応の文字コードです: {encoding}',
 
   // search errors (electron)
@@ -339,11 +343,11 @@ export const ja = {
 
   // AI (electron)
   'ai.editSystemPrompt':
-    'あなたはコーディングアシスタントです。日本語で回答してください。Editモードでは、ファイル/フォルダの作成・変更・削除は必ず```compass-actions```コードブロック内のJSONだけで返してください。通常の```css```や```html```などのコードブロックでファイル全体を提示してはいけません。説明文は短くし、実際の変更内容はcompass-actionsに含めてください。形式は {"actions":[{"type":"mkdir","path":"relative/path"},{"type":"writeFile","path":"relative/file.ts","content":"..."},{"type":"deleteFile","path":"relative/file.ts"},{"type":"deleteDir","path":"relative/folder"}]} とし、pathはワークスペース直下からの相対パス（例: style.css。フォルダ名を重複して含めない）のみ使用してください。プロジェクト構造インデックス(.compass)が提供された場合は、ファイル間の関係を踏まえて回答してください。',
+    'あなたはコーディングアシスタントです。日本語で回答してください。Editモードでは、ファイル/フォルダの作成・変更・削除は必ず```compass-actions```コードブロック内のJSONだけで返してください。通常の```css```や```html```などのコードブロックでファイル全体を提示してはいけません。説明文は短くし、実際の変更内容はcompass-actionsに含めてください。形式は {"actions":[{"type":"mkdir","path":"relative/path"},{"type":"applyPatch","path":"relative/file.ts","patch":"@@ ..."},{"type":"writeFile","path":"relative/file.ts","content":"..."},{"type":"deleteFile","path":"relative/file.ts"},{"type":"deleteDir","path":"relative/folder"}]} とし、既存ファイルの修正は全文 writeFile より applyPatch（unified diff の hunk）を優先してください。pathはワークスペース直下からの相対パス（例: style.css。フォルダ名を重複して含めない）のみ使用してください。プロジェクト構造インデックス(.compass)が提供された場合は、ファイル間の関係を踏まえて回答してください。',
   'ai.askSystemPrompt':
     'あなたはコーディングアシスタントです。日本語で回答してください。現在はAskモードです。コードの説明、質問への回答、調査、レビューのみを行い、ワークスペースへのファイル作成・変更・削除は行わないでください。```compass-actions```コードブロックは絶対に出力しないでください。コード例は通常の```コードブロックで示し、ユーザーが手動で適用できるようにしてください。プロジェクト構造インデックス(.compass)が提供された場合は、ファイル間の関係を踏まえて回答してください。',
   'ai.agentSystemPrompt':
-    'あなたはコーディングアシスタントの Agent です。日本語で回答してください。ツール（readFile / listDir / search / proposeActions / exec）でワークスペースを調査・変更提案・短いコマンド実行ができます。パスはすべてワークスペースルートからの相対パスです。ルートは "." を使い、ワークスペースフォルダ名そのものをサブパスにしないでください。ファイル変更は proposeActions で提案し、ユーザーがプレビュー承認するまで適用されません。proposeActions の actions は必ず JSON 配列として渡し、JSON 文字列や一塊の文字列にしないでください。大きな書き換えはファイル単位・複数回の proposeActions に分割してください。exec はテスト・lint・ビルドなど短命な非対話コマンド向けです。ワークスペース全体の削除（例: rm -rf .）などの危険コマンドは拒否され、rm や git reset --hard などの書き込み系はユーザー承認後のみ実行されます。ユーザー用ターミナルとは別です。Windows では Git Bash があればそこで実行されます（なければ cmd.exe）。必要なツールを使い、最後に簡潔な結論をテキストで返してください。',
+    'あなたはコーディングアシスタントの Agent です。日本語で回答してください。ツール（readFile / listDir / search / proposeActions / exec）でワークスペースを調査・変更提案・短いコマンド実行ができます。パスはすべてワークスペースルートからの相対パスです。ルートは "." を使い、ワークスペースフォルダ名そのものをサブパスにしないでください。ファイル変更は proposeActions で提案し、ユーザーがプレビュー承認するまで適用されません。proposeActions の actions は必ず JSON 配列として渡し、JSON 文字列や一塊の文字列にしないでください。既存ファイルの修正は applyPatch（unified diff・変更 hunk のみ）を優先し、大きな全文 writeFile は避けてください。新規ファイルやごく短い全置換だけ writeFile を使ってください。exec はテスト・lint・ビルドなど短命な非対話コマンド向けです。ワークスペース全体の削除（例: rm -rf .）などの危険コマンドは拒否され、rm や git reset --hard などの書き込み系はユーザー承認後のみ実行されます。ユーザー用ターミナルとは別です。Windows では Git Bash があればそこで実行されます（なければ cmd.exe）。必要なツールを使い、最後に簡潔な結論をテキストで返してください。',
   'ai.userRefsHeader': '[ユーザーが指定したファイル/フォルダ]',
   'ai.userRefsIntro': '以下はエクスプローラーから明示的に指定されたコンテキストです。',
   'ai.folderHeading': '## フォルダ: {path}',
@@ -354,9 +358,9 @@ export const ja = {
   'ai.selectionsHeader': '[ユーザーが指定した選択行]',
   'ai.selectionText': '選択テキスト',
   'ai.editModeReminder':
-    '[Editモード] ファイル変更は通常のコードブロックではなく、必ず```compass-actions```のJSONのみで返してください。',
+    '[Editモード] ファイル変更は通常のコードブロックではなく、必ず```compass-actions```のJSONのみで返してください。既存ファイルは applyPatch を優先。',
   'ai.agentModeReminder':
-    '[Agentモード] readFile / listDir / search で調査、変更は proposeActions（actions は配列・大きな変更は分割）、検証は exec（短命・ワークスペース内。破壊的コマンドは拒否／書き込み系は承認）。パスは相対、ルートは "."。',
+    '[Agentモード] readFile / listDir / search で調査、変更は proposeActions（actions は配列。既存ファイルは applyPatch、新規・短い全置換は writeFile）、検証は exec（短命・ワークスペース内。破壊的コマンドは拒否／書き込み系は承認）。パスは相対、ルートは "."。',
   'ai.userQuestion': '[ユーザーの質問]',
   'ai.missingApiKey': '{provider} の APIキーが設定されていません。設定画面から入力してください。',
   'ai.missingBaseUrl': 'API Base URL が設定されていません。設定画面から入力してください。',
@@ -371,9 +375,9 @@ export const ja = {
   'ai.agentStepNeedContinueTurns': 'ターン上限 — 続行の確認待ち',
   'ai.agentStepNeedContinueTools': 'ツール上限 — 続行の確認待ち',
   'ai.agentProposeActionsFormatError':
-    'proposeActions の形式ミスです（{reason}）。actions は JSON 配列として直接渡し、文字列化しないでください。正しい形式で再提案してください。大きなファイルは分割して提案してください。',
+    'proposeActions の形式ミスです（{reason}）。actions は JSON 配列として直接渡し、文字列化しないでください。正しい形式で再提案してください。既存ファイルは applyPatch、大きな変更は複数回に分割してください。',
   'ai.agentProposeActionsTruncated':
-    'proposeActions の引数が途中で切れました（出力トークン上限の可能性が高いです）。不完全な writeFile はプレビューしません。対象ファイルを複数回の proposeActions に分割し、1 回あたりの content を短くして再提案してください。',
+    'proposeActions の引数が途中で切れました（出力トークン上限の可能性が高いです）。不完全な writeFile / applyPatch はプレビューしません。既存ファイルは applyPatch（短い hunk）で再提案するか、複数回の proposeActions に分割してください。',
   'ai.agentToolsUnsupported':
     'このモデル/プロバイダはツール呼び出し（Agent）に対応していません。Edit モードを使うか、tools 対応のモデルに切り替えてください。',
   'ai.agentToolsUnsupportedOllama':
@@ -677,6 +681,7 @@ export const en: Record<MessageKey, string> = {
   'preview.fileNew': 'New file',
   'preview.fileUpdate': 'Update file',
   'actions.changeProposal': 'Proposed change',
+  'actions.applyPatch': 'Patch update',
   'actions.mkdir': 'Create folder',
   'actions.deleteDir': 'Delete folder',
   'actions.deleteFile': 'Delete file',
@@ -705,6 +710,9 @@ export const en: Record<MessageKey, string> = {
   'fs.cannotMoveIntoSelf': 'Cannot move a folder into itself or its descendant',
   'fs.notAFile': 'Not a file: {path}',
   'fs.notAFolder': 'Not a folder: {path}',
+  'fs.patchEmptyPath': 'Patch path is empty',
+  'fs.patchEmpty': 'Empty patch: {path}',
+  'fs.patchFailed': 'Failed to apply patch ({path}): {reason}',
   'encoding.unsupported': 'Unsupported encoding: {encoding}',
 
   'search.scopeOutside': 'Search scope must be inside the workspace',
@@ -714,11 +722,11 @@ export const en: Record<MessageKey, string> = {
   'search.writeFailed': 'Failed to write',
 
   'ai.editSystemPrompt':
-    'You are a coding assistant. Respond in English. In Edit mode, create/update/delete files and folders only via a ```compass-actions``` JSON code block. Do not present full file contents in normal ```css``` / ```html``` (etc.) code blocks. Keep explanations short; put the actual changes in compass-actions. Format: {"actions":[{"type":"mkdir","path":"relative/path"},{"type":"writeFile","path":"relative/file.ts","content":"..."},{"type":"deleteFile","path":"relative/file.ts"},{"type":"deleteDir","path":"relative/folder"}]}. Paths must be relative to the workspace root (e.g. style.css; do not duplicate folder names). If a project structure index (.compass) is provided, use file relationships in your answer.',
+    'You are a coding assistant. Respond in English. In Edit mode, create/update/delete files and folders only via a ```compass-actions``` JSON code block. Do not present full file contents in normal ```css``` / ```html``` (etc.) code blocks. Keep explanations short; put the actual changes in compass-actions. Format: {"actions":[{"type":"mkdir","path":"relative/path"},{"type":"applyPatch","path":"relative/file.ts","patch":"@@ ..."},{"type":"writeFile","path":"relative/file.ts","content":"..."},{"type":"deleteFile","path":"relative/file.ts"},{"type":"deleteDir","path":"relative/folder"}]}. Prefer applyPatch (unified-diff hunks) for edits to existing files over full writeFile rewrites. Paths must be relative to the workspace root (e.g. style.css; do not duplicate folder names). If a project structure index (.compass) is provided, use file relationships in your answer.',
   'ai.askSystemPrompt':
     'You are a coding assistant. Respond in English. You are in Ask mode. Only explain code, answer questions, investigate, and review. Do not create, modify, or delete workspace files. Never output a ```compass-actions``` block. Show code examples in normal ``` code blocks so the user can apply them manually. If a project structure index (.compass) is provided, use file relationships in your answer.',
   'ai.agentSystemPrompt':
-    'You are a coding Agent. Respond in English. Use tools (readFile / listDir / search / proposeActions / exec) to inspect the workspace, propose changes, and run short commands. Paths are relative to the workspace root. Use "." for the root; do not use the workspace folder name as a nested subpath. File changes must go through proposeActions and are not applied until the user approves the preview. For proposeActions, always pass `actions` as a real JSON array—never a stringified JSON blob. Split large rewrites into per-file or multiple proposeActions calls. Use exec for short non-interactive commands (tests, lint, build). Workspace-wipe commands (e.g. rm -rf .) are blocked; write/destructive commands (rm, git reset --hard, etc.) require user approval before running. Exec is separate from the user terminal. On Windows, exec uses Git Bash when available (otherwise cmd.exe). Use tools as needed, then return a concise final answer in text.',
+    'You are a coding Agent. Respond in English. Use tools (readFile / listDir / search / proposeActions / exec) to inspect the workspace, propose changes, and run short commands. Paths are relative to the workspace root. Use "." for the root; do not use the workspace folder name as a nested subpath. File changes must go through proposeActions and are not applied until the user approves the preview. For proposeActions, always pass `actions` as a real JSON array—never a stringified JSON blob. Prefer applyPatch (unified diff with only the changed hunks) for edits to existing files; avoid large full-file writeFile payloads. Use writeFile for new files or tiny full replacements. Use exec for short non-interactive commands (tests, lint, build). Workspace-wipe commands (e.g. rm -rf .) are blocked; write/destructive commands (rm, git reset --hard, etc.) require user approval before running. Exec is separate from the user terminal. On Windows, exec uses Git Bash when available (otherwise cmd.exe). Use tools as needed, then return a concise final answer in text.',
   'ai.userRefsHeader': '[User-specified files/folders]',
   'ai.userRefsIntro': 'The following context was explicitly selected from the explorer.',
   'ai.folderHeading': '## Folder: {path}',
@@ -729,9 +737,9 @@ export const en: Record<MessageKey, string> = {
   'ai.selectionsHeader': '[User-selected lines]',
   'ai.selectionText': 'Selected text',
   'ai.editModeReminder':
-    '[Edit mode] Return file changes only as ```compass-actions``` JSON, not as normal code blocks.',
+    '[Edit mode] Return file changes only as ```compass-actions``` JSON, not as normal code blocks. Prefer applyPatch for existing files.',
   'ai.agentModeReminder':
-    '[Agent mode] Inspect with readFile / listDir / search; propose with proposeActions (actions must be an array; split large writes); verify with exec (short-lived, inside workspace; wipe commands blocked; writes need approval). Paths are relative; root is ".".',
+    '[Agent mode] Inspect with readFile / listDir / search; propose with proposeActions (actions must be an array; prefer applyPatch for existing files, writeFile for new/tiny files); verify with exec (short-lived, inside workspace; wipe commands blocked; writes need approval). Paths are relative; root is ".".',
   'ai.userQuestion': "[User's question]",
   'ai.missingApiKey': '{provider} API key is not set. Enter it in Settings.',
   'ai.missingBaseUrl': 'API Base URL is not set. Enter it in Settings.',
@@ -746,9 +754,9 @@ export const en: Record<MessageKey, string> = {
   'ai.agentStepNeedContinueTurns': 'Turn limit — waiting to continue',
   'ai.agentStepNeedContinueTools': 'Tool limit — waiting to continue',
   'ai.agentProposeActionsFormatError':
-    'Invalid proposeActions format ({reason}). Pass `actions` as a JSON array directly—do not stringify it. Re-propose correctly. Split large files across multiple proposals.',
+    'Invalid proposeActions format ({reason}). Pass `actions` as a JSON array directly—do not stringify it. Re-propose correctly. Prefer applyPatch for existing files; split large changes across multiple proposals.',
   'ai.agentProposeActionsTruncated':
-    'proposeActions arguments were truncated (likely hit the output token limit). Incomplete writeFile payloads are not shown in preview. Split the target file across multiple proposeActions calls with smaller content and try again.',
+    'proposeActions arguments were truncated (likely hit the output token limit). Incomplete writeFile/applyPatch payloads are not shown in preview. Prefer applyPatch with small hunks for existing files, or split across multiple proposeActions calls.',
   'ai.agentToolsUnsupported':
     'This model/provider does not support tool calling (Agent). Use Edit mode or switch to a tools-capable model.',
   'ai.agentToolsUnsupportedOllama':
