@@ -651,10 +651,10 @@ export function FileTree() {
         selectedPaths.has(normalized) && selectedPaths.size > 1
           ? getChatAttachTargets(node)
           : [node]
-      e.dataTransfer.setData(
-        CHAT_CONTEXT_DRAG_MIME,
-        serializeChatContextRefs(chatTargets.map(toChatContextRef))
-      )
+      const chatPayload = serializeChatContextRefs(chatTargets.map(toChatContextRef))
+      e.dataTransfer.setData(CHAT_CONTEXT_DRAG_MIME, chatPayload)
+      // Unicode パス向けフォールバック（カスタム MIME が空になる環境対策）
+      e.dataTransfer.setData('text/plain', chatPayload)
 
       // Workspace root can be attached to chat, but must not be moved in the tree.
       if (isWorkspaceRootPath(node.path)) {

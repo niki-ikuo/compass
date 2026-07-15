@@ -56,9 +56,13 @@ export function detectMentionKind(inner: string): ChatMentionKind {
 export function isStructuredMention(inner: string): boolean {
   const value = inner.trim()
   if (!value || /\s/.test(value) || value.length > 260) return false
+  // 選択行: path:12 / path:12-34（パス部分は Unicode 可）
   if (/^.+:\d+(-\d+)?$/.test(value)) return true
-  if (value.endsWith('/') && /[\\/]/.test(value)) return true
+  // フォルダ（ルート直下の漢字名も含む）
+  if (value.endsWith('/')) return true
+  // ネストした相対パス
   if (/[\\/]/.test(value)) return true
-  if (/^[\w.@+-]+\.\w{1,12}$/.test(value)) return true
+  // ルート直下のファイル（拡張子あり）。\w だと漢字ファイル名が落ちるため basename は非空白・非区切りで許容
+  if (/^[^\s\\/]+\.\w{1,12}$/.test(value)) return true
   return false
 }
