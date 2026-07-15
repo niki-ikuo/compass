@@ -243,6 +243,11 @@ export interface AppSettings {
   locale: LocaleId
   /** エディタのインライン補完（ゴーストテキスト） */
   inlineCompletionsEnabled: boolean
+  /**
+   * Agent のファイル変更プレビューをエディタで自動オープンするか。
+   * false のときはエクスプローラ等で対象を開いたときに確認画面を出す。
+   */
+  autoOpenAgentPreview: boolean
   /** 新しいターミナルを開くときの初期シェル（powershell / cmd / bash / wsl） */
   defaultShellId: string
 }
@@ -539,5 +544,6 @@ export const DEFAULT_SETTINGS: AppSettings = {
   colorTheme: 'dark',
   locale: DEFAULT_LOCALE,
   inlineCompletionsEnabled: true,
+  autoOpenAgentPreview: false,
   defaultShellId: 'powershell'
 }

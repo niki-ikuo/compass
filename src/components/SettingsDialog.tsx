@@ -63,6 +63,7 @@ export function SettingsDialog() {
         ...settings,
         providerKeys: { ...settings.providerKeys },
         inlineCompletionsEnabled: settings.inlineCompletionsEnabled !== false,
+        autoOpenAgentPreview: settings.autoOpenAgentPreview === true,
         defaultShellId: settings.defaultShellId || DEFAULT_SETTINGS.defaultShellId
       }
       setForm(snapshot)
@@ -328,6 +329,18 @@ export function SettingsDialog() {
             <span>
               {t('settings.inlineCompletions')}
               <span className="field-hint">{t('settings.inlineCompletionsHint')}</span>
+            </span>
+          </label>
+
+          <label className="settings-checkbox-label">
+            <input
+              type="checkbox"
+              checked={form.autoOpenAgentPreview}
+              onChange={(e) => setForm({ ...form, autoOpenAgentPreview: e.target.checked })}
+            />
+            <span>
+              {t('settings.autoOpenAgentPreview')}
+              <span className="field-hint">{t('settings.autoOpenAgentPreviewHint')}</span>
             </span>
           </label>
 

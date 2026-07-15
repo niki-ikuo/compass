@@ -890,7 +890,9 @@ export const useAppStore = create<AppState>((set, get) => ({
       pendingWorkspacePreview: { chatId, actions: preview.actions, items: preview.items },
       lastApplyError: null
     })
-    get().activateWorkspacePreview(preview.items)
+    if (get().settings.autoOpenAgentPreview) {
+      get().activateWorkspacePreview(preview.items)
+    }
   },
 
   setPendingAgentApprovalId: (id) =>
