@@ -32,10 +32,8 @@ export function serializeChatContextRef(ref: ChatContextRef): string {
   return serializeChatContextRefs([ref])
 }
 
-export function parseChatContextRefs(dataTransfer: DataTransfer): ChatContextRef[] {
-  const raw = dataTransfer.getData(CHAT_CONTEXT_DRAG_MIME)
+function parseChatContextRefsJson(raw: string): ChatContextRef[] {
   if (!raw) return []
-
   try {
     const parsed: unknown = JSON.parse(raw)
     const items = Array.isArray(parsed) ? parsed : [parsed]
@@ -43,6 +41,13 @@ export function parseChatContextRefs(dataTransfer: DataTransfer): ChatContextRef
   } catch {
     return []
   }
+}
+
+export function parseChatContextRefs(dataTransfer: DataTransfer): ChatContextRef[] {
+  const fromMime = parseChatContextRefsJson(dataTransfer.getData(CHAT_CONTEXT_DRAG_MIME))
+  if (fromMime.length > 0) return fromMime
+  // 一部環境でカスタム MIME の Unicode が空になることがあるため text/plain をフォールバック
+  return parseChatContextRefsJson(dataTransfer.getData('text/plain'))
 }
 
 export function parseChatContextRef(dataTransfer: DataTransfer): ChatContextRef | null {
