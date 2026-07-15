@@ -202,6 +202,10 @@ export const ja = {
   'chat.agentToolOk': '成功',
   'chat.agentToolError': '失敗',
   'chat.agentWaitingApproval': '承認待ち（プレビューを確認してください）',
+  'chat.agentWaitingExecApproval': '危険なコマンドの実行承認待ち',
+  'chat.agentAllowExec': '実行を許可',
+  'chat.agentDenyExec': '拒否',
+  'chat.agentExecApprovalMeta': 'cwd: {cwd} · 理由: {reason}',
   'chat.agentNeedContinueTurns':
     'ターン数の上限に達しました（{turns} ターン / ツール {tools} 回）。続行しますか？',
   'chat.agentNeedContinueTools':
@@ -336,7 +340,7 @@ export const ja = {
   'ai.askSystemPrompt':
     'あなたはコーディングアシスタントです。日本語で回答してください。現在はAskモードです。コードの説明、質問への回答、調査、レビューのみを行い、ワークスペースへのファイル作成・変更・削除は行わないでください。```compass-actions```コードブロックは絶対に出力しないでください。コード例は通常の```コードブロックで示し、ユーザーが手動で適用できるようにしてください。プロジェクト構造インデックス(.compass)が提供された場合は、ファイル間の関係を踏まえて回答してください。',
   'ai.agentSystemPrompt':
-    'あなたはコーディングアシスタントの Agent です。日本語で回答してください。ツール（readFile / listDir / search / proposeActions / exec）でワークスペースを調査・変更提案・短いコマンド実行ができます。パスはすべてワークスペースルートからの相対パスです。ルートは "." を使い、ワークスペースフォルダ名そのものをサブパスにしないでください。ファイル変更は proposeActions で提案し、ユーザーがプレビュー承認するまで適用されません。proposeActions の actions は必ず JSON 配列として渡し、JSON 文字列や一塊の文字列にしないでください。大きな書き換えはファイル単位・複数回の proposeActions に分割してください。exec はテスト・lint・ビルドなど短命な非対話コマンド向けで、危険なコマンドは拒否され、ユーザー用ターミナルとは別です。Windows では Git Bash があればそこで実行されます（なければ cmd.exe）。必要なツールを使い、最後に簡潔な結論をテキストで返してください。',
+    'あなたはコーディングアシスタントの Agent です。日本語で回答してください。ツール（readFile / listDir / search / proposeActions / exec）でワークスペースを調査・変更提案・短いコマンド実行ができます。パスはすべてワークスペースルートからの相対パスです。ルートは "." を使い、ワークスペースフォルダ名そのものをサブパスにしないでください。ファイル変更は proposeActions で提案し、ユーザーがプレビュー承認するまで適用されません。proposeActions の actions は必ず JSON 配列として渡し、JSON 文字列や一塊の文字列にしないでください。大きな書き換えはファイル単位・複数回の proposeActions に分割してください。exec はテスト・lint・ビルドなど短命な非対話コマンド向けです。ワークスペース全体の削除（例: rm -rf .）などの危険コマンドは拒否され、rm や git reset --hard などの書き込み系はユーザー承認後のみ実行されます。ユーザー用ターミナルとは別です。Windows では Git Bash があればそこで実行されます（なければ cmd.exe）。必要なツールを使い、最後に簡潔な結論をテキストで返してください。',
   'ai.userRefsHeader': '[ユーザーが指定したファイル/フォルダ]',
   'ai.userRefsIntro': '以下はエクスプローラーから明示的に指定されたコンテキストです。',
   'ai.folderHeading': '## フォルダ: {path}',
@@ -349,7 +353,7 @@ export const ja = {
   'ai.editModeReminder':
     '[Editモード] ファイル変更は通常のコードブロックではなく、必ず```compass-actions```のJSONのみで返してください。',
   'ai.agentModeReminder':
-    '[Agentモード] readFile / listDir / search で調査、変更は proposeActions（actions は配列・大きな変更は分割）、検証は exec（短命・ワークスペース内）。パスは相対、ルートは "."。',
+    '[Agentモード] readFile / listDir / search で調査、変更は proposeActions（actions は配列・大きな変更は分割）、検証は exec（短命・ワークスペース内。破壊的コマンドは拒否／書き込み系は承認）。パスは相対、ルートは "."。',
   'ai.userQuestion': '[ユーザーの質問]',
   'ai.missingApiKey': '{provider} の APIキーが設定されていません。設定画面から入力してください。',
   'ai.missingBaseUrl': 'API Base URL が設定されていません。設定画面から入力してください。',
@@ -360,6 +364,7 @@ export const ja = {
   'ai.agentTurnLimit': 'Agent のターン数上限に達しました。',
   'ai.agentStepThinking': '思考中（ターン {turn}）',
   'ai.agentStepWaitingApproval': '変更提案の承認待ち',
+  'ai.agentStepWaitingExecApproval': 'コマンド実行の承認待ち',
   'ai.agentStepNeedContinueTurns': 'ターン上限 — 続行の確認待ち',
   'ai.agentStepNeedContinueTools': 'ツール上限 — 続行の確認待ち',
   'ai.agentProposeActionsFormatError':
@@ -575,6 +580,10 @@ export const en: Record<MessageKey, string> = {
   'chat.agentToolOk': 'ok',
   'chat.agentToolError': 'failed',
   'chat.agentWaitingApproval': 'Waiting for approval (review the preview)',
+  'chat.agentWaitingExecApproval': 'Waiting to approve a risky command',
+  'chat.agentAllowExec': 'Allow once',
+  'chat.agentDenyExec': 'Deny',
+  'chat.agentExecApprovalMeta': 'cwd: {cwd} · reason: {reason}',
   'chat.agentNeedContinueTurns':
     'Turn limit reached ({turns} turns / {tools} tools). Continue?',
   'chat.agentNeedContinueTools':
@@ -701,7 +710,7 @@ export const en: Record<MessageKey, string> = {
   'ai.askSystemPrompt':
     'You are a coding assistant. Respond in English. You are in Ask mode. Only explain code, answer questions, investigate, and review. Do not create, modify, or delete workspace files. Never output a ```compass-actions``` block. Show code examples in normal ``` code blocks so the user can apply them manually. If a project structure index (.compass) is provided, use file relationships in your answer.',
   'ai.agentSystemPrompt':
-    'You are a coding Agent. Respond in English. Use tools (readFile / listDir / search / proposeActions / exec) to inspect the workspace, propose changes, and run short commands. Paths are relative to the workspace root. Use "." for the root; do not use the workspace folder name as a nested subpath. File changes must go through proposeActions and are not applied until the user approves the preview. For proposeActions, always pass `actions` as a real JSON array—never a stringified JSON blob. Split large rewrites into per-file or multiple proposeActions calls. Use exec for short non-interactive commands (tests, lint, build); dangerous commands are blocked; this is separate from the user terminal. On Windows, exec uses Git Bash when available (otherwise cmd.exe). Use tools as needed, then return a concise final answer in text.',
+    'You are a coding Agent. Respond in English. Use tools (readFile / listDir / search / proposeActions / exec) to inspect the workspace, propose changes, and run short commands. Paths are relative to the workspace root. Use "." for the root; do not use the workspace folder name as a nested subpath. File changes must go through proposeActions and are not applied until the user approves the preview. For proposeActions, always pass `actions` as a real JSON array—never a stringified JSON blob. Split large rewrites into per-file or multiple proposeActions calls. Use exec for short non-interactive commands (tests, lint, build). Workspace-wipe commands (e.g. rm -rf .) are blocked; write/destructive commands (rm, git reset --hard, etc.) require user approval before running. Exec is separate from the user terminal. On Windows, exec uses Git Bash when available (otherwise cmd.exe). Use tools as needed, then return a concise final answer in text.',
   'ai.userRefsHeader': '[User-specified files/folders]',
   'ai.userRefsIntro': 'The following context was explicitly selected from the explorer.',
   'ai.folderHeading': '## Folder: {path}',
@@ -714,7 +723,7 @@ export const en: Record<MessageKey, string> = {
   'ai.editModeReminder':
     '[Edit mode] Return file changes only as ```compass-actions``` JSON, not as normal code blocks.',
   'ai.agentModeReminder':
-    '[Agent mode] Inspect with readFile / listDir / search; propose with proposeActions (actions must be an array; split large writes); verify with exec (short-lived, inside workspace). Paths are relative; root is ".".',
+    '[Agent mode] Inspect with readFile / listDir / search; propose with proposeActions (actions must be an array; split large writes); verify with exec (short-lived, inside workspace; wipe commands blocked; writes need approval). Paths are relative; root is ".".',
   'ai.userQuestion': "[User's question]",
   'ai.missingApiKey': '{provider} API key is not set. Enter it in Settings.',
   'ai.missingBaseUrl': 'API Base URL is not set. Enter it in Settings.',
@@ -725,6 +734,7 @@ export const en: Record<MessageKey, string> = {
   'ai.agentTurnLimit': 'Agent turn limit reached.',
   'ai.agentStepThinking': 'Thinking (turn {turn})',
   'ai.agentStepWaitingApproval': 'Waiting for change approval',
+  'ai.agentStepWaitingExecApproval': 'Waiting for command approval',
   'ai.agentStepNeedContinueTurns': 'Turn limit — waiting to continue',
   'ai.agentStepNeedContinueTools': 'Tool limit — waiting to continue',
   'ai.agentProposeActionsFormatError':

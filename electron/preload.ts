@@ -27,7 +27,8 @@ import type {
   AgentNeedApprovalEvent,
   AgentResolveApprovalRequest,
   AgentNeedContinueEvent,
-  AgentResolveContinueRequest
+  AgentResolveContinueRequest,
+  AgentNeedExecApprovalEvent
 } from '../src/types'
 
 const compassAPI = {
@@ -124,6 +125,14 @@ const compassAPI = {
     },
     resolveApproval: (request: AgentResolveApprovalRequest): Promise<boolean> =>
       ipcRenderer.invoke('ai:resolveApproval', request),
+    onNeedExecApproval: (callback: (event: AgentNeedExecApprovalEvent) => void): (() => void) => {
+      const handler = (
+        _event: Electron.IpcRendererEvent,
+        payload: AgentNeedExecApprovalEvent
+      ): void => callback(payload)
+      ipcRenderer.on('ai:needExecApproval', handler)
+      return () => ipcRenderer.removeListener('ai:needExecApproval', handler)
+    },
     onNeedContinue: (callback: (event: AgentNeedContinueEvent) => void): (() => void) => {
       const handler = (_event: Electron.IpcRendererEvent, payload: AgentNeedContinueEvent): void =>
         callback(payload)
