@@ -2,6 +2,8 @@
  * proposeActions の引数パース／回復（LLM が actions を文字列化するケース向け）。
  */
 
+const ACTION_TYPES = new Set(['writeFile', 'mkdir', 'deleteFile', 'deleteDir'])
+
 export function buildJsonParseAttempts(raw: string): string[] {
   const trimmed = raw.trim()
   const attempts: string[] = []
@@ -31,22 +33,213 @@ export function buildJsonParseAttempts(raw: string): string[] {
   return attempts
 }
 
-export function tryParseJsonValue(raw: string): unknown | undefined {
-  for (const attempt of buildJsonParseAttempts(raw)) {
-    try {
-      let parsed: unknown = JSON.parse(attempt)
-      // 二重エンコード: "\"{...}\"" → object
-      if (typeof parsed === 'string') {
-        try {
-          parsed = JSON.parse(parsed)
-        } catch {
-          // keep string
+/** JSON 文字列リテラル内の未エスケープ制御文字をエスケープする。 */
+export function escapeControlCharsInJsonStrings(raw: string): string {
+  let out = ''
+  let inString = false
+  let escape = false
+
+  for (let i = 0; i < raw.length; i++) {
+    const ch = raw[i]
+    if (!inString) {
+      out += ch
+      if (ch === '"') inString = true
+      continue
+    }
+
+    if (escape) {
+      out += ch
+      escape = false
+      continue
+    }
+
+    if (ch === '\\') {
+      out += ch
+      escape = true
+      continue
+    }
+
+    if (ch === '"') {
+      out += ch
+      inString = false
+      continue
+    }
+
+    if (ch === '\n') {
+      out += '\\n'
+      continue
+    }
+    if (ch === '\r') {
+      out += '\\r'
+      continue
+    }
+    if (ch === '\t') {
+      out += '\\t'
+      continue
+    }
+    if (ch.charCodeAt(0) < 0x20) {
+      out += `\\u${ch.charCodeAt(0).toString(16).padStart(4, '0')}`
+      continue
+    }
+
+    out += ch
+  }
+
+  return out
+}
+
+/** 末尾が切れた JSON を閉じ括弧／引用符で補完する（ベストエフォート）。 */
+export function closeTruncatedJson(raw: string): string {
+  let inString = false
+  let escape = false
+  const stack: string[] = []
+
+  for (let i = 0; i < raw.length; i++) {
+    const ch = raw[i]
+    if (inString) {
+      if (escape) {
+        escape = false
+        continue
+      }
+      if (ch === '\\') {
+        escape = true
+        continue
+      }
+      if (ch === '"') inString = false
+      continue
+    }
+
+    if (ch === '"') {
+      inString = true
+      continue
+    }
+    if (ch === '{') stack.push('}')
+    else if (ch === '[') stack.push(']')
+    else if (ch === '}' || ch === ']') {
+      if (stack.length > 0 && stack[stack.length - 1] === ch) stack.pop()
+    }
+  }
+
+  let result = raw
+  if (inString) result += '"'
+  result = result.replace(/,\s*$/, '')
+  // 途中で切れたキー（`"content":` のあと値なし）は null で埋める
+  if (/:\s*$/.test(result)) result += 'null'
+  while (stack.length > 0) result += stack.pop()
+  return result
+}
+
+function safeJsonParse(raw: string): unknown | undefined {
+  try {
+    return JSON.parse(raw)
+  } catch {
+    return undefined
+  }
+}
+
+function parseWithRepair(raw: string, options?: { closeTruncated?: boolean }): unknown | undefined {
+  const direct = safeJsonParse(raw)
+  if (direct !== undefined) return direct
+
+  const escaped = escapeControlCharsInJsonStrings(raw)
+  const escapedParsed = safeJsonParse(escaped)
+  if (escapedParsed !== undefined) return escapedParsed
+
+  if (options?.closeTruncated) {
+    for (const candidate of [raw, escaped]) {
+      const closed = closeTruncatedJson(candidate)
+      const parsed = safeJsonParse(closed)
+      if (parsed !== undefined) return parsed
+    }
+  }
+
+  return undefined
+}
+
+export function isActionLike(value: unknown): boolean {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false
+  const obj = value as Record<string, unknown>
+  return (
+    typeof obj.type === 'string' &&
+    ACTION_TYPES.has(obj.type) &&
+    typeof obj.path === 'string' &&
+    obj.path.trim().length > 0
+  )
+}
+
+function asActionsArray(value: unknown): unknown[] | null {
+  if (Array.isArray(value) && value.length > 0) {
+    return value
+  }
+  if (isActionLike(value)) {
+    return [value]
+  }
+  return null
+}
+
+/** 破損／途中切れテキストから完結した action オブジェクトだけを抜き出す。 */
+export function extractCompleteActions(text: string): unknown[] {
+  const actions: unknown[] = []
+  for (let i = 0; i < text.length; i++) {
+    if (text[i] !== '{') continue
+
+    let depth = 0
+    let inString = false
+    let escape = false
+    for (let j = i; j < text.length; j++) {
+      const ch = text[j]
+      if (inString) {
+        if (escape) {
+          escape = false
+          continue
+        }
+        if (ch === '\\') {
+          escape = true
+          continue
+        }
+        if (ch === '"') inString = false
+        continue
+      }
+
+      if (ch === '"') {
+        inString = true
+        continue
+      }
+      if (ch === '{') depth++
+      else if (ch === '}') {
+        depth--
+        if (depth === 0) {
+          const slice = text.slice(i, j + 1)
+          for (const candidate of [slice, escapeControlCharsInJsonStrings(slice)]) {
+            const parsed = safeJsonParse(candidate)
+            if (isActionLike(parsed)) {
+              actions.push(parsed)
+              break
+            }
+          }
+          i = j
+          break
         }
       }
-      return parsed
-    } catch {
-      // try next
     }
+  }
+  return actions
+}
+
+export function tryParseJsonValue(
+  raw: string,
+  options?: { closeTruncated?: boolean }
+): unknown | undefined {
+  for (const attempt of buildJsonParseAttempts(raw)) {
+    let parsed = parseWithRepair(attempt, options)
+    if (parsed === undefined) continue
+
+    // 二重エンコード: "\"{...}\"" → object
+    if (typeof parsed === 'string') {
+      const nested = parseWithRepair(parsed, options)
+      if (nested !== undefined) parsed = nested
+    }
+    return parsed
   }
   return undefined
 }
@@ -56,6 +249,10 @@ export function parseToolArgs(raw: string): Record<string, unknown> {
   const parsed = tryParseJsonValue(raw)
   if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
     return parsed as Record<string, unknown>
+  }
+  const asActions = asActionsArray(parsed)
+  if (asActions) {
+    return { actions: asActions }
   }
   return { _raw: raw }
 }
@@ -69,25 +266,46 @@ export function coerceProposeActionsArgs(args: Record<string, unknown>): Record<
   }
 
   const tryFromUnknown = (value: unknown): Record<string, unknown> | null => {
-    if (Array.isArray(value) && value.length > 0) {
-      return { actions: value }
-    }
+    const direct = asActionsArray(value)
+    if (direct) return { actions: direct }
+
     if (value && typeof value === 'object' && !Array.isArray(value)) {
       const obj = value as Record<string, unknown>
-      if (Array.isArray(obj.actions) && obj.actions.length > 0) {
-        return obj
+      const fromActions = asActionsArray(obj.actions)
+      if (fromActions) {
+        return { ...obj, actions: fromActions }
       }
       if (typeof obj.actions === 'string') {
         const nested = tryParseJsonValue(obj.actions)
-        if (Array.isArray(nested) && nested.length > 0) {
-          return { ...obj, actions: nested }
+        const nestedActions = asActionsArray(nested)
+        if (nestedActions) return { ...obj, actions: nestedActions }
+        if (nested && typeof nested === 'object' && !Array.isArray(nested)) {
+          const inner = asActionsArray((nested as Record<string, unknown>).actions)
+          if (inner) return { ...obj, actions: inner }
         }
+        const extracted = extractCompleteActions(obj.actions)
+        if (extracted.length > 0) return { ...obj, actions: extracted }
       }
     }
+
     if (typeof value === 'string') {
       const nested = tryParseJsonValue(value)
-      return nested === undefined ? null : tryFromUnknown(nested)
+      if (nested !== undefined) {
+        const fromNested = tryFromUnknown(nested)
+        if (fromNested) return fromNested
+      }
+      // 途中切れでも完結した action だけ先に拾う（不完全な末尾 writeFile は捨てる）
+      const extracted = extractCompleteActions(value)
+      if (extracted.length > 0) return { actions: extracted }
+
+      // 単一提案が末尾で切れた場合の最後の手段
+      const closed = tryParseJsonValue(value, { closeTruncated: true })
+      if (closed !== undefined) {
+        const fromClosed = tryFromUnknown(closed)
+        if (fromClosed) return fromClosed
+      }
     }
+
     return null
   }
 

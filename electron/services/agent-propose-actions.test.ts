@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
+  closeTruncatedJson,
   coerceProposeActionsArgs,
+  escapeControlCharsInJsonStrings,
+  extractCompleteActions,
   parseToolArgs,
   tryParseJsonValue
 } from './agent-propose-actions'
@@ -45,6 +48,52 @@ describe('coerceProposeActionsArgs', () => {
     expect(result.actions).toEqual(actions)
   })
 
+  it('wraps a single action object as an array', () => {
+    const action = { type: 'writeFile', path: 'solo.ts', content: 'one' }
+    const result = coerceProposeActionsArgs({ actions: action })
+    expect(result.actions).toEqual([action])
+  })
+
+  it('recovers a stringified single action object', () => {
+    const action = { type: 'mkdir', path: 'pkg' }
+    const result = coerceProposeActionsArgs({
+      actions: JSON.stringify(action)
+    })
+    expect(result.actions).toEqual([action])
+  })
+
+  it('recovers from _raw when content has literal newlines (broken JSON)', () => {
+    const broken =
+      '{"actions":[{"type":"writeFile","path":"src/board.js","content":"\\"use strict\\";\n\nconst pieces = require(\'./pieces\');\n"}]}'
+    const result = coerceProposeActionsArgs({ _raw: broken })
+    expect(result.actions).toEqual([
+      {
+        type: 'writeFile',
+        path: 'src/board.js',
+        content: `"use strict";\n\nconst pieces = require('./pieces');\n`
+      }
+    ])
+  })
+
+  it('recovers complete actions from truncated multi-action JSON in _raw', () => {
+    const truncated =
+      '{"actions":[{"type":"writeFile","path":"a.js","content":"ok"},{"type":"writeFile","path":"b.js","content":"cut mid'
+    const result = coerceProposeActionsArgs({ _raw: truncated })
+    expect(result.actions).toEqual([{ type: 'writeFile', path: 'a.js', content: 'ok' }])
+  })
+
+  it('recovers truncated single-action JSON by closing the payload', () => {
+    const truncated =
+      '{"actions":[{"type":"writeFile","path":"src/board.js","content":"\\"use strict\\";\\n\\nconst pieces = require(\'./pieces\');'
+    const result = coerceProposeActionsArgs({ _raw: truncated })
+    expect(Array.isArray(result.actions)).toBe(true)
+    expect(result.actions).toHaveLength(1)
+    const action = (result.actions as Array<{ type: string; path: string; content: string }>)[0]
+    expect(action.type).toBe('writeFile')
+    expect(action.path).toBe('src/board.js')
+    expect(action.content).toContain('use strict')
+  })
+
   it('leaves unrecoverable args unchanged', () => {
     const args = { actions: 'not-json' }
     expect(coerceProposeActionsArgs(args)).toEqual(args)
@@ -54,6 +103,11 @@ describe('coerceProposeActionsArgs', () => {
 describe('parseToolArgs / tryParseJsonValue', () => {
   it('parses object tool arguments', () => {
     expect(parseToolArgs('{"path":"src/a.ts"}')).toEqual({ path: 'src/a.ts' })
+  })
+
+  it('treats a root actions array as proposeActions args', () => {
+    const actions = [{ type: 'deleteDir', path: 'tmp' }]
+    expect(parseToolArgs(JSON.stringify(actions))).toEqual({ actions })
   })
 
   it('stores invalid JSON as _raw', () => {
@@ -67,5 +121,30 @@ describe('parseToolArgs / tryParseJsonValue', () => {
   it('returns undefined for empty input', () => {
     expect(tryParseJsonValue('')).toBeUndefined()
     expect(parseToolArgs('')).toEqual({})
+  })
+})
+
+describe('json recovery helpers', () => {
+  it('escapes literal newlines inside JSON strings', () => {
+    const input = '{"content":"line1\nline2"}'
+    expect(escapeControlCharsInJsonStrings(input)).toBe('{"content":"line1\\nline2"}')
+    expect(JSON.parse(escapeControlCharsInJsonStrings(input))).toEqual({
+      content: 'line1\nline2'
+    })
+  })
+
+  it('closes truncated objects and arrays', () => {
+    const closed = closeTruncatedJson('{"actions":[{"type":"mkdir","path":"x"')
+    expect(JSON.parse(closed)).toEqual({
+      actions: [{ type: 'mkdir', path: 'x' }]
+    })
+  })
+
+  it('extracts only complete action objects', () => {
+    const text =
+      'noise {"type":"writeFile","path":"a.ts","content":"x"} {"type":"writeFile","path":"b.ts","content":"partial'
+    expect(extractCompleteActions(text)).toEqual([
+      { type: 'writeFile', path: 'a.ts', content: 'x' }
+    ])
   })
 })
