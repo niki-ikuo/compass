@@ -23,6 +23,7 @@ import { previewWorkspaceActions, resolveInsideWorkspace } from './filesystem'
 import { searchWorkspace } from './workspace-search'
 import { runAgentExec } from './agent-exec'
 import { redactSecrets, redactSecretsInArgs } from '../../src/utils/redact'
+import { formatAgentToolsUnsupportedError } from '../../src/utils/agent-tools'
 
 /** 初期ターン／ツール予算（続行で追加付与） */
 const MAX_AGENT_TURNS = 16
@@ -940,7 +941,7 @@ async function streamAgentTurn(
   if (!response.ok) {
     const errorText = await response.text()
     if (isToolsUnsupportedApiError(response.status, errorText)) {
-      throw new Error(t('ai.agentToolsUnsupported'))
+      throw new Error(formatAgentToolsUnsupportedError(t('ai.agentToolsUnsupported')))
     }
     throw new Error(t('ai.apiError', { status: response.status, body: errorText }))
   }
@@ -1060,6 +1061,17 @@ export async function runAgent(webContents: WebContents, request: ChatRequest): 
     }
 
     const provider = getLlmProvider(settings.providerId)
+    if (provider.agentToolsSupport === 'unsupported') {
+      webContents.send(
+        'ai:error',
+        formatAgentToolsUnsupportedError(
+          provider.id === 'ollama'
+            ? t('ai.agentToolsUnsupportedOllama')
+            : t('ai.agentToolsUnsupported')
+        )
+      )
+      return
+    }
     if (provider.requiresApiKey && !settings.apiKey) {
       webContents.send('ai:error', t('ai.missingApiKey', { provider: getProviderLabel(provider.id) }))
       return
