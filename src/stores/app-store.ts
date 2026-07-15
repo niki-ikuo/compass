@@ -122,7 +122,8 @@ function getWriteActionsForFile(
 
   const writeAction = preview.actions.find(
     (action) =>
-      action.type === 'writeFile' && action.path.replace(/\\/g, '/') === rel
+      (action.type === 'writeFile' || action.type === 'applyPatch') &&
+      action.path.replace(/\\/g, '/') === rel
   )
   if (writeAction) actions.push(writeAction)
 
@@ -155,7 +156,7 @@ function removeFileFromPendingPreview(
   )
 
   const remainingActions = preview.actions.filter((action) => {
-    if (action.type === 'writeFile') {
+    if (action.type === 'writeFile' || action.type === 'applyPatch') {
       return action.path.replace(/\\/g, '/') !== relativePath
     }
     if (action.type === 'mkdir') {

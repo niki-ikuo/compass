@@ -84,7 +84,7 @@ Exact names can change; the contract should include **enough events for a step t
 
 | Topic | Decision |
 |-------|----------|
-| Write tool shape | Single batched **`proposeActions`** → `WorkspaceAction[]` |
+| Write tool shape | Single batched **`proposeActions`** → `WorkspaceAction[]` (`writeFile`, **`applyPatch`**, mkdir, deletes) |
 | Apply location | Renderer `applyWorkspacePreview` / `revertWorkspacePreview` (same UX as Edit) |
 | After reject | Return observation to the model and **continue** the loop (re-propose allowed) |
 | After apply | Return applied summary and **continue** |
@@ -132,7 +132,7 @@ Document Ask / Edit / Agent boundaries in SPEC (and keep this plan as the build 
 
 **Status:** Implemented on `feature/ai-chat-agent`.
 
-- Tool: `proposeActions({ actions: WorkspaceAction[] })`
+- Tool: `proposeActions({ actions: WorkspaceAction[] })` — prefer **`applyPatch`** (unified diff) for surgical edits to existing files; `writeFile` for new/small full files
 - Loop **pauses** and emits `ai:needApproval` with preview items
 - UI reuses Edit preview / PreviewBar; Apply or Reject calls `ai:resolveApproval`
 - Reject / apply both return an observation; the run **continues** (reject does not force-stop)
