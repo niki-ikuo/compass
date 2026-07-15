@@ -170,7 +170,7 @@ const AGENT_TOOLS = [
     function: {
       name: 'proposeActions',
       description:
-        'Propose workspace file/folder changes for the user to preview and approve. Paths must be relative to the workspace root. Changes are NOT applied until the user approves. Pass `actions` as a real JSON array (never a stringified JSON blob). Prefer applyPatch (unified diff) for edits to existing files—send only the changed hunks, not the whole file. Use writeFile for new files or tiny full rewrites. Truncated writeFile/applyPatch payloads are rejected.',
+        'Propose workspace file/folder changes for the user to preview and approve. Paths must be relative to the workspace root. Changes are NOT applied until the user approves. Pass `actions` as a real JSON array (never a stringified JSON blob). Prefer applyPatch (unified diff with @@ -start,count +start,count @@ hunks) for edits to existing files—send only the changed hunks, not the whole file. Never use Cursor/OpenAI *** Begin Patch / *** Update File: wrappers. Combine all edits to the same file into one applyPatch action. Use writeFile for new files or tiny full rewrites. Truncated writeFile/applyPatch payloads are rejected.',
       parameters: {
         type: 'object',
         properties: {
@@ -197,7 +197,7 @@ const AGENT_TOOLS = [
                 patch: {
                   type: 'string',
                   description:
-                    'Unified diff for applyPatch (required). Include @@ hunks with enough context lines. ---/+++ headers optional when path is set. Prefer small hunks over rewriting the whole file.'
+                    'Unified diff for applyPatch (required). Use @@ -start,count +start,count @@ hunks with enough context lines (space/-/+ prefixes). ---/+++ headers optional when path is set. Do NOT wrap in *** Begin Patch / *** Update File:. Prefer small hunks; put all hunks for one file in a single patch string.'
                 }
               },
               required: ['type', 'path']

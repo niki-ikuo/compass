@@ -1,6 +1,8 @@
 /**
  * Apply a unified-diff style patch to file contents (surgical edit).
  * Path headers (---/+++) are optional when the target path is supplied separately.
+ * Also accepts Cursor / OpenAI apply_patch wrappers (`*** Begin Patch`, etc.) by
+ * stripping meta lines before parsing.
  */
 
 export class ApplyPatchError extends Error {
@@ -43,15 +45,96 @@ function parseHunkHeader(line: string): Omit<Hunk, 'lines'> | null {
   }
 }
 
-export function parseUnifiedDiff(patch: string): Hunk[] {
+/** Cursor / OpenAI apply_patch meta lines (*** Begin Patch, *** Update File:, …). */
+function isApplyPatchMetaLine(line: string): boolean {
+  return line.trimStart().startsWith('***')
+}
+
+/**
+ * Strip apply_patch wrappers and ensure at least one hunk marker remains.
+ * Models often emit `*** Begin Patch` / `*** Update File:` instead of raw unified diff.
+ */
+export function normalizePatchInput(patch: string): string {
   const raw = patch.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
   const lines = raw.split('\n')
+  const out: string[] = []
+  let sawMeta = false
+  let sawHunk = false
+
+  for (const line of lines) {
+    if (isApplyPatchMetaLine(line)) {
+      sawMeta = true
+      continue
+    }
+    if (line.startsWith('@@')) sawHunk = true
+    out.push(line)
+  }
+
+  while (out.length > 0 && out[0].trim() === '') out.shift()
+  while (out.length > 0 && out[out.length - 1].trim() === '') out.pop()
+
+  if (out.length === 0) return ''
+
+  // Add-file style body: only +/- lines with no @@ after meta strip.
+  if (sawMeta && !sawHunk) {
+    return ['@@', ...out].join('\n')
+  }
+
+  return out.join('\n')
+}
+
+function parseHunkBodyLines(
+  lines: string[],
+  startIndex: number,
+  options: { lenientUnmarked: boolean }
+): { hunkLines: HunkLine[]; nextIndex: number } {
+  const hunkLines: HunkLine[] = []
+  let i = startIndex
+
+  while (i < lines.length) {
+    const hl = lines[i]
+    if (isApplyPatchMetaLine(hl)) {
+      i++
+      continue
+    }
+    if (
+      hl.startsWith('@@') ||
+      hl.startsWith('--- ') ||
+      hl.startsWith('+++ ') ||
+      hl.startsWith('diff ')
+    ) {
+      break
+    }
+    if (hl.startsWith('\\')) {
+      hunkLines.push({ kind: 'meta', text: hl.slice(1).trimStart() })
+    } else if (hl.startsWith('+')) {
+      hunkLines.push({ kind: 'add', text: hl.slice(1) })
+    } else if (hl.startsWith('-')) {
+      hunkLines.push({ kind: 'remove', text: hl.slice(1) })
+    } else if (hl.startsWith(' ') || hl === '') {
+      hunkLines.push({ kind: 'context', text: hl.startsWith(' ') ? hl.slice(1) : '' })
+    } else if (options.lenientUnmarked) {
+      // Treat unmarked lines as context (common LLM / apply_patch slip)
+      hunkLines.push({ kind: 'context', text: hl })
+    } else {
+      throw new ApplyPatchError(`Invalid hunk line: ${hl.slice(0, 80)}`)
+    }
+    i++
+  }
+
+  return { hunkLines, nextIndex: i }
+}
+
+export function parseUnifiedDiff(patch: string): Hunk[] {
+  const normalized = normalizePatchInput(patch)
+  const lines = normalized.split('\n')
   const hunks: Hunk[] = []
   let i = 0
 
   while (i < lines.length) {
     const line = lines[i]
     if (
+      isApplyPatchMetaLine(line) ||
       line.startsWith('---') ||
       line.startsWith('+++') ||
       line.startsWith('diff ') ||
@@ -64,27 +147,11 @@ export function parseUnifiedDiff(patch: string): Hunk[] {
 
     const header = parseHunkHeader(line)
     if (!header) {
-      // Allow a bare "@@" marker used by some LLM patches (search from start).
-      if (line.trim() === '@@' || /^@@\s*$/.test(line)) {
-        const hunkLines: HunkLine[] = []
+      // Bare "@@" or "@@ <annotation>" (V4A / apply_patch style).
+      if (line.startsWith('@@')) {
         i++
-        while (i < lines.length) {
-          const hl = lines[i]
-          if (hl.startsWith('@@') || hl.startsWith('---') || hl.startsWith('+++')) break
-          if (hl.startsWith('\\')) {
-            hunkLines.push({ kind: 'meta', text: hl.slice(1).trimStart() })
-          } else if (hl.startsWith('+')) {
-            hunkLines.push({ kind: 'add', text: hl.slice(1) })
-          } else if (hl.startsWith('-')) {
-            hunkLines.push({ kind: 'remove', text: hl.slice(1) })
-          } else if (hl.startsWith(' ') || hl === '') {
-            hunkLines.push({ kind: 'context', text: hl.startsWith(' ') ? hl.slice(1) : '' })
-          } else {
-            // Treat unmarked lines as context (common LLM slip)
-            hunkLines.push({ kind: 'context', text: hl })
-          }
-          i++
-        }
+        const { hunkLines, nextIndex } = parseHunkBodyLines(lines, i, { lenientUnmarked: true })
+        i = nextIndex
         const oldCount = hunkLines.filter((l) => l.kind === 'context' || l.kind === 'remove').length
         const newCount = hunkLines.filter((l) => l.kind === 'context' || l.kind === 'add').length
         hunks.push({ oldStart: 1, oldCount, newStart: 1, newCount, lines: hunkLines })
@@ -94,29 +161,8 @@ export function parseUnifiedDiff(patch: string): Hunk[] {
     }
 
     i++
-    const hunkLines: HunkLine[] = []
-    while (i < lines.length) {
-      const hl = lines[i]
-      if (hl.startsWith('@@') || hl.startsWith('--- ') || hl.startsWith('+++ ') || hl.startsWith('diff ')) {
-        break
-      }
-      if (hl.startsWith('\\')) {
-        hunkLines.push({ kind: 'meta', text: hl.slice(1).trimStart() })
-      } else if (hl.startsWith('+')) {
-        hunkLines.push({ kind: 'add', text: hl.slice(1) })
-      } else if (hl.startsWith('-')) {
-        hunkLines.push({ kind: 'remove', text: hl.slice(1) })
-      } else if (hl.startsWith(' ')) {
-        hunkLines.push({ kind: 'context', text: hl.slice(1) })
-      } else if (hl === '') {
-        // Empty line in a diff is sometimes emitted without the leading space
-        hunkLines.push({ kind: 'context', text: '' })
-      } else {
-        throw new ApplyPatchError(`Invalid hunk line: ${hl.slice(0, 80)}`)
-      }
-      i++
-    }
-
+    const { hunkLines, nextIndex } = parseHunkBodyLines(lines, i, { lenientUnmarked: false })
+    i = nextIndex
     hunks.push({ ...header, lines: hunkLines })
   }
 
@@ -187,9 +233,7 @@ export function applyUnifiedDiff(original: string, patch: string): string {
   const hunks = parseUnifiedDiff(trimmedPatch)
   let lines = splitLines(original)
 
-  // Apply in reverse order of oldStart so earlier line numbers stay stable... 
-  // Actually applying in reverse can still break overlapping hunks; apply forward
-  // but re-find each hunk against the evolving buffer using patch context.
+  // Apply forward; re-find each hunk against the evolving buffer using patch context.
   for (const hunk of hunks) {
     const pos = findHunkPosition(lines, hunk)
     const next: string[] = []
