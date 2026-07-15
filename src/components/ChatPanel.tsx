@@ -77,6 +77,7 @@ export function ChatPanel() {
   const [historyMenuPos, setHistoryMenuPos] = useState<{ top: number; right: number } | null>(
     null
   )
+  const messagesContainerRef = useRef<HTMLDivElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputComposerRef = useRef<ChatInputComposerHandle>(null)
   const historyRef = useRef<HTMLDivElement>(null)
@@ -85,6 +86,9 @@ export function ChatPanel() {
   const modePickerRef = useRef<HTMLDivElement>(null)
   const stopRequestedRef = useRef(false)
   const lastSentModeRef = useRef<ChatMode>('edit')
+  const prevActiveChatIdRef = useRef<string | null>(null)
+  const prevMessageCountRef = useRef(-1)
+  const hasSettledScrollRef = useRef(false)
 
   const chatSessions = useAppStore((s) => s.chatSessions)
   const activeChatId = useAppStore((s) => s.activeChatId)
@@ -167,7 +171,28 @@ export function ChatPanel() {
     }
   }, [activeChatId])
 
-  useEffect(() => {
+  useLayoutEffect(() => {
+    const container = messagesContainerRef.current
+    if (!container) return
+
+    const chatSwitched = prevActiveChatIdRef.current !== activeChatId
+    const delta = chatMessages.length - prevMessageCountRef.current
+    prevActiveChatIdRef.current = activeChatId
+    prevMessageCountRef.current = chatMessages.length
+
+    // 復元・セッション切替・大量差分は即時。通常の1通追加やストリーム更新だけ smooth。
+    const shouldJump =
+      !hasSettledScrollRef.current ||
+      chatSwitched ||
+      Math.abs(delta) > 1 ||
+      delta < 0
+
+    if (shouldJump) {
+      container.scrollTop = container.scrollHeight
+      hasSettledScrollRef.current = true
+      return
+    }
+
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [chatMessages, pendingWorkspacePreview, activeChatId])
 
@@ -940,7 +965,7 @@ export function ChatPanel() {
         ))}
       </div>
 
-      <div className="chat-messages">
+      <div className="chat-messages" ref={messagesContainerRef}>
         {chatMessages.length === 0 && (
           <div className="chat-empty">
             <p>{t('chat.emptyLead')}</p>
