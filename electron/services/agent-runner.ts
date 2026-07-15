@@ -27,7 +27,11 @@ import {
   waitForApproval,
   waitForContinue
 } from './agent-approval'
-import { coerceProposeActionsArgs, parseToolArgs } from './agent-propose-actions'
+import {
+  coerceProposeActionsArgs,
+  isIncompleteJson,
+  parseToolArgs
+} from './agent-propose-actions'
 import { normalizeAgentRelativePath } from './agent-paths'
 import { redactSecrets, redactSecretsInArgs } from '../../src/utils/redact'
 import { formatAgentToolsUnsupportedError } from '../../src/utils/agent-tools'
@@ -43,6 +47,11 @@ const MAX_READ_BYTES = 200 * 1024
 const MAX_LIST_ENTRIES = 200
 const MAX_SEARCH_RESULTS = 30
 const MAX_TOOL_RESULT_CHARS = 80_000
+/**
+ * Agent tool-call arguments (especially writeFile content) need more headroom than
+ * chat answers. Settings default (4096) cuts ~300-line rewrites mid-JSON.
+ */
+const AGENT_OUTPUT_TOKENS_FLOOR = 32_768
 /** 履歴に残すツール観測の上限（1 ステップ） */
 const MAX_PERSISTED_OBSERVATION_CHARS = 4_000
 /** フォローアップに載せる過去ツール文脈の合計上限 */
@@ -125,7 +134,7 @@ const AGENT_TOOLS = [
     function: {
       name: 'proposeActions',
       description:
-        'Propose workspace file/folder changes for the user to preview and approve. Paths must be relative to the workspace root. Changes are NOT applied until the user approves. Pass `actions` as a real JSON array (never a stringified JSON blob). Prefer one writeFile per file; for large rewrites, split into separate proposeActions calls instead of one huge payload.',
+        'Propose workspace file/folder changes for the user to preview and approve. Paths must be relative to the workspace root. Changes are NOT applied until the user approves. Pass `actions` as a real JSON array (never a stringified JSON blob). Prefer one writeFile per file. Never put a whole medium/large file in one call—keep each writeFile content small (roughly under ~150 lines or split by function/section across multiple proposeActions). Truncated writeFile payloads are rejected.',
       parameters: {
         type: 'object',
         properties: {
@@ -147,7 +156,7 @@ const AGENT_TOOLS = [
                 content: {
                   type: 'string',
                   description:
-                    'File contents (required for writeFile). Keep each write reasonably sized; split large files across multiple proposeActions calls.'
+                    'File contents (required for writeFile). Keep each write small; for files around 200+ lines, split into multiple proposeActions (section-sized chunks), never one huge payload.'
                 }
               },
               required: ['type', 'path']
@@ -536,6 +545,15 @@ async function executeSearch(
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     return { ok: false, summary: message, content: `Error: ${message}` }
+  }
+}
+
+function truncatedProposeActionsResult(): { ok: false; summary: string; content: string } {
+  const message = t('ai.agentProposeActionsTruncated')
+  return {
+    ok: false,
+    summary: message,
+    content: message.startsWith('Error:') ? message : `Error: ${message}`
   }
 }
 
@@ -937,7 +955,7 @@ export async function runAgent(webContents: WebContents, request: ChatRequest): 
         model: settings.model,
         messages: apiMessages,
         temperature: settings.temperature,
-        max_tokens: settings.maxTokens,
+        max_tokens: Math.max(settings.maxTokens, AGENT_OUTPUT_TOKENS_FLOOR),
         stream: true,
         tools: AGENT_TOOLS,
         tool_choice: 'auto'
@@ -993,7 +1011,8 @@ export async function runAgent(webContents: WebContents, request: ChatRequest): 
         }
 
         toolCallsUsed++
-        let rawArgs = parseToolArgs(call.function.arguments)
+        const rawArgumentText = call.function.arguments || ''
+        let rawArgs = parseToolArgs(rawArgumentText)
         if (call.function.name === 'proposeActions') {
           rawArgs = coerceProposeActionsArgs(rawArgs)
         }
@@ -1013,13 +1032,21 @@ export async function runAgent(webContents: WebContents, request: ChatRequest): 
         let result: { ok: boolean; summary: string; content: string }
         try {
           if (call.function.name === 'proposeActions') {
-            result = await executeProposeActions(
-              webContents,
-              request.workspaceRoot,
-              call.id,
-              args,
-              signal
-            )
+            // Incomplete JSON (often max_tokens cut mid-writeFile) must not become a preview.
+            const incompleteArgs = isIncompleteJson(rawArgumentText)
+            const hasRecoveredActions =
+              Array.isArray(args.actions) && args.actions.length > 0
+            if (incompleteArgs && !hasRecoveredActions) {
+              result = truncatedProposeActionsResult()
+            } else {
+              result = await executeProposeActions(
+                webContents,
+                request.workspaceRoot,
+                call.id,
+                args,
+                signal
+              )
+            }
           } else {
             result = await executeTool(
               webContents,
