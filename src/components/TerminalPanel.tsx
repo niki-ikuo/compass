@@ -28,13 +28,48 @@ interface TerminalInstanceProps {
 /** Mount generation — only used to ignore async results from disposed effects. */
 let nextMountGeneration = 0
 
+function normalizeClipboardTextForPty(text: string): string {
+  return text.replace(/\r?\n/g, '\r')
+}
+
+function copyTerminalSelection(terminal: Terminal | null): boolean {
+  if (!terminal?.hasSelection()) return false
+  const text = terminal.getSelection()
+  if (!text) return false
+  void navigator.clipboard.writeText(text).catch(() => {
+    // Clipboard may be unavailable in some environments; ignore failures.
+  })
+  return true
+}
+
+function isTerminalCopyShortcut(event: KeyboardEvent, hasSelection: boolean): boolean {
+  const { key, ctrlKey, altKey, metaKey, shiftKey } = event
+  if (altKey) return false
+  if (key !== 'c' && key !== 'C') return false
+  // macOS: Cmd+C copies when there is a selection
+  if (metaKey && !ctrlKey) return hasSelection
+  if (!ctrlKey || metaKey) return false
+  // Windows/Linux: Ctrl+Shift+C always copies; Ctrl+C copies when selected
+  return shiftKey || hasSelection
+}
+
+function isTerminalPasteShortcut(event: KeyboardEvent): boolean {
+  const { key, ctrlKey, altKey, metaKey, shiftKey } = event
+  if (altKey) return false
+  if (key !== 'v' && key !== 'V') return false
+  // macOS: Cmd+V; Windows/Linux: Ctrl+Shift+V (Ctrl+V uses the paste event)
+  if (metaKey && !ctrlKey) return true
+  return Boolean(ctrlKey && !metaKey && shiftKey)
+}
+
 function encodeTerminalKey(event: KeyboardEvent): string | null {
   if (event.isComposing) return null
 
   const { key, ctrlKey, altKey, metaKey, shiftKey } = event
 
   if (ctrlKey && !altKey && !metaKey) {
-    if (key === 'c' || key === 'C') return '\x03'
+    // Ctrl+C is handled in the keydown path when a selection exists (copy).
+    if ((key === 'c' || key === 'C') && !shiftKey) return '\x03'
     if (key === 'd' || key === 'D') return '\x04'
     if (key === 'z' || key === 'Z') return '\x1a'
     if (key === 'l' || key === 'L') return '\x0c'
@@ -381,13 +416,45 @@ function TerminalInstance({
       if (event.defaultPrevented || event.isComposing) return
       if (shouldIgnoreTerminalKeyTarget(event.target)) return
 
+      const terminal = terminalRef.current
+      const hasSelection = Boolean(terminal?.hasSelection())
+
+      if (isTerminalCopyShortcut(event, hasSelection)) {
+        if (!copyTerminalSelection(terminal)) return
+        event.preventDefault()
+        event.stopPropagation()
+        return
+      }
+
+      if (isTerminalPasteShortcut(event)) {
+        event.preventDefault()
+        event.stopPropagation()
+        void navigator.clipboard.readText().then((text) => {
+          if (!text || !activeRef.current || !inputArmedRef.current) return
+          sendInputRef.current(normalizeClipboardTextForPty(text))
+        })
+        return
+      }
+
       const encoded = encodeTerminalKey(event)
       if (!encoded) return
 
       event.preventDefault()
       event.stopPropagation()
-      focusXterm(terminalRef.current, () => activeRef.current)
+      focusXterm(terminal, () => activeRef.current)
       sendInputRef.current(encoded)
+    }
+
+    const handleCopy = (event: ClipboardEvent): void => {
+      if (!activeRef.current || !inputArmedRef.current) return
+      if (shouldIgnoreTerminalKeyTarget(event.target)) return
+      const terminal = terminalRef.current
+      if (!terminal?.hasSelection()) return
+      const text = terminal.getSelection()
+      if (!text) return
+      event.preventDefault()
+      event.stopPropagation()
+      event.clipboardData?.setData('text/plain', text)
     }
 
     const handlePaste = (event: ClipboardEvent): void => {
@@ -397,15 +464,17 @@ function TerminalInstance({
       if (!text) return
       event.preventDefault()
       event.stopPropagation()
-      sendInputRef.current(text.replace(/\r?\n/g, '\r'))
+      sendInputRef.current(normalizeClipboardTextForPty(text))
     }
 
     document.addEventListener('mousedown', handleMouseDown, true)
     window.addEventListener('keydown', handleKeyDown, true)
+    window.addEventListener('copy', handleCopy, true)
     window.addEventListener('paste', handlePaste, true)
     return () => {
       document.removeEventListener('mousedown', handleMouseDown, true)
       window.removeEventListener('keydown', handleKeyDown, true)
+      window.removeEventListener('copy', handleCopy, true)
       window.removeEventListener('paste', handlePaste, true)
     }
   }, [active, tabId])
