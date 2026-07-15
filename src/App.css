@@ -1898,15 +1898,16 @@ body:has(.monaco-editor .find-widget.visible) .workbench-hover-container .action
   color: var(--text-secondary);
 }
 
-/* Preview bar (editor) */
+/* Preview bar (editor bottom) */
 .preview-bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  flex-shrink: 0;
   padding: 6px 12px;
   background: rgba(0, 120, 212, 0.15);
-  border-bottom: 1px solid var(--accent);
+  border-top: 1px solid var(--accent);
   font-size: 12px;
 }
 
@@ -1933,7 +1934,7 @@ body:has(.monaco-editor .find-widget.visible) .workbench-hover-container .action
 
 .preview-bar-error {
   background: rgba(248, 81, 73, 0.12);
-  border-bottom-color: var(--danger, #f85149);
+  border-top-color: var(--danger, #f85149);
 }
 
 .action-preview-error {
