@@ -35,6 +35,9 @@ export const ja = {
   'settings.inlineCompletions': 'インライン補完',
   'settings.inlineCompletionsHint':
     '入力停止後に AI がゴーストテキストで続きを提案します（Tab で確定）。API を消費します。',
+  'settings.autoOpenAgentPreview': 'Agent 変更をエディタで自動表示',
+  'settings.autoOpenAgentPreviewHint':
+    'オンにすると、Agent のファイル変更提案をすぐにエディタの確認画面で開きます。オフのときはエクスプローラで対象ファイルを開いたときに確認します。',
   'settings.terminal': 'ターミナル',
   'settings.defaultShell': '初期シェル',
   'settings.defaultShellHint': '新しいターミナルを開くときに使うシェルです',
@@ -422,6 +425,9 @@ export const en: Record<MessageKey, string> = {
   'settings.inlineCompletions': 'Inline completions',
   'settings.inlineCompletionsHint':
     'After you pause typing, AI suggests ghost text (Tab to accept). Uses your API.',
+  'settings.autoOpenAgentPreview': 'Auto-open Agent changes in editor',
+  'settings.autoOpenAgentPreviewHint':
+    'When on, Agent file proposals open immediately in the editor preview. When off, open the target file from the explorer to review.',
   'settings.terminal': 'Terminal',
   'settings.defaultShell': 'Default shell',
   'settings.defaultShellHint': 'Shell used when opening a new terminal',

@@ -24,6 +24,7 @@ interface StoredSettings {
   colorTheme: ColorThemeId
   locale: LocaleId
   inlineCompletionsEnabled: boolean
+  autoOpenAgentPreview: boolean
   defaultShellId: string
   lastWorkspaceRoot: string | null
   recentWorkspaceRoots: string[]
@@ -39,6 +40,10 @@ function resolveLocale(value: unknown): LocaleId {
 
 function resolveInlineCompletionsEnabled(value: unknown): boolean {
   return typeof value === 'boolean' ? value : DEFAULT_SETTINGS.inlineCompletionsEnabled
+}
+
+function resolveAutoOpenAgentPreview(value: unknown): boolean {
+  return typeof value === 'boolean' ? value : DEFAULT_SETTINGS.autoOpenAgentPreview
 }
 
 function resolveDefaultShellId(value: unknown): string {
@@ -118,6 +123,7 @@ async function readStoredSettings(): Promise<StoredSettings> {
       colorTheme: resolveColorTheme(stored.colorTheme),
       locale: resolveLocale(stored.locale),
       inlineCompletionsEnabled: resolveInlineCompletionsEnabled(stored.inlineCompletionsEnabled),
+      autoOpenAgentPreview: resolveAutoOpenAgentPreview(stored.autoOpenAgentPreview),
       defaultShellId: resolveDefaultShellId(stored.defaultShellId),
       lastWorkspaceRoot: stored.lastWorkspaceRoot ?? null,
       recentWorkspaceRoots:
@@ -136,6 +142,7 @@ async function readStoredSettings(): Promise<StoredSettings> {
       colorTheme: DEFAULT_SETTINGS.colorTheme,
       locale: DEFAULT_SETTINGS.locale,
       inlineCompletionsEnabled: DEFAULT_SETTINGS.inlineCompletionsEnabled,
+      autoOpenAgentPreview: DEFAULT_SETTINGS.autoOpenAgentPreview,
       defaultShellId: DEFAULT_SETTINGS.defaultShellId,
       lastWorkspaceRoot: null,
       recentWorkspaceRoots: []
@@ -177,6 +184,7 @@ function toAppSettings(stored: StoredSettings): AppSettings {
     colorTheme: stored.colorTheme,
     locale: stored.locale,
     inlineCompletionsEnabled: stored.inlineCompletionsEnabled,
+    autoOpenAgentPreview: stored.autoOpenAgentPreview,
     defaultShellId: stored.defaultShellId
   }
 }
@@ -220,6 +228,7 @@ export async function setSettings(settings: AppSettings): Promise<void> {
     colorTheme: resolveColorTheme(settings.colorTheme),
     locale,
     inlineCompletionsEnabled: resolveInlineCompletionsEnabled(settings.inlineCompletionsEnabled),
+    autoOpenAgentPreview: resolveAutoOpenAgentPreview(settings.autoOpenAgentPreview),
     defaultShellId: resolveDefaultShellId(settings.defaultShellId)
   })
   setLocale(locale)
