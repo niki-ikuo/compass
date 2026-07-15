@@ -369,6 +369,8 @@ export const ja = {
   'ai.agentStepNeedContinueTools': 'ツール上限 — 続行の確認待ち',
   'ai.agentProposeActionsFormatError':
     'proposeActions の形式ミスです（{reason}）。actions は JSON 配列として直接渡し、文字列化しないでください。正しい形式で再提案してください。大きなファイルは分割して提案してください。',
+  'ai.agentProposeActionsTruncated':
+    'proposeActions の引数が途中で切れました（出力トークン上限の可能性が高いです）。不完全な writeFile はプレビューしません。対象ファイルを複数回の proposeActions に分割し、1 回あたりの content を短くして再提案してください。',
   'ai.agentToolsUnsupported':
     'このモデル/プロバイダはツール呼び出し（Agent）に対応していません。Edit モードを使うか、tools 対応のモデルに切り替えてください。',
   'ai.agentToolsUnsupportedOllama':
@@ -739,6 +741,8 @@ export const en: Record<MessageKey, string> = {
   'ai.agentStepNeedContinueTools': 'Tool limit — waiting to continue',
   'ai.agentProposeActionsFormatError':
     'Invalid proposeActions format ({reason}). Pass `actions` as a JSON array directly—do not stringify it. Re-propose correctly. Split large files across multiple proposals.',
+  'ai.agentProposeActionsTruncated':
+    'proposeActions arguments were truncated (likely hit the output token limit). Incomplete writeFile payloads are not shown in preview. Split the target file across multiple proposeActions calls with smaller content and try again.',
   'ai.agentToolsUnsupported':
     'This model/provider does not support tool calling (Agent). Use Edit mode or switch to a tools-capable model.',
   'ai.agentToolsUnsupportedOllama':

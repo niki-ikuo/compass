@@ -117,11 +117,17 @@ export function escapeControlCharsInJsonStrings(raw: string): string {
   return out
 }
 
-/** 末尾が切れた JSON を閉じ括弧／引用符で補完する（ベストエフォート）。 */
-export function closeTruncatedJson(raw: string): string {
+interface JsonScanState {
+  inString: boolean
+  escape: boolean
+  /** `\uXXXX` の残り桁。0 なら未着手。 */
+  unicodeRemaining: number
+  stack: string[]
+}
+
+function scanJsonStructure(raw: string): JsonScanState {
   let inString = false
   let escape = false
-  /** `\uXXXX` の残り桁。0 なら未着手。 */
   let unicodeRemaining = 0
   const stack: string[] = []
 
@@ -162,6 +168,21 @@ export function closeTruncatedJson(raw: string): string {
     }
   }
 
+  return { inString, escape, unicodeRemaining, stack }
+}
+
+/** 括弧／文字列が閉じ切っていない（トークン上限で途中切れしやすい）JSON かどうか。 */
+export function isIncompleteJson(raw: string): boolean {
+  const trimmed = raw.trim()
+  if (!trimmed) return false
+  const { inString, escape, unicodeRemaining, stack } = scanJsonStructure(trimmed)
+  return inString || escape || unicodeRemaining > 0 || stack.length > 0
+}
+
+/** 末尾が切れた JSON を閉じ括弧／引用符で補完する（ベストエフォート）。 */
+export function closeTruncatedJson(raw: string): string {
+  const { inString, escape, unicodeRemaining, stack } = scanJsonStructure(raw)
+
   let result = raw
   if (inString) {
     // トークン限界などでエスケープの途中で切れることが多い
@@ -176,8 +197,19 @@ export function closeTruncatedJson(raw: string): string {
   result = result.replace(/,\s*$/, '')
   // 途中で切れたキー（`"content":` のあと値なし）は null で埋める
   if (/:\s*$/.test(result)) result += 'null'
-  while (stack.length > 0) result += stack.pop()
+  const closers = [...stack]
+  while (closers.length > 0) result += closers.pop()
   return result
+}
+
+function actionsIncludeWriteFile(actions: unknown[]): boolean {
+  return actions.some(
+    (item) =>
+      !!item &&
+      typeof item === 'object' &&
+      !Array.isArray(item) &&
+      (item as { type?: unknown }).type === 'writeFile'
+  )
 }
 
 function safeJsonParse(raw: string): unknown | undefined {
@@ -349,11 +381,18 @@ export function coerceProposeActionsArgs(args: Record<string, unknown>): Record<
       const extracted = extractCompleteActions(value)
       if (extracted.length > 0) return { actions: extracted }
 
-      // 単一提案が末尾で切れた場合の最後の手段
+      // mkdir/delete など content なし action の途中切れのみ閉じ補完する。
+      // writeFile の content 途中切れを閉じると不完全プレビューになるため拒否する。
       const closed = tryParseJsonValue(value, { closeTruncated: true })
       if (closed !== undefined) {
         const fromClosed = tryFromUnknown(closed)
-        if (fromClosed) return fromClosed
+        if (
+          fromClosed &&
+          Array.isArray(fromClosed.actions) &&
+          !actionsIncludeWriteFile(fromClosed.actions)
+        ) {
+          return fromClosed
+        }
       }
     }
 

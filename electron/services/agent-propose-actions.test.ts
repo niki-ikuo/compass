@@ -4,6 +4,7 @@ import {
   coerceProposeActionsArgs,
   escapeControlCharsInJsonStrings,
   extractCompleteActions,
+  isIncompleteJson,
   parseToolArgs,
   tryParseJsonValue
 } from './agent-propose-actions'
@@ -82,16 +83,18 @@ describe('coerceProposeActionsArgs', () => {
     expect(result.actions).toEqual([{ type: 'writeFile', path: 'a.js', content: 'ok' }])
   })
 
-  it('recovers truncated single-action JSON by closing the payload', () => {
+  it('does not force-close a truncated single writeFile into a partial preview', () => {
     const truncated =
       '{"actions":[{"type":"writeFile","path":"src/board.js","content":"\\"use strict\\";\\n\\nconst pieces = require(\'./pieces\');'
     const result = coerceProposeActionsArgs({ _raw: truncated })
-    expect(Array.isArray(result.actions)).toBe(true)
-    expect(result.actions).toHaveLength(1)
-    const action = (result.actions as Array<{ type: string; path: string; content: string }>)[0]
-    expect(action.type).toBe('writeFile')
-    expect(action.path).toBe('src/board.js')
-    expect(action.content).toContain('use strict')
+    expect(result.actions).toBeUndefined()
+    expect(result._raw).toBe(truncated)
+  })
+
+  it('recovers truncated mkdir-only payloads by closing JSON', () => {
+    const truncated = '{"actions":[{"type":"mkdir","path":"src/new"'
+    const result = coerceProposeActionsArgs({ _raw: truncated })
+    expect(result.actions).toEqual([{ type: 'mkdir', path: 'src/new' }])
   })
 
   it('leaves unrecoverable args unchanged', () => {
@@ -154,13 +157,19 @@ describe('json recovery helpers', () => {
     })
   })
 
-  it('recovers _raw truncated after an escape boundary', () => {
+  it('detects incomplete JSON payloads', () => {
+    expect(isIncompleteJson('{"actions":[{"type":"writeFile","path":"a.js","content":"hello')).toBe(
+      true
+    )
+    expect(isIncompleteJson('{"actions":[{"type":"mkdir","path":"x"}]}')).toBe(false)
+  })
+
+  it('does not coerce a writeFile truncated after an escape boundary', () => {
     const raw =
       '{"actions":[{"type":"writeFile","path":"src/board.js","content":"hello\\'
     const result = coerceProposeActionsArgs({ _raw: raw })
-    expect(result.actions).toEqual([
-      { type: 'writeFile', path: 'src/board.js', content: 'hello' }
-    ])
+    expect(result.actions).toBeUndefined()
+    expect(result._raw).toBe(raw)
   })
 
   it('recovers when content has invalid backslash-apostrophe escapes', () => {
