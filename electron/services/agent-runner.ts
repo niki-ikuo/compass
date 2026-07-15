@@ -33,6 +33,15 @@ import {
   parseToolArgs
 } from './agent-propose-actions'
 import { normalizeAgentRelativePath } from './agent-paths'
+import {
+  applyCheckpoint,
+  applyUpdateTodo,
+  formatAgentPlanForModel,
+  rebuildPlanFromSteps,
+  sanitizeCheckpointArgs,
+  sanitizeUpdateTodoArgs,
+  type AgentPlanState
+} from './agent-plan'
 import { redactSecrets, redactSecretsInArgs } from '../../src/utils/redact'
 import { formatAgentToolsUnsupportedError } from '../../src/utils/agent-tools'
 
@@ -198,6 +207,59 @@ const AGENT_TOOLS = [
         required: ['command']
       }
     }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'updateTodo',
+      description:
+        'Maintain an explicit checklist for multi-step work. Call early with the plan, then update statuses as you progress (especially before hitting turn/tool limits). Pass todos as a JSON array of { id, content, status }. status is pending | in_progress | done | cancelled. Default replaces the full list; set merge=true to patch by id.',
+      parameters: {
+        type: 'object',
+        properties: {
+          todos: {
+            type: 'array',
+            description: 'Checklist items',
+            items: {
+              type: 'object',
+              properties: {
+                id: { type: 'string', description: 'Stable item id' },
+                content: { type: 'string', description: 'Short task description' },
+                status: {
+                  type: 'string',
+                  enum: ['pending', 'in_progress', 'done', 'cancelled']
+                }
+              },
+              required: ['id', 'content', 'status']
+            }
+          },
+          merge: {
+            type: 'boolean',
+            description: 'If true, merge/update by id; otherwise replace the whole list'
+          }
+        },
+        required: ['todos']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'checkpoint',
+      description:
+        'Save a short resume summary of what you have done and what remains. Call before long work bursts and whenever you approach turn/tool limits so Continue (or a follow-up) stays oriented.',
+      parameters: {
+        type: 'object',
+        properties: {
+          summary: {
+            type: 'string',
+            description:
+              'Compact resume note: done so far, remaining steps, key paths/findings (a few sentences)'
+          }
+        },
+        required: ['summary']
+      }
+    }
   }
 ] as const
 
@@ -209,6 +271,7 @@ function truncatePersistedObservation(content: string): string {
 
 /**
  * 過去アシスタントの agentSteps から、モデルへ渡す調査文脈を組み立てる。
+ * 計画レイヤ（updateTodo / checkpoint）は先頭に再注入する。
  */
 function buildPriorAgentContext(steps: AgentToolStep[]): string | null {
   const usable = steps.filter(
@@ -216,12 +279,15 @@ function buildPriorAgentContext(steps: AgentToolStep[]): string | null {
   )
   if (usable.length === 0) return null
 
+  const planBlock = formatAgentPlanForModel(rebuildPlanFromSteps(usable))
   const header =
     '[Previous agent tool context from earlier in this chat. Prefer this over re-reading the same paths unless the files may have changed.]'
-  const blocks: string[] = [header]
-  let total = header.length
+  const toolBlocks: string[] = []
+  let total = (planBlock?.length ?? 0) + header.length
 
   for (const step of usable) {
+    // Plan tools already summarized in the plan block
+    if (step.name === 'updateTodo' || step.name === 'checkpoint') continue
     let argsJson = '{}'
     try {
       argsJson = JSON.stringify(step.args)
@@ -239,14 +305,33 @@ function buildPriorAgentContext(steps: AgentToolStep[]): string | null {
       block += `\n${observation}`
     }
     if (total + block.length + 2 > MAX_PRIOR_CONTEXT_CHARS) {
-      blocks.push('...(older tool results omitted to fit context budget)')
+      toolBlocks.push('...(older tool results omitted to fit context budget)')
       break
     }
-    blocks.push(block)
+    toolBlocks.push(block)
     total += block.length + 2
   }
 
-  return blocks.length > 1 ? blocks.join('\n\n') : null
+  if (!planBlock && toolBlocks.length === 0) return null
+
+  const parts: string[] = []
+  if (planBlock) parts.push(planBlock)
+  if (toolBlocks.length > 0) {
+    parts.push(header)
+    parts.push(...toolBlocks)
+  }
+  return parts.join('\n\n')
+}
+
+/** 履歴上の assistant agentSteps から計画状態を復元する */
+function rebuildPlanFromHistory(history: ChatRequestMessage[]): AgentPlanState {
+  const steps: AgentToolStep[] = []
+  for (const msg of history) {
+    if (msg.role === 'assistant' && msg.agentSteps?.length) {
+      steps.push(...msg.agentSteps)
+    }
+  }
+  return rebuildPlanFromSteps(steps)
 }
 
 function appendHistoryMessages(
@@ -352,14 +437,23 @@ function sanitizeProposeActionsArgs(args: Record<string, unknown>): Record<strin
   return { actionCount: raw.length, actions }
 }
 
-function sanitizeArgs(args: Record<string, unknown>): Record<string, unknown> {
-  if (Array.isArray(args.actions)) {
+function sanitizeArgs(
+  args: Record<string, unknown>,
+  toolName?: string
+): Record<string, unknown> {
+  if (toolName === 'proposeActions' || Array.isArray(args.actions)) {
     return redactSecretsInArgs(sanitizeProposeActionsArgs(args))
+  }
+  if (toolName === 'updateTodo' || Array.isArray(args.todos)) {
+    return redactSecretsInArgs(sanitizeUpdateTodoArgs(args))
+  }
+  if (toolName === 'checkpoint') {
+    return redactSecretsInArgs(sanitizeCheckpointArgs(args))
   }
   const out: Record<string, unknown> = {}
   for (const [key, value] of Object.entries(args)) {
     if (typeof value === 'string') {
-      const limit = key === 'command' ? 300 : 200
+      const limit = key === 'command' || key === 'summary' ? 300 : 200
       const truncated = value.length > limit ? `${value.slice(0, limit)}…` : value
       out[key] = redactSecrets(truncated)
     } else if (typeof value === 'number' || typeof value === 'boolean' || value === null) {
@@ -737,7 +831,8 @@ async function executeTool(
   callId: string,
   name: string,
   args: Record<string, unknown>,
-  signal: AbortSignal
+  signal: AbortSignal,
+  plan: AgentPlanState
 ): Promise<{ ok: boolean; summary: string; content: string }> {
   switch (name) {
     case 'readFile':
@@ -748,6 +843,10 @@ async function executeTool(
       return executeSearch(workspaceRoot, args)
     case 'exec':
       return executeExec(webContents, workspaceRoot, callId, args, signal)
+    case 'updateTodo':
+      return applyUpdateTodo(plan, args)
+    case 'checkpoint':
+      return applyCheckpoint(plan, args)
     default:
       return {
         ok: false,
@@ -755,6 +854,15 @@ async function executeTool(
         content: `Error: unknown tool "${name}"`
       }
   }
+}
+
+function injectPlanAfterContinue(
+  apiMessages: ApiMessage[],
+  plan: AgentPlanState
+): void {
+  const planBlock = formatAgentPlanForModel(plan)
+  if (!planBlock) return
+  apiMessages.push({ role: 'user', content: planBlock })
 }
 
 function isToolsUnsupportedApiError(status: number, body: string): boolean {
@@ -888,9 +996,10 @@ async function streamAgentTurn(
 }
 
 /**
- * Agent tool loop: read tools, proposeActions (preview approval), restricted exec.
+ * Agent tool loop: read tools, proposeActions (preview approval), restricted exec,
+ * plus updateTodo / checkpoint for durable mid-run orientation.
  * Follow-up turns receive prior agentSteps as injected tool context.
- * Turn/tool budgets can be extended via user Continue.
+ * Turn/tool budgets can be extended via user Continue (re-injects plan state).
  */
 export async function runAgent(webContents: WebContents, request: ChatRequest): Promise<void> {
   const abortController = acquireChatAbortController()
@@ -937,6 +1046,7 @@ export async function runAgent(webContents: WebContents, request: ChatRequest): 
     appendHistoryMessages(apiMessages, history)
     apiMessages.push({ role: 'user', content: await buildUserMessage(request) })
 
+    const plan = rebuildPlanFromHistory(history)
     const url = `${settings.apiBaseUrl.replace(/\/$/, '')}/chat/completions`
     const headers = buildApiHeaders(settings)
     let toolCallsUsed = 0
@@ -962,6 +1072,7 @@ export async function runAgent(webContents: WebContents, request: ChatRequest): 
         }
         turnBudget += CONTINUE_TURN_GRANT
         toolBudget += CONTINUE_TOOL_GRANT
+        injectPlanAfterContinue(apiMessages, plan)
       }
 
       webContents.send('ai:step', {
@@ -1013,6 +1124,7 @@ export async function runAgent(webContents: WebContents, request: ChatRequest): 
         }
         turnBudget += CONTINUE_TURN_GRANT
         toolBudget += CONTINUE_TOOL_GRANT
+        injectPlanAfterContinue(apiMessages, plan)
       }
 
       apiMessages.push({
@@ -1038,7 +1150,7 @@ export async function runAgent(webContents: WebContents, request: ChatRequest): 
           call.function.name,
           rawArgs
         )
-        const sanitized = sanitizeArgs(args)
+        const sanitized = sanitizeArgs(args, call.function.name)
 
         webContents.send('ai:toolStart', {
           id: call.id,
@@ -1071,7 +1183,8 @@ export async function runAgent(webContents: WebContents, request: ChatRequest): 
               call.id,
               call.function.name,
               args,
-              signal
+              signal,
+              plan
             )
           }
         } catch (err) {

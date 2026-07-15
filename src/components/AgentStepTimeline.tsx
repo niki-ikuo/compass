@@ -26,6 +26,10 @@ function toolIcon(name: string): string {
       return '⌨️'
     case 'proposeActions':
       return '✏️'
+    case 'updateTodo':
+      return '☑️'
+    case 'checkpoint':
+      return '📌'
     default:
       return '🔧'
   }
