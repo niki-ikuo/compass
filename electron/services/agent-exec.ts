@@ -11,8 +11,24 @@ const MAX_TIMEOUT_MS = 120_000
 const MAX_OUTPUT_CHARS = 64_000
 const MAX_COMMAND_CHARS = 4_000
 
-/** 明らかに危険なコマンドパターン（deny-list 優先） */
-const DENY_PATTERNS: RegExp[] = [
+/**
+ * 危険度:
+ * - blocked: 実行不可（機械／ワークスペース丸ごと破壊など）
+ * - needs_approval: 書き込み・削除など — ユーザー承認後のみ実行
+ * - allowed: テスト・lint・読取系などそのまま実行
+ */
+export type AgentExecRiskLevel = 'blocked' | 'needs_approval' | 'allowed'
+
+export type AgentExecRiskKind = 'system' | 'workspace_wipe' | 'write' | 'none'
+
+export interface AgentExecRiskClassification {
+  level: AgentExecRiskLevel
+  kind: AgentExecRiskKind
+  reason: string
+}
+
+/** マシン／OS を壊しうるコマンド（無条件拒否） */
+const SYSTEM_DENY_PATTERNS: RegExp[] = [
   /\brm\s+-rf\s+\/($|\s)/i,
   /\brm\s+(-[a-zA-Z]*\s+)*\/\s*$/i,
   /\b(?:del|rmdir|Remove-Item)\b.*\b(?:C:\\|D:\\|\\\\)\b/i,
@@ -33,6 +49,52 @@ const DENY_PATTERNS: RegExp[] = [
   /\bdiskpart\b/i
 ]
 
+/**
+ * ワークスペース全体を消しうるコマンド（無条件拒否）。
+ * 例: rm -rf . / * / $PWD
+ */
+const WORKSPACE_WIPE_PATTERNS: RegExp[] = [
+  /\brm\s+(?:-[a-zA-Z]*\s+)*(?:--\s+)?(?:\.|\\.\/|\*|\$PWD|\"\$PWD\"|'\$PWD'|`\$PWD`)(?:\s|$)/i,
+  /\brm\s+(?:-[a-zA-Z]*\s+)+rf?\s+(?:\.|\\.\/|\*)(?:\s|$)/i,
+  /\brm\s+-r(?:f)?\s+(?:--\s+)?(?:\.|\\.\/|\*)(?:\s|$)/i,
+  /\bgit\s+clean\s+[^\n]*-[^\n]*x/i,
+  /\b(?:rd|rmdir)\s+(?:\/s\s+)?(?:\/q\s+)?(?:\.|\\\.)(?:\s|$)/i,
+  /\bRemove-Item\b[^\n]*-(?:Recurse|Force)[^\n]*(?:\.|\*)(?:\s|$|;|\|)/i,
+  /\b(?:rm|del)\s+(?:\/s\s+)?(?:\/q\s+|\/f\s+)*(?:\*|\\.|\.)(?:\s|$)/i
+]
+
+/**
+ * 書き込み・削除・破壊的 git など — 承認ゲート対象。
+ * （ブロック済みのパターンには先にマッチさせない）
+ */
+const WRITE_APPROVAL_PATTERNS: Array<{ pattern: RegExp; reason: string }> = [
+  { pattern: /\brm\b/i, reason: 'file/directory deletion (rm)' },
+  { pattern: /\brmdir\b/i, reason: 'directory removal (rmdir)' },
+  { pattern: /\b(?:del|erase)\b/i, reason: 'file deletion (del)' },
+  { pattern: /\bRemove-Item\b/i, reason: 'PowerShell Remove-Item' },
+  { pattern: /\b(?:mv|move|ren|rename)\b/i, reason: 'move/rename' },
+  { pattern: /\bcp\s+(?:-[a-zA-Z]*\s+)*r/i, reason: 'recursive copy (cp -r)' },
+  { pattern: /\bgit\s+reset\s+--hard\b/i, reason: 'git reset --hard' },
+  { pattern: /\bgit\s+clean\b/i, reason: 'git clean' },
+  { pattern: /\bgit\s+push\b[^\n]*(?:-f|--force|--force-with-lease)\b/i, reason: 'force git push' },
+  { pattern: /\bnpm\s+(?:publish|unpublish)\b/i, reason: 'npm publish/unpublish' },
+  { pattern: /\bpnpm\s+publish\b/i, reason: 'pnpm publish' },
+  { pattern: /\byarn\s+publish\b/i, reason: 'yarn publish' },
+  { pattern: /\bchmod\b/i, reason: 'chmod' },
+  { pattern: /\bchown\b/i, reason: 'chown' },
+  { pattern: /\bsudo\b/i, reason: 'sudo' },
+  { pattern: /\b(?:kill|pkill|killall)\b/i, reason: 'process kill' },
+  { pattern: /\btruncate\b/i, reason: 'truncate' },
+  { pattern: /\bshred\b/i, reason: 'shred' },
+  { pattern: /\bdd\b/i, reason: 'dd' },
+  { pattern: /\bmkfifo\b/i, reason: 'mkfifo' },
+  { pattern: /\bln\s+-s?f?\b/i, reason: 'symlink create/overwrite' },
+  { pattern: /\btee\b/i, reason: 'tee (writes files)' },
+  { pattern: /\binstall\s+-m\b/i, reason: 'install -m' },
+  { pattern: /\bsed\s+-i\b/i, reason: 'in-place sed' },
+  { pattern: /\bperl\s+-i\b/i, reason: 'in-place perl' }
+]
+
 export interface AgentExecOptions {
   workspaceRoot: string
   command: string
@@ -40,6 +102,11 @@ export interface AgentExecOptions {
   cwd?: string
   timeoutMs?: number
   signal: AbortSignal
+  /**
+   * true のとき needs_approval 分類でも実行する（Runner が承認済みの場合）。
+   * blocked は常に拒否。
+   */
+  approvalGranted?: boolean
 }
 
 export interface AgentExecResult {
@@ -48,6 +115,9 @@ export interface AgentExecResult {
   timedOut: boolean
   killed: boolean
   denied: boolean
+  /** 承認が必要だが未承認のとき true */
+  needsApproval?: boolean
+  risk?: AgentExecRiskClassification
   cwd: string
   shell: string
   stdout: string
@@ -91,17 +161,60 @@ function resolveExecCwd(workspaceRoot: string, cwdArg?: string): string {
   return resolveInsideWorkspace(workspaceRoot, raw, { allowRoot: true })
 }
 
-export function findDeniedCommandReason(command: string): string | null {
+/**
+ * exec コマンドの危険度を分類する。
+ * blocked > needs_approval > allowed の順で評価。
+ */
+export function classifyAgentExecCommand(command: string): AgentExecRiskClassification {
   const trimmed = command.trim()
-  if (!trimmed) return 'command is empty'
-  if (trimmed.length > MAX_COMMAND_CHARS) {
-    return `command exceeds ${MAX_COMMAND_CHARS} characters`
+  if (!trimmed) {
+    return { level: 'blocked', kind: 'system', reason: 'command is empty' }
   }
-  for (const pattern of DENY_PATTERNS) {
-    if (pattern.test(trimmed)) {
-      return 'command blocked by safety deny list'
+  if (trimmed.length > MAX_COMMAND_CHARS) {
+    return {
+      level: 'blocked',
+      kind: 'system',
+      reason: `command exceeds ${MAX_COMMAND_CHARS} characters`
     }
   }
+
+  for (const pattern of SYSTEM_DENY_PATTERNS) {
+    if (pattern.test(trimmed)) {
+      return {
+        level: 'blocked',
+        kind: 'system',
+        reason: 'command blocked by system safety deny list'
+      }
+    }
+  }
+
+  for (const pattern of WORKSPACE_WIPE_PATTERNS) {
+    if (pattern.test(trimmed)) {
+      return {
+        level: 'blocked',
+        kind: 'workspace_wipe',
+        reason: 'command would wipe the workspace root (blocked)'
+      }
+    }
+  }
+
+  for (const entry of WRITE_APPROVAL_PATTERNS) {
+    if (entry.pattern.test(trimmed)) {
+      return {
+        level: 'needs_approval',
+        kind: 'write',
+        reason: entry.reason
+      }
+    }
+  }
+
+  return { level: 'allowed', kind: 'none', reason: 'allowed' }
+}
+
+/** @deprecated classifyAgentExecCommand を使う。互換のため残す */
+export function findDeniedCommandReason(command: string): string | null {
+  const risk = classifyAgentExecCommand(command)
+  if (risk.level === 'blocked') return risk.reason
   return null
 }
 
@@ -146,7 +259,7 @@ function spawnShell(command: string, cwd: string): SpawnedShell {
           env: buildGitBashEnv(gitBash),
           windowsHide: true,
           stdio: ['ignore', 'pipe', 'pipe']
-        }) as ChildProcessWithoutNullStreams,
+        }) as unknown as ChildProcessWithoutNullStreams,
         shellLabel: 'git-bash'
       }
     }
@@ -158,7 +271,7 @@ function spawnShell(command: string, cwd: string): SpawnedShell {
         env: process.env,
         windowsHide: true,
         stdio: ['ignore', 'pipe', 'pipe']
-      }) as ChildProcessWithoutNullStreams,
+      }) as unknown as ChildProcessWithoutNullStreams,
       shellLabel: 'cmd'
     }
   }
@@ -168,8 +281,30 @@ function spawnShell(command: string, cwd: string): SpawnedShell {
       cwd,
       env: process.env,
       stdio: ['ignore', 'pipe', 'pipe']
-    }) as ChildProcessWithoutNullStreams,
+    }) as unknown as ChildProcessWithoutNullStreams,
     shellLabel: '/bin/sh'
+  }
+}
+
+function deniedResult(
+  reason: string,
+  risk: AgentExecRiskClassification,
+  cwd = '.'
+): AgentExecResult {
+  return {
+    ok: false,
+    exitCode: null,
+    timedOut: false,
+    killed: false,
+    denied: true,
+    needsApproval: false,
+    risk,
+    cwd,
+    shell: 'none',
+    stdout: '',
+    stderr: '',
+    summary: reason,
+    content: `Error: ${reason}`
   }
 }
 
@@ -179,20 +314,27 @@ function spawnShell(command: string, cwd: string): SpawnedShell {
  */
 export async function runAgentExec(options: AgentExecOptions): Promise<AgentExecResult> {
   const command = typeof options.command === 'string' ? options.command : ''
-  const denyReason = findDeniedCommandReason(command)
-  if (denyReason) {
+  const risk = classifyAgentExecCommand(command)
+
+  if (risk.level === 'blocked') {
+    return deniedResult(risk.reason, risk)
+  }
+
+  if (risk.level === 'needs_approval' && !options.approvalGranted) {
     return {
       ok: false,
       exitCode: null,
       timedOut: false,
       killed: false,
-      denied: true,
-      cwd: '.',
+      denied: false,
+      needsApproval: true,
+      risk,
+      cwd: options.cwd || '.',
       shell: 'none',
       stdout: '',
       stderr: '',
-      summary: denyReason,
-      content: `Error: ${denyReason}`
+      summary: `approval required: ${risk.reason}`,
+      content: `Error: approval required before running this command (${risk.reason})`
     }
   }
 
@@ -207,6 +349,7 @@ export async function runAgentExec(options: AgentExecOptions): Promise<AgentExec
       timedOut: false,
       killed: false,
       denied: false,
+      risk,
       cwd: options.cwd || '.',
       shell: 'none',
       stdout: '',
@@ -229,6 +372,7 @@ export async function runAgentExec(options: AgentExecOptions): Promise<AgentExec
       timedOut: false,
       killed: true,
       denied: false,
+      risk,
       cwd: cwdRel,
       shell: 'none',
       stdout: '',
@@ -277,6 +421,7 @@ export async function runAgentExec(options: AgentExecOptions): Promise<AgentExec
         timedOut: false,
         killed: false,
         denied: false,
+        risk,
         cwd: cwdRel,
         shell: shellLabel,
         stdout: '',
@@ -315,6 +460,7 @@ export async function runAgentExec(options: AgentExecOptions): Promise<AgentExec
         timedOut,
         killed,
         denied: false,
+        risk,
         cwd: cwdRel,
         shell: shellLabel,
         stdout: truncateOutput(stdout).text,
@@ -347,6 +493,7 @@ export async function runAgentExec(options: AgentExecOptions): Promise<AgentExec
         `shell: ${shellLabel}`,
         `cwd: ${cwdRel}`,
         `exitCode: ${exitCode}`,
+        risk.level !== 'allowed' ? `risk: ${risk.level} (${risk.reason})` : null,
         timedOut ? 'timedOut: true' : null,
         killed ? 'killed: true' : null,
         '',
@@ -365,6 +512,7 @@ export async function runAgentExec(options: AgentExecOptions): Promise<AgentExec
         timedOut,
         killed,
         denied: false,
+        risk,
         cwd: cwdRel,
         shell: shellLabel,
         stdout: out.text,

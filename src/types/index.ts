@@ -127,6 +127,15 @@ export interface AgentNeedApprovalEvent {
   items: ActionPreviewItem[]
 }
 
+/** Agent exec の危険コマンド承認待ち */
+export interface AgentNeedExecApprovalEvent {
+  id: string
+  command: string
+  cwd: string
+  reason: string
+  riskKind: 'write' | 'system' | 'workspace_wipe' | 'none'
+}
+
 export interface AgentResolveApprovalRequest {
   id: string
   approved: boolean
@@ -438,6 +447,7 @@ export interface CompassAPI {
     onStep: (callback: (event: AgentStepEvent) => void) => () => void
     onNeedApproval: (callback: (event: AgentNeedApprovalEvent) => void) => () => void
     resolveApproval: (request: AgentResolveApprovalRequest) => Promise<boolean>
+    onNeedExecApproval: (callback: (event: AgentNeedExecApprovalEvent) => void) => () => void
     onNeedContinue: (callback: (event: AgentNeedContinueEvent) => void) => () => void
     resolveContinue: (request: AgentResolveContinueRequest) => Promise<boolean>
   }

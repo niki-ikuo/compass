@@ -11,6 +11,7 @@ import {
 import type {
   ActionPreviewItem,
   AgentNeedContinueEvent,
+  AgentNeedExecApprovalEvent,
   AgentToolStep,
   ChatMode,
   ChatSelectionRef
@@ -64,6 +65,9 @@ export function ChatPanel() {
   const [modeMenuOpen, setModeMenuOpen] = useState(false)
   const [agentStreamStatus, setAgentStreamStatus] = useState<string | null>(null)
   const [pendingContinue, setPendingContinue] = useState<AgentNeedContinueEvent | null>(null)
+  const [pendingExecApproval, setPendingExecApproval] = useState<AgentNeedExecApprovalEvent | null>(
+    null
+  )
   const [agentEditFallback, setAgentEditFallback] = useState<{ prompt: string } | null>(null)
   const [pendingCode, setPendingCode] = useState<{ code: string; language: string } | null>(null)
   const [isDragOver, setIsDragOver] = useState(false)
@@ -141,6 +145,7 @@ export function ChatPanel() {
     setPendingCode(null)
     setPinnedSelections([])
     setAgentEditFallback(null)
+    setPendingExecApproval(null)
     const session = useAppStore.getState().getActiveChatSession()
     const lastUser = [...(session?.messages ?? [])]
       .reverse()
@@ -278,6 +283,7 @@ export function ChatPanel() {
     stopRequestedRef.current = false
     setAgentStreamStatus(null)
     setPendingContinue(null)
+    setPendingExecApproval(null)
     setChatLoading(true)
 
     const activeFile = getActiveFile()
@@ -301,6 +307,7 @@ export function ChatPanel() {
     let unsubToolStart: (() => void) | undefined
     let unsubToolResult: (() => void) | undefined
     let unsubNeedApproval: (() => void) | undefined
+    let unsubNeedExecApproval: (() => void) | undefined
     let unsubNeedContinue: (() => void) | undefined
     let unsubStep: (() => void) | undefined
     let settled = false
@@ -313,6 +320,7 @@ export function ChatPanel() {
       unsubToolStart?.()
       unsubToolResult?.()
       unsubNeedApproval?.()
+      unsubNeedExecApproval?.()
       unsubNeedContinue?.()
       unsubStep?.()
     }
@@ -323,6 +331,7 @@ export function ChatPanel() {
       cleanup()
       setAgentStreamStatus(null)
       setPendingContinue(null)
+      setPendingExecApproval(null)
       setChatLoading(false)
     }
 
@@ -371,6 +380,7 @@ export function ChatPanel() {
 
       unsubNeedApproval = window.compass.ai.onNeedApproval((event) => {
         setPendingContinue(null)
+        setPendingExecApproval(null)
         setPendingAgentApprovalId(event.id)
         setPendingWorkspacePreview({ actions: event.actions, items: event.items })
         setAgentStreamStatus(t('chat.agentWaitingApproval'))
@@ -386,7 +396,24 @@ export function ChatPanel() {
         syncAssistant(accumulated.trim() || t('chat.reviewProposal'))
       })
 
+      unsubNeedExecApproval = window.compass.ai.onNeedExecApproval((event) => {
+        setPendingContinue(null)
+        setPendingExecApproval(event)
+        setAgentStreamStatus(t('chat.agentWaitingExecApproval'))
+        agentSteps = agentSteps.map((step) =>
+          step.id === event.id
+            ? {
+                ...step,
+                status: 'waiting_approval',
+                summary: t('chat.agentWaitingExecApproval')
+              }
+            : step
+        )
+        syncAssistant(accumulated.trim() || t('chat.agentWaitingExecApproval'))
+      })
+
       unsubNeedContinue = window.compass.ai.onNeedContinue((event) => {
+        setPendingExecApproval(null)
         setPendingContinue(event)
         const status =
           event.reason === 'tools'
@@ -459,6 +486,7 @@ export function ChatPanel() {
           revertWorkspacePreview()
         }
         setPendingContinue(null)
+        setPendingExecApproval(null)
         agentSteps = agentSteps.map((step) =>
           step.status === 'running' ||
           step.status === 'waiting_approval' ||
@@ -719,6 +747,29 @@ export function ChatPanel() {
     void window.compass.ai.resolveContinue({ id: event.id, continue: false })
   }
 
+  const handleAllowExec = () => {
+    const event = pendingExecApproval
+    if (!event) return
+    setPendingExecApproval(null)
+    setAgentStreamStatus(t('chat.generating'))
+    void window.compass.ai.resolveApproval({
+      id: event.id,
+      approved: true,
+      detail: `User approved exec: ${event.command}`
+    })
+  }
+
+  const handleDenyExec = () => {
+    const event = pendingExecApproval
+    if (!event) return
+    setPendingExecApproval(null)
+    void window.compass.ai.resolveApproval({
+      id: event.id,
+      approved: false,
+      detail: `User rejected exec command (${event.reason}): ${event.command}`
+    })
+  }
+
   const handleResendAsEdit = () => {
     const prompt = agentEditFallback?.prompt?.trim()
     if (!prompt || isChatLoading) return
@@ -962,7 +1013,30 @@ export function ChatPanel() {
         </div>
       )}
 
-      {agentEditFallback && !pendingContinue && (
+      {pendingExecApproval && !pendingContinue && (
+        <div className="agent-exec-approval-bar">
+          <div className="agent-exec-approval-info">
+            <div className="agent-exec-approval-title">{t('chat.agentWaitingExecApproval')}</div>
+            <code className="agent-exec-approval-command">{pendingExecApproval.command}</code>
+            <div className="agent-exec-approval-meta">
+              {t('chat.agentExecApprovalMeta', {
+                cwd: pendingExecApproval.cwd,
+                reason: pendingExecApproval.reason
+              })}
+            </div>
+          </div>
+          <div className="agent-exec-approval-actions">
+            <button type="button" className="btn-apply" onClick={handleAllowExec}>
+              {t('chat.agentAllowExec')}
+            </button>
+            <button type="button" className="btn-reject" onClick={handleDenyExec}>
+              {t('chat.agentDenyExec')}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {agentEditFallback && !pendingContinue && !pendingExecApproval && (
         <div className="agent-fallback-bar">
           <div className="agent-fallback-info">{t('chat.agentFallbackHint')}</div>
           <div className="agent-fallback-actions">

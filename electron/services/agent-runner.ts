@@ -21,7 +21,7 @@ import {
 } from './ai-client'
 import { previewWorkspaceActions, resolveInsideWorkspace } from './filesystem'
 import { searchWorkspace } from './workspace-search'
-import { runAgentExec } from './agent-exec'
+import { runAgentExec, classifyAgentExecCommand } from './agent-exec'
 import { redactSecrets, redactSecretsInArgs } from '../../src/utils/redact'
 import { formatAgentToolsUnsupportedError } from '../../src/utils/agent-tools'
 
@@ -154,7 +154,7 @@ const AGENT_TOOLS = [
     function: {
       name: 'exec',
       description:
-        'Run a short non-interactive shell command with cwd inside the workspace. Use for tests, lint, build, or similar feedback. Dangerous commands are blocked. Default timeout 30s (max 120s). Do not use for interactive programs.',
+        'Run a short non-interactive shell command with cwd inside the workspace. Use for tests, lint, build, or similar feedback. Dangerous system/workspace-wipe commands are blocked. Destructive write commands (rm, git reset --hard, chmod, etc.) require the user to approve before running. Default timeout 30s (max 120s). Do not use for interactive programs.',
       parameters: {
         type: 'object',
         properties: {
@@ -864,19 +864,68 @@ async function executeProposeActions(
 }
 
 async function executeExec(
+  webContents: WebContents,
   workspaceRoot: string,
+  callId: string,
   args: Record<string, unknown>,
   signal: AbortSignal
 ): Promise<{ ok: boolean; summary: string; content: string }> {
   const command = typeof args.command === 'string' ? args.command : ''
   const cwd = typeof args.cwd === 'string' ? args.cwd : undefined
   const timeoutMs = typeof args.timeoutMs === 'number' ? args.timeoutMs : undefined
+  const risk = classifyAgentExecCommand(command)
+
+  if (risk.level === 'blocked') {
+    return {
+      ok: false,
+      summary: risk.reason,
+      content: `Error: ${risk.reason}. Choose a safer command (for example delete a specific path, not the workspace root).`
+    }
+  }
+
+  if (risk.level === 'needs_approval') {
+    if (signal.aborted) {
+      return { ok: false, summary: 'aborted', content: 'Error: aborted before exec approval' }
+    }
+
+    const cwdLabel = (cwd && cwd.trim()) || '.'
+    webContents.send('ai:needExecApproval', {
+      id: callId,
+      command: redactSecrets(command),
+      cwd: cwdLabel,
+      reason: risk.reason,
+      riskKind: risk.kind
+    })
+    webContents.send('ai:step', { label: t('ai.agentStepWaitingExecApproval') })
+
+    try {
+      const decision = await waitForApproval(callId, signal)
+      if (!decision.approved) {
+        const detail =
+          decision.detail ??
+          'User rejected this shell command. It was not executed. Propose a safer alternative or continue without it.'
+        return {
+          ok: false,
+          summary: 'User rejected exec',
+          content: detail
+        }
+      }
+    } catch (err) {
+      if (isAbortError(err) || signal.aborted) {
+        throw err
+      }
+      const message = err instanceof Error ? err.message : String(err)
+      return { ok: false, summary: message, content: `Error: ${message}` }
+    }
+  }
+
   const result = await runAgentExec({
     workspaceRoot,
     command,
     cwd,
     timeoutMs,
-    signal
+    signal,
+    approvalGranted: risk.level === 'needs_approval'
   })
   return {
     ok: result.ok,
@@ -886,7 +935,9 @@ async function executeExec(
 }
 
 async function executeTool(
+  webContents: WebContents,
   workspaceRoot: string,
+  callId: string,
   name: string,
   args: Record<string, unknown>,
   signal: AbortSignal
@@ -899,7 +950,7 @@ async function executeTool(
     case 'search':
       return executeSearch(workspaceRoot, args)
     case 'exec':
-      return executeExec(workspaceRoot, args, signal)
+      return executeExec(webContents, workspaceRoot, callId, args, signal)
     default:
       return {
         ok: false,
@@ -1208,7 +1259,14 @@ export async function runAgent(webContents: WebContents, request: ChatRequest): 
               signal
             )
           } else {
-            result = await executeTool(request.workspaceRoot, call.function.name, args, signal)
+            result = await executeTool(
+              webContents,
+              request.workspaceRoot,
+              call.id,
+              call.function.name,
+              args,
+              signal
+            )
           }
         } catch (err) {
           if (isAbortError(err) || signal.aborted) {
