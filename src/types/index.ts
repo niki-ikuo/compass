@@ -82,7 +82,12 @@ export type AgentRunState =
 
 export type AgentToolName = 'readFile' | 'listDir' | 'search' | 'proposeActions' | 'exec'
 
-export type AgentToolStepStatus = 'running' | 'waiting_approval' | 'done' | 'error'
+export type AgentToolStepStatus =
+  | 'running'
+  | 'waiting_approval'
+  | 'waiting_continue'
+  | 'done'
+  | 'error'
 
 /** チャット履歴に載せるツールステップ（アシスタントメッセージに埋め込む） */
 export interface AgentToolStep {
@@ -92,6 +97,8 @@ export interface AgentToolStep {
   status: AgentToolStepStatus
   ok?: boolean
   summary?: string
+  /** 後続ターン向けに残す切り詰め済みツール観測 */
+  observation?: string
 }
 
 export interface AgentToolStartEvent {
@@ -105,6 +112,8 @@ export interface AgentToolResultEvent {
   name: string
   ok: boolean
   summary: string
+  /** 履歴・フォローアップ用（切り詰め済み） */
+  observation?: string
 }
 
 export interface AgentStepEvent {
@@ -124,6 +133,19 @@ export interface AgentResolveApprovalRequest {
   detail?: string
 }
 
+/** Agent ターン／ツール上限到達時の続行確認 */
+export interface AgentNeedContinueEvent {
+  id: string
+  reason: 'turns' | 'tools'
+  turnsUsed: number
+  toolsUsed: number
+}
+
+export interface AgentResolveContinueRequest {
+  id: string
+  continue: boolean
+}
+
 export function normalizeChatMode(mode: unknown): ChatMode | undefined {
   if (mode === 'ask' || mode === 'edit' || mode === 'agent') return mode
   return undefined
@@ -139,10 +161,13 @@ export function normalizeAgentSteps(raw: unknown): AgentToolStep[] | undefined {
     const status: AgentToolStepStatus =
       s.status === 'running' ||
       s.status === 'waiting_approval' ||
+      s.status === 'waiting_continue' ||
       s.status === 'error' ||
       s.status === 'done'
         ? s.status
         : 'done'
+    const interrupted =
+      status === 'running' || status === 'waiting_approval' || status === 'waiting_continue'
     steps.push({
       id: s.id,
       name: s.name,
@@ -150,15 +175,12 @@ export function normalizeAgentSteps(raw: unknown): AgentToolStep[] | undefined {
         s.args && typeof s.args === 'object' && !Array.isArray(s.args)
           ? (s.args as Record<string, unknown>)
           : {},
-      // 途中保存の running / waiting_approval は履歴読込時に error 扱い
-      status: status === 'running' || status === 'waiting_approval' ? 'error' : status,
+      // 途中保存の in-flight ステータスは履歴読込時に error 扱い
+      status: interrupted ? 'error' : status,
       ok: typeof s.ok === 'boolean' ? s.ok : status === 'done',
       summary:
-        typeof s.summary === 'string'
-          ? s.summary
-          : status === 'running' || status === 'waiting_approval'
-            ? 'interrupted'
-            : undefined
+        typeof s.summary === 'string' ? s.summary : interrupted ? 'interrupted' : undefined,
+      observation: typeof s.observation === 'string' ? s.observation : undefined
     })
   }
   return steps.length > 0 ? steps : undefined
@@ -216,8 +238,15 @@ export interface AppSettings {
   defaultShellId: string
 }
 
+export interface ChatRequestMessage {
+  role: 'user' | 'assistant' | 'system'
+  content: string
+  /** Agent フォローアップ用。直前までのツール観測を Main へ渡す */
+  agentSteps?: AgentToolStep[]
+}
+
 export interface ChatRequest {
-  messages: Array<{ role: 'user' | 'assistant' | 'system'; content: string }>
+  messages: ChatRequestMessage[]
   workspaceRoot?: string
   mode?: ChatMode
   context?: {
@@ -409,6 +438,8 @@ export interface CompassAPI {
     onStep: (callback: (event: AgentStepEvent) => void) => () => void
     onNeedApproval: (callback: (event: AgentNeedApprovalEvent) => void) => () => void
     resolveApproval: (request: AgentResolveApprovalRequest) => Promise<boolean>
+    onNeedContinue: (callback: (event: AgentNeedContinueEvent) => void) => () => void
+    resolveContinue: (request: AgentResolveContinueRequest) => Promise<boolean>
   }
   settings: {
     get: () => Promise<AppSettings>

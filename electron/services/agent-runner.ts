@@ -1,7 +1,13 @@
 import type { WebContents } from 'electron'
+import { randomUUID } from 'crypto'
 import { readdir, readFile, stat } from 'fs/promises'
 import { basename, isAbsolute, join, relative, resolve } from 'path'
-import type { ChatRequest, WorkspaceAction } from '../../src/types'
+import type {
+  AgentToolStep,
+  ChatRequest,
+  ChatRequestMessage,
+  WorkspaceAction
+} from '../../src/types'
 import { t } from '../../src/i18n/runtime'
 import { getLlmProvider, getProviderLabel } from '../../src/utils/llm-providers'
 import { normalizeWorkspaceActions } from '../../src/utils/workspace-actions'
@@ -18,12 +24,20 @@ import { searchWorkspace } from './workspace-search'
 import { runAgentExec } from './agent-exec'
 import { redactSecrets, redactSecretsInArgs } from '../../src/utils/redact'
 
-const MAX_AGENT_TURNS = 8
-const MAX_TOOL_CALLS = 20
+/** 初期ターン／ツール予算（続行で追加付与） */
+const MAX_AGENT_TURNS = 16
+const MAX_TOOL_CALLS = 40
+const CONTINUE_TURN_GRANT = 12
+const CONTINUE_TOOL_GRANT = 30
 const MAX_READ_BYTES = 200 * 1024
 const MAX_LIST_ENTRIES = 200
 const MAX_SEARCH_RESULTS = 30
 const MAX_TOOL_RESULT_CHARS = 80_000
+/** 履歴に残すツール観測の上限（1 ステップ） */
+const MAX_PERSISTED_OBSERVATION_CHARS = 4_000
+/** フォローアップに載せる過去ツール文脈の合計上限 */
+const MAX_PRIOR_CONTEXT_CHARS = 24_000
+const MAX_PRIOR_STEP_OBSERVATION_CHARS = 3_000
 
 type ApiMessage = {
   role: string
@@ -164,11 +178,19 @@ const AGENT_TOOLS = [
 ] as const
 
 type ApprovalDecision = { approved: boolean; detail?: string }
+type ContinueDecision = { continue: boolean }
 
 const pendingApprovals = new Map<
   string,
   {
     resolve: (decision: ApprovalDecision) => void
+  }
+>()
+
+const pendingContinues = new Map<
+  string,
+  {
+    resolve: (decision: ContinueDecision) => void
   }
 >()
 
@@ -182,6 +204,15 @@ export function resolveAgentApproval(payload: {
   if (!pending) return false
   pendingApprovals.delete(payload.id)
   pending.resolve({ approved: payload.approved, detail: payload.detail })
+  return true
+}
+
+/** Renderer がターン上限の続行/停止後に呼ぶ */
+export function resolveAgentContinue(payload: { id: string; continue: boolean }): boolean {
+  const pending = pendingContinues.get(payload.id)
+  if (!pending) return false
+  pendingContinues.delete(payload.id)
+  pending.resolve({ continue: payload.continue })
   return true
 }
 
@@ -207,6 +238,119 @@ function waitForApproval(id: string, signal: AbortSignal): Promise<ApprovalDecis
       }
     })
   })
+}
+
+function waitForContinue(id: string, signal: AbortSignal): Promise<ContinueDecision> {
+  return new Promise((resolve, reject) => {
+    if (signal.aborted) {
+      reject(new DOMException('Aborted', 'AbortError'))
+      return
+    }
+
+    const onAbort = (): void => {
+      pendingContinues.delete(id)
+      signal.removeEventListener('abort', onAbort)
+      reject(new DOMException('Aborted', 'AbortError'))
+    }
+
+    signal.addEventListener('abort', onAbort)
+    pendingContinues.set(id, {
+      resolve: (decision) => {
+        signal.removeEventListener('abort', onAbort)
+        pendingContinues.delete(id)
+        resolve(decision)
+      }
+    })
+  })
+}
+
+function truncatePersistedObservation(content: string): string {
+  const redacted = redactSecrets(content)
+  if (redacted.length <= MAX_PERSISTED_OBSERVATION_CHARS) return redacted
+  return `${redacted.slice(0, MAX_PERSISTED_OBSERVATION_CHARS)}\n...(truncated for history)`
+}
+
+/**
+ * 過去アシスタントの agentSteps から、モデルへ渡す調査文脈を組み立てる。
+ */
+function buildPriorAgentContext(steps: AgentToolStep[]): string | null {
+  const usable = steps.filter(
+    (step) => step.status === 'done' || step.status === 'error'
+  )
+  if (usable.length === 0) return null
+
+  const header =
+    '[Previous agent tool context from earlier in this chat. Prefer this over re-reading the same paths unless the files may have changed.]'
+  const blocks: string[] = [header]
+  let total = header.length
+
+  for (const step of usable) {
+    let argsJson = '{}'
+    try {
+      argsJson = JSON.stringify(step.args)
+    } catch {
+      argsJson = '{}'
+    }
+    const status = step.ok === false ? 'FAIL' : 'OK'
+    const summary = step.summary?.trim() || '(no summary)'
+    let block = `${status} ${step.name}(${argsJson}) — ${summary}`
+    if (step.observation?.trim()) {
+      let observation = step.observation.trim()
+      if (observation.length > MAX_PRIOR_STEP_OBSERVATION_CHARS) {
+        observation = `${observation.slice(0, MAX_PRIOR_STEP_OBSERVATION_CHARS)}\n...(truncated)`
+      }
+      block += `\n${observation}`
+    }
+    if (total + block.length + 2 > MAX_PRIOR_CONTEXT_CHARS) {
+      blocks.push('...(older tool results omitted to fit context budget)')
+      break
+    }
+    blocks.push(block)
+    total += block.length + 2
+  }
+
+  return blocks.length > 1 ? blocks.join('\n\n') : null
+}
+
+function appendHistoryMessages(
+  apiMessages: ApiMessage[],
+  history: ChatRequestMessage[]
+): void {
+  for (let i = 0; i < history.length - 1; i++) {
+    const msg = history[i]
+    apiMessages.push({ role: msg.role, content: msg.content })
+    if (msg.role !== 'assistant' || !msg.agentSteps?.length) continue
+    const prior = buildPriorAgentContext(msg.agentSteps)
+    if (prior) {
+      apiMessages.push({ role: 'user', content: prior })
+    }
+  }
+}
+
+async function offerAgentContinue(
+  webContents: WebContents,
+  signal: AbortSignal,
+  payload: {
+    reason: 'turns' | 'tools'
+    turnsUsed: number
+    toolsUsed: number
+  }
+): Promise<boolean> {
+  const id = randomUUID()
+  webContents.send('ai:needContinue', {
+    id,
+    reason: payload.reason,
+    turnsUsed: payload.turnsUsed,
+    toolsUsed: payload.toolsUsed
+  })
+  webContents.send('ai:step', {
+    label:
+      payload.reason === 'tools'
+        ? t('ai.agentStepNeedContinueTools')
+        : t('ai.agentStepNeedContinueTurns')
+  })
+  const decision = await waitForContinue(id, signal)
+  return decision.continue
 }
 
 function parseProposeActions(
@@ -895,8 +1039,9 @@ async function streamAgentTurn(
 }
 
 /**
- * Phase 1 Agent: read-only tool loop (readFile / listDir / search).
- * Shares cancel with Ask/Edit via `cancelChat`.
+ * Agent tool loop: read tools, proposeActions (preview approval), restricted exec.
+ * Follow-up turns receive prior agentSteps as injected tool context.
+ * Turn/tool budgets can be extended via user Continue.
  */
 export async function runAgent(webContents: WebContents, request: ChatRequest): Promise<void> {
   const abortController = acquireChatAbortController()
@@ -929,19 +1074,34 @@ export async function runAgent(webContents: WebContents, request: ChatRequest): 
       { role: 'system', content: t('ai.agentSystemPrompt') }
     ]
 
-    for (let i = 0; i < history.length - 1; i++) {
-      apiMessages.push({ role: history[i].role, content: history[i].content })
-    }
+    appendHistoryMessages(apiMessages, history)
     apiMessages.push({ role: 'user', content: await buildUserMessage(request) })
 
     const url = `${settings.apiBaseUrl.replace(/\/$/, '')}/chat/completions`
     const headers = buildApiHeaders(settings)
     let toolCallsUsed = 0
+    let turnBudget = MAX_AGENT_TURNS
+    let toolBudget = MAX_TOOL_CALLS
+    let turn = 0
 
-    for (let turn = 0; turn < MAX_AGENT_TURNS; turn++) {
+    while (true) {
       if (signal.aborted) {
         webContents.send('ai:aborted')
         return
+      }
+
+      if (turn >= turnBudget) {
+        const shouldContinue = await offerAgentContinue(webContents, signal, {
+          reason: 'turns',
+          turnsUsed: turn,
+          toolsUsed: toolCallsUsed
+        })
+        if (!shouldContinue) {
+          webContents.send('ai:done')
+          return
+        }
+        turnBudget += CONTINUE_TURN_GRANT
+        toolBudget += CONTINUE_TOOL_GRANT
       }
 
       webContents.send('ai:step', {
@@ -981,9 +1141,18 @@ export async function runAgent(webContents: WebContents, request: ChatRequest): 
         return
       }
 
-      if (toolCallsUsed + turnResult.toolCalls.length > MAX_TOOL_CALLS) {
-        webContents.send('ai:error', t('ai.agentToolLimit'))
-        return
+      while (toolCallsUsed + turnResult.toolCalls.length > toolBudget) {
+        const shouldContinue = await offerAgentContinue(webContents, signal, {
+          reason: 'tools',
+          turnsUsed: turn + 1,
+          toolsUsed: toolCallsUsed
+        })
+        if (!shouldContinue) {
+          webContents.send('ai:done')
+          return
+        }
+        turnBudget += CONTINUE_TURN_GRANT
+        toolBudget += CONTINUE_TOOL_GRANT
       }
 
       apiMessages.push({
@@ -1037,11 +1206,13 @@ export async function runAgent(webContents: WebContents, request: ChatRequest): 
           throw err
         }
 
+        const observation = truncatePersistedObservation(result.content)
         webContents.send('ai:toolResult', {
           id: call.id,
           name: call.function.name,
           ok: result.ok,
-          summary: redactSecrets(result.summary)
+          summary: redactSecrets(result.summary),
+          observation
         })
 
         apiMessages.push({
@@ -1051,9 +1222,9 @@ export async function runAgent(webContents: WebContents, request: ChatRequest): 
           content: truncateForModel(result.content)
         })
       }
-    }
 
-    webContents.send('ai:error', t('ai.agentTurnLimit'))
+      turn++
+    }
   } catch (err) {
     if (isAbortError(err) || signal.aborted) {
       webContents.send('ai:aborted')

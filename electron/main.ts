@@ -18,7 +18,7 @@ import {
   writeFileContent
 } from './services/filesystem'
 import { cancelChat, cancelInlineCompletion, completeInline, streamChat } from './services/ai-client'
-import { runAgent, resolveAgentApproval } from './services/agent-runner'
+import { runAgent, resolveAgentApproval, resolveAgentContinue } from './services/agent-runner'
 import {
   getSettings,
   setSettings,
@@ -392,6 +392,13 @@ function registerIpcHandlers(): void {
       request: { id: string; approved: boolean; detail?: string }
     ): boolean => {
       return resolveAgentApproval(request)
+    }
+  )
+
+  ipcMain.handle(
+    'ai:resolveContinue',
+    (_event, request: { id: string; continue: boolean }): boolean => {
+      return resolveAgentContinue(request)
     }
   )
 

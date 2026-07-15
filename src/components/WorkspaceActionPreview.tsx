@@ -8,6 +8,7 @@ interface WorkspaceActionPreviewProps {
   onApply: () => void
   onReject: () => void
   onSelectItem?: (item: ActionPreviewItem) => void
+  applyError?: string | null
 }
 
 function ActionItemPreview({
@@ -118,7 +119,8 @@ export function WorkspaceActionPreview({
   items,
   onApply,
   onReject,
-  onSelectItem
+  onSelectItem,
+  applyError
 }: WorkspaceActionPreviewProps) {
   const { t } = useI18n()
   const summary = summarizePreviewItems(items)
@@ -129,14 +131,21 @@ export function WorkspaceActionPreview({
         <span>{t('preview.proposalTitle', { summary })}</span>
         <div className="diff-actions">
           <button className="btn-apply" onClick={onApply}>
-            {t('preview.applyAll')}
+            {applyError ? t('chat.retryApply') : t('preview.applyAll')}
           </button>
           <button className="btn-reject" onClick={onReject}>
             {t('editor.reject')}
           </button>
         </div>
       </div>
-      <p className="action-preview-hint">{t('preview.openDiffHint')}</p>
+      {applyError ? (
+        <p className="action-preview-error">
+          {t('chat.fileOpError', { message: applyError })}
+          <span className="action-preview-retry-hint">{t('chat.applyRetryHint')}</span>
+        </p>
+      ) : (
+        <p className="action-preview-hint">{t('preview.openDiffHint')}</p>
+      )}
       <div className="action-preview-list">
         {items.map((item, index) => (
           <ActionItemPreview

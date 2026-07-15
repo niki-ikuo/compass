@@ -5,6 +5,7 @@ import { useI18n, t as tSync } from '@/i18n'
 export function PreviewBar() {
   const { t } = useI18n()
   const pendingWorkspacePreview = useAppStore((s) => s.pendingWorkspacePreview)
+  const lastApplyError = useAppStore((s) => s.lastApplyError)
   const activeChatId = useAppStore((s) => s.activeChatId)
   const workspaceRoot = useAppStore((s) => s.workspaceRoot)
   const setFileTree = useAppStore((s) => s.setFileTree)
@@ -49,21 +50,28 @@ export function PreviewBar() {
       const last = session?.messages[session.messages.length - 1]
       if (last?.role === 'assistant') {
         state.updateLastAssistantMessage(
-          `${last.content}\n\n${tSync('chat.fileOpError', { message })}`
+          `${last.content}\n\n${tSync('chat.fileOpError', { message })}\n${tSync('chat.applyRetryHint')}`
         )
       }
     }
   }
 
   return (
-    <div className="preview-bar">
+    <div className={`preview-bar${lastApplyError ? ' preview-bar-error' : ''}`}>
       <div className="preview-bar-info">
         <span className="preview-bar-badge">{t('editor.previewTab')}</span>
-        <span>{t('preview.barHint', { summary: parts.join(' · ') })}</span>
+        {lastApplyError ? (
+          <span>
+            {t('chat.fileOpError', { message: lastApplyError })}{' '}
+            {t('chat.applyRetryHint')}
+          </span>
+        ) : (
+          <span>{t('preview.barHint', { summary: parts.join(' · ') })}</span>
+        )}
       </div>
       <div className="preview-bar-actions">
         <button className="btn-apply" onClick={() => void handleApply()}>
-          {t('preview.applyAll')}
+          {lastApplyError ? t('chat.retryApply') : t('preview.applyAll')}
         </button>
         <button className="btn-reject" onClick={() => revertWorkspacePreview()}>
           {t('editor.reject')}

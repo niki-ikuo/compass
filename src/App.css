@@ -1400,6 +1400,10 @@ body:has(.monaco-editor .find-widget.visible) .workbench-hover-container .action
   border-left-color: var(--warning, #c9a227);
 }
 
+.agent-step-block.agent-step-waiting_continue {
+  border-left-color: var(--warning, #c9a227);
+}
+
 .agent-step-block.agent-step-done {
   border-left-color: var(--success);
 }
@@ -1923,6 +1927,45 @@ body:has(.monaco-editor .find-widget.visible) .workbench-hover-container .action
 }
 
 .preview-bar-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.preview-bar-error {
+  background: rgba(248, 81, 73, 0.12);
+  border-bottom-color: var(--danger, #f85149);
+}
+
+.action-preview-error {
+  padding: 0 12px 8px;
+  font-size: 11px;
+  color: var(--danger, #f85149);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.action-preview-retry-hint {
+  color: var(--text-secondary);
+}
+
+.agent-continue-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px;
+  background: rgba(210, 153, 34, 0.12);
+  border-top: 1px solid var(--warning, #d29922);
+  font-size: 12px;
+}
+
+.agent-continue-info {
+  flex: 1;
+  color: var(--text-primary);
+}
+
+.agent-continue-actions {
   display: flex;
   gap: 8px;
 }

@@ -38,11 +38,13 @@ function AgentStepAccordion({ step }: { step: AgentToolStep }) {
   const statusLabel =
     step.status === 'waiting_approval'
       ? t('chat.agentWaitingApproval')
-      : step.status === 'running'
-        ? t('chat.agentToolRunning')
-        : step.ok === false || step.status === 'error'
-          ? t('chat.agentToolError')
-          : t('chat.agentToolOk')
+      : step.status === 'waiting_continue'
+        ? t('chat.agentContinueStep')
+        : step.status === 'running'
+          ? t('chat.agentToolRunning')
+          : step.ok === false || step.status === 'error'
+            ? t('chat.agentToolError')
+            : t('chat.agentToolOk')
 
   const argsText = formatArgs(step.args)
   const bodyParts = [
