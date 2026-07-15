@@ -167,6 +167,7 @@ Document Ask / Edit / Agent boundaries in SPEC (and keep this plan as the build 
 - **Tools-less providers:** Clear error (`ai.agentToolsUnsupported`) directing the user to Edit or a tools-capable model (no auto Edit fallback yet)
 - **History:** `waiting_approval` / `running` steps normalize safely on load
 - **Guardrails:** Turn limits, payload truncation, secret redaction in tool args/logs (`src/utils/redact.ts`) and `exec` output
+- **Plan layer:** `updateTodo` checklist + `checkpoint` resume summary; re-injected on Continue and into follow-up prior context (`electron/services/agent-plan.ts`)
 
 **Exit criteria:** Stable enough for daily use on the primary providers Compass already supports.
 

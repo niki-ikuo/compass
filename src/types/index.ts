@@ -80,7 +80,14 @@ export type AgentRunState =
   | 'error'
   | 'aborted'
 
-export type AgentToolName = 'readFile' | 'listDir' | 'search' | 'proposeActions' | 'exec'
+export type AgentToolName =
+  | 'readFile'
+  | 'listDir'
+  | 'search'
+  | 'proposeActions'
+  | 'exec'
+  | 'updateTodo'
+  | 'checkpoint'
 
 export type AgentToolStepStatus =
   | 'running'
