@@ -56,11 +56,14 @@ export const ja = {
   'provider.groq.label': 'Groq',
   'provider.groq.hint': '高速なオープンモデル推論',
   'provider.openrouter.label': 'OpenRouter',
-  'provider.openrouter.hint': '複数ベンダーのモデルを一括利用（Claude 含む）',
+  'provider.openrouter.hint':
+    '複数ベンダーのモデルを一括利用（Claude 含む）。Agent 可否はモデル次第',
   'provider.ollama.label': 'Ollama（ローカル）',
-  'provider.ollama.hint': 'ローカル実行。API Key は不要です',
+  'provider.ollama.hint':
+    'ローカル実行。API Key は不要です。Agent モード非対応（Ask / Edit のみ）',
   'provider.custom.label': 'カスタム（OpenAI互換）',
-  'provider.custom.hint': 'LiteLLM / Azure / 自前ゲートウェイなど',
+  'provider.custom.hint':
+    'LiteLLM / Azure / 自前ゲートウェイなど。Agent 可否はエンドポイント次第',
 
   // menu
   'menu.file': 'ファイル',
@@ -187,6 +190,13 @@ export const ja = {
   'chat.askModeTitle': 'このメッセージを Ask モードで送信（質問への回答のみ）',
   'chat.agentModeTitle':
     'このメッセージを Agent モードで送信（調査・変更提案・制限付きコマンド）',
+  'chat.agentModeUnavailable':
+    'このプロバイダは Agent（ツール呼び出し）に対応していないため、Ask / Edit のみ選べます',
+  'chat.agentFallbackHint':
+    'Agent を使えないモデルです。Edit モードで同じ内容を送り直せます',
+  'chat.agentResendAsEdit': 'Edit で再送',
+  'chat.agentFallbackSwitched':
+    '（送信モードを Edit に切り替えました）',
   'chat.agentSteps': 'ツール',
   'chat.agentToolRunning': '実行中…',
   'chat.agentToolOk': '成功',
@@ -356,6 +366,8 @@ export const ja = {
     'proposeActions の形式ミスです（{reason}）。actions は JSON 配列として直接渡し、文字列化しないでください。正しい形式で再提案してください。大きなファイルは分割して提案してください。',
   'ai.agentToolsUnsupported':
     'このモデル/プロバイダはツール呼び出し（Agent）に対応していません。Edit モードを使うか、tools 対応のモデルに切り替えてください。',
+  'ai.agentToolsUnsupportedOllama':
+    'Ollama では Agent を使えません（多くのローカルモデルが tools 非対応のため）。Edit モードを使うか、OpenAI / Gemini など tools 対応プロバイダへ切り替えてください。',
   'ai.indexHeader': '[プロジェクト構造インデックス (.compass)]',
   'ai.indexLines': '{count}行',
   'ai.inlineCompletionSystemPrompt':
@@ -422,11 +434,14 @@ export const en: Record<MessageKey, string> = {
   'provider.groq.label': 'Groq',
   'provider.groq.hint': 'Fast open-model inference',
   'provider.openrouter.label': 'OpenRouter',
-  'provider.openrouter.hint': 'Multi-vendor models in one place (including Claude)',
+  'provider.openrouter.hint':
+    'Multi-vendor models in one place (including Claude). Agent depends on the model',
   'provider.ollama.label': 'Ollama (local)',
-  'provider.ollama.hint': 'Runs locally. API Key not required',
+  'provider.ollama.hint':
+    'Runs locally. API Key not required. Agent mode unavailable (Ask / Edit only)',
   'provider.custom.label': 'Custom (OpenAI-compatible)',
-  'provider.custom.hint': 'LiteLLM / Azure / custom gateway, etc.',
+  'provider.custom.hint':
+    'LiteLLM / Azure / custom gateway, etc. Agent depends on the endpoint',
 
   'menu.file': 'File',
   'menu.edit': 'Edit',
@@ -548,6 +563,13 @@ export const en: Record<MessageKey, string> = {
   'chat.askModeTitle': 'Send in Ask mode (answers only)',
   'chat.agentModeTitle':
     'Send in Agent mode (inspect, propose changes, restricted commands)',
+  'chat.agentModeUnavailable':
+    'This provider does not support Agent (tool calling), so only Ask / Edit are available',
+  'chat.agentFallbackHint':
+    'This model cannot run Agent. You can resend the same prompt in Edit mode',
+  'chat.agentResendAsEdit': 'Resend as Edit',
+  'chat.agentFallbackSwitched':
+    '(Switched send mode to Edit)',
   'chat.agentSteps': 'Tools',
   'chat.agentToolRunning': 'Running…',
   'chat.agentToolOk': 'ok',
@@ -709,6 +731,8 @@ export const en: Record<MessageKey, string> = {
     'Invalid proposeActions format ({reason}). Pass `actions` as a JSON array directly—do not stringify it. Re-propose correctly. Split large files across multiple proposals.',
   'ai.agentToolsUnsupported':
     'This model/provider does not support tool calling (Agent). Use Edit mode or switch to a tools-capable model.',
+  'ai.agentToolsUnsupportedOllama':
+    'Agent is unavailable for Ollama (many local models lack tools). Use Edit mode or switch to a tools-capable provider such as OpenAI or Gemini.',
   'ai.indexHeader': '[Project structure index (.compass)]',
   'ai.indexLines': '{count} lines',
   'ai.inlineCompletionSystemPrompt':

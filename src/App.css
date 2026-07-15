@@ -1970,6 +1970,36 @@ body:has(.monaco-editor .find-widget.visible) .workbench-hover-container .action
   gap: 8px;
 }
 
+.agent-fallback-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px;
+  background: rgba(248, 81, 73, 0.1);
+  border-top: 1px solid var(--danger, #f85149);
+  font-size: 12px;
+}
+
+.agent-fallback-info {
+  flex: 1;
+  color: var(--text-primary);
+}
+
+.agent-fallback-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.chat-mode-menu-hint {
+  margin: 0;
+  padding: 8px 10px 6px;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--text-secondary);
+  border-top: 1px solid var(--border);
+}
+
 /* Editor diff preview */
 .editor-container.preview-mode {
   flex: 1;

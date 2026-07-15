@@ -38,7 +38,8 @@ import {
   toChatSelectionRef
 } from '@/utils/chat-selection-drag'
 import { buildWorkspaceIndex, ensureWorkspaceIndex } from '@/utils/project-index'
-import { getLlmProvider, getModelOptions, getProviderLabel } from '@/utils/llm-providers'
+import { getLlmProvider, getModelOptions, getProviderLabel, isAgentModeAvailable } from '@/utils/llm-providers'
+import { parseAgentToolsUnsupportedError } from '@/utils/agent-tools'
 import { useI18n, getDateLocale } from '@/i18n'
 
 function selectionRefKey(ref: ChatSelectionRef): string {
@@ -63,6 +64,7 @@ export function ChatPanel() {
   const [modeMenuOpen, setModeMenuOpen] = useState(false)
   const [agentStreamStatus, setAgentStreamStatus] = useState<string | null>(null)
   const [pendingContinue, setPendingContinue] = useState<AgentNeedContinueEvent | null>(null)
+  const [agentEditFallback, setAgentEditFallback] = useState<{ prompt: string } | null>(null)
   const [pendingCode, setPendingCode] = useState<{ code: string; language: string } | null>(null)
   const [isDragOver, setIsDragOver] = useState(false)
   const [pinnedSelections, setPinnedSelections] = useState<ChatSelectionRef[]>([])
@@ -118,24 +120,40 @@ export function ChatPanel() {
 
   const chatMessages = activeChat?.messages ?? []
   const chatContextRefs = activeChat?.contextRefs ?? []
+  const agentModeAvailable = isAgentModeAvailable(settings.providerId)
+  const modeOptions = CHAT_MODE_OPTIONS.filter(
+    (option) => option.id !== 'agent' || agentModeAvailable
+  )
   const isEditSendMode = sendMode === 'edit'
   const isAskSendMode = sendMode === 'ask'
   const isActiveChatPreview = pendingWorkspacePreview?.chatId === activeChatId
   const activeModeOption =
-    CHAT_MODE_OPTIONS.find((option) => option.id === sendMode) ?? CHAT_MODE_OPTIONS[0]
+    modeOptions.find((option) => option.id === sendMode) ?? modeOptions[0]
+
+  useEffect(() => {
+    if (sendMode === 'agent' && !agentModeAvailable) {
+      setSendMode('edit')
+      lastSentModeRef.current = 'edit'
+    }
+  }, [agentModeAvailable, sendMode, settings.providerId])
 
   useEffect(() => {
     setPendingCode(null)
     setPinnedSelections([])
+    setAgentEditFallback(null)
     const session = useAppStore.getState().getActiveChatSession()
     const lastUser = [...(session?.messages ?? [])]
       .reverse()
       .find((message) => message.role === 'user')
-    if (lastUser?.mode === 'ask' || lastUser?.mode === 'edit' || lastUser?.mode === 'agent') {
+    const available = isAgentModeAvailable(useAppStore.getState().settings.providerId)
+    if (lastUser?.mode === 'agent' && !available) {
+      setSendMode('edit')
+    } else if (lastUser?.mode === 'ask' || lastUser?.mode === 'edit' || lastUser?.mode === 'agent') {
       setSendMode(lastUser.mode)
     } else {
       // 新規チャットなど履歴がない場合は、直前の送信モードを引き継ぐ
-      setSendMode(lastSentModeRef.current)
+      const fallback = lastSentModeRef.current
+      setSendMode(fallback === 'agent' && !available ? 'edit' : fallback)
     }
   }, [activeChatId])
 
@@ -221,17 +239,31 @@ export function ChatPanel() {
     }
   }
 
-  const handleSend = async () => {
-    const text = input.trim()
+  const handleSend = async (overrides?: { text?: string; mode?: ChatMode }) => {
+    const text = (overrides?.text ?? input).trim()
     if (!text || isChatLoading) return
 
-    const messageMode = sendMode
+    const messageMode = overrides?.mode ?? sendMode
+    if (messageMode === 'agent' && !isAgentModeAvailable(settings.providerId)) {
+      setSendMode('edit')
+      lastSentModeRef.current = 'edit'
+      setAgentEditFallback({ prompt: text })
+      if (!overrides?.text) setInput('')
+      return
+    }
+
     const isEditMessage = messageMode === 'edit'
     const isAgentMessage = messageMode === 'agent'
     const selectionsForRequest = buildSelectionsForRequest()
 
     lastSentModeRef.current = messageMode
-    setInput('')
+    if (messageMode !== sendMode) {
+      setSendMode(messageMode)
+    }
+    setAgentEditFallback(null)
+    if (!overrides?.text) {
+      setInput('')
+    }
     setPinnedSelections([])
     if (isEditMessage) {
       setPendingWorkspacePreview(null)
@@ -442,6 +474,23 @@ export function ChatPanel() {
 
     unsubError = window.compass.ai.onError((error) => {
       finish()
+      const toolsUnsupportedMessage = parseAgentToolsUnsupportedError(error)
+      if (isAgentMessage && toolsUnsupportedMessage) {
+        setSendMode('edit')
+        lastSentModeRef.current = 'edit'
+        setAgentEditFallback({ prompt: text })
+        agentSteps = agentSteps.map((step) =>
+          step.status === 'running' ||
+          step.status === 'waiting_approval' ||
+          step.status === 'waiting_continue'
+            ? { ...step, status: 'error', ok: false, summary: toolsUnsupportedMessage }
+            : step
+        )
+        syncAssistant(
+          `${t('chat.errorPrefix', { error: toolsUnsupportedMessage })}\n${t('chat.agentFallbackSwitched')}`
+        )
+        return
+      }
       if (isAgentMessage) {
         agentSteps = agentSteps.map((step) =>
           step.status === 'running' ||
@@ -668,6 +717,13 @@ export function ChatPanel() {
     if (!event) return
     setPendingContinue(null)
     void window.compass.ai.resolveContinue({ id: event.id, continue: false })
+  }
+
+  const handleResendAsEdit = () => {
+    const prompt = agentEditFallback?.prompt?.trim()
+    if (!prompt || isChatLoading) return
+    setAgentEditFallback(null)
+    void handleSend({ text: prompt, mode: 'edit' })
   }
 
   const activeFile = getActiveFile()
@@ -906,6 +962,30 @@ export function ChatPanel() {
         </div>
       )}
 
+      {agentEditFallback && !pendingContinue && (
+        <div className="agent-fallback-bar">
+          <div className="agent-fallback-info">{t('chat.agentFallbackHint')}</div>
+          <div className="agent-fallback-actions">
+            <button
+              type="button"
+              className="btn-apply"
+              onClick={handleResendAsEdit}
+              disabled={isChatLoading}
+            >
+              {t('chat.agentResendAsEdit')}
+            </button>
+            <button
+              type="button"
+              className="btn-reject"
+              onClick={() => setAgentEditFallback(null)}
+              disabled={isChatLoading}
+            >
+              {t('common.cancel')}
+            </button>
+          </div>
+        </div>
+      )}
+
       {isAskSendMode && pendingCode && activeFile && (
         <DiffPreview
           oldText={activeFile.content}
@@ -953,7 +1033,11 @@ export function ChatPanel() {
                 className={`chat-mode-trigger mode-${sendMode}`}
                 onClick={() => setModeMenuOpen((open) => !open)}
                 disabled={isChatLoading}
-                title={t(activeModeOption.titleKey)}
+                title={
+                  !agentModeAvailable
+                    ? t('chat.agentModeUnavailable')
+                    : t(activeModeOption.titleKey)
+                }
                 aria-label={t('chat.sendMode')}
                 aria-haspopup="listbox"
                 aria-expanded={modeMenuOpen}
@@ -966,7 +1050,7 @@ export function ChatPanel() {
               </button>
               {modeMenuOpen ? (
                 <div className="chat-mode-menu" role="listbox" aria-label={t('chat.sendMode')}>
-                  {CHAT_MODE_OPTIONS.map((option) => {
+                  {modeOptions.map((option) => {
                     const selected = option.id === sendMode
                     return (
                       <button
@@ -993,6 +1077,9 @@ export function ChatPanel() {
                       </button>
                     )
                   })}
+                  {!agentModeAvailable ? (
+                    <p className="chat-mode-menu-hint">{t('chat.agentModeUnavailable')}</p>
+                  ) : null}
                 </div>
               ) : null}
             </div>
@@ -1009,7 +1096,7 @@ export function ChatPanel() {
               <button
                 type="button"
                 className="btn-send"
-                onClick={handleSend}
+                onClick={() => void handleSend()}
                 disabled={!input.trim()}
               >
                 {t('chat.send')}
