@@ -3,7 +3,7 @@ import { dirname, extname, join, relative } from 'path'
 import { t } from '../../src/i18n/runtime'
 import type { IndexBuildResult, ProjectIndexContext } from '../../src/types'
 
-const INDEX_VERSION = 1
+const INDEX_VERSION = 2
 const COMPASS_DIR = '.compass'
 const IGNORED_DIRS = new Set([
   'node_modules',
@@ -152,7 +152,7 @@ function extractSymbols(content: string, language: string): IndexedSymbol[] {
 
   lines.forEach((line, index) => {
     const lineNo = index + 1
-    let match: RegExpExecArray | null
+    let match: RegExpMatchArray | null
 
     if (language === 'typescript' || language === 'javascript') {
       if ((match = line.match(/(?:export\s+)?(?:async\s+)?function\s+(\w+)/))) {
@@ -220,22 +220,126 @@ function resolveImportPath(fromFile: string, importPath: string, allFiles: Set<s
   return null
 }
 
-function buildSummary(files: IndexedFile[], edges: GraphEdge[]): string {
+/** Score path names that usually mark app / package entry points. */
+function entryPointScore(path: string): number {
+  const lower = path.toLowerCase()
+  const base = lower.split('/').pop() ?? lower
+  let score = 0
+
+  if (
+    /^(main|index|app|server|cli|electron)\.(tsx?|jsx?|mjs|cjs)$/.test(base)
+  ) {
+    score += 40
+  }
+  if (/(^|\/)(src|electron|app|apps?|packages\/[^/]+)\/(main|index|app)\./.test(lower)) {
+    score += 25
+  }
+  if (/(^|\/)(main|preload)\.(tsx?|jsx?)$/.test(lower)) score += 20
+  if (base === 'package.json' || base === 'pyproject.toml' || base === 'cargo.toml') {
+    score += 50
+  }
+  if (base === 'readme.md') score += 15
+  if (/\/routes?\//.test(lower) || /\/pages?\//.test(lower)) score += 8
+  return score
+}
+
+function inboundImportCounts(edges: GraphEdge[]): Map<string, number> {
+  const counts = new Map<string, number>()
+  for (const edge of edges) {
+    counts.set(edge.to, (counts.get(edge.to) ?? 0) + 1)
+  }
+  return counts
+}
+
+function formatSymbolBrief(file: IndexedFile, max = 8): string {
+  const parts: string[] = []
+  // Prefer exports when present — they are the public surface.
+  if (file.exports.length > 0) {
+    parts.push(`exports: ${file.exports.slice(0, max).join(', ')}`)
+  }
+  const exportSet = new Set(file.exports)
+  const extras = file.symbols
+    .filter((s) => !exportSet.has(s.name))
+    .slice(0, Math.max(0, max - Math.min(file.exports.length, max)))
+    .map((s) => `${s.name}(${s.kind}@L${s.line})`)
+  if (extras.length > 0) {
+    parts.push(`symbols: ${extras.join(', ')}`)
+  } else if (file.exports.length === 0 && file.symbols.length > 0) {
+    parts.push(
+      `symbols: ${file.symbols
+        .slice(0, max)
+        .map((s) => `${s.name}(${s.kind}@L${s.line})`)
+        .join(', ')}`
+    )
+  }
+  return parts.join(' | ')
+}
+
+function pickEntryPoints(files: IndexedFile[], edges: GraphEdge[]): IndexedFile[] {
+  const inbound = inboundImportCounts(edges)
+  const ranked = files
+    .map((file) => {
+      const nameScore = entryPointScore(file.path)
+      const fanIn = inbound.get(file.path) ?? 0
+      const exportBonus = Math.min(file.exports.length, 10)
+      return { file, score: nameScore + fanIn * 3 + exportBonus }
+    })
+    .filter((row) => row.score >= 15)
+    .sort((a, b) => b.score - a.score || a.file.path.localeCompare(b.file.path))
+
+  const picked: IndexedFile[] = []
+  const seen = new Set<string>()
+  for (const row of ranked) {
+    if (seen.has(row.file.path)) continue
+    seen.add(row.file.path)
+    picked.push(row.file)
+    if (picked.length >= 16) break
+  }
+  return picked
+}
+
+/** Exported for unit tests — builds the human/AI-facing summary.txt body. */
+export function buildSummary(files: IndexedFile[], edges: GraphEdge[]): string {
+  const inbound = inboundImportCounts(edges)
   const lines: string[] = [
     '# Compass Project Index',
     '',
     `Files: ${files.length}`,
     `Relations: ${edges.length}`,
-    '',
-    '## File Overview'
+    ''
   ]
 
-  for (const file of files.slice(0, 80)) {
-    const symbolNames = file.symbols.map((s) => s.name).slice(0, 6).join(', ')
+  const entryPoints = pickEntryPoints(files, edges)
+  if (entryPoints.length > 0) {
+    lines.push('## Entry points')
+    for (const file of entryPoints) {
+      const brief = formatSymbolBrief(file, 6)
+      const fanIn = inbound.get(file.path) ?? 0
+      const fanInLabel = fanIn > 0 ? `, importedBy:${fanIn}` : ''
+      lines.push(
+        `- ${file.path} (${file.language}, ${t('ai.indexLines', { count: file.lines })}${fanInLabel})` +
+          (brief ? ` | ${brief}` : '')
+      )
+    }
+    lines.push('')
+  }
+
+  lines.push('## File Overview')
+
+  // Prefer files with symbols/exports; keep a stable path sort within ties.
+  const overview = [...files].sort((a, b) => {
+    const sa = a.exports.length * 2 + a.symbols.length + entryPointScore(a.path)
+    const sb = b.exports.length * 2 + b.symbols.length + entryPointScore(b.path)
+    if (sb !== sa) return sb - sa
+    return a.path.localeCompare(b.path)
+  })
+
+  for (const file of overview.slice(0, 80)) {
+    const brief = formatSymbolBrief(file, 6)
     const importTargets = file.imports.filter((i) => i.startsWith('.')).slice(0, 4).join(', ')
     lines.push(
       `- ${file.path} (${file.language}, ${t('ai.indexLines', { count: file.lines })})` +
-        (symbolNames ? ` | symbols: ${symbolNames}` : '') +
+        (brief ? ` | ${brief}` : '') +
         (importTargets ? ` | imports: ${importTargets}` : '')
     )
   }
@@ -245,7 +349,14 @@ function buildSummary(files: IndexedFile[], edges: GraphEdge[]): string {
   }
 
   lines.push('', '## Key Relations')
-  const relationSample = edges.slice(0, 60)
+  // Prefer edges into / out of entry points when available.
+  const entrySet = new Set(entryPoints.map((f) => f.path))
+  const rankedEdges = [...edges].sort((a, b) => {
+    const sa = (entrySet.has(a.from) ? 2 : 0) + (entrySet.has(a.to) ? 2 : 0)
+    const sb = (entrySet.has(b.from) ? 2 : 0) + (entrySet.has(b.to) ? 2 : 0)
+    return sb - sa
+  })
+  const relationSample = rankedEdges.slice(0, 60)
   for (const edge of relationSample) {
     lines.push(`- ${edge.from} -> ${edge.to}`)
   }
@@ -545,15 +656,22 @@ export async function getProjectIndexContext(
         ? [
             '## Related to current context',
             ...relatedFiles.map((f) => {
+              const exportBrief =
+                f.exports.length > 0
+                  ? `exports: ${f.exports.slice(0, 8).join(', ')}`
+                  : ''
               const syms = f.symbols
-                .map((s) => `${s.name}(${s.kind})`)
+                .map((s) => `${s.name}(${s.kind}@L${s.line})`)
                 .slice(0, 8)
                 .join(', ')
               const imps = f.imports
                 .filter((i) => i.startsWith('.'))
                 .slice(0, 5)
                 .join(', ')
-              return `- ${f.path}: ${syms || 'no symbols'}${imps ? ` | -> ${imps}` : ''}`
+              const detail = [exportBrief, syms ? `symbols: ${syms}` : '', imps ? `-> ${imps}` : '']
+                .filter(Boolean)
+                .join(' | ')
+              return `- ${f.path}: ${detail || 'no symbols'}`
             })
           ].join('\n')
         : ''

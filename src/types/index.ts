@@ -88,6 +88,7 @@ export type AgentToolName =
   | 'exec'
   | 'updateTodo'
   | 'checkpoint'
+  | 'remember'
 
 export type AgentToolStepStatus =
   | 'running'
