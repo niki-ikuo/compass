@@ -140,6 +140,42 @@ describe('json recovery helpers', () => {
     })
   })
 
+  it('closes truncated JSON that ends mid-escape (dangling backslash)', () => {
+    const raw = '{"actions":[{"type":"writeFile","path":"a.js","content":"hello\\'
+    expect(JSON.parse(closeTruncatedJson(raw))).toEqual({
+      actions: [{ type: 'writeFile', path: 'a.js', content: 'hello' }]
+    })
+  })
+
+  it('closes truncated JSON that ends mid-unicode escape', () => {
+    const raw = '{"actions":[{"type":"writeFile","path":"a.js","content":"hi\\u00'
+    expect(JSON.parse(closeTruncatedJson(raw))).toEqual({
+      actions: [{ type: 'writeFile', path: 'a.js', content: 'hi' }]
+    })
+  })
+
+  it('recovers _raw truncated after an escape boundary', () => {
+    const raw =
+      '{"actions":[{"type":"writeFile","path":"src/board.js","content":"hello\\'
+    const result = coerceProposeActionsArgs({ _raw: raw })
+    expect(result.actions).toEqual([
+      { type: 'writeFile', path: 'src/board.js', content: 'hello' }
+    ])
+  })
+
+  it('recovers when content has invalid backslash-apostrophe escapes', () => {
+    const raw =
+      '{"actions":[{"type":"writeFile","path":"src/board.js","content":"const pieces = require(\\\'./pieces\\\');"}]}'
+    const result = coerceProposeActionsArgs({ _raw: raw })
+    expect(result.actions).toEqual([
+      {
+        type: 'writeFile',
+        path: 'src/board.js',
+        content: "const pieces = require('./pieces');"
+      }
+    ])
+  })
+
   it('extracts only complete action objects', () => {
     const text =
       'noise {"type":"writeFile","path":"a.ts","content":"x"} {"type":"writeFile","path":"b.ts","content":"partial'
