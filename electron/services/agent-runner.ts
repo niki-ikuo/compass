@@ -1,7 +1,6 @@
 import type { WebContents } from 'electron'
 import { randomUUID } from 'crypto'
 import { readdir, readFile, stat } from 'fs/promises'
-import { basename, isAbsolute, join, relative, resolve } from 'path'
 import type {
   AgentToolStep,
   ChatRequest,
@@ -22,8 +21,18 @@ import {
 import { previewWorkspaceActions, resolveInsideWorkspace } from './filesystem'
 import { searchWorkspace } from './workspace-search'
 import { runAgentExec, classifyAgentExecCommand } from './agent-exec'
+import {
+  resolveAgentApproval,
+  resolveAgentContinue,
+  waitForApproval,
+  waitForContinue
+} from './agent-approval'
+import { coerceProposeActionsArgs, parseToolArgs } from './agent-propose-actions'
+import { normalizeAgentRelativePath } from './agent-paths'
 import { redactSecrets, redactSecretsInArgs } from '../../src/utils/redact'
 import { formatAgentToolsUnsupportedError } from '../../src/utils/agent-tools'
+
+export { resolveAgentApproval, resolveAgentContinue }
 
 /** 初期ターン／ツール予算（続行で追加付与） */
 const MAX_AGENT_TURNS = 16
@@ -177,93 +186,6 @@ const AGENT_TOOLS = [
     }
   }
 ] as const
-
-type ApprovalDecision = { approved: boolean; detail?: string }
-type ContinueDecision = { continue: boolean }
-
-const pendingApprovals = new Map<
-  string,
-  {
-    resolve: (decision: ApprovalDecision) => void
-  }
->()
-
-const pendingContinues = new Map<
-  string,
-  {
-    resolve: (decision: ContinueDecision) => void
-  }
->()
-
-/** Renderer が preview 承認/却下後に呼ぶ */
-export function resolveAgentApproval(payload: {
-  id: string
-  approved: boolean
-  detail?: string
-}): boolean {
-  const pending = pendingApprovals.get(payload.id)
-  if (!pending) return false
-  pendingApprovals.delete(payload.id)
-  pending.resolve({ approved: payload.approved, detail: payload.detail })
-  return true
-}
-
-/** Renderer がターン上限の続行/停止後に呼ぶ */
-export function resolveAgentContinue(payload: { id: string; continue: boolean }): boolean {
-  const pending = pendingContinues.get(payload.id)
-  if (!pending) return false
-  pendingContinues.delete(payload.id)
-  pending.resolve({ continue: payload.continue })
-  return true
-}
-
-function waitForApproval(id: string, signal: AbortSignal): Promise<ApprovalDecision> {
-  return new Promise((resolve, reject) => {
-    if (signal.aborted) {
-      reject(new DOMException('Aborted', 'AbortError'))
-      return
-    }
-
-    const onAbort = (): void => {
-      pendingApprovals.delete(id)
-      signal.removeEventListener('abort', onAbort)
-      reject(new DOMException('Aborted', 'AbortError'))
-    }
-
-    signal.addEventListener('abort', onAbort)
-    pendingApprovals.set(id, {
-      resolve: (decision) => {
-        signal.removeEventListener('abort', onAbort)
-        pendingApprovals.delete(id)
-        resolve(decision)
-      }
-    })
-  })
-}
-
-function waitForContinue(id: string, signal: AbortSignal): Promise<ContinueDecision> {
-  return new Promise((resolve, reject) => {
-    if (signal.aborted) {
-      reject(new DOMException('Aborted', 'AbortError'))
-      return
-    }
-
-    const onAbort = (): void => {
-      pendingContinues.delete(id)
-      signal.removeEventListener('abort', onAbort)
-      reject(new DOMException('Aborted', 'AbortError'))
-    }
-
-    signal.addEventListener('abort', onAbort)
-    pendingContinues.set(id, {
-      resolve: (decision) => {
-        signal.removeEventListener('abort', onAbort)
-        pendingContinues.delete(id)
-        resolve(decision)
-      }
-    })
-  })
-}
 
 function truncatePersistedObservation(content: string): string {
   const redacted = redactSecrets(content)
@@ -429,63 +351,12 @@ function truncateForModel(text: string): string {
   return `${redacted.slice(0, MAX_TOOL_RESULT_CHARS)}\n…(truncated)`
 }
 
-function normalizeSlashes(path: string): string {
-  return path.replace(/\\/g, '/')
-}
-
-/**
- * ツール引数のパスをワークスペース相対に正規化する。
- * ワークスペース名そのもの（例: ルートが .../aaa なのに path="aaa"）は、
- * 同名サブフォルダが無い限りルート "." として扱う。
- */
-async function normalizeAgentRelativePath(
-  workspaceRoot: string,
-  pathArg: string | undefined,
-  options?: { defaultToRoot?: boolean }
-): Promise<string> {
-  const root = resolve(workspaceRoot)
-  let raw = (pathArg ?? '').trim().replace(/\\/g, '/')
-  while (raw.length > 1 && raw.endsWith('/')) {
-    raw = raw.slice(0, -1)
-  }
-
-  if (!raw || raw === '.' || raw === './') {
-    return options?.defaultToRoot === false ? '' : '.'
-  }
-
-  // 絶対パスがワークスペース直下を指す場合
-  if (isAbsolute(raw) || /^[a-zA-Z]:/.test(raw)) {
-    const abs = resolve(raw)
-    const rel = relative(root, abs)
-    if (!rel || rel === '') return '.'
-    if (rel.startsWith('..') || isAbsolute(rel)) {
-      return raw
-    }
-    return normalizeSlashes(rel)
-  }
-
-  const rootName = basename(root)
-  const sameName =
-    raw === rootName || (process.platform === 'win32' && raw.toLowerCase() === rootName.toLowerCase())
-
-  if (sameName) {
-    try {
-      await stat(join(root, raw))
-      // 同名サブフォルダ/ファイルが実在するならそのまま
-    } catch {
-      return '.'
-    }
-  }
-
-  return raw
-}
-
 async function resolveAgentToolPath(
   workspaceRoot: string,
   pathArg: string | undefined,
   options?: { allowRoot?: boolean; defaultToRoot?: boolean }
 ): Promise<{ relativePath: string; absolutePath: string }> {
-  const relativePath = await normalizeAgentRelativePath(workspaceRoot, pathArg, {
+  const relativePath = normalizeAgentRelativePath(workspaceRoot, pathArg, {
     defaultToRoot: options?.defaultToRoot
   })
   if (!relativePath || relativePath === '.') {
@@ -498,123 +369,14 @@ async function resolveAgentToolPath(
   return { relativePath, absolutePath }
 }
 
-function buildJsonParseAttempts(raw: string): string[] {
-  const trimmed = raw.trim()
-  const attempts: string[] = []
-  const pushUnique = (value: string) => {
-    const v = value.trim()
-    if (!v || attempts.includes(v)) return
-    attempts.push(v)
-  }
-
-  pushUnique(trimmed)
-
-  const fence = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i)
-  if (fence?.[1]) pushUnique(fence[1])
-
-  const start = trimmed.indexOf('{')
-  const end = trimmed.lastIndexOf('}')
-  if (start >= 0 && end > start) {
-    pushUnique(trimmed.slice(start, end + 1))
-  }
-
-  const arrayStart = trimmed.indexOf('[')
-  const arrayEnd = trimmed.lastIndexOf(']')
-  if (arrayStart >= 0 && arrayEnd > arrayStart) {
-    pushUnique(trimmed.slice(arrayStart, arrayEnd + 1))
-  }
-
-  return attempts
-}
-
-function tryParseJsonValue(raw: string): unknown | undefined {
-  for (const attempt of buildJsonParseAttempts(raw)) {
-    try {
-      let parsed: unknown = JSON.parse(attempt)
-      // 二重エンコード: "\"{...}\"" → object
-      if (typeof parsed === 'string') {
-        try {
-          parsed = JSON.parse(parsed)
-        } catch {
-          // keep string
-        }
-      }
-      return parsed
-    } catch {
-      // try next
-    }
-  }
-  return undefined
-}
-
-/**
- * LLM が actions を文字列化したり、壊れた JSON を _raw に落とした場合の回復。
- */
-function coerceProposeActionsArgs(args: Record<string, unknown>): Record<string, unknown> {
-  if (Array.isArray(args.actions) && args.actions.length > 0) {
-    return args
-  }
-
-  const tryFromUnknown = (value: unknown): Record<string, unknown> | null => {
-    if (Array.isArray(value) && value.length > 0) {
-      return { actions: value }
-    }
-    if (value && typeof value === 'object' && !Array.isArray(value)) {
-      const obj = value as Record<string, unknown>
-      if (Array.isArray(obj.actions) && obj.actions.length > 0) {
-        return obj
-      }
-      if (typeof obj.actions === 'string') {
-        const nested = tryParseJsonValue(obj.actions)
-        if (Array.isArray(nested) && nested.length > 0) {
-          return { ...obj, actions: nested }
-        }
-      }
-    }
-    if (typeof value === 'string') {
-      const nested = tryParseJsonValue(value)
-      return nested === undefined ? null : tryFromUnknown(nested)
-    }
-    return null
-  }
-
-  if ('actions' in args) {
-    const recovered = tryFromUnknown(args.actions)
-    if (recovered) return recovered
-  }
-
-  if (typeof args._raw === 'string') {
-    const recovered = tryFromUnknown(args._raw)
-    if (recovered) return recovered
-  }
-
-  for (const value of Object.values(args)) {
-    if (typeof value !== 'string') continue
-    if (!value.includes('actions') && !value.includes('writeFile')) continue
-    const recovered = tryFromUnknown(value)
-    if (recovered) return recovered
-  }
-
-  return args
-}
-
-function parseToolArgs(raw: string): Record<string, unknown> {
-  if (!raw.trim()) return {}
-  const parsed = tryParseJsonValue(raw)
-  if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-    return parsed as Record<string, unknown>
-  }
-  return { _raw: raw }
-}
-
 /** UI / 次ターン用に path 引数を正規化してから返す */
-async function normalizeToolArgsForCall(
+function normalizeToolArgsForCall(
   workspaceRoot: string,
   name: string,
   args: Record<string, unknown>
-): Promise<Record<string, unknown>> {
+): Record<string, unknown> {
   if (name === 'readFile' || name === 'listDir') {
-    const relativePath = await normalizeAgentRelativePath(
+    const relativePath = normalizeAgentRelativePath(
       workspaceRoot,
       typeof args.path === 'string' ? args.path : undefined,
       { defaultToRoot: name === 'listDir' }
@@ -625,7 +387,7 @@ async function normalizeToolArgsForCall(
     return { ...args, path: relativePath || '.' }
   }
   if (name === 'search' && typeof args.path === 'string' && args.path.trim()) {
-    const relativePath = await normalizeAgentRelativePath(workspaceRoot, args.path, {
+    const relativePath = normalizeAgentRelativePath(workspaceRoot, args.path, {
       defaultToRoot: true
     })
     return { ...args, path: relativePath === '.' ? '' : relativePath }
@@ -1235,7 +997,7 @@ export async function runAgent(webContents: WebContents, request: ChatRequest): 
         if (call.function.name === 'proposeActions') {
           rawArgs = coerceProposeActionsArgs(rawArgs)
         }
-        const args = await normalizeToolArgsForCall(
+        const args = normalizeToolArgsForCall(
           request.workspaceRoot,
           call.function.name,
           rawArgs

@@ -54,9 +54,9 @@ const SYSTEM_DENY_PATTERNS: RegExp[] = [
  * 例: rm -rf . / * / $PWD
  */
 const WORKSPACE_WIPE_PATTERNS: RegExp[] = [
-  /\brm\s+(?:-[a-zA-Z]*\s+)*(?:--\s+)?(?:\.|\\.\/|\*|\$PWD|\"\$PWD\"|'\$PWD'|`\$PWD`)(?:\s|$)/i,
-  /\brm\s+(?:-[a-zA-Z]*\s+)+rf?\s+(?:\.|\\.\/|\*)(?:\s|$)/i,
-  /\brm\s+-r(?:f)?\s+(?:--\s+)?(?:\.|\\.\/|\*)(?:\s|$)/i,
+  /\brm\s+(?:-[a-zA-Z]*\s+)*(?:--\s+)?(?:\.\/|\.|\\|\*|\$PWD|\"\$PWD\"|'\$PWD'|`\$PWD`)(?:\s|$)/i,
+  /\brm\s+(?:-[a-zA-Z]*\s+)+rf?\s+(?:\.\/|\.|\*)(?:\s|$)/i,
+  /\brm\s+-r(?:f)?\s+(?:--\s+)?(?:\.\/|\.|\*)(?:\s|$)/i,
   /\bgit\s+clean\s+[^\n]*-[^\n]*x/i,
   /\b(?:rd|rmdir)\s+(?:\/s\s+)?(?:\/q\s+)?(?:\.|\\\.)(?:\s|$)/i,
   /\bRemove-Item\b[^\n]*-(?:Recurse|Force)[^\n]*(?:\.|\*)(?:\s|$|;|\|)/i,
