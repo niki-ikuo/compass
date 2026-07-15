@@ -17,8 +17,8 @@ export function EditorCenter() {
     <div className="editor-center">
       <div className="editor-main">
         <TabBar />
-        <PreviewBar />
         <CodeEditor />
+        <PreviewBar />
       </div>
       {wasShownRef.current && (
         <div className={showTerminal ? '' : 'terminal-panel-hidden'}>
