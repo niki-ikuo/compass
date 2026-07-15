@@ -392,6 +392,8 @@ interface AppState {
   activateWorkspacePreview: (items: ActionPreviewItem[]) => void
   openPreviewFile: (path: string, newContent: string, originalContent: string, isNew: boolean) => void
   revertWorkspacePreview: () => void
+  /** Agent 承認待ち中の適用失敗を観測として返し、再提案させる */
+  sendApplyFailureToAgent: () => void
   applyWorkspacePreview: () => Promise<void>
   applyPreviewFile: (filePath: string) => Promise<void>
   rejectPreviewFile: (filePath: string) => void
@@ -1002,6 +1004,68 @@ export const useAppStore = create<AppState>((set, get) => ({
         id: approvalId,
         approved: false,
         detail: 'User rejected the proposed workspace actions'
+      })
+    }
+  },
+
+  sendApplyFailureToAgent: () => {
+    const state = get()
+    const approvalId = state.pendingAgentApprovalId
+    const error = state.lastApplyError
+    if (!approvalId || !error || !state.pendingWorkspacePreview) return
+
+    const actionSummary = state.pendingWorkspacePreview.actions
+      .map((a) => `- ${a.type}: ${a.path}`)
+      .join('\n')
+
+    set((s) => {
+      const openFiles: OpenFile[] = []
+      let activeFilePath = s.activeFilePath
+
+      for (const file of s.openFiles) {
+        if (!file.isPreview) {
+          openFiles.push(file)
+          continue
+        }
+        if (file.isNewPreview) {
+          if (activeFilePath === file.path) activeFilePath = null
+          continue
+        }
+        openFiles.push({
+          ...file,
+          content: file.previewOriginal ?? file.content,
+          isPreview: false,
+          previewOriginal: undefined,
+          isNewPreview: false,
+          isDirty: false
+        })
+      }
+
+      if (!activeFilePath && openFiles.length > 0) {
+        activeFilePath = openFiles[openFiles.length - 1].path
+      }
+
+      return {
+        openFiles,
+        activeFilePath,
+        pendingWorkspacePreview: null,
+        pendingAgentApprovalId: null,
+        agentApprovalTrace: null,
+        lastApplyError: null
+      }
+    })
+
+    if (typeof window !== 'undefined' && window.compass?.ai?.resolveApproval) {
+      void window.compass.ai.resolveApproval({
+        id: approvalId,
+        approved: false,
+        detail: [
+          `Apply failed: ${error}`,
+          'The proposed actions were NOT applied.',
+          'Inspect the failure, then propose a corrected set of actions (prefer applyPatch for existing files).',
+          'Proposed actions were:',
+          actionSummary
+        ].join('\n')
       })
     }
   },

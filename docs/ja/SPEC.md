@@ -30,7 +30,7 @@
 
 ### 後回し（v2以降）
 
-- **Agent の続き** — Phase 4 の UX / ガードレールは実装済み。後回し: 再試行 UI、tools 非対応時の自動 Edit フォールバック — [AGENT_PLAN.md](./AGENT_PLAN.md)
+- **Agent の続き** — Phase 4 の UX / ガードレールは実装済み（適用失敗時の Agent 修正依頼、`verify` による test/lint/typecheck ループを含む）。後回し: tools 非対応時の自動 Edit フォールバック — [AGENT_PLAN.md](./AGENT_PLAN.md)
 - ベクトル検索 / RAG による意味検索（現状の `.compass` は構造索引であり埋め込み検索ではない）
 - MCP連携
 - Git統合

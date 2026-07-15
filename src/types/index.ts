@@ -86,6 +86,7 @@ export type AgentToolName =
   | 'search'
   | 'proposeActions'
   | 'exec'
+  | 'verify'
   | 'updateTodo'
   | 'checkpoint'
   | 'remember'

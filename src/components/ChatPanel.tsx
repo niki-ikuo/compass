@@ -96,6 +96,7 @@ export function ChatPanel() {
   const isChatLoading = useAppStore((s) => s.isChatLoading)
   const pendingWorkspacePreview = useAppStore((s) => s.pendingWorkspacePreview)
   const lastApplyError = useAppStore((s) => s.lastApplyError)
+  const pendingAgentApprovalId = useAppStore((s) => s.pendingAgentApprovalId)
   const addChatMessage = useAppStore((s) => s.addChatMessage)
   const updateLastAssistantMessage = useAppStore((s) => s.updateLastAssistantMessage)
   const setChatLoading = useAppStore((s) => s.setChatLoading)
@@ -109,6 +110,7 @@ export function ChatPanel() {
   const openPreviewFile = useAppStore((s) => s.openPreviewFile)
   const applyWorkspacePreview = useAppStore((s) => s.applyWorkspacePreview)
   const revertWorkspacePreview = useAppStore((s) => s.revertWorkspacePreview)
+  const sendApplyFailureToAgent = useAppStore((s) => s.sendApplyFailureToAgent)
   const setFileTree = useAppStore((s) => s.setFileTree)
   const addChatContextRefs = useAppStore((s) => s.addChatContextRefs)
   const createChatSession = useAppStore((s) => s.createChatSession)
@@ -756,8 +758,11 @@ export function ChatPanel() {
       appendAssistantNote(t('chat.applied', { count: itemCount }))
     } catch (error) {
       const message = error instanceof Error ? error.message : t('chat.applyFailed')
+      const canAskAgent = Boolean(useAppStore.getState().pendingAgentApprovalId)
       appendAssistantNote(
-        `${t('chat.fileOpError', { message })}\n${t('chat.applyRetryHint')}`
+        `${t('chat.fileOpError', { message })}\n${
+          canAskAgent ? t('chat.applyFailedAskAgentHint') : t('chat.applyRetryHint')
+        }`
       )
     }
   }
@@ -1015,6 +1020,11 @@ export function ChatPanel() {
           applyError={lastApplyError}
           onApply={() => void handleApplyActions()}
           onReject={() => revertWorkspacePreview()}
+          onAskAgentFix={
+            lastApplyError && pendingAgentApprovalId
+              ? () => sendApplyFailureToAgent()
+              : undefined
+          }
           onSelectItem={handleSelectPreviewItem}
         />
       )}
