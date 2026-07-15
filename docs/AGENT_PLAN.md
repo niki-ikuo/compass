@@ -2,7 +2,7 @@
 
 **English** | [日本語](ja/AGENT_PLAN.md)
 
-Plan for v2.0 **Agent** autonomy (tool loops, commands, multi-step runs). Related: [SPEC.md](./SPEC.md) §10, [ARCHITECTURE.md](./ARCHITECTURE.md).
+Plan for v2.0 **Agent** autonomy (tool loops, commands, multi-step runs). For how the shipped runtime behaves, see [AGENT.md](./AGENT.md). Related: [SPEC.md](./SPEC.md) §10, [ARCHITECTURE.md](./ARCHITECTURE.md).
 
 Branch: `feature/ai-chat-agent`
 

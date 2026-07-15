@@ -79,7 +79,7 @@ Renderer からは `window.compass.*` を呼び出します。実装の正は `e
 6. 完了時に `ai:done`、失敗時に `ai:error`、キャンセル時に `ai:aborted`
 7. **Ask**: 説明のみ（ファイル変更アクションは出さない）
 8. **Edit**: `compass-actions` をパース → プレビュー → ユーザー承認で適用（自律ツールループではない）
-9. **Agent（Phase 1–4）**: 読取ツール、`proposeActions`（一時停止 → プレビュー → 承認、部分適用含む）、制限付き `exec`、ターン/ペイロード上限、秘密マスキング、tools 非対応エラー、`waiting_approval` UI
+9. **Agent（Phase 1–4）**: 読取ツール、`proposeActions`（一時停止 → プレビュー → 承認、部分適用含む）、制限付き `exec`、ターン/ペイロード上限、秘密マスキング、tools 非対応エラー、`waiting_approval` UI — 詳細: [AGENT.md](./AGENT.md)
 
 ## `.compass` 索引
 

@@ -2,7 +2,7 @@
 
 [English](../AGENT_PLAN.md) | **日本語**
 
-v2.0 **Agent** 自律実行（ツールループ・コマンド・複数ステップ）の実装計画です。関連: [SPEC.md](./SPEC.md) §10、[ARCHITECTURE.md](./ARCHITECTURE.md)。
+v2.0 **Agent** 自律実行（ツールループ・コマンド・複数ステップ）の実装計画です。出荷済みランタイムの動きは [AGENT.md](./AGENT.md) を参照。関連: [SPEC.md](./SPEC.md) §10、[ARCHITECTURE.md](./ARCHITECTURE.md)。
 
 ブランチ: `feature/ai-chat-agent`
 
