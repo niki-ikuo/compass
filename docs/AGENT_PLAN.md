@@ -168,6 +168,7 @@ Document Ask / Edit / Agent boundaries in SPEC (and keep this plan as the build 
 - **History:** `waiting_approval` / `running` steps normalize safely on load
 - **Guardrails:** Turn limits, payload truncation, secret redaction in tool args/logs (`src/utils/redact.ts`) and `exec` output
 - **Plan layer:** `updateTodo` checklist + `checkpoint` resume summary; re-injected on Continue and into follow-up prior context (`electron/services/agent-plan.ts`)
+- **Context retention (pre-RAG):** working memory via auto-captured observations + `remember` tool (`agent-memory.ts`); smarter `.compass` summary with entry points / exports / symbols (`project-indexer.ts`); in-run `readFile` smart cache with `force=true` bypass (`agent-read-cache.ts`)
 
 **Exit criteria:** Stable enough for daily use on the primary providers Compass already supports.
 

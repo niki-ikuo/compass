@@ -30,6 +30,8 @@ function toolIcon(name: string): string {
       return '☑️'
     case 'checkpoint':
       return '📌'
+    case 'remember':
+      return '🧠'
     default:
       return '🔧'
   }

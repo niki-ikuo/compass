@@ -42,6 +42,23 @@ import {
   sanitizeUpdateTodoArgs,
   type AgentPlanState
 } from './agent-plan'
+import {
+  applyRemember,
+  formatAgentMemoryForModel,
+  rebuildMemoryFromSteps,
+  recordToolObservation,
+  sanitizeRememberArgs,
+  type AgentMemoryState
+} from './agent-memory'
+import {
+  buildFileOutline,
+  createAgentReadCache,
+  formatCacheHit,
+  getCachedRead,
+  invalidateCachedPaths,
+  putCachedRead,
+  type AgentReadCache
+} from './agent-read-cache'
 import { redactSecrets, redactSecretsInArgs } from '../../src/utils/redact'
 import { formatAgentToolsUnsupportedError } from '../../src/utils/agent-tools'
 
@@ -92,11 +109,16 @@ const AGENT_TOOLS = [
     type: 'function',
     function: {
       name: 'readFile',
-      description: 'Read a text file under the workspace. Path is relative to the workspace root.',
+      description:
+        'Read a text file under the workspace. Path is relative to the workspace root. Re-reads of an unchanged file return a cache hit (outline only); pass force=true to reload full contents from disk.',
       parameters: {
         type: 'object',
         properties: {
-          path: { type: 'string', description: 'Relative path from workspace root' }
+          path: { type: 'string', description: 'Relative path from workspace root' },
+          force: {
+            type: 'boolean',
+            description: 'If true, bypass the in-run read cache and reload from disk'
+          }
         },
         required: ['path']
       }
@@ -260,6 +282,28 @@ const AGENT_TOOLS = [
         required: ['summary']
       }
     }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'remember',
+      description:
+        'Store an important finding in durable working memory (kept as conversation state across Continue and follow-ups). Use for conclusions, bug causes, API contracts, or other facts that must not be lost when tool observations are truncated. Prefer short notes.',
+      parameters: {
+        type: 'object',
+        properties: {
+          note: {
+            type: 'string',
+            description: 'Short durable fact to remember'
+          },
+          path: {
+            type: 'string',
+            description: 'Optional workspace-relative path this note is about'
+          }
+        },
+        required: ['note']
+      }
+    }
   }
 ] as const
 
@@ -271,7 +315,7 @@ function truncatePersistedObservation(content: string): string {
 
 /**
  * 過去アシスタントの agentSteps から、モデルへ渡す調査文脈を組み立てる。
- * 計画レイヤ（updateTodo / checkpoint）は先頭に再注入する。
+ * 計画レイヤ + 作業メモリを先頭に再注入し、個別ツール観測は予算内で付与する。
  */
 function buildPriorAgentContext(steps: AgentToolStep[]): string | null {
   const usable = steps.filter(
@@ -280,14 +324,22 @@ function buildPriorAgentContext(steps: AgentToolStep[]): string | null {
   if (usable.length === 0) return null
 
   const planBlock = formatAgentPlanForModel(rebuildPlanFromSteps(usable))
+  const memoryBlock = formatAgentMemoryForModel(rebuildMemoryFromSteps(usable))
   const header =
-    '[Previous agent tool context from earlier in this chat. Prefer this over re-reading the same paths unless the files may have changed.]'
+    '[Previous agent tool context from earlier in this chat. Prefer working memory and this summary over re-reading the same paths unless the files may have changed.]'
   const toolBlocks: string[] = []
-  let total = (planBlock?.length ?? 0) + header.length
+  let total =
+    (planBlock?.length ?? 0) + (memoryBlock?.length ?? 0) + header.length
 
   for (const step of usable) {
-    // Plan tools already summarized in the plan block
-    if (step.name === 'updateTodo' || step.name === 'checkpoint') continue
+    // Plan / memory tools already summarized in dedicated blocks
+    if (
+      step.name === 'updateTodo' ||
+      step.name === 'checkpoint' ||
+      step.name === 'remember'
+    ) {
+      continue
+    }
     let argsJson = '{}'
     try {
       argsJson = JSON.stringify(step.args)
@@ -312,10 +364,11 @@ function buildPriorAgentContext(steps: AgentToolStep[]): string | null {
     total += block.length + 2
   }
 
-  if (!planBlock && toolBlocks.length === 0) return null
+  if (!planBlock && !memoryBlock && toolBlocks.length === 0) return null
 
   const parts: string[] = []
   if (planBlock) parts.push(planBlock)
+  if (memoryBlock) parts.push(memoryBlock)
   if (toolBlocks.length > 0) {
     parts.push(header)
     parts.push(...toolBlocks)
@@ -332,6 +385,16 @@ function rebuildPlanFromHistory(history: ChatRequestMessage[]): AgentPlanState {
     }
   }
   return rebuildPlanFromSteps(steps)
+}
+
+function rebuildMemoryFromHistory(history: ChatRequestMessage[]): AgentMemoryState {
+  const steps: AgentToolStep[] = []
+  for (const msg of history) {
+    if (msg.role === 'assistant' && msg.agentSteps?.length) {
+      steps.push(...msg.agentSteps)
+    }
+  }
+  return rebuildMemoryFromSteps(steps)
 }
 
 function appendHistoryMessages(
@@ -450,10 +513,14 @@ function sanitizeArgs(
   if (toolName === 'checkpoint') {
     return redactSecretsInArgs(sanitizeCheckpointArgs(args))
   }
+  if (toolName === 'remember') {
+    return redactSecretsInArgs(sanitizeRememberArgs(args))
+  }
   const out: Record<string, unknown> = {}
   for (const [key, value] of Object.entries(args)) {
     if (typeof value === 'string') {
-      const limit = key === 'command' || key === 'summary' ? 300 : 200
+      const limit =
+        key === 'command' || key === 'summary' || key === 'note' ? 300 : 200
       const truncated = value.length > limit ? `${value.slice(0, limit)}…` : value
       out[key] = redactSecrets(truncated)
     } else if (typeof value === 'number' || typeof value === 'boolean' || value === null) {
@@ -517,12 +584,14 @@ function normalizeToolArgsForCall(
 
 async function executeReadFile(
   workspaceRoot: string,
-  args: Record<string, unknown>
+  args: Record<string, unknown>,
+  readCache: AgentReadCache
 ): Promise<{ ok: boolean; summary: string; content: string }> {
   const pathArg = typeof args.path === 'string' ? args.path : ''
   if (!pathArg.trim() || pathArg === '.') {
     return { ok: false, summary: 'path is required', content: 'Error: path is required' }
   }
+  const force = args.force === true
 
   try {
     const { relativePath, absolutePath } = await resolveAgentToolPath(workspaceRoot, pathArg)
@@ -541,20 +610,45 @@ async function executeReadFile(
         content: 'Error: path is a directory; use listDir'
       }
     }
-    if (info.size > MAX_READ_BYTES) {
-      const buffer = await readFile(absolutePath)
-      const text = buffer.subarray(0, MAX_READ_BYTES).toString('utf8')
-      return {
-        ok: true,
-        summary: `Read ${relativePath} (truncated to ${MAX_READ_BYTES} bytes)`,
-        content: truncateForModel(`# ${relativePath} (truncated)\n${text}`)
+
+    if (!force) {
+      const cached = getCachedRead(readCache, relativePath)
+      if (cached && cached.mtimeMs === info.mtimeMs && cached.size === info.size) {
+        return formatCacheHit(cached)
       }
     }
-    const text = (await readFile(absolutePath)).toString('utf8')
+
+    let text: string
+    let truncated = false
+    if (info.size > MAX_READ_BYTES) {
+      const buffer = await readFile(absolutePath)
+      text = buffer.subarray(0, MAX_READ_BYTES).toString('utf8')
+      truncated = true
+    } else {
+      text = (await readFile(absolutePath)).toString('utf8')
+    }
+
+    const outline = buildFileOutline(relativePath, text)
+    const body = truncated
+      ? `# ${relativePath} (truncated)\nOutline: ${outline || '(none)'}\n${text}`
+      : `# ${relativePath}\nOutline: ${outline || '(none)'}\n${text}`
+    const content = truncateForModel(body)
+
+    putCachedRead(readCache, {
+      relativePath,
+      mtimeMs: info.mtimeMs,
+      size: info.size,
+      charCount: text.length,
+      outline,
+      content
+    })
+
     return {
       ok: true,
-      summary: `Read ${relativePath} (${text.length} chars)`,
-      content: truncateForModel(`# ${relativePath}\n${text}`)
+      summary: truncated
+        ? `Read ${relativePath} (truncated to ${MAX_READ_BYTES} bytes)`
+        : `Read ${relativePath} (${text.length} chars)`,
+      content
     }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
@@ -832,11 +926,13 @@ async function executeTool(
   name: string,
   args: Record<string, unknown>,
   signal: AbortSignal,
-  plan: AgentPlanState
+  plan: AgentPlanState,
+  memory: AgentMemoryState,
+  readCache: AgentReadCache
 ): Promise<{ ok: boolean; summary: string; content: string }> {
   switch (name) {
     case 'readFile':
-      return executeReadFile(workspaceRoot, args)
+      return executeReadFile(workspaceRoot, args, readCache)
     case 'listDir':
       return executeListDir(workspaceRoot, args)
     case 'search':
@@ -847,6 +943,8 @@ async function executeTool(
       return applyUpdateTodo(plan, args)
     case 'checkpoint':
       return applyCheckpoint(plan, args)
+    case 'remember':
+      return applyRemember(memory, args)
     default:
       return {
         ok: false,
@@ -856,13 +954,16 @@ async function executeTool(
   }
 }
 
-function injectPlanAfterContinue(
+function injectOrientationAfterContinue(
   apiMessages: ApiMessage[],
-  plan: AgentPlanState
+  plan: AgentPlanState,
+  memory: AgentMemoryState
 ): void {
   const planBlock = formatAgentPlanForModel(plan)
-  if (!planBlock) return
-  apiMessages.push({ role: 'user', content: planBlock })
+  const memoryBlock = formatAgentMemoryForModel(memory)
+  const parts = [planBlock, memoryBlock].filter(Boolean) as string[]
+  if (parts.length === 0) return
+  apiMessages.push({ role: 'user', content: parts.join('\n\n') })
 }
 
 function isToolsUnsupportedApiError(status: number, body: string): boolean {
@@ -997,9 +1098,9 @@ async function streamAgentTurn(
 
 /**
  * Agent tool loop: read tools, proposeActions (preview approval), restricted exec,
- * plus updateTodo / checkpoint for durable mid-run orientation.
- * Follow-up turns receive prior agentSteps as injected tool context.
- * Turn/tool budgets can be extended via user Continue (re-injects plan state).
+ * plus updateTodo / checkpoint / remember for durable mid-run orientation.
+ * Follow-up turns receive prior agentSteps as injected tool context + working memory.
+ * Turn/tool budgets can be extended via user Continue (re-injects plan + memory).
  */
 export async function runAgent(webContents: WebContents, request: ChatRequest): Promise<void> {
   const abortController = acquireChatAbortController()
@@ -1047,6 +1148,9 @@ export async function runAgent(webContents: WebContents, request: ChatRequest): 
     apiMessages.push({ role: 'user', content: await buildUserMessage(request) })
 
     const plan = rebuildPlanFromHistory(history)
+    const memory = rebuildMemoryFromHistory(history)
+    const readCache = createAgentReadCache()
+
     const url = `${settings.apiBaseUrl.replace(/\/$/, '')}/chat/completions`
     const headers = buildApiHeaders(settings)
     let toolCallsUsed = 0
@@ -1072,7 +1176,7 @@ export async function runAgent(webContents: WebContents, request: ChatRequest): 
         }
         turnBudget += CONTINUE_TURN_GRANT
         toolBudget += CONTINUE_TOOL_GRANT
-        injectPlanAfterContinue(apiMessages, plan)
+        injectOrientationAfterContinue(apiMessages, plan, memory)
       }
 
       webContents.send('ai:step', {
@@ -1124,7 +1228,7 @@ export async function runAgent(webContents: WebContents, request: ChatRequest): 
         }
         turnBudget += CONTINUE_TURN_GRANT
         toolBudget += CONTINUE_TOOL_GRANT
-        injectPlanAfterContinue(apiMessages, plan)
+        injectOrientationAfterContinue(apiMessages, plan, memory)
       }
 
       apiMessages.push({
@@ -1175,6 +1279,10 @@ export async function runAgent(webContents: WebContents, request: ChatRequest): 
                 args,
                 signal
               )
+              if (result.ok) {
+                const paths = extractActionPaths(args)
+                invalidateCachedPaths(readCache, paths)
+              }
             }
           } else {
             result = await executeTool(
@@ -1184,7 +1292,9 @@ export async function runAgent(webContents: WebContents, request: ChatRequest): 
               call.function.name,
               args,
               signal,
-              plan
+              plan,
+              memory,
+              readCache
             )
           }
         } catch (err) {
@@ -1193,6 +1303,10 @@ export async function runAgent(webContents: WebContents, request: ChatRequest): 
             return
           }
           throw err
+        }
+
+        if (call.function.name !== 'remember') {
+          recordToolObservation(memory, call.function.name, args, result)
         }
 
         const observation = truncatePersistedObservation(result.content)
@@ -1224,4 +1338,17 @@ export async function runAgent(webContents: WebContents, request: ChatRequest): 
   } finally {
     releaseChatAbortController(abortController)
   }
+}
+
+function extractActionPaths(args: Record<string, unknown>): string[] {
+  const actions = Array.isArray(args.actions) ? args.actions : []
+  const paths: string[] = []
+  for (const action of actions) {
+    if (!action || typeof action !== 'object') continue
+    const path = (action as { path?: unknown }).path
+    if (typeof path === 'string' && path.trim()) {
+      paths.push(path.replace(/\\/g, '/'))
+    }
+  }
+  return paths
 }
