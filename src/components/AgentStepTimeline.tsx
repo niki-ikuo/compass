@@ -24,6 +24,8 @@ function toolIcon(name: string): string {
       return '🔎'
     case 'exec':
       return '⌨️'
+    case 'verify':
+      return '✅'
     case 'proposeActions':
       return '✏️'
     case 'updateTodo':

@@ -59,6 +59,11 @@ import {
   putCachedRead,
   type AgentReadCache
 } from './agent-read-cache'
+import {
+  normalizeVerifyChecks,
+  runAgentVerify,
+  VERIFY_AFTER_APPLY_NUDGE
+} from './agent-verify'
 import { redactSecrets, redactSecretsInArgs } from '../../src/utils/redact'
 import { formatAgentToolsUnsupportedError } from '../../src/utils/agent-tools'
 
@@ -208,7 +213,7 @@ const AGENT_TOOLS = [
     function: {
       name: 'exec',
       description:
-        'Run a short non-interactive shell command with cwd inside the workspace. Use for tests, lint, build, or similar feedback. Dangerous system/workspace-wipe commands are blocked. Destructive write commands (rm, git reset --hard, chmod, etc.) require the user to approve before running. Default timeout 30s (max 120s). Do not use for interactive programs.',
+        'Run a short non-interactive shell command with cwd inside the workspace. Prefer the verify tool for standard test/lint/typecheck. Use exec for builds, ad-hoc commands, or when verify has no matching script. Dangerous system/workspace-wipe commands are blocked. Destructive write commands (rm, git reset --hard, chmod, etc.) require the user to approve before running. Default timeout 30s (max 120s). Do not use for interactive programs.',
       parameters: {
         type: 'object',
         properties: {
@@ -227,6 +232,37 @@ const AGENT_TOOLS = [
           }
         },
         required: ['command']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'verify',
+      description:
+        'Standard post-edit verification loop: run project test / lint / typecheck via known package scripts or safe fallbacks (e.g. tsc --noEmit, cargo test). Prefer this after proposeActions is applied. Pass checks to limit which suites run; default runs all that can be resolved. If a check is missing, fall back to exec with an explicit command. On failure, fix with proposeActions and verify again before finishing.',
+      parameters: {
+        type: 'object',
+        properties: {
+          checks: {
+            type: 'array',
+            description:
+              'Which checks to run. Default: test, lint, and typecheck (skips any that cannot be resolved).',
+            items: {
+              type: 'string',
+              enum: ['test', 'lint', 'typecheck']
+            }
+          },
+          cwd: {
+            type: 'string',
+            description: 'Working directory relative to workspace root (default ".")'
+          },
+          timeoutMs: {
+            type: 'number',
+            description:
+              'Per-check timeout in milliseconds (default 30000, max 120000). Applied to each resolved command.'
+          }
+        }
       }
     }
   },
@@ -515,6 +551,18 @@ function sanitizeArgs(
   }
   if (toolName === 'remember') {
     return redactSecretsInArgs(sanitizeRememberArgs(args))
+  }
+  if (toolName === 'verify') {
+    const checks = Array.isArray(args.checks)
+      ? args.checks.filter(
+          (c): c is string => c === 'test' || c === 'lint' || c === 'typecheck'
+        )
+      : undefined
+    return redactSecretsInArgs({
+      ...(checks && checks.length > 0 ? { checks } : {}),
+      ...(typeof args.cwd === 'string' ? { cwd: args.cwd.slice(0, 200) } : {}),
+      ...(typeof args.timeoutMs === 'number' ? { timeoutMs: args.timeoutMs } : {})
+    })
   }
   const out: Record<string, unknown> = {}
   for (const [key, value] of Object.entries(args)) {
@@ -828,7 +876,7 @@ async function executeProposeActions(
       return {
         ok: true,
         summary: `Applied ${normalized.length} action(s)`,
-        content: detail
+        content: `${detail}\n\n${VERIFY_AFTER_APPLY_NUDGE}`
       }
     }
     const detail =
@@ -836,7 +884,9 @@ async function executeProposeActions(
       'User rejected the proposed workspace actions. They were not applied. You may propose a revised set of actions or continue without changes.'
     return {
       ok: false,
-      summary: 'User rejected',
+      summary: detail.toLowerCase().includes('apply failed')
+        ? 'Apply failed — re-propose'
+        : 'User rejected',
       content: detail
     }
   } catch (err) {
@@ -919,6 +969,28 @@ async function executeExec(
   }
 }
 
+async function executeVerify(
+  workspaceRoot: string,
+  args: Record<string, unknown>,
+  signal: AbortSignal
+): Promise<{ ok: boolean; summary: string; content: string }> {
+  const checks = normalizeVerifyChecks(args.checks)
+  const cwd = typeof args.cwd === 'string' ? args.cwd : undefined
+  const timeoutMs = typeof args.timeoutMs === 'number' ? args.timeoutMs : undefined
+  const result = await runAgentVerify({
+    workspaceRoot,
+    checks,
+    cwd,
+    timeoutMs,
+    signal
+  })
+  return {
+    ok: result.ok,
+    summary: result.summary,
+    content: truncateForModel(result.content)
+  }
+}
+
 async function executeTool(
   webContents: WebContents,
   workspaceRoot: string,
@@ -939,6 +1011,8 @@ async function executeTool(
       return executeSearch(workspaceRoot, args)
     case 'exec':
       return executeExec(webContents, workspaceRoot, callId, args, signal)
+    case 'verify':
+      return executeVerify(workspaceRoot, args, signal)
     case 'updateTodo':
       return applyUpdateTodo(plan, args)
     case 'checkpoint':
@@ -1098,7 +1172,8 @@ async function streamAgentTurn(
 
 /**
  * Agent tool loop: read tools, proposeActions (preview approval), restricted exec,
- * plus updateTodo / checkpoint / remember for durable mid-run orientation.
+ * verify (test/lint/typecheck templates), plus updateTodo / checkpoint / remember
+ * for durable mid-run orientation.
  * Follow-up turns receive prior agentSteps as injected tool context + working memory.
  * Turn/tool budgets can be extended via user Continue (re-injects plan + memory).
  */

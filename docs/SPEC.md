@@ -30,7 +30,7 @@
 
 ### Deferred (v2+)
 
-- **Agent follow-ups** — Phase 4 UX/guardrails are implemented; deferred: retry UI, auto Edit fallback for tools-less providers — see [AGENT_PLAN.md](./AGENT_PLAN.md)
+- **Agent follow-ups** — Phase 4 UX/guardrails are implemented (including apply-failure → Ask Agent to fix, and the `verify` test/lint/typecheck loop); deferred: auto Edit fallback for tools-less providers — see [AGENT_PLAN.md](./AGENT_PLAN.md)
 - Vector search / RAG (`.compass` is a structure index, not embedding search)
 - MCP
 - Git integration

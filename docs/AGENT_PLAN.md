@@ -162,7 +162,9 @@ Document Ask / Edit / Agent boundaries in SPEC (and keep this plan as the build 
 
 **Status:** Implemented on `feature/ai-chat-agent`.
 
-- **Partial apply:** When the preview queue empties after per-file apply/reject, Agent approval resumes with an applied/rejected observation (full retry-after-failure UI deferred)
+- **Partial apply:** When the preview queue empties after per-file apply/reject, Agent approval resumes with an applied/rejected observation
+- **Apply failure → re-propose:** On apply error the preview stays for Retry; when Agent approval is pending, **Ask Agent to fix** clears the preview and returns the failure observation so the loop can re-propose
+- **Verify loop:** `verify` tool runs project test / lint / typecheck via package scripts (or safe fallbacks); prompts nudge fix → verify → fix after apply
 - **Progress / cancel:** `ai:step` status labels; `waiting_approval` step status; abort clears approval + running/waiting steps
 - **Tools-less providers:** Clear error (`ai.agentToolsUnsupported`) directing the user to Edit or a tools-capable model (no auto Edit fallback yet)
 - **History:** `waiting_approval` / `running` steps normalize safely on load
@@ -172,7 +174,7 @@ Document Ask / Edit / Agent boundaries in SPEC (and keep this plan as the build 
 
 **Exit criteria:** Stable enough for daily use on the primary providers Compass already supports.
 
-**Deferred:** Retry-after-failure UI; automatic Ask/Edit fallback when tools are unsupported; hide Agent toggle per provider.
+**Deferred:** Automatic Ask/Edit fallback when tools are unsupported; hide Agent toggle per provider.
 
 ---
 

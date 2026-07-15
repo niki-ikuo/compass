@@ -5,12 +5,14 @@ import { useI18n, t as tSync } from '@/i18n'
 export function PreviewBar() {
   const { t } = useI18n()
   const pendingWorkspacePreview = useAppStore((s) => s.pendingWorkspacePreview)
+  const pendingAgentApprovalId = useAppStore((s) => s.pendingAgentApprovalId)
   const lastApplyError = useAppStore((s) => s.lastApplyError)
   const activeChatId = useAppStore((s) => s.activeChatId)
   const workspaceRoot = useAppStore((s) => s.workspaceRoot)
   const setFileTree = useAppStore((s) => s.setFileTree)
   const applyWorkspacePreview = useAppStore((s) => s.applyWorkspacePreview)
   const revertWorkspacePreview = useAppStore((s) => s.revertWorkspacePreview)
+  const sendApplyFailureToAgent = useAppStore((s) => s.sendApplyFailureToAgent)
   const isActiveChatPreview =
     pendingWorkspacePreview && pendingWorkspacePreview.chatId === activeChatId
 
@@ -25,6 +27,8 @@ export function PreviewBar() {
   if (fileCount > 0) parts.push(t('preview.files', { count: fileCount }))
   if (dirCount > 0) parts.push(t('preview.mkdir', { count: dirCount }))
   if (deleteCount > 0) parts.push(t('preview.delete', { count: deleteCount }))
+
+  const showAskAgent = Boolean(lastApplyError && pendingAgentApprovalId)
 
   const handleApply = async () => {
     if (!workspaceRoot) return
@@ -49,8 +53,11 @@ export function PreviewBar() {
       const session = state.getActiveChatSession()
       const last = session?.messages[session.messages.length - 1]
       if (last?.role === 'assistant') {
+        const hint = state.pendingAgentApprovalId
+          ? tSync('chat.applyFailedAskAgentHint')
+          : tSync('chat.applyRetryHint')
         state.updateLastAssistantMessage(
-          `${last.content}\n\n${tSync('chat.fileOpError', { message })}\n${tSync('chat.applyRetryHint')}`
+          `${last.content}\n\n${tSync('chat.fileOpError', { message })}\n${hint}`
         )
       }
     }
@@ -63,7 +70,7 @@ export function PreviewBar() {
         {lastApplyError ? (
           <span>
             {t('chat.fileOpError', { message: lastApplyError })}{' '}
-            {t('chat.applyRetryHint')}
+            {showAskAgent ? t('chat.applyFailedAskAgentHint') : t('chat.applyRetryHint')}
           </span>
         ) : (
           <span>{t('preview.barHint', { summary: parts.join(' · ') })}</span>
@@ -73,6 +80,15 @@ export function PreviewBar() {
         <button className="btn-apply" onClick={() => void handleApply()}>
           {lastApplyError ? t('chat.retryApply') : t('preview.applyAll')}
         </button>
+        {showAskAgent ? (
+          <button
+            className="btn-secondary"
+            type="button"
+            onClick={() => sendApplyFailureToAgent()}
+          >
+            {t('chat.askAgentToFix')}
+          </button>
+        ) : null}
         <button className="btn-reject" onClick={() => revertWorkspacePreview()}>
           {t('editor.reject')}
         </button>

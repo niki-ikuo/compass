@@ -177,6 +177,11 @@ export function recordToolObservation(
     return
   }
 
+  if (toolName === 'verify') {
+    pushEntry(state, 'exec', `verify — ${result.summary}`)
+    return
+  }
+
   if (toolName === 'proposeActions') {
     pushEntry(state, 'write', result.summary)
   }
@@ -288,6 +293,12 @@ export function rebuildMemoryFromSteps(
       })
     } else if (step.name === 'exec' && step.args && step.summary) {
       recordToolObservation(state, 'exec', step.args, {
+        ok: true,
+        summary: step.summary,
+        content: ''
+      })
+    } else if (step.name === 'verify' && step.summary) {
+      recordToolObservation(state, 'verify', step.args ?? {}, {
         ok: true,
         summary: step.summary,
         content: ''

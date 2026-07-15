@@ -9,6 +9,8 @@ interface WorkspaceActionPreviewProps {
   onReject: () => void
   onSelectItem?: (item: ActionPreviewItem) => void
   applyError?: string | null
+  /** Agent approval pending + apply failed → send error back to the loop */
+  onAskAgentFix?: () => void
 }
 
 function ActionItemPreview({
@@ -120,10 +122,12 @@ export function WorkspaceActionPreview({
   onApply,
   onReject,
   onSelectItem,
-  applyError
+  applyError,
+  onAskAgentFix
 }: WorkspaceActionPreviewProps) {
   const { t } = useI18n()
   const summary = summarizePreviewItems(items)
+  const showAskAgent = Boolean(applyError && onAskAgentFix)
 
   return (
     <div className="workspace-action-preview">
@@ -133,6 +137,11 @@ export function WorkspaceActionPreview({
           <button className="btn-apply" onClick={onApply}>
             {applyError ? t('chat.retryApply') : t('preview.applyAll')}
           </button>
+          {showAskAgent ? (
+            <button className="btn-secondary" type="button" onClick={onAskAgentFix}>
+              {t('chat.askAgentToFix')}
+            </button>
+          ) : null}
           <button className="btn-reject" onClick={onReject}>
             {t('editor.reject')}
           </button>
@@ -141,7 +150,9 @@ export function WorkspaceActionPreview({
       {applyError ? (
         <p className="action-preview-error">
           {t('chat.fileOpError', { message: applyError })}
-          <span className="action-preview-retry-hint">{t('chat.applyRetryHint')}</span>
+          <span className="action-preview-retry-hint">
+            {showAskAgent ? t('chat.applyFailedAskAgentHint') : t('chat.applyRetryHint')}
+          </span>
         </p>
       ) : (
         <p className="action-preview-hint">{t('preview.openDiffHint')}</p>
