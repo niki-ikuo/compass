@@ -41,6 +41,7 @@ import {
 import { buildWorkspaceIndex, ensureWorkspaceIndex } from '@/utils/project-index'
 import { getLlmProvider, getModelOptions, getProviderLabel, isAgentModeAvailable } from '@/utils/llm-providers'
 import { parseAgentToolsUnsupportedError } from '@/utils/agent-tools'
+import { resolveLastSentChatMode } from '@/utils/chat-mode'
 import { useI18n, getDateLocale } from '@/i18n'
 
 function selectionRefKey(ref: ChatSelectionRef): string {
@@ -146,19 +147,23 @@ export function ChatPanel() {
     setPinnedSelections([])
     setAgentEditFallback(null)
     setPendingExecApproval(null)
-    const session = useAppStore.getState().getActiveChatSession()
+    const store = useAppStore.getState()
+    const session = store.getActiveChatSession()
     const lastUser = [...(session?.messages ?? [])]
       .reverse()
       .find((message) => message.role === 'user')
-    const available = isAgentModeAvailable(useAppStore.getState().settings.providerId)
+    const available = isAgentModeAvailable(store.settings.providerId)
     if (lastUser?.mode === 'agent' && !available) {
       setSendMode('edit')
     } else if (lastUser?.mode === 'ask' || lastUser?.mode === 'edit' || lastUser?.mode === 'agent') {
       setSendMode(lastUser.mode)
+      lastSentModeRef.current = lastUser.mode
     } else {
-      // 新規チャットなど履歴がない場合は、直前の送信モードを引き継ぐ
-      const fallback = lastSentModeRef.current
-      setSendMode(fallback === 'agent' && !available ? 'edit' : fallback)
+      // 新規チャットなど履歴がない場合は、最終送信のモードを引き継ぐ
+      const inherited =
+        resolveLastSentChatMode(store.chatSessions) ?? lastSentModeRef.current
+      lastSentModeRef.current = inherited
+      setSendMode(inherited === 'agent' && !available ? 'edit' : inherited)
     }
   }, [activeChatId])
 
