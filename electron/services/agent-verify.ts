@@ -380,4 +380,4 @@ export async function runAgentVerify(options: AgentVerifyOptions): Promise<Agent
 
 /** Nudge appended after successful proposeActions apply. */
 export const VERIFY_AFTER_APPLY_NUDGE =
-  'After applying changes, run the verify tool (test / lint / typecheck as available) or an equivalent exec command before finishing. If verify fails, fix with proposeActions and verify again.'
+  'After applying changes, run the verify tool (test / lint / typecheck as available) or an equivalent exec command before finishing. If verify fails, fix with proposeActions and verify again. If verify only skips because scripts are missing, do not mention that in the final reply—the timeline already shows it.'

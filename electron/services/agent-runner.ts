@@ -240,7 +240,7 @@ const AGENT_TOOLS = [
     function: {
       name: 'verify',
       description:
-        'Standard post-edit verification loop: run project test / lint / typecheck via known package scripts or safe fallbacks (e.g. tsc --noEmit, cargo test). Prefer this after proposeActions is applied. Pass checks to limit which suites run; default runs all that can be resolved. If a check is missing, fall back to exec with an explicit command. On failure, fix with proposeActions and verify again before finishing.',
+        'Standard post-edit verification loop: run project test / lint / typecheck via known package scripts or safe fallbacks (e.g. tsc --noEmit, cargo test). Prefer this after proposeActions is applied. Pass checks to limit which suites run; default runs all that can be resolved. If a check is missing, fall back to exec with an explicit command. On failure, fix with proposeActions and verify again before finishing. If all checks are skipped because scripts are missing, do not narrate that skip in the final user-facing reply.',
       parameters: {
         type: 'object',
         properties: {
