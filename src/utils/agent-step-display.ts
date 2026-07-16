@@ -1,8 +1,44 @@
-import type { AgentToolStep } from '@/types'
+import type { AgentToolName, AgentToolStep } from '@/types'
 import { getAgentStepTone } from '@/utils/apply-error'
 
 /** Collapse quiet tool rows once this many quiet steps exist in a run. */
 export const QUIET_STEP_COLLAPSE_THRESHOLD = 3
+
+export type AgentToolLabelKey =
+  | 'chat.agentToolName.readFile'
+  | 'chat.agentToolName.listDir'
+  | 'chat.agentToolName.search'
+  | 'chat.agentToolName.proposeActions'
+  | 'chat.agentToolName.exec'
+  | 'chat.agentToolName.verify'
+  | 'chat.agentToolName.updateTodo'
+  | 'chat.agentToolName.checkpoint'
+  | 'chat.agentToolName.remember'
+
+const AGENT_TOOL_LABEL_KEYS: Record<AgentToolName, AgentToolLabelKey> = {
+  readFile: 'chat.agentToolName.readFile',
+  listDir: 'chat.agentToolName.listDir',
+  search: 'chat.agentToolName.search',
+  proposeActions: 'chat.agentToolName.proposeActions',
+  exec: 'chat.agentToolName.exec',
+  verify: 'chat.agentToolName.verify',
+  updateTodo: 'chat.agentToolName.updateTodo',
+  checkpoint: 'chat.agentToolName.checkpoint',
+  remember: 'chat.agentToolName.remember'
+}
+
+/** Map internal tool ids to i18n keys; unknown names fall back to the raw id. */
+export function getAgentToolLabelKey(name: string): AgentToolLabelKey | null {
+  return (AGENT_TOOL_LABEL_KEYS as Record<string, AgentToolLabelKey | undefined>)[name] ?? null
+}
+
+export function formatAgentToolLabel(
+  name: string,
+  t: (key: AgentToolLabelKey) => string
+): string {
+  const key = getAgentToolLabelKey(name)
+  return key ? t(key) : name
+}
 
 export function isQuietAgentStep(step: AgentToolStep): boolean {
   if (

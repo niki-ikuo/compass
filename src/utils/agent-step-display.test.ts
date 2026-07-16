@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import type { AgentToolStep } from '@/types'
 import {
+  formatAgentToolLabel,
+  getAgentToolLabelKey,
   groupConsecutiveAgentSteps,
   isQuietAgentStep,
   segmentAgentSteps,
@@ -16,6 +18,15 @@ function step(partial: Partial<AgentToolStep> & Pick<AgentToolStep, 'id' | 'name
     ...partial
   }
 }
+
+describe('getAgentToolLabelKey / formatAgentToolLabel', () => {
+  it('maps known tools to i18n keys and falls back for unknown names', () => {
+    expect(getAgentToolLabelKey('proposeActions')).toBe('chat.agentToolName.proposeActions')
+    expect(getAgentToolLabelKey('mysteryTool')).toBeNull()
+    expect(formatAgentToolLabel('search', (key) => key)).toBe('chat.agentToolName.search')
+    expect(formatAgentToolLabel('mysteryTool', (key) => key)).toBe('mysteryTool')
+  })
+})
 
 describe('isQuietAgentStep', () => {
   it('treats successful inspect/meta tools as quiet', () => {
