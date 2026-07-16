@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { AgentToolStep } from '@/types'
+import { getApplyErrorTone } from '@/utils/apply-error'
 import { useI18n } from '@/i18n'
 
 function formatArgs(args: Record<string, unknown>): string {
@@ -42,6 +43,12 @@ function toolIcon(name: string): string {
 function AgentStepAccordion({ step }: { step: AgentToolStep }) {
   const { t } = useI18n()
   const [open, setOpen] = useState(false)
+  const stepTone =
+    step.ok === false && step.name === 'proposeActions' && getApplyErrorTone(step.summary) === 'warning'
+      ? 'warning'
+      : step.ok === false
+        ? 'failed'
+        : null
 
   const statusLabel =
     step.status === 'waiting_approval'
@@ -50,7 +57,9 @@ function AgentStepAccordion({ step }: { step: AgentToolStep }) {
         ? t('chat.agentContinueStep')
         : step.status === 'running'
           ? t('chat.agentToolRunning')
-          : step.ok === false || step.status === 'error'
+          : stepTone === 'warning'
+            ? t('chat.agentToolWarning')
+            : step.ok === false || step.status === 'error'
             ? t('chat.agentToolError')
             : t('chat.agentToolOk')
 
@@ -76,7 +85,7 @@ function AgentStepAccordion({ step }: { step: AgentToolStep }) {
   return (
     <div
       className={`chat-code-block agent-step-block agent-step-${step.status}${
-        step.ok === false ? ' agent-step-failed' : ''
+        stepTone ? ` agent-step-${stepTone}` : ''
       }`}
     >
       {canExpand ? (
