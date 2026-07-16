@@ -1,5 +1,6 @@
 import { useAppStore } from '@/stores/app-store'
 import { buildWorkspaceIndex } from '@/utils/project-index'
+import { getApplyErrorTone } from '@/utils/apply-error'
 import { useI18n, t as tSync } from '@/i18n'
 
 export function PreviewBar() {
@@ -29,6 +30,8 @@ export function PreviewBar() {
   if (deleteCount > 0) parts.push(t('preview.delete', { count: deleteCount }))
 
   const showAskAgent = Boolean(lastApplyError && pendingAgentApprovalId)
+  const applyErrorTone = getApplyErrorTone(lastApplyError)
+  const isWarning = applyErrorTone === 'warning'
 
   const handleApply = async () => {
     if (!workspaceRoot) return
@@ -54,23 +57,41 @@ export function PreviewBar() {
       const last = session?.messages[session.messages.length - 1]
       if (last?.role === 'assistant') {
         const hint = state.pendingAgentApprovalId
-          ? tSync('chat.applyFailedAskAgentHint')
-          : tSync('chat.applyRetryHint')
+          ? isWarning
+            ? tSync('chat.patchMismatchAskAgentHint')
+            : tSync('chat.applyFailedAskAgentHint')
+          : isWarning
+            ? tSync('chat.patchMismatchRetryHint')
+            : tSync('chat.applyRetryHint')
         state.updateLastAssistantMessage(
-          `${last.content}\n\n${tSync('chat.fileOpError', { message })}\n${hint}`
+          `${last.content}\n\n${
+            isWarning ? tSync('chat.patchMismatchError', { message }) : tSync('chat.fileOpError', { message })
+          }\n${hint}`
         )
       }
     }
   }
 
   return (
-    <div className={`preview-bar${lastApplyError ? ' preview-bar-error' : ''}`}>
+    <div
+      className={`preview-bar${
+        lastApplyError ? ` preview-bar-${applyErrorTone}` : ''
+      }`}
+    >
       <div className="preview-bar-info">
         <span className="preview-bar-badge">{t('editor.previewTab')}</span>
         {lastApplyError ? (
           <span>
-            {t('chat.fileOpError', { message: lastApplyError })}{' '}
-            {showAskAgent ? t('chat.applyFailedAskAgentHint') : t('chat.applyRetryHint')}
+            {isWarning
+              ? t('chat.patchMismatchError', { message: lastApplyError })
+              : t('chat.fileOpError', { message: lastApplyError })}{' '}
+            {showAskAgent
+              ? isWarning
+                ? t('chat.patchMismatchAskAgentHint')
+                : t('chat.applyFailedAskAgentHint')
+              : isWarning
+                ? t('chat.patchMismatchRetryHint')
+                : t('chat.applyRetryHint')}
           </span>
         ) : (
           <span>{t('preview.barHint', { summary: parts.join(' · ') })}</span>

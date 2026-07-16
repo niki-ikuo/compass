@@ -203,6 +203,7 @@ export const ja = {
   'chat.agentSteps': 'ツール',
   'chat.agentToolRunning': '実行中…',
   'chat.agentToolOk': '成功',
+  'chat.agentToolWarning': '要更新',
   'chat.agentToolError': '失敗',
   'chat.agentWaitingApproval': '承認待ち（プレビューを確認してください）',
   'chat.agentWaitingExecApproval': '危険なコマンドの実行承認待ち',
@@ -233,6 +234,11 @@ export const ja = {
   'chat.askAgentToFix': 'Agentに修正させる',
   'chat.applyFailedAskAgentHint':
     '適用に失敗しました。再試行するか、Agentにエラー内容を渡して再提案させられます。',
+  'chat.patchMismatchError': '⚠️ 提案が現在のファイル内容と一致しません: {message}',
+  'chat.patchMismatchRetryHint':
+    '提案時からファイル内容が変わった可能性があります。再試行するより、Agent に再提案させるのが安全です。',
+  'chat.patchMismatchAskAgentHint':
+    '提案時からファイル内容が変わった可能性があります。Agent に読み直しと再提案を依頼できます。',
   'chat.fileOpError': '⚠️ ファイル操作エラー: {message}',
   'chat.generating': '生成中',
   'chat.preparingChangesShort': '変更を準備しています',
@@ -593,6 +599,7 @@ export const en: Record<MessageKey, string> = {
   'chat.agentSteps': 'Tools',
   'chat.agentToolRunning': 'Running…',
   'chat.agentToolOk': 'ok',
+  'chat.agentToolWarning': 'needs refresh',
   'chat.agentToolError': 'failed',
   'chat.agentWaitingApproval': 'Waiting for approval (review the preview)',
   'chat.agentWaitingExecApproval': 'Waiting to approve a risky command',
@@ -623,6 +630,11 @@ export const en: Record<MessageKey, string> = {
   'chat.askAgentToFix': 'Ask Agent to fix',
   'chat.applyFailedAskAgentHint':
     'Apply failed. Retry, or send the error to Agent so it can re-propose.',
+  'chat.patchMismatchError': '⚠️ The proposal no longer matches the current file contents: {message}',
+  'chat.patchMismatchRetryHint':
+    'The file may have changed since the proposal was created. Asking Agent to re-propose is safer than retrying.',
+  'chat.patchMismatchAskAgentHint':
+    'The file may have changed since the proposal was created. You can ask Agent to re-read it and propose again.',
   'chat.fileOpError': '⚠️ File operation error: {message}',
   'chat.generating': 'Generating',
   'chat.preparingChangesShort': 'Preparing changes',

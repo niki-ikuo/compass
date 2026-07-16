@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { ActionPreviewItem, WorkspaceAction } from '@/types'
 import { computeLineDiff } from '@/utils/code-blocks'
+import { getApplyErrorTone } from '@/utils/apply-error'
 import { useI18n, t } from '@/i18n'
 
 interface WorkspaceActionPreviewProps {
@@ -128,6 +129,8 @@ export function WorkspaceActionPreview({
   const { t } = useI18n()
   const summary = summarizePreviewItems(items)
   const showAskAgent = Boolean(applyError && onAskAgentFix)
+  const applyErrorTone = getApplyErrorTone(applyError)
+  const isWarning = applyErrorTone === 'warning'
 
   return (
     <div className="workspace-action-preview">
@@ -148,10 +151,18 @@ export function WorkspaceActionPreview({
         </div>
       </div>
       {applyError ? (
-        <p className="action-preview-error">
-          {t('chat.fileOpError', { message: applyError })}
+        <p className={`action-preview-error action-preview-${applyErrorTone}`}>
+          {isWarning
+            ? t('chat.patchMismatchError', { message: applyError })
+            : t('chat.fileOpError', { message: applyError })}
           <span className="action-preview-retry-hint">
-            {showAskAgent ? t('chat.applyFailedAskAgentHint') : t('chat.applyRetryHint')}
+            {showAskAgent
+              ? isWarning
+                ? t('chat.patchMismatchAskAgentHint')
+                : t('chat.applyFailedAskAgentHint')
+              : isWarning
+                ? t('chat.patchMismatchRetryHint')
+                : t('chat.applyRetryHint')}
           </span>
         </p>
       ) : (

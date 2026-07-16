@@ -1413,6 +1413,10 @@ body:has(.monaco-editor .find-widget.visible) .workbench-hover-container .action
   border-left-color: var(--error, #e05252);
 }
 
+.agent-step-block.agent-step-warning {
+  border-left-color: var(--warning, #c9a227);
+}
+
 .agent-step-block .chat-code-label {
   font-family: var(--font-mono, ui-monospace, monospace);
 }
@@ -1937,6 +1941,11 @@ body:has(.monaco-editor .find-widget.visible) .workbench-hover-container .action
   border-top-color: var(--danger, #f85149);
 }
 
+.preview-bar-warning {
+  background: color-mix(in srgb, var(--warning, #d29922) 14%, transparent);
+  border-top-color: var(--warning, #d29922);
+}
+
 .action-preview-error {
   padding: 0 12px 8px;
   font-size: 11px;
@@ -1944,6 +1953,10 @@ body:has(.monaco-editor .find-widget.visible) .workbench-hover-container .action
   display: flex;
   flex-direction: column;
   gap: 4px;
+}
+
+.action-preview-warning {
+  color: var(--warning, #d29922);
 }
 
 .action-preview-retry-hint {
