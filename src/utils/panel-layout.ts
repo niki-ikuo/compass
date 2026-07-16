@@ -1,15 +1,55 @@
-import { PANEL_LAYOUT_DEFAULTS, PANEL_LAYOUT_LIMITS, TERMINAL_LAYOUT_LIMITS } from '@/components/ResizableLayout'
+import {
+  PANEL_LAYOUT_DEFAULTS,
+  PANEL_LAYOUT_LIMITS,
+  REFERENCE_LAYOUT_WIDTH,
+  TERMINAL_LAYOUT_LIMITS
+} from '@/utils/proportional-panel-widths'
 
 const STORAGE_KEY = 'compass-panel-layout'
 
 export interface PanelLayout {
-  fileTreeWidth: number
-  chatWidth: number
+  fileTreeWidthRatio: number
+  chatWidthRatio: number
   terminalHeight: number
+}
+
+type StoredPanelLayout = Partial<PanelLayout> & {
+  fileTreeWidth?: number
+  chatWidth?: number
 }
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value))
+}
+
+function clampRatio(ratio: number): number {
+  const minRatio = PANEL_LAYOUT_LIMITS.fileTree.min / REFERENCE_LAYOUT_WIDTH
+  const maxRatio = PANEL_LAYOUT_LIMITS.fileTree.max / REFERENCE_LAYOUT_WIDTH
+  return clamp(ratio, minRatio, maxRatio)
+}
+
+function migrateLegacyWidths(parsed: StoredPanelLayout): PanelLayout {
+  const fileTreeWidthRatio =
+    parsed.fileTreeWidthRatio ??
+    (parsed.fileTreeWidth != null
+      ? parsed.fileTreeWidth / REFERENCE_LAYOUT_WIDTH
+      : PANEL_LAYOUT_DEFAULTS.fileTreeWidthRatio)
+
+  const chatWidthRatio =
+    parsed.chatWidthRatio ??
+    (parsed.chatWidth != null
+      ? parsed.chatWidth / REFERENCE_LAYOUT_WIDTH
+      : PANEL_LAYOUT_DEFAULTS.chatWidthRatio)
+
+  return {
+    fileTreeWidthRatio: clampRatio(fileTreeWidthRatio),
+    chatWidthRatio: clampRatio(chatWidthRatio),
+    terminalHeight: clamp(
+      parsed.terminalHeight ?? PANEL_LAYOUT_DEFAULTS.terminalHeight,
+      TERMINAL_LAYOUT_LIMITS.min,
+      TERMINAL_LAYOUT_LIMITS.max
+    )
+  }
 }
 
 export function loadPanelLayout(): PanelLayout {
@@ -21,24 +61,8 @@ export function loadPanelLayout(): PanelLayout {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) return { ...PANEL_LAYOUT_DEFAULTS }
 
-    const parsed = JSON.parse(raw) as Partial<PanelLayout>
-    return {
-      fileTreeWidth: clamp(
-        parsed.fileTreeWidth ?? PANEL_LAYOUT_DEFAULTS.fileTreeWidth,
-        PANEL_LAYOUT_LIMITS.fileTree.min,
-        PANEL_LAYOUT_LIMITS.fileTree.max
-      ),
-      chatWidth: clamp(
-        parsed.chatWidth ?? PANEL_LAYOUT_DEFAULTS.chatWidth,
-        PANEL_LAYOUT_LIMITS.chat.min,
-        PANEL_LAYOUT_LIMITS.chat.max
-      ),
-      terminalHeight: clamp(
-        parsed.terminalHeight ?? PANEL_LAYOUT_DEFAULTS.terminalHeight,
-        TERMINAL_LAYOUT_LIMITS.min,
-        TERMINAL_LAYOUT_LIMITS.max
-      )
-    }
+    const parsed = JSON.parse(raw) as StoredPanelLayout
+    return migrateLegacyWidths(parsed)
   } catch {
     return { ...PANEL_LAYOUT_DEFAULTS }
   }
