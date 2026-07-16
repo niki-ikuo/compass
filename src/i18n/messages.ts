@@ -201,6 +201,10 @@ export const ja = {
   'chat.agentFallbackSwitched':
     '（送信モードを Edit に切り替えました）',
   'chat.agentSteps': 'ツール',
+  'chat.agentStepsCollapsed': 'ツール {count} 件',
+  'chat.agentStepsSummaryOk': '成功 {count}',
+  'chat.agentStepsSummarySkipped': 'スキップ {count}',
+  'chat.agentStepsSummaryWarning': '要更新 {count}',
   'chat.agentToolRunning': '実行中…',
   'chat.agentToolOk': '成功',
   'chat.agentToolWarning': '要更新',
@@ -600,6 +604,10 @@ export const en: Record<MessageKey, string> = {
   'chat.agentFallbackSwitched':
     '(Switched send mode to Edit)',
   'chat.agentSteps': 'Tools',
+  'chat.agentStepsCollapsed': '{count} tools',
+  'chat.agentStepsSummaryOk': '{count} ok',
+  'chat.agentStepsSummarySkipped': '{count} skipped',
+  'chat.agentStepsSummaryWarning': '{count} need refresh',
   'chat.agentToolRunning': 'Running…',
   'chat.agentToolOk': 'ok',
   'chat.agentToolWarning': 'needs refresh',

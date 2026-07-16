@@ -1382,8 +1382,40 @@ body:has(.monaco-editor .find-widget.visible) .workbench-hover-container .action
 .agent-step-timeline {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
   margin-bottom: 8px;
+}
+
+.agent-step-quiet-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.agent-step-group-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px 8px 8px;
+  border-top: 1px solid var(--border);
+  background: var(--bg-primary);
+}
+
+.agent-step-group-body .agent-step-block {
+  margin: 0;
+}
+
+.agent-step-block.agent-step-quiet-summary {
+  border-left-color: var(--text-secondary, #8b949e);
+}
+
+.agent-step-block.agent-step-quiet-summary > .chat-code-header {
+  padding: 5px 10px;
+  color: var(--text-secondary);
+}
+
+.agent-step-block.agent-step-quiet-summary > .chat-code-header .chat-code-label {
+  font-weight: 500;
 }
 
 .agent-step-block {
