@@ -810,6 +810,23 @@ function truncatedProposeActionsResult(): { ok: false; summary: string; content:
   }
 }
 
+function summarizeProposeActionsRejection(detail: string): string {
+  if (!detail.toLowerCase().includes('apply failed')) {
+    return 'User rejected'
+  }
+
+  const applyFailedLine = detail
+    .split('\n')
+    .map((line) => line.trim())
+    .find((line) => line.toLowerCase().startsWith('apply failed:'))
+
+  if (!applyFailedLine) {
+    return 'Apply failed — re-propose'
+  }
+
+  return applyFailedLine.replace(/^Apply failed:\s*/i, '').trim() || 'Apply failed — re-propose'
+}
+
 async function executeProposeActions(
   webContents: WebContents,
   workspaceRoot: string,
@@ -884,9 +901,7 @@ async function executeProposeActions(
       'User rejected the proposed workspace actions. They were not applied. You may propose a revised set of actions or continue without changes.'
     return {
       ok: false,
-      summary: detail.toLowerCase().includes('apply failed')
-        ? 'Apply failed — re-propose'
-        : 'User rejected',
+      summary: summarizeProposeActionsRejection(detail),
       content: detail
     }
   } catch (err) {

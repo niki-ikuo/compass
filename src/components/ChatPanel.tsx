@@ -41,6 +41,7 @@ import {
 import { buildWorkspaceIndex, ensureWorkspaceIndex } from '@/utils/project-index'
 import { getLlmProvider, getModelOptions, getProviderLabel, isAgentModeAvailable } from '@/utils/llm-providers'
 import { parseAgentToolsUnsupportedError } from '@/utils/agent-tools'
+import { formatActionPreviewError } from '@/utils/apply-error'
 import { resolveLastSentChatMode } from '@/utils/chat-mode'
 import { useI18n, getDateLocale } from '@/i18n'
 
@@ -495,7 +496,9 @@ export function ChatPanel() {
           } catch (error) {
             const message = error instanceof Error ? error.message : t('chat.previewFailed')
             updateLastAssistantMessage(
-              displayContent ? `${displayContent}\n\n⚠️ ${message}` : `⚠️ ${message}`
+              displayContent
+                ? `${displayContent}\n\n${formatActionPreviewError(message, t)}`
+                : formatActionPreviewError(message, t)
             )
           }
         } else if (displayContent !== accumulated.trim()) {
