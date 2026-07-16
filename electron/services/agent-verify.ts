@@ -293,7 +293,7 @@ export async function runAgentVerify(options: AgentVerifyOptions): Promise<Agent
         source: entry.source,
         scriptName: entry.scriptName,
         skipped: true,
-        ok: false,
+        ok: true,
         summary: entry.reason ?? 'no command',
         exitCode: null,
         stdout: '',
@@ -343,7 +343,10 @@ export async function runAgentVerify(options: AgentVerifyOptions): Promise<Agent
   const runnable = results.filter((r) => !r.skipped)
   const failed = runnable.filter((r) => !r.ok)
   const skipped = results.filter((r) => r.skipped)
-  const ok = runnable.length > 0 && failed.length === 0
+  const allMissing =
+    results.length > 0 &&
+    results.every((r) => r.skipped && r.source === 'missing')
+  const ok = runnable.length > 0 ? failed.length === 0 : allMissing
 
   const summaryParts: string[] = []
   if (runnable.length === 0) {

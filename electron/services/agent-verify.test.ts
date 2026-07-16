@@ -2,7 +2,7 @@ import { mkdirSync, writeFileSync, rmSync } from 'fs'
 import { join } from 'path'
 import { tmpdir } from 'os'
 import { afterEach, describe, expect, it } from 'vitest'
-import { normalizeVerifyChecks, resolveVerifyCommands } from './agent-verify'
+import { normalizeVerifyChecks, resolveVerifyCommands, runAgentVerify } from './agent-verify'
 
 const roots: string[] = []
 
@@ -111,5 +111,22 @@ describe('resolveVerifyCommands', () => {
       command: 'cargo check',
       source: 'fallback'
     })
+  })
+})
+
+describe('runAgentVerify', () => {
+  it('treats all-missing checks as skipped success, not failure', async () => {
+    const root = makeRoot('verify-empty')
+    writeFileSync(join(root, 'package.json'), JSON.stringify({ name: 'x' }))
+
+    const result = await runAgentVerify({
+      workspaceRoot: root,
+      checks: ['test', 'lint', 'typecheck'],
+      signal: new AbortController().signal
+    })
+
+    expect(result.ok).toBe(true)
+    expect(result.summary).toContain('no verify commands available')
+    expect(result.checks.every((check) => check.skipped && check.ok)).toBe(true)
   })
 })
