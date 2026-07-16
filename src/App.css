@@ -1417,6 +1417,10 @@ body:has(.monaco-editor .find-widget.visible) .workbench-hover-container .action
   border-left-color: var(--warning, #c9a227);
 }
 
+.agent-step-block.agent-step-cancelled {
+  border-left-color: var(--text-secondary, #8b949e);
+}
+
 .agent-step-block .chat-code-label {
   font-family: var(--font-mono, ui-monospace, monospace);
 }

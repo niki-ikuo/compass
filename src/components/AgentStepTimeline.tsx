@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { AgentToolStep } from '@/types'
-import { getAgentStepTone } from '@/utils/apply-error'
+import { getAgentStepStatusLabelKey, getAgentStepTone } from '@/utils/apply-error'
 import { useI18n } from '@/i18n'
 
 function formatArgs(args: Record<string, unknown>): string {
@@ -45,20 +45,7 @@ function AgentStepAccordion({ step }: { step: AgentToolStep }) {
   const [open, setOpen] = useState(false)
   const stepTone = getAgentStepTone(step)
 
-  const statusLabel =
-    step.status === 'waiting_approval'
-      ? t('chat.agentWaitingApproval')
-      : step.status === 'waiting_continue'
-        ? t('chat.agentContinueStep')
-        : step.status === 'running'
-          ? t('chat.agentToolRunning')
-          : stepTone === 'warning'
-            ? step.name === 'verify'
-              ? t('chat.agentToolSkipped')
-              : t('chat.agentToolWarning')
-            : step.ok === false || step.status === 'error'
-              ? t('chat.agentToolError')
-              : t('chat.agentToolOk')
+  const statusLabel = t(getAgentStepStatusLabelKey(step))
 
   const argsText = formatArgs(step.args)
   const bodyParts = [
