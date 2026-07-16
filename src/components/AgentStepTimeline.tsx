@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import type { AgentToolStep } from '@/types'
 import { getAgentStepStatusLabelKey, getAgentStepTone } from '@/utils/apply-error'
 import {
+  formatAgentToolLabel,
   groupConsecutiveAgentSteps,
   isActiveAgentStep,
   segmentAgentSteps,
@@ -99,7 +100,7 @@ function AgentStepAccordion({ step }: { step: AgentToolStep }) {
       <span className="chat-code-icon" aria-hidden="true">
         {toolIcon(step.name)}
       </span>
-      <span className="chat-code-label">{step.name}</span>
+      <span className="chat-code-label">{formatAgentToolLabel(step.name, t)}</span>
       <span className="chat-code-meta">{statusLabel}</span>
     </>
   )
@@ -130,7 +131,7 @@ function AgentStepAccordion({ step }: { step: AgentToolStep }) {
 function AgentStepGroupAccordion({ group }: { group: AgentStepGroup }) {
   const { t } = useI18n()
   const [open, setOpen] = useState(false)
-  const label = `${group.name} ×${group.steps.length}`
+  const label = `${formatAgentToolLabel(group.name, t)} ×${group.steps.length}`
   const statusLabel = groupStatusLabel(group, t)
   const toneClass = groupToneClass(group)
   const statusClass = groupStatusClass(group)
