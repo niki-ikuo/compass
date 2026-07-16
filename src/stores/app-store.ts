@@ -333,7 +333,7 @@ interface AppState {
     mentions: string[]
     selection?: ChatSelectionRef
   } | null
-  panelLayout: { fileTreeWidth: number; chatWidth: number; terminalHeight: number }
+  panelLayout: { fileTreeWidthRatio: number; chatWidthRatio: number; terminalHeight: number }
 
   setWorkspaceRoot: (root: string | null) => void
   restoreChatSessions: (sessions: ChatSession[], activeChatId: string | null) => void
@@ -406,8 +406,8 @@ interface AppState {
     selection?: ChatSelectionRef
   ) => void
   clearChatComposerInsertRequest: () => void
-  setFileTreeWidth: (width: number) => void
-  setChatPanelWidth: (width: number) => void
+  setFileTreeWidthRatio: (ratio: number) => void
+  setChatPanelWidthRatio: (ratio: number) => void
   setTerminalHeight: (height: number) => void
   getActiveChatSession: () => ChatSession | null
   getActiveFile: () => OpenFile | null
@@ -1307,16 +1307,16 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   clearChatComposerInsertRequest: () => set({ chatComposerInsertRequest: null }),
 
-  setFileTreeWidth: (width) =>
+  setFileTreeWidthRatio: (ratio) =>
     set((state) => {
-      const panelLayout = { ...state.panelLayout, fileTreeWidth: width }
+      const panelLayout = { ...state.panelLayout, fileTreeWidthRatio: ratio }
       savePanelLayout(panelLayout)
       return { panelLayout }
     }),
 
-  setChatPanelWidth: (width) =>
+  setChatPanelWidthRatio: (ratio) =>
     set((state) => {
-      const panelLayout = { ...state.panelLayout, chatWidth: width }
+      const panelLayout = { ...state.panelLayout, chatWidthRatio: ratio }
       savePanelLayout(panelLayout)
       return { panelLayout }
     }),

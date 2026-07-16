@@ -21,8 +21,8 @@ export function App() {
   const setShowFileTree = useAppStore((s) => s.setShowFileTree)
   const setShowChat = useAppStore((s) => s.setShowChat)
   const setShowTerminal = useAppStore((s) => s.setShowTerminal)
-  const setFileTreeWidth = useAppStore((s) => s.setFileTreeWidth)
-  const setChatPanelWidth = useAppStore((s) => s.setChatPanelWidth)
+  const setFileTreeWidthRatio = useAppStore((s) => s.setFileTreeWidthRatio)
+  const setChatPanelWidthRatio = useAppStore((s) => s.setChatPanelWidthRatio)
   const setSettingsOpen = useAppStore((s) => s.setSettingsOpen)
   const openSearchPanel = useAppStore((s) => s.openSearchPanel)
   const setLeftSidebarView = useAppStore((s) => s.setLeftSidebarView)
@@ -226,10 +226,10 @@ export function App() {
       <ResizableLayout
         showLeft={showFileTree}
         showRight={showChat}
-        leftWidth={panelLayout.fileTreeWidth}
-        rightWidth={panelLayout.chatWidth}
-        onLeftWidthChange={setFileTreeWidth}
-        onRightWidthChange={setChatPanelWidth}
+        leftRatio={panelLayout.fileTreeWidthRatio}
+        rightRatio={panelLayout.chatWidthRatio}
+        onLeftRatioChange={setFileTreeWidthRatio}
+        onRightRatioChange={setChatPanelWidthRatio}
         left={<LeftSidebar />}
         center={
           workspaceRoot ? (

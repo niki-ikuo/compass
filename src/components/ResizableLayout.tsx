@@ -1,16 +1,20 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
-
-const MIN_SIDE_PANEL = 120
-const MAX_SIDE_PANEL = 1200
-const MIN_EDITOR = 200
+import {
+  getMaxLeftWidth,
+  getMaxRightWidth,
+  MIN_SIDE_PANEL,
+  PANEL_HANDLE_WIDTH,
+  ratioFromPixelWidth,
+  resolveProportionalPanelWidths
+} from '@/utils/proportional-panel-widths'
 
 interface ResizableLayoutProps {
   showLeft: boolean
   showRight: boolean
-  leftWidth: number
-  rightWidth: number
-  onLeftWidthChange: (width: number) => void
-  onRightWidthChange: (width: number) => void
+  leftRatio: number
+  rightRatio: number
+  onLeftRatioChange: (ratio: number) => void
+  onRightRatioChange: (ratio: number) => void
   left: ReactNode
   center: ReactNode
   right: ReactNode
@@ -66,40 +70,63 @@ function ResizeHandle({
 export function ResizableLayout({
   showLeft,
   showRight,
-  leftWidth,
-  rightWidth,
-  onLeftWidthChange,
-  onRightWidthChange,
+  leftRatio,
+  rightRatio,
+  onLeftRatioChange,
+  onRightRatioChange,
   left,
   center,
   right
 }: ResizableLayoutProps) {
   const containerRef = useRef<HTMLDivElement>(null)
+  const [containerWidth, setContainerWidth] = useState(0)
 
-  const getMaxLeftWidth = useCallback(() => {
-    const total = containerRef.current?.clientWidth ?? window.innerWidth
-    const reservedRight = showRight ? rightWidth + 4 : 0
-    return Math.min(MAX_SIDE_PANEL, total - reservedRight - MIN_EDITOR - 4)
-  }, [rightWidth, showRight])
+  useEffect(() => {
+    const element = containerRef.current
+    if (!element) return
 
-  const getMaxRightWidth = useCallback(() => {
-    const total = containerRef.current?.clientWidth ?? window.innerWidth
-    const reservedLeft = showLeft ? leftWidth + 4 : 0
-    return Math.min(MAX_SIDE_PANEL, total - reservedLeft - MIN_EDITOR - 4)
-  }, [leftWidth, showLeft])
+    const updateWidth = () => {
+      setContainerWidth(element.clientWidth)
+    }
+
+    updateWidth()
+    const resizeObserver = new ResizeObserver(updateWidth)
+    resizeObserver.observe(element)
+    return () => resizeObserver.disconnect()
+  }, [])
+
+  const { leftWidth, rightWidth } = resolveProportionalPanelWidths({
+    containerWidth,
+    showLeft,
+    showRight,
+    leftRatio,
+    rightRatio
+  })
 
   const handleLeftDrag = useCallback(
     (deltaX: number) => {
-      onLeftWidthChange(clamp(leftWidth + deltaX, MIN_SIDE_PANEL, getMaxLeftWidth()))
+      if (containerWidth <= 0) return
+      const nextWidth = clamp(
+        leftWidth + deltaX,
+        MIN_SIDE_PANEL,
+        getMaxLeftWidth(containerWidth, showRight, rightWidth)
+      )
+      onLeftRatioChange(ratioFromPixelWidth(nextWidth, containerWidth))
     },
-    [leftWidth, onLeftWidthChange, getMaxLeftWidth]
+    [containerWidth, leftWidth, onLeftRatioChange, rightWidth, showRight]
   )
 
   const handleRightDrag = useCallback(
     (deltaX: number) => {
-      onRightWidthChange(clamp(rightWidth - deltaX, MIN_SIDE_PANEL, getMaxRightWidth()))
+      if (containerWidth <= 0) return
+      const nextWidth = clamp(
+        rightWidth - deltaX,
+        MIN_SIDE_PANEL,
+        getMaxRightWidth(containerWidth, showLeft, leftWidth)
+      )
+      onRightRatioChange(ratioFromPixelWidth(nextWidth, containerWidth))
     },
-    [rightWidth, onRightWidthChange, getMaxRightWidth]
+    [containerWidth, leftWidth, onRightRatioChange, rightWidth, showLeft]
   )
 
   return (
@@ -127,18 +154,8 @@ export function ResizableLayout({
   )
 }
 
-export const PANEL_LAYOUT_DEFAULTS = {
-  fileTreeWidth: 240,
-  chatWidth: 360,
-  terminalHeight: 220
-}
-
-export const PANEL_LAYOUT_LIMITS = {
-  fileTree: { min: MIN_SIDE_PANEL, max: MAX_SIDE_PANEL },
-  chat: { min: MIN_SIDE_PANEL, max: MAX_SIDE_PANEL }
-}
-
-export const TERMINAL_LAYOUT_LIMITS = {
-  min: 100,
-  max: 600
-}
+export {
+  PANEL_LAYOUT_DEFAULTS,
+  PANEL_LAYOUT_LIMITS,
+  TERMINAL_LAYOUT_LIMITS
+} from '@/utils/proportional-panel-widths'
