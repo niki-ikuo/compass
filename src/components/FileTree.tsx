@@ -100,6 +100,38 @@ function resolveCreateParentDir(
   return parentDirPath(node.path) || workspaceRoot
 }
 
+function findNodeByPath(nodes: FileTreeNode[], path: string): FileTreeNode | null {
+  const target = normalizeNodePath(path)
+  for (const node of nodes) {
+    if (normalizeNodePath(node.path) === target) return node
+    if (node.children) {
+      const found = findNodeByPath(node.children, path)
+      if (found) return found
+    }
+  }
+  return null
+}
+
+/** 選択中のフォルダ（ファイルなら親）へ作成。未選択時はワークスペース直下 */
+function resolveCreateParentFromSelection(
+  selectedPaths: Set<string>,
+  lastSelectedPath: string | null,
+  rootedTree: FileTreeNode[],
+  workspaceRoot: string
+): string {
+  const lastNorm = lastSelectedPath ? normalizeNodePath(lastSelectedPath) : null
+  const focusPath =
+    lastNorm && selectedPaths.has(lastNorm)
+      ? lastSelectedPath!
+      : selectedPaths.size > 0
+        ? [...selectedPaths][selectedPaths.size - 1]
+        : null
+
+  if (!focusPath) return workspaceRoot
+  const node = findNodeByPath(rootedTree, focusPath)
+  return resolveCreateParentDir(node, workspaceRoot)
+}
+
 function collectDirectoryPaths(nodes: FileTreeNode[]): string[] {
   const paths: string[] = []
   for (const node of nodes) {
@@ -798,6 +830,11 @@ export function FileTree() {
   const startCreate = (mode: 'create-file' | 'create-folder', parentDir: string) => {
     setContextMenu(null)
     setTemplateMenu(null)
+    setExpandedDirs((prev) => {
+      const next = new Set(prev)
+      next.add(normalizeNodePath(parentDir))
+      return next
+    })
     setInlineInput({
       mode,
       parentDir,
@@ -805,6 +842,14 @@ export function FileTree() {
     })
     setError(null)
   }
+
+  const getToolbarCreateParentDir = () =>
+    resolveCreateParentFromSelection(
+      selectedPaths,
+      lastSelectedPathRef.current,
+      rootedTree,
+      workspaceRoot
+    )
 
   const openTemplateMenu = (parentDir: string, x: number, y: number) => {
     setContextMenu(null)
@@ -959,14 +1004,14 @@ export function FileTree() {
           <button
             className="btn-icon"
             title={t('explorer.newFile')}
-            onClick={() => startCreate('create-file', workspaceRoot)}
+            onClick={() => startCreate('create-file', getToolbarCreateParentDir())}
           >
             📄+
           </button>
           <button
             className="btn-icon"
             title={t('explorer.newFolder')}
-            onClick={() => startCreate('create-folder', workspaceRoot)}
+            onClick={() => startCreate('create-folder', getToolbarCreateParentDir())}
           >
             📁+
           </button>
@@ -976,7 +1021,7 @@ export function FileTree() {
             onClick={(e) => {
               e.stopPropagation()
               const rect = (e.currentTarget as HTMLButtonElement).getBoundingClientRect()
-              openTemplateMenu(workspaceRoot, rect.left, rect.bottom + 4)
+              openTemplateMenu(getToolbarCreateParentDir(), rect.left, rect.bottom + 4)
             }}
           >
             📝+
