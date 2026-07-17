@@ -1,7 +1,6 @@
-import type { UseCasePreset } from '@/types'
-import { normalizeUseCasePreset } from '@/types'
-import { getLanguageFromPath } from '@/utils/language'
-import { DEFAULT_USE_CASE_PRESET } from '@/utils/use-case-preset'
+import type { UseCasePreset } from '../types'
+import { DEFAULT_SETTINGS, normalizeUseCasePreset } from '../types'
+import { getLanguageFromPath } from './language'
 
 export type InlineCompletionStyle = 'code' | 'text'
 
@@ -65,6 +64,8 @@ function normalizeLanguageId(language: string | undefined): string | undefined {
 /**
  * インライン補完の system / intro 文言スタイルを決める。
  * 優先: 言語 → 拡張子 → 用途プリセット（code のみ code、それ以外は text）
+ *
+ * 注意: electron main からも import されるため `@/` エイリアスは使わない。
  */
 export function resolveInlineCompletionStyle(options: {
   language?: string | null
@@ -83,6 +84,7 @@ export function resolveInlineCompletionStyle(options: {
     return 'code'
   }
 
-  const preset = normalizeUseCasePreset(options.useCasePreset) ?? DEFAULT_USE_CASE_PRESET
+  const preset =
+    normalizeUseCasePreset(options.useCasePreset) ?? DEFAULT_SETTINGS.defaultUseCasePreset
   return preset === 'code' ? 'code' : 'text'
 }
