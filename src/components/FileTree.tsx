@@ -1005,14 +1005,14 @@ export function FileTree() {
             title={t('explorer.newFile')}
             onClick={() => startCreate('create-file', getToolbarCreateParentDir())}
           >
-            📄+
+            📄
           </button>
           <button
             className="btn-icon"
             title={t('explorer.newFolder')}
             onClick={() => startCreate('create-folder', getToolbarCreateParentDir())}
           >
-            📁+
+            📁
           </button>
           <button
             className="btn-icon"
@@ -1023,7 +1023,7 @@ export function FileTree() {
               openTemplateMenu(getToolbarCreateParentDir(), rect.left, rect.bottom + 4)
             }}
           >
-            📝+
+            📝
           </button>
           <button className="btn-icon" title={t('explorer.refresh')} onClick={() => void refreshTree()}>
             ↻

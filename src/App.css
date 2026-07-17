@@ -398,10 +398,13 @@ body.is-resizing-panels * {
 
 .file-tree-expand {
   flex-shrink: 0;
-  width: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
   font-size: 10px;
   color: var(--text-secondary);
-  text-align: center;
   line-height: 1;
 }
 
@@ -511,6 +514,10 @@ body.is-resizing-panels * {
   width: 16px;
   height: 16px;
   line-height: 0;
+}
+
+.file-tree-icon svg {
+  display: block;
 }
 
 .file-tree-empty {
