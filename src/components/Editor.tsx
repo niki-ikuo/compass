@@ -78,7 +78,7 @@ export function CodeEditor() {
   const editorRevealRequest = useAppStore((s) => s.editorRevealRequest)
   const clearEditorRevealRequest = useAppStore((s) => s.clearEditorRevealRequest)
 
-  const [markdownViewMode, setMarkdownViewMode] = useState<MarkdownViewMode>('split')
+  const [markdownViewMode, setMarkdownViewMode] = useState<MarkdownViewMode>('edit')
   const [isApplying, setIsApplying] = useState(false)
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null)
   const selectionPayloadRef = useRef<ReturnType<typeof buildSelectionDragPayload> | null>(null)
@@ -547,16 +547,16 @@ export function CodeEditor() {
             {t('editor.editTab')}
           </button>
           <button
-            className={markdownViewMode === 'preview' ? 'active' : ''}
-            onClick={() => setMarkdownViewMode('preview')}
-          >
-            {t('editor.previewTab')}
-          </button>
-          <button
             className={markdownViewMode === 'split' ? 'active' : ''}
             onClick={() => setMarkdownViewMode('split')}
           >
             {t('editor.splitTab')}
+          </button>
+          <button
+            className={markdownViewMode === 'preview' ? 'active' : ''}
+            onClick={() => setMarkdownViewMode('preview')}
+          >
+            {t('editor.previewTab')}
           </button>
         </div>
       )}
