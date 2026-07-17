@@ -27,16 +27,22 @@ export function StatusBar() {
   const activeFile = openFiles.find((f) => f.path === activeFilePath) ?? null
   const isMedia = activeFile ? isMediaOpenFile(activeFile) : false
   const isBrowser = activeFile?.viewKind === 'browser'
+  const isSettings = activeFile?.viewKind === 'settings'
   const language = activeFilePath
-    ? isBrowser
-      ? t('browser.label')
-      : isMedia
-        ? activeFile?.viewKind === 'pdf'
-          ? t('editor.pdfLabel')
-          : t('editor.imageLabel')
-        : getLanguageFromPath(activeFilePath)
+    ? isSettings
+      ? t('settings.title')
+      : isBrowser
+        ? t('browser.label')
+        : isMedia
+          ? activeFile?.viewKind === 'pdf'
+            ? t('editor.pdfLabel')
+            : t('editor.imageLabel')
+          : getLanguageFromPath(activeFilePath)
     : ''
-  const encodingLabel = activeFile && !isMedia && !isBrowser ? getEncodingLabel(activeFile.encoding) : ''
+  const encodingLabel =
+    activeFile && !isMedia && !isBrowser && !isSettings
+      ? getEncodingLabel(activeFile.encoding)
+      : ''
   const provider = getLlmProvider(settings.providerId)
   const providerLabel = t(`provider.${provider.id}.label` as MessageKey)
 
@@ -101,10 +107,12 @@ export function StatusBar() {
           ? activeFile?.browserUrl && activeFile.browserUrl !== 'about:blank'
             ? activeFile.browserUrl
             : t('browser.newTab')
-          : `Ln ${cursorPosition.line}, Col ${cursorPosition.column}`}
+          : isSettings
+            ? t('settings.title')
+            : `Ln ${cursorPosition.line}, Col ${cursorPosition.column}`}
       </span>
       {language && <span className="status-item">{language}</span>}
-      {activeFile && !isMedia && !isBrowser && (
+      {activeFile && !isMedia && !isBrowser && !isSettings && (
         <div className="status-encoding" ref={menuRef}>
           <button
             type="button"

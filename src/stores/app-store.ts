@@ -28,6 +28,7 @@ import { getLanguageFromPath } from '@/utils/language'
 import { generateId } from '@/utils/code-blocks'
 import { loadPanelLayout, savePanelLayout } from '@/utils/panel-layout'
 import { createBrowserTabPath, normalizeBrowserUrl } from '@/utils/browser-tab'
+import { SETTINGS_TAB_PATH } from '@/utils/settings-tab'
 import { t, isDefaultChatTitle } from '@/i18n'
 
 function createEmptyChatSession(): ChatSession {
@@ -359,6 +360,7 @@ interface AppState {
     base64: string
   ) => void
   openBrowserTab: (url?: string) => void
+  openSettingsTab: () => void
   updateBrowserTab: (
     path: string,
     patch: { browserUrl?: string; browserTitle?: string }
@@ -647,6 +649,26 @@ export const useAppStore = create<AppState>((set, get) => ({
       return {
         openFiles: [...state.openFiles, tab],
         activeFilePath: path
+      }
+    }),
+
+  openSettingsTab: () =>
+    set((state) => {
+      const existing = state.openFiles.find((f) => f.viewKind === 'settings')
+      if (existing) {
+        return { activeFilePath: existing.path }
+      }
+      const tab: OpenFile = {
+        path: SETTINGS_TAB_PATH,
+        content: '',
+        language: 'settings',
+        encoding: 'utf8',
+        isDirty: false,
+        viewKind: 'settings'
+      }
+      return {
+        openFiles: [...state.openFiles, tab],
+        activeFilePath: tab.path
       }
     }),
 

@@ -14,8 +14,10 @@ import { MarkdownPreview } from './MarkdownPreview'
 import { MarkdownOutline } from './MarkdownOutline'
 import { MediaViewer } from './MediaViewer'
 import { BrowserViewer } from './BrowserViewer'
+import { SettingsPanel } from './SettingsDialog'
 import { isMediaOpenFile } from '@/utils/media-context'
 import { isBrowserOpenFile } from '@/utils/browser-tab'
+import { isSettingsOpenFile } from '@/utils/settings-tab'
 import { buildWorkspaceIndex } from '@/utils/project-index'
 import {
   buildSelectionDragPayload,
@@ -82,6 +84,8 @@ export function CodeEditor() {
   const selectionPayloadRef = useRef<ReturnType<typeof buildSelectionDragPayload> | null>(null)
 
   const activeFile = openFiles.find((f) => f.path === activeFilePath) ?? null
+  const settingsTab = openFiles.find((f) => isSettingsOpenFile(f)) ?? null
+  const showSettings = Boolean(activeFile && isSettingsOpenFile(activeFile))
   const isMarkdown = activeFile ? isMarkdownFile(activeFile.path) : false
   const isPreview = Boolean(activeFile?.isPreview)
   const previewFiles = openFiles.filter((f) => f.isPreview)
@@ -347,7 +351,7 @@ export function CodeEditor() {
     setActiveFile(previewFiles[nextIndex].path)
   }
 
-  if (!activeFile) {
+  if (!activeFile && !settingsTab) {
     return (
       <div className="editor-empty">
         <div className="editor-empty-content">
@@ -357,15 +361,44 @@ export function CodeEditor() {
     )
   }
 
+  const settingsPane = settingsTab ? (
+    <div
+      className={`editor-container${showSettings ? '' : ' is-hidden'}`}
+      aria-hidden={!showSettings}
+    >
+      <SettingsPanel />
+    </div>
+  ) : null
+
+  if (showSettings) {
+    return settingsPane
+  }
+
+  if (!activeFile) {
+    return (
+      <>
+        {settingsPane}
+        <div className="editor-empty">
+          <div className="editor-empty-content">
+            <p>{t('editor.selectFile')}</p>
+          </div>
+        </div>
+      </>
+    )
+  }
+
   if (isBrowserOpenFile(activeFile)) {
     return (
-      <div className="editor-container">
-        <BrowserViewer
-          key={activeFile.path}
-          path={activeFile.path}
-          initialUrl={activeFile.browserUrl || 'about:blank'}
-        />
-      </div>
+      <>
+        {settingsPane}
+        <div className="editor-container">
+          <BrowserViewer
+            key={activeFile.path}
+            path={activeFile.path}
+            initialUrl={activeFile.browserUrl || 'about:blank'}
+          />
+        </div>
+      </>
     )
   }
 
@@ -376,20 +409,25 @@ export function CodeEditor() {
     (activeFile.viewKind === 'image' || activeFile.viewKind === 'pdf')
   ) {
     return (
-      <div className="editor-container">
-        <MediaViewer
-          path={activeFile.path}
-          viewKind={activeFile.viewKind}
-          mimeType={activeFile.mediaMimeType}
-          base64={activeFile.mediaBase64}
-        />
-      </div>
+      <>
+        {settingsPane}
+        <div className="editor-container">
+          <MediaViewer
+            path={activeFile.path}
+            viewKind={activeFile.viewKind}
+            mimeType={activeFile.mediaMimeType}
+            base64={activeFile.mediaBase64}
+          />
+        </div>
+      </>
     )
   }
 
   if (isPreview) {
     return (
-      <div className="editor-container preview-mode">
+      <>
+        {settingsPane}
+        <div className="editor-container preview-mode">
         <div className="editor-diff-header">
           <div className="editor-diff-header-left">
             <span className="editor-diff-badge">
@@ -488,6 +526,7 @@ export function CodeEditor() {
           />
         </div>
       </div>
+      </>
     )
   }
 
@@ -496,7 +535,9 @@ export function CodeEditor() {
   const showOutline = isMarkdown && showEditor
 
   return (
-    <div className="editor-container">
+    <>
+      {settingsPane}
+      <div className="editor-container">
       {isMarkdown && (
         <div className="editor-view-toolbar">
           <button
@@ -547,5 +588,6 @@ export function CodeEditor() {
         )}
       </div>
     </div>
+    </>
   )
 }

@@ -24,8 +24,8 @@ export interface OpenFile {
   isPreview?: boolean
   previewOriginal?: string
   isNewPreview?: boolean
-  /** テキスト以外のタブ表示（画像 / PDF / ブラウザ） */
-  viewKind?: 'text' | 'image' | 'pdf' | 'browser'
+  /** テキスト以外のタブ表示（画像 / PDF / ブラウザ / 設定） */
+  viewKind?: 'text' | 'image' | 'pdf' | 'browser' | 'settings'
   mediaMimeType?: string
   mediaBase64?: string
   /** ブラウザタブの URL */

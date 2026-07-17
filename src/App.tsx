@@ -2,7 +2,6 @@ import { useEffect, useCallback } from 'react'
 import { useAppStore } from '@/stores/app-store'
 import { LeftSidebar } from './components/LeftSidebar'
 import { ChatPanel } from './components/ChatPanel'
-import { SettingsDialog } from './components/SettingsDialog'
 import { StatusBar } from './components/StatusBar'
 import { ResizableLayout } from './components/ResizableLayout'
 import { WorkspaceWelcome } from './components/WorkspaceWelcome'
@@ -23,7 +22,7 @@ export function App() {
   const setShowTerminal = useAppStore((s) => s.setShowTerminal)
   const setFileTreeWidthRatio = useAppStore((s) => s.setFileTreeWidthRatio)
   const setChatPanelWidthRatio = useAppStore((s) => s.setChatPanelWidthRatio)
-  const setSettingsOpen = useAppStore((s) => s.setSettingsOpen)
+  const openSettingsTab = useAppStore((s) => s.openSettingsTab)
   const openSearchPanel = useAppStore((s) => s.openSearchPanel)
   const setLeftSidebarView = useAppStore((s) => s.setLeftSidebarView)
   const leftSidebarView = useAppStore((s) => s.leftSidebarView)
@@ -93,7 +92,8 @@ export function App() {
     if (
       activeFile.viewKind === 'image' ||
       activeFile.viewKind === 'pdf' ||
-      activeFile.viewKind === 'browser'
+      activeFile.viewKind === 'browser' ||
+      activeFile.viewKind === 'settings'
     ) {
       return
     }
@@ -162,7 +162,7 @@ export function App() {
       window.compass.menu.onOpenFolder(handleOpenFolder),
       window.compass.menu.onCloseFolder(handleCloseFolder),
       window.compass.menu.onSave(handleSave),
-      window.compass.menu.onSettings(() => setSettingsOpen(true)),
+      window.compass.menu.onSettings(() => openSettingsTab()),
       window.compass.menu.onToggleTerminal(() => {
         if (!useAppStore.getState().workspaceRoot) return
         setShowTerminal(!useAppStore.getState().showTerminal)
@@ -187,7 +187,7 @@ export function App() {
     handleOpenFolder,
     handleCloseFolder,
     handleSave,
-    setSettingsOpen,
+    openSettingsTab,
     setShowTerminal,
     openSearchPanel
   ])
@@ -251,7 +251,7 @@ export function App() {
         onOpenSearch={handleOpenSearch}
         onToggleChat={() => setShowChat(!showChat)}
         onToggleTerminal={() => setShowTerminal(!showTerminal)}
-        onOpenSettings={() => setSettingsOpen(true)}
+        onOpenSettings={() => openSettingsTab()}
         onOpenFolder={() => void handleOpenFolder()}
         onCloseFolder={() => void handleCloseFolder()}
         onSave={() => void handleSave()}
@@ -279,7 +279,6 @@ export function App() {
       />
 
       <StatusBar />
-      <SettingsDialog />
     </div>
   )
 }

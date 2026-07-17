@@ -1,10 +1,15 @@
 import { useAppStore } from '@/stores/app-store'
 import { getFileName } from '@/utils/language'
 import { isBrowserOpenFile } from '@/utils/browser-tab'
+import { isSettingsOpenFile } from '@/utils/settings-tab'
 import { useI18n } from '@/i18n'
 import type { OpenFile } from '@/types'
 
-function tabLabel(file: OpenFile, newTabLabel: string): string {
+function tabLabel(
+  file: OpenFile,
+  labels: { browser: string; settings: string }
+): string {
+  if (isSettingsOpenFile(file)) return labels.settings
   if (isBrowserOpenFile(file)) {
     const title = file.browserTitle?.trim()
     if (title) return title
@@ -16,7 +21,7 @@ function tabLabel(file: OpenFile, newTabLabel: string): string {
         return url
       }
     }
-    return newTabLabel
+    return labels.browser
   }
   return getFileName(file.path)
 }
@@ -35,14 +40,26 @@ export function TabBar() {
       {openFiles.map((file) => (
         <div
           key={file.path}
-          className={`tab ${file.path === activeFilePath ? 'active' : ''}${file.isPreview ? ' preview-tab' : ''}${isBrowserOpenFile(file) ? ' browser-tab' : ''}`}
+          className={`tab ${file.path === activeFilePath ? 'active' : ''}${file.isPreview ? ' preview-tab' : ''}${isBrowserOpenFile(file) ? ' browser-tab' : ''}${isSettingsOpenFile(file) ? ' settings-tab-item' : ''}`}
           onClick={() => setActiveFile(file.path)}
         >
-          <span className="tab-name" title={isBrowserOpenFile(file) ? file.browserUrl : file.path}>
+          <span
+            className="tab-name"
+            title={
+              isBrowserOpenFile(file)
+                ? file.browserUrl
+                : isSettingsOpenFile(file)
+                  ? t('settings.title')
+                  : file.path
+            }
+          >
             {file.isPreview && <span className="tab-preview-badge">P</span>}
             {isBrowserOpenFile(file) && <span className="tab-browser-badge">B</span>}
             {file.isDirty && !file.isPreview && <span className="dirty-dot">●</span>}
-            {tabLabel(file, t('browser.newTab'))}
+            {tabLabel(file, {
+              browser: t('browser.newTab'),
+              settings: t('settings.title')
+            })}
           </span>
           <button
             className="tab-close"

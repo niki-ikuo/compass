@@ -55,6 +55,7 @@ import {
 import { join } from '@/utils/path'
 import { isMediaOpenFile } from '@/utils/media-context'
 import { isBrowserOpenFile } from '@/utils/browser-tab'
+import { isSettingsOpenFile } from '@/utils/settings-tab'
 import { useI18n, getDateLocale } from '@/i18n'
 
 function selectionRefKey(ref: ChatSelectionRef): string {
@@ -661,11 +662,17 @@ export function ChatPanel() {
       preset: messagePreset,
       context: {
         filePath:
-          activeFile && !isMediaOpenFile(activeFile) && !isBrowserOpenFile(activeFile)
+          activeFile &&
+          !isMediaOpenFile(activeFile) &&
+          !isBrowserOpenFile(activeFile) &&
+          !isSettingsOpenFile(activeFile)
             ? activeFile.path
             : undefined,
         fileContent:
-          activeFile && !isMediaOpenFile(activeFile) && !isBrowserOpenFile(activeFile)
+          activeFile &&
+          !isMediaOpenFile(activeFile) &&
+          !isBrowserOpenFile(activeFile) &&
+          !isSettingsOpenFile(activeFile)
             ? activeFile.content
             : undefined,
         selections: selectionsForRequest.length > 0 ? selectionsForRequest : undefined,

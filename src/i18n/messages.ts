@@ -20,6 +20,7 @@ export const ja = {
   // locales / settings
   'settings.title': '設定',
   'settings.appearance': '外観',
+  'settings.chat': 'チャット',
   'settings.language': '表示言語',
   'settings.colorTheme': '配色テーマ',
   'settings.llm': 'LLM',
@@ -52,6 +53,7 @@ export const ja = {
   'settings.rememberLastUseCasePresetHint':
     'オンにすると、送信成功時にデフォルトの用途をそのときの選択で更新します',
   'settings.saveFailed': '保存に失敗しました',
+  'settings.saved': '設定を保存しました',
 
   // themes
   'theme.dark': 'ダーク',
@@ -505,6 +507,7 @@ export const en: Record<MessageKey, string> = {
 
   'settings.title': 'Settings',
   'settings.appearance': 'Appearance',
+  'settings.chat': 'Chat',
   'settings.language': 'Language',
   'settings.colorTheme': 'Color theme',
   'settings.llm': 'LLM',
@@ -538,6 +541,7 @@ export const en: Record<MessageKey, string> = {
   'settings.rememberLastUseCasePresetHint':
     'When on, a successful send updates the default preset to the one you used',
   'settings.saveFailed': 'Failed to save settings',
+  'settings.saved': 'Settings saved',
 
   'theme.dark': 'Dark',
   'theme.light': 'Light',
