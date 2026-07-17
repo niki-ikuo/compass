@@ -9,6 +9,7 @@ import {
 import { useAppStore } from '@/stores/app-store'
 import { normalizeBrowserUrl } from '@/utils/browser-tab'
 import { useI18n } from '@/i18n'
+import { ArrowLeftIcon, ArrowRightIcon, RefreshIcon, StopIcon } from './icons/ToolbarIcons'
 
 interface ElectronWebView extends HTMLElement {
   src: string
@@ -125,7 +126,7 @@ export function BrowserViewer({ path, initialUrl }: BrowserViewerProps) {
             title={t('browser.back')}
             onClick={() => webviewRef.current?.goBack()}
           >
-            ←
+            <ArrowLeftIcon />
           </button>
           <button
             type="button"
@@ -134,7 +135,7 @@ export function BrowserViewer({ path, initialUrl }: BrowserViewerProps) {
             title={t('browser.forward')}
             onClick={() => webviewRef.current?.goForward()}
           >
-            →
+            <ArrowRightIcon />
           </button>
           <button
             type="button"
@@ -145,7 +146,7 @@ export function BrowserViewer({ path, initialUrl }: BrowserViewerProps) {
               else webviewRef.current?.reload()
             }}
           >
-            {loading ? '■' : '↻'}
+            {loading ? <StopIcon /> : <RefreshIcon />}
           </button>
         </div>
         <form className="browser-address-form" onSubmit={handleSubmit}>

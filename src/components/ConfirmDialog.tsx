@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { useI18n } from '@/i18n'
+import { CloseIcon } from './icons/ToolbarIcons'
 
 interface ConfirmDialogProps {
   open: boolean
@@ -60,7 +61,7 @@ export function ConfirmDialog({
             title={t('common.close')}
             aria-label={t('common.close')}
           >
-            ×
+            <CloseIcon />
           </button>
         </div>
         <div className="modal-body">

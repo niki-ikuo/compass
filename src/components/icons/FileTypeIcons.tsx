@@ -1,6 +1,6 @@
 import type { ReactElement } from 'react'
 
-const SIZE = 16
+const SIZE = 18
 
 /** Soft tint of a hex color for icon fills (works on light/dark themes). */
 function tint(hex: string, alpha = 0.18): string {

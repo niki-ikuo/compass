@@ -65,6 +65,44 @@ import type {
 } from '../src/types'
 
 let mainWindow: BrowserWindow | null = null
+let currentZoomLevel = 0
+let lastWheelZoomAt = 0
+
+const ZOOM_STEP = 0.5
+const ZOOM_MIN = -3
+const ZOOM_MAX = 5
+const WHEEL_ZOOM_INTERVAL_MS = 120
+
+function clampZoomLevel(level: number): number {
+  return Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, level))
+}
+
+function applyViewZoom(
+  webContents: Electron.WebContents,
+  action: 'resetZoom' | 'zoomIn' | 'zoomOut'
+): void {
+  switch (action) {
+    case 'resetZoom':
+      currentZoomLevel = 0
+      break
+    case 'zoomIn':
+      currentZoomLevel = clampZoomLevel(currentZoomLevel + ZOOM_STEP)
+      break
+    case 'zoomOut':
+      currentZoomLevel = clampZoomLevel(currentZoomLevel - ZOOM_STEP)
+      break
+  }
+  webContents.setZoomLevel(currentZoomLevel)
+}
+
+function registerWheelZoom(webContents: Electron.WebContents): void {
+  webContents.on('zoom-changed', (_event, zoomDirection) => {
+    const now = Date.now()
+    if (now - lastWheelZoomAt < WHEEL_ZOOM_INTERVAL_MS) return
+    lastWheelZoomAt = now
+    applyViewZoom(webContents, zoomDirection === 'in' ? 'zoomIn' : 'zoomOut')
+  })
+}
 
 function createWindow(): void {
   mainWindow = new BrowserWindow({
@@ -92,6 +130,8 @@ function createWindow(): void {
   if (process.platform !== 'darwin') {
     mainWindow.setMenuBarVisibility(false)
   }
+
+  registerWheelZoom(mainWindow.webContents)
 
   mainWindow.on('closed', () => {
     mainWindow = null
@@ -252,13 +292,9 @@ function registerIpcHandlers(): void {
         webContents.toggleDevTools()
         break
       case 'resetZoom':
-        webContents.setZoomLevel(0)
-        break
       case 'zoomIn':
-        webContents.setZoomLevel(webContents.getZoomLevel() + 0.5)
-        break
       case 'zoomOut':
-        webContents.setZoomLevel(webContents.getZoomLevel() - 0.5)
+        applyViewZoom(webContents, action)
         break
     }
   })

@@ -5,6 +5,7 @@ import { buildWorkspaceIndex } from '@/utils/project-index'
 import { openWorkspaceFile } from '@/utils/open-workspace-file'
 import type { WorkspaceSearchFileResult, WorkspaceSearchMatch } from '@/types'
 import { useI18n } from '@/i18n'
+import { ChevronRightIcon } from './icons/ToolbarIcons'
 
 function ToggleChip({
   label,
@@ -365,7 +366,7 @@ export function SearchPanel() {
             aria-expanded={searchReplaceOpen}
             onClick={() => setSearchReplaceOpen(!searchReplaceOpen)}
           >
-            ▸
+            <ChevronRightIcon />
           </button>
           <input
             ref={queryInputRef}

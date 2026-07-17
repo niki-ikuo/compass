@@ -30,6 +30,9 @@
   --chat-mode-agent: #3794ff;
   --font-mono: 'Cascadia Code', 'Consolas', 'Monaco', monospace;
   --font-ui: 'Segoe UI', system-ui, sans-serif;
+  --icon-size: 18px;
+  --icon-command: #969696;
+  --icon-command-hover: #969696;
 }
 
 [data-theme='light'] {
@@ -53,6 +56,8 @@
   --chat-mode-ask: #8a6d00;
   --chat-mode-edit: #0e7a5f;
   --chat-mode-agent: #0078d4;
+  --icon-command: #616161;
+  --icon-command-hover: #616161;
 }
 
 [data-theme='midnight'] {
@@ -76,6 +81,8 @@
   --chat-mode-ask: #d29922;
   --chat-mode-edit: #3fb950;
   --chat-mode-agent: #58a6ff;
+  --icon-command: #8b949e;
+  --icon-command-hover: #8b949e;
 }
 
 [data-theme='high-contrast'] {
@@ -99,6 +106,8 @@
   --chat-mode-ask: #00ffff;
   --chat-mode-edit: #00ff00;
   --chat-mode-agent: #ffff00;
+  --icon-command: #ffffff;
+  --icon-command-hover: #ffffff;
 }
 
 html,
@@ -222,13 +231,13 @@ body {
 
 .menu-bar-btn:disabled:hover {
   background: transparent;
-  color: var(--text-secondary);
+  color: var(--icon-command);
 }
 
 .menu-bar-controls {
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: 0;
   margin-left: auto;
   flex-shrink: 0;
 }
@@ -243,18 +252,27 @@ body {
   border: none;
   border-radius: 4px;
   background: transparent;
-  color: var(--text-secondary);
+  color: var(--icon-command);
   cursor: pointer;
 }
 
-.menu-bar-btn:hover {
+.menu-bar-btn:hover:not(:disabled) {
   background: var(--bg-hover);
-  color: var(--text-primary);
+  color: var(--icon-command);
 }
 
 .menu-bar-btn.active {
-  color: var(--text-primary);
+  color: var(--icon-command);
+}
+
+.menu-bar-btn.active:hover:not(:disabled) {
   background: var(--bg-hover);
+  color: var(--icon-command);
+}
+
+.menu-bar-btn svg {
+  display: block;
+  flex-shrink: 0;
 }
 
 /* Main layout */
@@ -276,14 +294,14 @@ body {
 }
 
 .file-tree-panel {
-  flex-shrink: 0;
+  flex: 0 1 auto;
   border-right: none;
   background: var(--bg-secondary);
 }
 
 .editor-panel {
-  flex: 1;
-  min-width: 300px;
+  flex: 1 1 0;
+  min-width: 200px;
 }
 
 .editor-center {
@@ -307,7 +325,7 @@ body {
 }
 
 .chat-panel-container {
-  flex-shrink: 0;
+  flex: 0 1 auto;
   border-left: none;
   background: var(--bg-secondary);
 }
@@ -374,8 +392,8 @@ body.is-resizing-panels * {
 .file-tree-item {
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 3px 8px;
+  gap: 2px;
+  padding: 3px 6px;
   cursor: pointer;
   white-space: nowrap;
   overflow: hidden;
@@ -401,11 +419,24 @@ body.is-resizing-panels * {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  width: 22px;
+  height: 22px;
+  margin-right: 1px;
+  border-radius: 4px;
+  color: var(--icon-command);
+  line-height: 0;
+  cursor: pointer;
+}
+
+.file-tree-expand svg {
+  display: block;
   width: 16px;
   height: 16px;
-  font-size: 10px;
-  color: var(--text-secondary);
-  line-height: 1;
+}
+
+.file-tree-expand:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
 }
 
 .file-tree-expand-spacer {
@@ -420,6 +451,10 @@ body.is-resizing-panels * {
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.file-tree-header.panel-header {
+  padding: 6px 8px;
 }
 
 .file-tree-toolbar {
@@ -437,10 +472,12 @@ body.is-resizing-panels * {
   height: 22px;
   padding: 0;
   border-radius: 4px;
+  color: var(--icon-command);
 }
 
-.file-tree-toolbar .btn-icon:hover {
+.file-tree-toolbar .btn-icon:hover:not(:disabled) {
   background: var(--bg-hover);
+  color: var(--icon-command);
 }
 
 .file-tree-name {
@@ -548,8 +585,8 @@ body.is-resizing-panels * {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 16px;
-  height: 16px;
+  width: var(--icon-size);
+  height: var(--icon-size);
   line-height: 0;
 }
 
@@ -608,17 +645,24 @@ body.is-resizing-panels * {
 }
 
 .tab-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border: none;
   background: transparent;
-  color: var(--text-secondary);
+  color: var(--icon-command);
   cursor: pointer;
-  font-size: 14px;
-  padding: 0 2px;
+  padding: 0 1px;
   line-height: 1;
 }
 
+.tab-close svg {
+  width: 14px;
+  height: 14px;
+}
+
 .tab-close:hover {
-  color: var(--text-primary);
+  color: var(--icon-command-hover);
 }
 
 .tab-browser-badge {
@@ -661,14 +705,16 @@ body.is-resizing-panels * {
 }
 
 .browser-nav-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   width: 28px;
   height: 28px;
   border: 1px solid var(--border);
   border-radius: 4px;
   background: var(--bg-primary);
-  color: var(--text-primary);
+  color: var(--icon-command);
   cursor: pointer;
-  font-size: 13px;
   line-height: 1;
 }
 
@@ -679,6 +725,7 @@ body.is-resizing-panels * {
 
 .browser-nav-btn:not(:disabled):hover {
   background: var(--bg-hover);
+  color: var(--icon-command-hover);
 }
 
 .browser-address-form {
@@ -1139,8 +1186,8 @@ body:has(.monaco-editor .find-widget.visible) .workbench-hover-container .action
 
 .workspace-welcome-icon {
   display: block;
-  width: 64px;
-  height: 64px;
+  width: 72px;
+  height: 72px;
   margin: 0 auto 16px;
 }
 
@@ -1395,20 +1442,27 @@ body:has(.monaco-editor .find-widget.visible) .workbench-hover-container .action
 
 .chat-history-item-delete {
   flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   width: 28px;
   margin: 4px 4px 4px 0;
   border: none;
   border-radius: 4px;
   background: transparent;
-  color: var(--text-secondary);
+  color: var(--icon-command);
   cursor: pointer;
-  font-size: 14px;
   line-height: 1;
+}
+
+.chat-history-item-delete svg {
+  width: 14px;
+  height: 14px;
 }
 
 .chat-history-item-delete:hover {
   background: var(--bg-tertiary);
-  color: var(--text-primary);
+  color: var(--icon-command-hover);
 }
 
 .chat-tabs {
@@ -1474,21 +1528,28 @@ body:has(.monaco-editor .find-widget.visible) .workbench-hover-container .action
 
 .chat-tab-close {
   flex-shrink: 0;
-  width: 16px;
-  height: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--icon-size);
+  height: var(--icon-size);
   padding: 0;
   border: none;
   border-radius: 3px;
   background: transparent;
-  color: var(--text-secondary);
+  color: var(--icon-command);
   cursor: pointer;
-  font-size: 12px;
   line-height: 1;
+}
+
+.chat-tab-close svg {
+  width: 14px;
+  height: 14px;
 }
 
 .chat-tab-close:hover {
   background: var(--bg-hover);
-  color: var(--text-primary);
+  color: var(--icon-command-hover);
 }
 
 .chat-header-left {
@@ -1848,7 +1909,7 @@ body:has(.monaco-editor .find-widget.visible) .workbench-hover-container .action
 
 .chat-path-capsule-icon {
   flex-shrink: 0;
-  font-size: 11px;
+  font-size: 13px;
   line-height: 1;
   opacity: 0.9;
 }
@@ -1976,7 +2037,7 @@ body:has(.monaco-editor .find-widget.visible) .workbench-hover-container .action
 
 .chat-code-icon {
   flex-shrink: 0;
-  font-size: 13px;
+  font-size: 15px;
 }
 
 .chat-code-label {
@@ -2219,6 +2280,8 @@ body:has(.monaco-editor .find-widget.visible) .workbench-hover-container .action
 
 .action-preview-icon {
   flex-shrink: 0;
+  font-size: 16px;
+  line-height: 1;
 }
 
 .action-preview-info {
@@ -2712,16 +2775,29 @@ body:has(.monaco-editor .find-widget.visible) .workbench-hover-container .action
 }
 
 .btn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border: none;
   background: transparent;
-  color: var(--text-secondary);
+  color: var(--icon-command);
   cursor: pointer;
-  font-size: 14px;
-  padding: 2px 6px;
+  padding: 0 3px;
+  line-height: 1;
 }
 
-.btn-icon:hover {
-  color: var(--text-primary);
+.btn-icon svg {
+  display: block;
+  flex-shrink: 0;
+}
+
+.btn-icon:hover:not(:disabled) {
+  color: var(--icon-command);
+}
+
+.btn-icon:disabled {
+  opacity: 0.4;
+  cursor: default;
 }
 
 /* Status bar */
@@ -3197,17 +3273,21 @@ body.is-resizing-terminal * {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 16px;
-  height: 16px;
+  width: var(--icon-size);
+  height: var(--icon-size);
   border-radius: 3px;
-  font-size: 14px;
   line-height: 1;
-  color: var(--text-secondary);
+  color: var(--icon-command);
+}
+
+.terminal-tab-close svg {
+  width: 14px;
+  height: 14px;
 }
 
 .terminal-tab-close:hover {
   background: var(--bg-hover);
-  color: var(--text-primary);
+  color: var(--icon-command-hover);
 }
 
 .terminal-tab-add {
@@ -3219,14 +3299,13 @@ body.is-resizing-terminal * {
   border: none;
   border-radius: 4px;
   background: transparent;
-  color: var(--text-secondary);
-  font-size: 16px;
+  color: var(--icon-command);
   cursor: default;
 }
 
 .terminal-tab-add:hover {
   background: var(--bg-hover);
-  color: var(--text-primary);
+  color: var(--icon-command-hover);
 }
 
 .terminal-panel-actions {
@@ -3256,14 +3335,18 @@ body.is-resizing-terminal * {
   border: none;
   border-radius: 4px;
   background: transparent;
-  color: var(--text-secondary);
-  font-size: 16px;
+  color: var(--icon-command);
   cursor: default;
+}
+
+.terminal-panel-btn svg {
+  width: 16px;
+  height: 16px;
 }
 
 .terminal-panel-btn:hover {
   background: var(--bg-hover);
-  color: var(--text-primary);
+  color: var(--icon-command-hover);
 }
 
 .terminal-body {
@@ -3367,16 +3450,24 @@ body.is-resizing-terminal * {
 }
 
 .search-expand-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   width: 20px;
   height: 24px;
   border: none;
   background: transparent;
-  color: var(--text-secondary);
+  color: var(--icon-command);
   cursor: pointer;
   border-radius: 3px;
   padding: 0;
   line-height: 1;
   transition: transform 0.12s ease;
+}
+
+.search-expand-btn svg {
+  width: 14px;
+  height: 14px;
 }
 
 .search-expand-btn.open {
@@ -3385,7 +3476,7 @@ body.is-resizing-terminal * {
 
 .search-expand-btn:hover {
   background: var(--bg-hover);
-  color: var(--text-primary);
+  color: var(--icon-command-hover);
 }
 
 .search-expand-spacer {

@@ -3,6 +3,7 @@ import { getFileName } from '@/utils/language'
 import { isBrowserOpenFile } from '@/utils/browser-tab'
 import { isSettingsOpenFile } from '@/utils/settings-tab'
 import { useI18n } from '@/i18n'
+import { CloseIcon } from './icons/ToolbarIcons'
 import type { OpenFile } from '@/types'
 
 function tabLabel(
@@ -68,7 +69,7 @@ export function TabBar() {
               closeFile(file.path)
             }}
           >
-            ×
+            <CloseIcon />
           </button>
         </div>
       ))}

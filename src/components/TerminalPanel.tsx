@@ -8,6 +8,7 @@ import { getColorTheme } from '@/utils/color-theme'
 import { TERMINAL_LAYOUT_LIMITS } from '@/components/ResizableLayout'
 import type { TerminalShell } from '@/types'
 import { useI18n, t as translate } from '@/i18n'
+import { PlusIcon, CloseIcon } from './icons/ToolbarIcons'
 
 interface TerminalTab {
   id: string
@@ -667,7 +668,7 @@ export function TerminalPanel() {
             title={t('common.close')}
             aria-label={t('common.close')}
           >
-            ×
+            <CloseIcon />
           </button>
         </div>
         <div className="terminal-empty">{t('menu.terminalDisabled')}</div>
@@ -701,7 +702,7 @@ export function TerminalPanel() {
                 }}
                 aria-label={t('terminal.closeTab')}
               >
-                ×
+                <CloseIcon />
               </span>
             </button>
           ))}
@@ -712,7 +713,7 @@ export function TerminalPanel() {
             title={t('terminal.new')}
             aria-label={t('terminal.new')}
           >
-            +
+            <PlusIcon />
           </button>
         </div>
 
@@ -738,7 +739,7 @@ export function TerminalPanel() {
             title={t('terminal.closePanel')}
             aria-label={t('terminal.closePanel')}
           >
-            ×
+            <CloseIcon />
           </button>
         </div>
       </div>

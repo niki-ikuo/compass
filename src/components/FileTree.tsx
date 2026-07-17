@@ -23,7 +23,15 @@ import {
   type DocTemplateId
 } from '@/utils/doc-templates'
 import { ConfirmDialog } from './ConfirmDialog'
-import { NewFileIcon, NewFolderIcon } from './icons/ToolbarIcons'
+import {
+  NewFileIcon,
+  NewFolderIcon,
+  ExpandAllIcon,
+  CollapseAllIcon,
+  RefreshIcon,
+  ChevronRightIcon,
+  ChevronDownIcon
+} from './icons/ToolbarIcons'
 import { FileTreeNodeIcon } from './icons/FileTypeIcons'
 import { restoreWorkbenchFocus } from '@/utils/workbench-focus'
 import { openWorkspaceFile } from '@/utils/open-workspace-file'
@@ -311,7 +319,7 @@ function FileTreeItem({
           onContextMenu={(e) => onContextMenu(e, node)}
         >
           <span className="file-tree-expand" onClick={handleExpandClick}>
-            {isExpanded ? '▾' : '▸'}
+            {isExpanded ? <ChevronDownIcon /> : <ChevronRightIcon />}
           </span>
           <span className="file-tree-icon">
             <FileTreeNodeIcon name={node.name} isDirectory isExpanded={isExpanded} />
@@ -1097,10 +1105,10 @@ export function FileTree() {
       <div className="panel-header file-tree-header">
         <div className="file-tree-toolbar">
           <button className="btn-icon" title={t('explorer.expandAll')} onClick={handleExpandAll}>
-            ⊞
+            <ExpandAllIcon />
           </button>
           <button className="btn-icon" title={t('explorer.collapseAll')} onClick={handleCollapseAll}>
-            ⊟
+            <CollapseAllIcon />
           </button>
           <button
             className="btn-icon"
@@ -1121,7 +1129,7 @@ export function FileTree() {
             <NewFolderIcon />
           </button>
           <button className="btn-icon" title={t('explorer.refresh')} onClick={() => void refreshTree()}>
-            ↻
+            <RefreshIcon />
           </button>
         </div>
       </div>

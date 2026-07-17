@@ -20,6 +20,7 @@ import type {
 import { normalizeUseCasePreset } from '@/types'
 import { AgentStepTimeline } from './AgentStepTimeline'
 import { AnimatedStatus } from './AnimatedEllipsis'
+import { ListIcon, PlusIcon, TrashIcon, CloseIcon } from './icons/ToolbarIcons'
 import {
   buildDisplayContentForActions,
   inferWorkspaceActionsFromCodeBlocks,
@@ -1029,7 +1030,7 @@ export function ChatPanel() {
               aria-expanded={historyOpen}
               aria-haspopup="listbox"
             >
-              ☰
+              <ListIcon />
             </button>
             {historyOpen &&
               historyMenuPos &&
@@ -1078,7 +1079,7 @@ export function ChatPanel() {
                               deleteChatSession(session.id)
                             }}
                           >
-                            ×
+                            <CloseIcon />
                           </button>
                         </li>
                       ))}
@@ -1094,7 +1095,7 @@ export function ChatPanel() {
             title={t('chat.newChat')}
             disabled={isChatLoading}
           >
-            ＋
+            <PlusIcon />
           </button>
           <button
             className="btn-icon"
@@ -1102,7 +1103,7 @@ export function ChatPanel() {
             title={t('chat.clear')}
             disabled={isChatLoading}
           >
-            🗑
+            <TrashIcon />
           </button>
         </div>
       </div>
@@ -1125,7 +1126,7 @@ export function ChatPanel() {
               }}
               title={t('chat.closeTab')}
             >
-              ×
+              <CloseIcon />
             </button>
           </div>
         ))}

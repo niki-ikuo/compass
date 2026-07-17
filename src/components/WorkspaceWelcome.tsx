@@ -37,7 +37,7 @@ export function WorkspaceWelcome({ onOpenFolder, onOpenRecent }: WorkspaceWelcom
   return (
     <div className="workspace-welcome">
       <div className="workspace-welcome-content">
-        <img className="workspace-welcome-icon" src="/icon.svg" alt="" width={64} height={64} />
+        <img className="workspace-welcome-icon" src="/icon.svg" alt="" width={72} height={72} />
         <h2>Compass</h2>
         <p className="workspace-welcome-lead">{t('welcome.lead')}</p>
 
