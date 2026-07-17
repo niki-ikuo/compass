@@ -2,6 +2,7 @@ import { existsSync } from 'fs'
 import { readFile } from 'fs/promises'
 import { join } from 'path'
 import type { UseCasePreset } from '../../src/types'
+import { normalizeUseCasePreset, DEFAULT_SETTINGS } from '../../src/types'
 import { runAgentExec, type AgentExecResult } from './agent-exec'
 import { runUseCaseLightVerify, shouldRunShellVerify } from './agent-verify-light'
 
@@ -402,12 +403,12 @@ export async function runAgentVerify(options: AgentVerifyOptions): Promise<Agent
   }
 }
 
-/** Nudge appended after successful proposeActions apply (code default). */
+/** Nudge appended after successful proposeActions apply (code preset). */
 export const VERIFY_AFTER_APPLY_NUDGE =
   'After applying changes, run the verify tool (test / lint / typecheck as available) or an equivalent exec command before finishing. If verify fails, fix with proposeActions and verify again. If verify only skips because scripts are missing, do not mention that in the final reply—the timeline already shows it.'
 
 export function getVerifyAfterApplyNudge(preset?: UseCasePreset | null): string {
-  const resolved = preset === 'document' || preset === 'data' || preset === 'general' ? preset : 'code'
+  const resolved = normalizeUseCasePreset(preset) ?? DEFAULT_SETTINGS.defaultUseCasePreset
   if (resolved === 'document') {
     return 'After applying changes, run the verify tool to check markdown heading structure (broken ATX / level jumps) on the edited files. If verify fails, fix with proposeActions and verify again.'
   }

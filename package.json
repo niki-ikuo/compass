@@ -1,7 +1,7 @@
 {
   "name": "compass",
   "version": "2.0.0",
-  "description": "AI-powered code editor for Windows",
+  "description": "AI workspace for Windows — local folders, text, and AI",
   "license": "MIT",
   "main": "./out/main/index.js",
   "scripts": {

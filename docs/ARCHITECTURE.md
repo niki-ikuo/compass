@@ -2,7 +2,7 @@
 
 **English** | [日本語](ja/ARCHITECTURE.md)
 
-Compass uses Electron’s three-layer model: main, preload, and renderer. Privileged work (filesystem, AI networking, settings, terminal) stays in the main process. The renderer talks only through IPC exposed via `contextBridge`.
+Compass is an AI workspace for local folders. It uses Electron’s three-layer model: main, preload, and renderer. Privileged work (filesystem, AI networking, settings, terminal) stays in the main process. The renderer talks only through IPC exposed via `contextBridge`.
 
 ## Process layout
 
@@ -104,7 +104,7 @@ Relevant slices are added to chat context. This is **not** embedding-based RAG.
 | API keys | Encrypted per provider; restored on switch |
 | Models | Settings or chat header (free-form input allowed) |
 | Transport | Main `ai-client` connects via `/chat/completions` SSE |
-| Use-case presets (planned) | Orthogonal to Ask / Edit / Agent; header switch + settings default — [USE_CASE_PRESET.md](./USE_CASE_PRESET.md) |
+| Use-case presets | Orthogonal to Ask / Edit / Agent; header switch + app/workspace defaults — [USE_CASE_PRESET.md](./USE_CASE_PRESET.md) |
 
 Native non–OpenAI-compatible APIs (e.g. Claude) are unsupported; use OpenRouter.
 

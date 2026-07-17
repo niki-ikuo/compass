@@ -6,10 +6,11 @@ import type {
   ResolvedContextFile,
   UseCasePreset
 } from '../../src/types'
-import { normalizeUseCasePreset } from '../../src/types'
+import { normalizeUseCasePreset, DEFAULT_SETTINGS } from '../../src/types'
 import { t } from '../../src/i18n/runtime'
 import type { MessageKey } from '../../src/i18n/messages'
 import { composeSystemPrompt, getUseCasePresetReminderKey } from '../../src/utils/system-prompt'
+import { resolveInlineCompletionStyle } from '../../src/utils/inline-completion-prompt'
 import {
   toApiUserContent,
   type ChatContentPart,
@@ -25,10 +26,10 @@ export type { ChatContentPart, ChatImageAttachment, UserMessagePayload }
 export { toApiUserContent }
 
 const PRESET_ROLE_KEYS: Record<UseCasePreset, MessageKey> = {
-  code: 'ai.preset.code.role',
+  general: 'ai.preset.general.role',
   document: 'ai.preset.document.role',
   data: 'ai.preset.data.role',
-  general: 'ai.preset.general.role'
+  code: 'ai.preset.code.role'
 }
 
 export { composeSystemPrompt }
@@ -66,7 +67,7 @@ export function getSystemPrompt(
   mode: ChatRequest['mode'],
   preset?: UseCasePreset | null
 ): string {
-  const resolved = normalizeUseCasePreset(preset) ?? 'code'
+  const resolved = normalizeUseCasePreset(preset) ?? DEFAULT_SETTINGS.defaultUseCasePreset
   const rolePrompt = t(PRESET_ROLE_KEYS[resolved])
   const modePrompt =
     mode === 'ask'
@@ -93,6 +94,11 @@ function isReasoningModel(model: string): boolean {
 }
 
 function buildInlineCompletionUserMessage(request: InlineCompletionRequest): string {
+  const style = resolveInlineCompletionStyle({
+    language: request.language,
+    filePath: request.filePath,
+    useCasePreset: request.preset
+  })
   const meta: string[] = []
   if (request.filePath) {
     meta.push(t('ai.inlineCompletionFile', { path: request.filePath }))
@@ -103,7 +109,7 @@ function buildInlineCompletionUserMessage(request: InlineCompletionRequest): str
 
   return [
     meta.length > 0 ? meta.join('\n') : null,
-    t('ai.inlineCompletionIntro'),
+    t(style === 'code' ? 'ai.inlineCompletionIntroCode' : 'ai.inlineCompletionIntroText'),
     '',
     request.prefix + '<|cursor|>' + request.suffix,
     t('ai.inlineCompletionOutro')
@@ -115,10 +121,22 @@ function buildInlineCompletionUserMessage(request: InlineCompletionRequest): str
 function buildInlineCompletionMessages(
   request: InlineCompletionRequest
 ): Array<{ role: 'system' | 'user' | 'assistant'; content: string }> {
+  const style = resolveInlineCompletionStyle({
+    language: request.language,
+    filePath: request.filePath,
+    useCasePreset: request.preset
+  })
   // few-shot なし（例文コピーや Chat デバッグ時の混乱を避ける）
   // プロンプト文言は getSettings() → setLocale 後に t() で UI 言語に合わせる
   return [
-    { role: 'system', content: t('ai.inlineCompletionSystemPrompt') },
+    {
+      role: 'system',
+      content: t(
+        style === 'code'
+          ? 'ai.inlineCompletionSystemPromptCode'
+          : 'ai.inlineCompletionSystemPromptText'
+      )
+    },
     { role: 'user', content: buildInlineCompletionUserMessage(request) }
   ]
 }
@@ -271,7 +289,7 @@ export async function buildUserMessagePayload(request: ChatRequest): Promise<Use
   }
 
   const presetReminderKey = getUseCasePresetReminderKey(
-    normalizeUseCasePreset(request.preset) ?? 'code'
+    normalizeUseCasePreset(request.preset) ?? DEFAULT_SETTINGS.defaultUseCasePreset
   )
   if (presetReminderKey) {
     parts.push(t(presetReminderKey))

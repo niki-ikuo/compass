@@ -2,21 +2,21 @@
 
 **English** | [日本語](ja/USE_CASE_PRESET.md)
 
-Product spec for **use-case presets** (`code` / `document` / `data` / `general`) that widen Compass from a code-only IDE toward an AI workspace for local folders.
+Product spec for **use-case presets** (`general` / `document` / `data` / `code`) that position Compass as an **AI workspace** for local folders (text work: notes, docs, data, code — not a code-only IDE).
 
 Related: [SPEC.md](./SPEC.md) (Ask / Edit / Agent), [ARCHITECTURE.md](./ARCHITECTURE.md)
 
-**Status:** Not implemented (spec only)
+**Status:** Implemented (UI header + settings / workspace defaults + system-prompt roles + Agent light verify for document/data)
 
 ---
 
 ## 1. Goal
 
-Keep Compass strengths (folders, Ask / Edit / Agent, diff approval, terminal) and broaden the target to text-centric docs, notes, and data.
+Keep Compass strengths (folders, Ask / Edit / Agent, diff approval, terminal) and serve anyone who works with text in a local folder — notes, docs, data, and code.
 
 Out of scope for this direction:
 
-- Dropping the Monaco code editor
+- Dropping the Monaco editor
 - Building a large dashboard product
 - Turning Compass into a catch-all app
 - Depending on Office integration
@@ -30,7 +30,7 @@ A **use-case preset** chooses *what kind of expert* the model is.
 
 | Axis | Values | Controls |
 |------|--------|----------|
-| Use case | `code` / `document` / `data` / `general` | Role, tone, preferred files, domain cautions in the system prompt |
+| Use case | `general` / `document` / `data` / `code` | Role, tone, preferred files, domain cautions in the system prompt |
 | Mode | `ask` / `edit` / `agent` | Whether changes are allowed, output format, tools |
 
 ```
@@ -45,21 +45,25 @@ Keep them in separate UI controls as well.
 
 | ID | UI label | Best for | Model self-image |
 |----|----------|----------|------------------|
-| `code` | Code | Implement, refactor, review | Coding assistant (current behavior) |
+| `general` | General | Note tidy-up, task breakdown, folder overview | General workspace assistant |
 | `document` | Document | Plans, minutes, procedures, summarize, structure | Document-editing assistant |
 | `data` | Data | Organize / explain CSV, JSON, YAML | Data-wrangling assistant |
-| `general` | General | Note tidy-up, task breakdown, folder overview | General workspace assistant |
+| `code` | Code | Implement, refactor, review | Coding assistant |
 
-**Default:** `code` (backward compatible)
+**Default:** `general` (AI workspace default). Saved app/workspace settings are kept as-is.
+
+### UI order
+
+`general` → `document` → `data` → `code` (broad → specialized; default first)
 
 ### Copy
 
 | ID | Label | One-line description |
 |----|-------|----------------------|
-| code | Code | Implement, review, refactor |
+| general | General | Tidy notes, break down tasks |
 | document | Document | Polish plans, minutes, procedures |
 | data | Data | Organize CSV / JSON / YAML |
-| general | General | Tidy notes, break down tasks |
+| code | Code | Implement, review, refactor |
 
 ---
 
@@ -164,12 +168,12 @@ i18n keys (example): `ai.preset.code.role` / `document` / `data` / `general` (ja
 ### Types (sketch)
 
 ```ts
-export type UseCasePreset = 'code' | 'document' | 'data' | 'general'
+export type UseCasePreset = 'general' | 'document' | 'data' | 'code'
 
 // ChatRequest / ChatMessage(user)
 preset?: UseCasePreset
 
-// AppSettings (required, default 'code')
+// AppSettings (required, default 'general')
 defaultUseCasePreset: UseCasePreset
 ```
 
@@ -180,7 +184,7 @@ defaultUseCasePreset: UseCasePreset
 ### Primary: chat header (next to model)
 
 ```
-[ Model ▼ ]  [ Use case: Code ▼ ]  [history] [+] [🗑]
+[ Model ▼ ]  [ Use case: General ▼ ]  [history] [+] [🗑]
 ────────────────────────────────
 messages…
 ────────────────────────────────
@@ -262,7 +266,7 @@ Approval flows (Edit / Agent) stay the same. The preset only changes *what* is w
 1. **Use case ≠ mode**
 2. **v1 is prompt + UI + persistence only** (no tool / index changes)
 3. **Header for the active chat; Settings for the default**
-4. **Unset → `code`** (do not break existing users)
+4. **Unset → `general`** (workspace-first default; existing saved settings keep their value)
 
 ---
 

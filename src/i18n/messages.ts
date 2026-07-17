@@ -108,7 +108,7 @@ export const ja = {
   'menu.terminal': 'ターミナル',
   'menu.newBrowserTab': '新しいブラウザタブ',
   'menu.about': 'バージョン情報',
-  'menu.aboutDetail': 'バージョン {version}',
+  'menu.aboutDetail': 'AI ワークスペース — バージョン {version}',
   'menu.toggleExplorer': 'エクスプローラの開閉',
   'menu.toggleSearch': '検索',
   'menu.searchDisabled': 'フォルダを開くと検索が利用できます',
@@ -118,7 +118,7 @@ export const ja = {
   'menu.toggleChat': 'チャットの開閉',
 
   // welcome
-  'welcome.lead': 'フォルダを開いてコード編集を始めましょう',
+  'welcome.lead': 'フォルダを開いて、テキストの編集を始めましょう',
   'welcome.openFolder': '新しいフォルダを開く',
   'welcome.recent': '最近開いたフォルダ',
 
@@ -218,7 +218,7 @@ export const ja = {
   'chat.deleteFromHistory': '履歴から削除',
   'chat.clear': 'このチャットをクリア',
   'chat.closeTab': 'タブを閉じる（履歴は残ります）',
-  'chat.emptyLead': 'コードについて質問したり、実装や変更を依頼できます',
+  'chat.emptyLead': 'メモ・文書・データ・コードについて質問したり、変更を依頼できます',
   'chat.emptyModes':
     '送信前に Ask / Edit / Agent を選べます。Ask は説明のみ、Edit はファイル変更を提案、Agent はツールで調査・変更提案（承認後に適用）します',
   'chat.emptyContext': '現在のファイルが自動的にコンテキストに含まれます',
@@ -231,9 +231,9 @@ export const ja = {
   'chat.ai': 'AI',
   'chat.modelOf': '{provider} のモデル',
   'chat.llmModel': 'LLMモデル',
-  'chat.placeholderEdit': '実装や変更を依頼... (Enterで送信, Shift+Enterで改行)',
+  'chat.placeholderEdit': '書く・直す・整理を依頼... (Enterで送信, Shift+Enterで改行)',
   'chat.placeholderAsk': '質問を入力... (Enterで送信, Shift+Enterで改行)',
-  'chat.placeholderAgent': 'コードベースを調査・説明... (Enterで送信, Shift+Enterで改行)',
+  'chat.placeholderAgent': 'フォルダを調査・説明... (Enterで送信, Shift+Enterで改行)',
   'chat.sendMode': '送信モード',
   'chat.useCasePreset': '用途',
   'chat.preset.code': 'コード',
@@ -502,11 +502,16 @@ export const ja = {
     'Ollama では Agent を使えません（多くのローカルモデルが tools 非対応のため）。Edit モードを使うか、OpenAI / Gemini など tools 対応プロバイダへ切り替えてください。',
   'ai.indexHeader': '[プロジェクト構造インデックス (.compass)]',
   'ai.indexLines': '{count}行',
-  'ai.inlineCompletionSystemPrompt':
+  'ai.inlineCompletionSystemPromptCode':
     'あなたは fill-in-the-middle のコード補完エンジンです。ユーザーはカーソルを <|cursor|> で示します。<|cursor|> に挿入すべきコードだけを返してください。説明・markdown・コードフェンス・引用符・ラベルは付けないでください。<|cursor|> の前後に既にあるテキストは繰り返さないでください。短く（数トークン〜数行）。改行とインデントは可。',
+  'ai.inlineCompletionSystemPromptText':
+    'あなたは fill-in-the-middle のテキスト補完エンジンです。ユーザーはカーソルを <|cursor|> で示します。<|cursor|> に挿入すべきテキストだけを返してください。説明・markdown・コードフェンス・引用符・ラベルは付けないでください。<|cursor|> の前後に既にあるテキストは繰り返さないでください。短く（数トークン〜数行）。改行とインデントは可。',
   'ai.inlineCompletionFile': 'ファイル: {path}',
   'ai.inlineCompletionLanguage': '言語: {language}',
-  'ai.inlineCompletionIntro': '次のコードで <|cursor|> がカーソル位置です。ここから挿入するテキストだけを出力してください:',
+  'ai.inlineCompletionIntroCode':
+    '次のコードで <|cursor|> がカーソル位置です。ここから挿入するコードだけを出力してください:',
+  'ai.inlineCompletionIntroText':
+    '次のテキストで <|cursor|> がカーソル位置です。ここから挿入するテキストだけを出力してください:',
   'ai.inlineCompletionOutro': '挿入テキストのみを出力（説明禁止）:'
 } as const
 
@@ -618,7 +623,7 @@ export const en: Record<MessageKey, string> = {
   'menu.terminal': 'Terminal',
   'menu.newBrowserTab': 'New Browser Tab',
   'menu.about': 'About',
-  'menu.aboutDetail': 'Version {version}',
+  'menu.aboutDetail': 'AI workspace — version {version}',
   'menu.toggleExplorer': 'Toggle Explorer',
   'menu.toggleSearch': 'Search',
   'menu.searchDisabled': 'Open a folder to use search',
@@ -627,7 +632,7 @@ export const en: Record<MessageKey, string> = {
   'menu.terminalDisabled': 'Open a folder to use the terminal',
   'menu.toggleChat': 'Toggle Chat',
 
-  'welcome.lead': 'Open a folder to start editing code',
+  'welcome.lead': 'Open a folder to start editing text',
   'welcome.openFolder': 'Open Folder',
   'welcome.recent': 'Recent folders',
 
@@ -724,7 +729,7 @@ export const en: Record<MessageKey, string> = {
   'chat.deleteFromHistory': 'Delete from history',
   'chat.clear': 'Clear this chat',
   'chat.closeTab': 'Close tab (keeps history)',
-  'chat.emptyLead': 'Ask about code, or request implementations and changes',
+  'chat.emptyLead': 'Ask about notes, documents, data, or code — or request changes',
   'chat.emptyModes':
     'Choose Ask / Edit / Agent before sending. Ask explains; Edit proposes file changes; Agent inspects with tools and proposes changes (apply after approval)',
   'chat.emptyContext': 'The current file is included as context automatically',
@@ -736,9 +741,9 @@ export const en: Record<MessageKey, string> = {
   'chat.ai': 'AI',
   'chat.modelOf': '{provider} model',
   'chat.llmModel': 'LLM model',
-  'chat.placeholderEdit': 'Ask for implementations or changes... (Enter to send, Shift+Enter for newline)',
+  'chat.placeholderEdit': 'Ask to write, fix, or organize... (Enter to send, Shift+Enter for newline)',
   'chat.placeholderAsk': 'Ask a question... (Enter to send, Shift+Enter for newline)',
-  'chat.placeholderAgent': 'Explore or explain the codebase... (Enter to send, Shift+Enter for newline)',
+  'chat.placeholderAgent': 'Explore or explain this folder... (Enter to send, Shift+Enter for newline)',
   'chat.sendMode': 'Send mode',
   'chat.useCasePreset': 'Use case',
   'chat.preset.code': 'Code',
@@ -999,12 +1004,16 @@ export const en: Record<MessageKey, string> = {
     'Agent is unavailable for Ollama (many local models lack tools). Use Edit mode or switch to a tools-capable provider such as OpenAI or Gemini.',
   'ai.indexHeader': '[Project structure index (.compass)]',
   'ai.indexLines': '{count} lines',
-  'ai.inlineCompletionSystemPrompt':
+  'ai.inlineCompletionSystemPromptCode':
     'You are a fill-in-the-middle code completion engine. The user marks the cursor with <|cursor|>. Respond with ONLY the code that should be inserted at <|cursor|>. No explanations, markdown, fences, quotes, or labels. Do not repeat text already before or after <|cursor|>. Keep it short (tokens to a few lines). Newlines/indentation are allowed.',
+  'ai.inlineCompletionSystemPromptText':
+    'You are a fill-in-the-middle text completion engine. The user marks the cursor with <|cursor|>. Respond with ONLY the text that should be inserted at <|cursor|>. No explanations, markdown, fences, quotes, or labels. Do not repeat text already before or after <|cursor|>. Keep it short (tokens to a few lines). Newlines/indentation are allowed.',
   'ai.inlineCompletionFile': 'File: {path}',
   'ai.inlineCompletionLanguage': 'Language: {language}',
-  'ai.inlineCompletionIntro':
-    'In the following code, <|cursor|> marks the cursor. Output only the text to insert there:',
+  'ai.inlineCompletionIntroCode':
+    'In the following code, <|cursor|> marks the cursor. Output only the code to insert there:',
+  'ai.inlineCompletionIntroText':
+    'In the following text, <|cursor|> marks the cursor. Output only the text to insert there:',
   'ai.inlineCompletionOutro': 'Output only the insertion text (no explanation):'
 }
 

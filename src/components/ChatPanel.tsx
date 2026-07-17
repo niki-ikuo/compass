@@ -18,6 +18,11 @@ import type {
   UseCasePreset
 } from '@/types'
 import { normalizeUseCasePreset } from '@/types'
+import {
+  DEFAULT_USE_CASE_PRESET,
+  resolveEffectiveUseCasePreset,
+  USE_CASE_PRESET_OPTIONS
+} from '@/utils/use-case-preset'
 import { AgentStepTimeline } from './AgentStepTimeline'
 import { AnimatedStatus } from './AnimatedEllipsis'
 import { ListIcon, PlusIcon, TrashIcon, CloseIcon } from './icons/ToolbarIcons'
@@ -46,7 +51,6 @@ import { getLlmProvider, getModelOptions, getProviderLabel, isAgentModeAvailable
 import { parseAgentToolsUnsupportedError } from '@/utils/agent-tools'
 import { formatActionPreviewError } from '@/utils/apply-error'
 import { resolveLastSentChatMode } from '@/utils/chat-mode'
-import { resolveEffectiveUseCasePreset } from '@/utils/use-case-preset'
 import {
   buildPastedMediaFileName,
   classifyMediaFile,
@@ -74,26 +78,11 @@ const CHAT_MODE_OPTIONS: { id: ChatMode; label: string; titleKey: 'chat.askModeT
     { id: 'agent', label: 'Agent', titleKey: 'chat.agentModeTitle' }
   ]
 
-const USE_CASE_PRESET_OPTIONS: {
-  id: UseCasePreset
-  labelKey: 'chat.preset.code' | 'chat.preset.document' | 'chat.preset.data' | 'chat.preset.general'
-  descKey:
-    | 'chat.preset.codeDesc'
-    | 'chat.preset.documentDesc'
-    | 'chat.preset.dataDesc'
-    | 'chat.preset.generalDesc'
-}[] = [
-  { id: 'code', labelKey: 'chat.preset.code', descKey: 'chat.preset.codeDesc' },
-  { id: 'document', labelKey: 'chat.preset.document', descKey: 'chat.preset.documentDesc' },
-  { id: 'data', labelKey: 'chat.preset.data', descKey: 'chat.preset.dataDesc' },
-  { id: 'general', labelKey: 'chat.preset.general', descKey: 'chat.preset.generalDesc' }
-]
-
 export function ChatPanel() {
   const { t } = useI18n()
   const [input, setInput] = useState('')
   const [sendMode, setSendMode] = useState<ChatMode>('edit')
-  const [sendPreset, setSendPreset] = useState<UseCasePreset>('code')
+  const [sendPreset, setSendPreset] = useState<UseCasePreset>(DEFAULT_USE_CASE_PRESET)
   const [modeMenuOpen, setModeMenuOpen] = useState(false)
   const [agentStreamStatus, setAgentStreamStatus] = useState<string | null>(null)
   const [pendingContinue, setPendingContinue] = useState<AgentNeedContinueEvent | null>(null)
@@ -1008,7 +997,7 @@ export function ChatPanel() {
             <select
               value={sendPreset}
               onChange={(e) => {
-                const next = normalizeUseCasePreset(e.target.value) ?? 'code'
+                const next = normalizeUseCasePreset(e.target.value) ?? DEFAULT_USE_CASE_PRESET
                 setSendPreset(next)
               }}
               disabled={isChatLoading}

@@ -1,7 +1,7 @@
 import { readFile } from 'fs/promises'
 import { join } from 'path'
 import type { UseCasePreset } from '../../src/types'
-import { normalizeUseCasePreset } from '../../src/types'
+import { normalizeUseCasePreset, DEFAULT_SETTINGS } from '../../src/types'
 import { validateMarkdownDocument } from '../../src/utils/markdown-outline'
 import { verifyDataFile } from '../../src/utils/data-verify'
 import type { AgentVerifyCheckResult } from './agent-verify'
@@ -153,7 +153,7 @@ export async function runUseCaseLightVerify(options: {
   preset?: UseCasePreset | null
   paths?: string[]
 }): Promise<AgentVerifyCheckResult[]> {
-  const preset = normalizeUseCasePreset(options.preset) ?? 'code'
+  const preset = normalizeUseCasePreset(options.preset) ?? DEFAULT_SETTINGS.defaultUseCasePreset
   if (preset === 'document') {
     return runDocumentLightVerify(options.workspaceRoot, options.paths)
   }
@@ -164,6 +164,6 @@ export async function runUseCaseLightVerify(options: {
 }
 
 export function shouldRunShellVerify(preset?: UseCasePreset | null): boolean {
-  const resolved = normalizeUseCasePreset(preset) ?? 'code'
+  const resolved = normalizeUseCasePreset(preset) ?? DEFAULT_SETTINGS.defaultUseCasePreset
   return resolved === 'code'
 }

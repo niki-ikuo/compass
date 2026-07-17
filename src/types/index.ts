@@ -87,7 +87,7 @@ export interface ResolvedChatContext {
 export type ChatMode = 'edit' | 'ask' | 'agent'
 
 /** 用途プリセット（何の専門家として振る舞うか）。Ask/Edit/Agent とは直交 */
-export type UseCasePreset = 'code' | 'document' | 'data' | 'general'
+export type UseCasePreset = 'general' | 'document' | 'data' | 'code'
 
 /** Agent ランの概念的ライフサイクル（UI / ランナー共有） */
 export type AgentRunState =
@@ -314,7 +314,7 @@ export interface ChatRequest {
   messages: ChatRequestMessage[]
   workspaceRoot?: string
   mode?: ChatMode
-  /** 用途プリセット（未指定は code） */
+  /** 用途プリセット（未指定は general） */
   preset?: UseCasePreset
   context?: {
     filePath?: string
@@ -330,6 +330,8 @@ export interface ChatRequest {
 export interface InlineCompletionRequest {
   filePath?: string
   language?: string
+  /** 用途プリセット（言語不明時のフォールバック用） */
+  preset?: UseCasePreset
   prefix: string
   suffix: string
 }
@@ -611,6 +613,6 @@ export const DEFAULT_SETTINGS: AppSettings = {
   inlineCompletionsEnabled: true,
   autoOpenAgentPreview: false,
   defaultShellId: 'powershell',
-  defaultUseCasePreset: 'code',
+  defaultUseCasePreset: 'general',
   rememberLastUseCasePreset: false
 }

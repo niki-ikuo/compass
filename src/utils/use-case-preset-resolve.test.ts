@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { resolveEffectiveUseCasePreset } from '@/utils/use-case-preset'
 
 describe('resolveEffectiveUseCasePreset', () => {
-  it('prefers UI selection, then workspace, then app, then code', () => {
+  it('prefers UI selection, then workspace, then app, then general', () => {
     expect(
       resolveEffectiveUseCasePreset({
         uiPreset: 'data',
@@ -22,11 +22,11 @@ describe('resolveEffectiveUseCasePreset', () => {
     expect(
       resolveEffectiveUseCasePreset({
         workspacePreset: undefined,
-        appPreset: 'general'
+        appPreset: 'code'
       })
-    ).toBe('general')
+    ).toBe('code')
 
-    expect(resolveEffectiveUseCasePreset({})).toBe('code')
+    expect(resolveEffectiveUseCasePreset({})).toBe('general')
   })
 
   it('ignores invalid values', () => {

@@ -7,6 +7,8 @@ const EXTENSION_MAP: Record<string, string> = {
   json: 'json',
   md: 'markdown',
   markdown: 'markdown',
+  csv: 'csv',
+  tsv: 'tsv',
   html: 'html',
   htm: 'html',
   css: 'css',

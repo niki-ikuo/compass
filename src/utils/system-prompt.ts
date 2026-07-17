@@ -3,7 +3,7 @@ export function composeSystemPrompt(rolePrompt: string, modePrompt: string): str
   return `${rolePrompt}\n\n${modePrompt}`
 }
 
-/** code は現行互換のため reminder なし。document / data / general のみ短いヒント */
+/** code は reminder なし。document / data / general のみ短いヒント */
 export function getUseCasePresetReminderKey(
   preset: string | null | undefined
 ): 'ai.preset.document.reminder' | 'ai.preset.data.reminder' | 'ai.preset.general.reminder' | null {

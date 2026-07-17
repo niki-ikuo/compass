@@ -2,9 +2,9 @@
 
 **English** | [日本語](README.ja.md)
 
-![Compass — AI code editor with Edit mode diff preview](docs/assets/screenshot.png)
+![Compass — AI workspace with Edit mode diff preview](docs/assets/screenshot.png)
 
-An AI code editor for Windows. Edit local code and work with AI to write and fix it.
+An AI workspace for Windows. Open a local folder and work with AI on notes, documents, data, and code.
 
 Open a folder → edit files → ask the AI → apply suggestions.
 
@@ -16,11 +16,12 @@ Installer: `Compass Setup x.y.z.exe` (Windows 10/11 x64)
 
 ## Features
 
-- Monaco Editor with syntax highlighting
+- Monaco Editor with syntax highlighting (text files, not code-only)
 - Workspace file tree
-- AI chat (streaming) — **Ask** (explain only) / **Edit** (propose file changes → preview & apply)
+- AI chat (streaming) — **Ask** / **Edit** / **Agent**, plus use-case presets (general / document / data / code)
 - Inline completions (ghost text; Tab to accept)
-- Project structure index (`.compass/`) for AI context
+- Workspace structure index (`.compass/`) for AI context
+- Doc templates (Markdown presets under `.compass/templates/`)
 - Diff preview and apply for AI suggestions
 - Integrated terminal (xterm.js)
 - OpenAI-compatible API settings (multi-LLM: OpenAI / Gemini / DeepSeek / Groq / OpenRouter / Ollama / custom)
@@ -90,7 +91,7 @@ Artifacts are written to `release/` (NSIS installer).
 
 - **Electron** — desktop shell
 - **React** + **TypeScript** — UI
-- **Monaco Editor** — code editor
+- **Monaco Editor** — text editor
 - **Zustand** — state management
 - **electron-vite** — build
 - **electron-builder** — packaging

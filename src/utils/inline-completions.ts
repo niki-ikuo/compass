@@ -1,6 +1,7 @@
 import type { Monaco } from '@monaco-editor/react'
 import type { CancellationToken, IDisposable, Position, editor, languages } from 'monaco-editor'
 import { useAppStore } from '@/stores/app-store'
+import { resolveEffectiveUseCasePreset } from '@/utils/use-case-preset'
 
 /** Monaco 側にも debounce があるので、こちらは API コスト用の追加待ち */
 const DEBOUNCE_MS = 350
@@ -108,9 +109,14 @@ async function provideInlineCompletions(
   try {
     // Monaco の token cancel では HTTP を即 abort しない（再トリガーで潰れて空返りしやすい）。
     // 重複リクエストは Main の complete 開始時に abort。明示停止は cancelPendingInlineCompletion。
+    const store = useAppStore.getState()
     const result = await window.compass.ai.complete({
       filePath: resolveCompletionFilePath(model),
       language: model.getLanguageId(),
+      preset: resolveEffectiveUseCasePreset({
+        workspacePreset: store.workspaceDefaultUseCasePreset,
+        appPreset: store.settings.defaultUseCasePreset
+      }),
       prefix,
       suffix
     })

@@ -122,6 +122,7 @@ describe('runAgentVerify', () => {
     const result = await runAgentVerify({
       workspaceRoot: root,
       checks: ['test', 'lint', 'typecheck'],
+      preset: 'code',
       signal: new AbortController().signal
     })
 

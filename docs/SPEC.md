@@ -1,4 +1,4 @@
-# Compass — minimum product spec (Windows)
+# Compass — AI workspace product spec (Windows)
 
 **English** | [日本語](ja/SPEC.md)
 
@@ -8,7 +8,8 @@
 |------|---------|
 | Name (working) | **Compass** |
 | Platform | Windows 10/11 (x64) |
-| Goal | Edit local code while chatting with AI to write and fix it |
+| Concept | **AI workspace** for local folders — anyone who works with text (notes, docs, data, code), not a code-only IDE |
+| Goal | Edit local text files while chatting with AI to write, fix, and organize them |
 | MVP goal | Complete loop: open folder → edit files → ask AI → apply suggestions |
 
 ---
@@ -25,8 +26,10 @@
 - OpenAI-compatible API (multi-LLM: provider presets, per-provider API keys, model selection)
 - Settings (API keys, etc.)
 - Integrated terminal (xterm.js + node-pty)
-- Codebase structure index (workspace `.compass/` — file list, import graph, etc. for AI context)
+- Workspace structure index (`.compass/` — file list, import graph for code, etc. for AI context)
+- Use-case presets (`general` / `document` / `data` / `code`) — orthogonal to Ask / Edit / Agent; see [USE_CASE_PRESET.md](./USE_CASE_PRESET.md)
 - Inline completions (ghost text / Tab accept; toggle in Settings)
+- Doc templates (built-in Markdown presets; workspace `.compass/templates/`)
 
 ### Deferred (v2+)
 
@@ -43,13 +46,13 @@
 ┌──────────────────────────────────────────────────────────┐
 │  Menu bar  [File] [Edit] [View] [Settings]               │
 ├──────────┬───────────────────────────────┬───────────────┤
-│          │  Tabs: main.ts  utils.ts      │               │
+│          │  Tabs: plan.md  notes.md      │               │
 │ File     │───────────────────────────────│   AI chat     │
 │ tree     │                               │               │
 │          │   Monaco Editor               │  ┌──────────┐ │
-│  📁 src  │   (syntax highlighting)       │  │ history  │ │
-│   📄 a.ts│                               │  └──────────┘ │
-│   📄 b.ts│                               │  [input]      │
+│  📁 docs │   (syntax highlighting)       │  │ history  │ │
+│   📄 plan│                               │  └──────────┘ │
+│   📄 data│                               │  [input]      │
 │          │                               │  [send]       │
 ├──────────┴───────────────────────────────┴───────────────┤
 │  Status bar: line/col | language | connection            │
@@ -92,7 +95,7 @@
 | Context | (1) full current file (2) user selection if any |
 | Streaming | Token-by-token display |
 | History | In-session only (cleared on restart) |
-| System prompt | You are a coding assistant; wrap code in fenced blocks |
+| System prompt | Use-case role (`general` / `document` / `data` / `code`) + mode constraints (Ask / Edit / Agent). See [USE_CASE_PRESET.md](./USE_CASE_PRESET.md) |
 
 **Example context format:**
 
@@ -108,7 +111,7 @@ Fix the bug in this function
 
 ### 4.4 Apply
 
-For AI code blocks:
+For AI change proposals:
 
 1. **Preview** — diff (additions green, deletions red)
 2. **Apply** — overwrite current file or insert at selection
@@ -128,7 +131,7 @@ MVP: whole-file replace or insert at cursor only.
 | Max tokens | 4096 |
 | Inline completions | ON |
 | Default shell | `powershell` (PowerShell / cmd / Git Bash / WSL) |
-| Default use-case preset | `code` (`document` / `data` / `general` also available — see [USE_CASE_PRESET.md](./USE_CASE_PRESET.md)) |
+| Default use-case preset | `general` (`document` / `data` / `code` also available — see [USE_CASE_PRESET.md](./USE_CASE_PRESET.md)) |
 
 ---
 
@@ -254,15 +257,15 @@ interface AppSettings {
 ## 10. Roadmap (v2+)
 
 ```
-Now (terminal / .compass structure index / Ask·Edit·Agent / multi-LLM / inline completions)
- ├─ Use-case presets (code / document / data / general) — spec: [USE_CASE_PRESET.md](./USE_CASE_PRESET.md)
+Now (terminal / .compass index / Ask·Edit·Agent / multi-LLM / inline completions /
+     use-case presets / doc templates)
  └─ v2.0: Agent autonomy (tool loop, commands, multi-step) — plan: [AGENT_PLAN.md](./AGENT_PLAN.md)
-     └─ v2.1: semantic codebase search (RAG / embeddings)
+     └─ v2.1: semantic workspace search (RAG / embeddings); heading/summary index for docs
          └─ v3.0: MCP, plugins, native non–OpenAI APIs
 ```
 
 Phased build checklist for v2.0 Agent: [AGENT_PLAN.md](./AGENT_PLAN.md).  
-Use-case presets (folder work beyond code): [USE_CASE_PRESET.md](./USE_CASE_PRESET.md).
+Use-case presets (AI workspace beyond code-only): [USE_CASE_PRESET.md](./USE_CASE_PRESET.md).
 
 **Terminology**
 
@@ -271,7 +274,7 @@ Use-case presets (folder work beyond code): [USE_CASE_PRESET.md](./USE_CASE_PRES
 | Ask mode | Explain / review only; no workspace change proposals |
 | Edit mode | Propose create/change/delete as JSON; user previews and applies |
 | Agent | Tool-call loop. Phase 1–3: read tools, `proposeActions` (preview approval), restricted `exec` — see [AGENT_PLAN.md](./AGENT_PLAN.md) |
-| Use-case preset | *What kind of expert* (`code` / `document` / `data` / `general`). Orthogonal to Ask / Edit / Agent — see [USE_CASE_PRESET.md](./USE_CASE_PRESET.md) |
+| Use-case preset | *What kind of expert* (`general` / `document` / `data` / `code`). Orthogonal to Ask / Edit / Agent — see [USE_CASE_PRESET.md](./USE_CASE_PRESET.md) |
 
 ---
 
@@ -307,11 +310,11 @@ compass/
 
 ## 12. Summary
 
-MVP rests on four pillars:
+Compass is an **AI workspace** for local folders. MVP rests on four pillars:
 
-1. **Monaco-based editor** — editing foundation
-2. **File tree + workspace** — project-scoped work
-3. **Contextual AI chat** — dialogue that understands the current file
-4. **Apply suggestions** — put AI output into the editor
+1. **Monaco-based text editor** — editing foundation (code and other text)
+2. **File tree + workspace** — folder-scoped work
+3. **Contextual AI chat** — dialogue that understands the current file and use case
+4. **Apply suggestions** — put AI output into the workspace after approval
 
-Cursor’s core is “editor + contextual AI + apply changes.” Structure index, Edit (propose/apply), and inline completions are shipped; autonomous Agent loops and RAG come later.
+Core loop: “editor + contextual AI + apply changes.” Structure index, use-case presets, Edit (propose/apply), and inline completions are shipped; deeper Agent autonomy and RAG come later.

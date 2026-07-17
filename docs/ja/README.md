@@ -2,12 +2,12 @@
 
 [English](../README.md) | **日本語**
 
-プログラム開発・仕様確認に使うドキュメントです。利用者向けの概要やインストール手順はリポジトリルートの [README.ja.md](../../README.ja.md)（英語版は [README.md](../../README.md)）を参照してください。
+ローカルフォルダ向け AI ワークスペース「Compass」のプログラム開発・仕様確認用ドキュメントです。利用者向けの概要やインストール手順はリポジトリルートの [README.ja.md](../../README.ja.md)（英語版は [README.md](../../README.md)）を参照してください。
 
 | ドキュメント | 内容 |
 |--------------|------|
-| [SPEC.md](./SPEC.md) | 製品仕様（MVP 範囲、画面構成、機能要件） |
-| [USE_CASE_PRESET.md](./USE_CASE_PRESET.md) | 用途プリセット（code / document / data / general）仕様 |
+| [SPEC.md](./SPEC.md) | 製品仕様（AI ワークスペース、MVP 範囲、画面構成、機能要件） |
+| [USE_CASE_PRESET.md](./USE_CASE_PRESET.md) | 用途プリセット（general / document / data / code）— 実装済み |
 | [ARCHITECTURE.md](./ARCHITECTURE.md) | プロセス構成、IPC、ディレクトリ役割 |
 | [DEVELOPMENT.md](./DEVELOPMENT.md) | 開発環境、コマンド、実装時の注意点 |
 | [AGENT.md](./AGENT.md) | Agent ランタイム — ツールループ、承認、IPC、モジュール |

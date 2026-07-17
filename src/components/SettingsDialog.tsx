@@ -9,6 +9,7 @@ import {
   getModelOptions,
   resolveModelForProvider
 } from '@/utils/llm-providers'
+import { USE_CASE_PRESET_OPTIONS } from '@/utils/use-case-preset'
 import {
   useI18n,
   setLocale,
@@ -25,13 +26,6 @@ const SETTINGS_TABS: Array<{ id: SettingsTabId; labelKey: MessageKey }> = [
   { id: 'llm', labelKey: 'settings.llm' },
   { id: 'terminal', labelKey: 'settings.terminal' }
 ]
-
-const USE_CASE_OPTIONS = [
-  { id: 'code', labelKey: 'chat.preset.code', descKey: 'chat.preset.codeDesc' },
-  { id: 'document', labelKey: 'chat.preset.document', descKey: 'chat.preset.documentDesc' },
-  { id: 'data', labelKey: 'chat.preset.data', descKey: 'chat.preset.dataDesc' },
-  { id: 'general', labelKey: 'chat.preset.general', descKey: 'chat.preset.generalDesc' }
-] as const
 
 function switchProvider(form: AppSettings, nextId: LlmProviderId): AppSettings {
   if (form.providerId === nextId) return form
@@ -302,7 +296,7 @@ export function SettingsPanel() {
                   })
                 }
               >
-                {USE_CASE_OPTIONS.map((option) => (
+                {USE_CASE_PRESET_OPTIONS.map((option) => (
                   <option key={option.id} value={option.id}>
                     {t(option.labelKey)} — {t(option.descKey)}
                   </option>
@@ -326,7 +320,7 @@ export function SettingsPanel() {
                 }}
               >
                 <option value="">{t('settings.workspaceUseCasePresetFollowApp')}</option>
-                {USE_CASE_OPTIONS.map((option) => (
+                {USE_CASE_PRESET_OPTIONS.map((option) => (
                   <option key={option.id} value={option.id}>
                     {t(option.labelKey)}
                   </option>
