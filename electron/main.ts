@@ -15,6 +15,7 @@ import {
   renamePath,
   resolveChatContext,
   previewWorkspaceActions,
+  importFilesToWorkspace,
   writeBinaryFile,
   writeFileContent,
   readBinaryFile
@@ -326,6 +327,21 @@ function registerIpcHandlers(): void {
   ipcMain.handle('fs:delete', async (_event, targetPath: string) => {
     await deletePath(targetPath)
   })
+
+  ipcMain.handle('fs:pickFiles', async () => {
+    const result = await dialog.showOpenDialog(mainWindow!, {
+      properties: ['openFile', 'multiSelections']
+    })
+    if (result.canceled || result.filePaths.length === 0) return null
+    return result.filePaths
+  })
+
+  ipcMain.handle(
+    'fs:importFiles',
+    async (_event, parentDir: string, sourcePaths: string[]) => {
+      return importFilesToWorkspace(parentDir, sourcePaths)
+    }
+  )
 
   ipcMain.handle(
     'fs:resolveChatContext',

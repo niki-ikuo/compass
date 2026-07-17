@@ -475,6 +475,8 @@ export interface CompassAPI {
     rename: (targetPath: string, newName: string) => Promise<string>
     move: (sourcePath: string, destDir: string) => Promise<string>
     delete: (targetPath: string) => Promise<void>
+    pickFiles: () => Promise<string[] | null>
+    importFiles: (parentDir: string, sourcePaths: string[]) => Promise<string[]>
     search: (
       workspaceRoot: string,
       options: WorkspaceSearchOptions

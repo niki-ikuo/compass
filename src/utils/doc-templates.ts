@@ -1,5 +1,6 @@
 import type { LocaleId } from '@/i18n'
 import { DEFAULT_LOCALE } from '@/i18n'
+import { buildUniqueFileName } from '@/utils/unique-file-name'
 
 export type DocTemplateId = 'meeting-notes' | 'procedure' | 'plan-memo' | 'data-memo'
 
@@ -289,13 +290,5 @@ export function buildUniqueTemplateFileName(
   preferredName: string,
   existingNames: Iterable<string>
 ): string {
-  const existing = new Set(
-    [...existingNames].map((name) => name.replace(/\\/g, '/').split('/').pop()!.toLowerCase())
-  )
-  const stem = preferredName.replace(/\.md$/i, '')
-  for (let i = 0; i < 100; i++) {
-    const name = i === 0 ? `${stem}.md` : `${stem}-${i + 1}.md`
-    if (!existing.has(name.toLowerCase())) return name
-  }
-  return `${stem}-${Date.now()}.md`
+  return buildUniqueFileName(preferredName, existingNames)
 }

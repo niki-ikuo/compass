@@ -1,4 +1,4 @@
-import { mkdir, readdir, readFile, rename, rm, stat, writeFile } from 'fs/promises'
+import { mkdir, readdir, readFile, rename, rm, stat, writeFile, copyFile } from 'fs/promises'
 import { resolve, relative, dirname, join, basename, isAbsolute } from 'path'
 import type {
   FileEncoding,
@@ -14,6 +14,7 @@ import type {
 } from '../../src/types'
 import { t } from '../../src/i18n/runtime'
 import { normalizeWorkspaceActionPath } from '../../src/utils/workspace-actions'
+import { buildUniqueFileName } from '../../src/utils/unique-file-name'
 import { ApplyPatchError, applyUnifiedDiff } from '../../src/utils/apply-patch'
 import { decodeFileBuffer, encodeContent } from './encoding'
 import { getImageMimeType, isImagePath, isPdfPath } from '../../src/utils/media-context'
@@ -138,6 +139,7 @@ export async function writeBinaryFile(filePath: string, base64: string): Promise
 }
 
 const MAX_EDITOR_MEDIA_BYTES = 25 * 1024 * 1024
+const MAX_IMPORT_BYTES = 100 * 1024 * 1024
 
 export async function readBinaryFile(
   filePath: string
@@ -198,6 +200,48 @@ export async function createDirectory(parentDir: string, name: string): Promise<
   }
   await mkdir(dirPath)
   return dirPath
+}
+
+/** ワークスペース外のファイルを parentDir へコピーする */
+export async function importFilesToWorkspace(
+  parentDir: string,
+  sourcePaths: string[]
+): Promise<string[]> {
+  if (sourcePaths.length === 0) return []
+
+  let existingEntries: string[] = []
+  try {
+    existingEntries = await readdir(parentDir)
+  } catch {
+    throw new Error(t('fs.destMustBeFolder'))
+  }
+
+  const created: string[] = []
+  const reservedNames = [...existingEntries]
+
+  for (const sourcePath of sourcePaths) {
+    const resolved = resolve(sourcePath)
+    const info = await stat(resolved)
+    if (!info.isFile()) {
+      throw new Error(t('fs.notAFile', { path: basename(resolved) }))
+    }
+    if (info.size > MAX_IMPORT_BYTES) {
+      throw new Error(
+        t('fs.importTooLarge', {
+          name: basename(resolved),
+          maxMb: Math.round(MAX_IMPORT_BYTES / (1024 * 1024))
+        })
+      )
+    }
+
+    const fileName = buildUniqueFileName(basename(resolved), reservedNames)
+    reservedNames.push(fileName)
+    const destPath = join(parentDir, fileName)
+    await copyFile(resolved, destPath)
+    created.push(destPath)
+  }
+
+  return created
 }
 
 export async function renamePath(targetPath: string, newName: string): Promise<string> {

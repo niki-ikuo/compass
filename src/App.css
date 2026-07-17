@@ -419,12 +419,28 @@ body.is-resizing-panels * {
 .file-tree-header {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: center;
 }
 
 .file-tree-toolbar {
   display: flex;
+  align-items: center;
+  justify-content: center;
   gap: 2px;
+}
+
+.file-tree-toolbar .btn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border-radius: 4px;
+}
+
+.file-tree-toolbar .btn-icon:hover {
+  background: var(--bg-hover);
 }
 
 .file-tree-name {
@@ -498,6 +514,27 @@ body.is-resizing-panels * {
 
 .file-tree-context-menu button.danger {
   color: var(--danger);
+}
+
+.file-tree-context-menu button.context-menu-has-submenu {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.file-tree-context-menu button.context-menu-has-submenu.active,
+.file-tree-context-menu button.context-menu-has-submenu:hover {
+  background: var(--bg-hover);
+}
+
+.file-tree-context-submenu {
+  z-index: 1001;
+}
+
+.file-tree-context-menu button.context-menu-has-submenu::after {
+  content: '›';
+  opacity: 0.6;
 }
 
 .context-menu-separator {

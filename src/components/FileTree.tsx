@@ -23,6 +23,7 @@ import {
   type DocTemplateId
 } from '@/utils/doc-templates'
 import { ConfirmDialog } from './ConfirmDialog'
+import { NewFileIcon, NewFolderIcon } from './icons/ToolbarIcons'
 import { FileTreeNodeIcon } from './icons/FileTypeIcons'
 import { restoreWorkbenchFocus } from '@/utils/workbench-focus'
 import { openWorkspaceFile } from '@/utils/open-workspace-file'
@@ -33,6 +34,12 @@ interface ContextMenuState {
   x: number
   y: number
   node: FileTreeNode | null
+}
+
+interface CreateMenuState {
+  x: number
+  y: number
+  parentDir: string
 }
 
 interface TemplateMenuState {
@@ -443,6 +450,7 @@ export function FileTree() {
   )
 
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
+  const [createMenu, setCreateMenu] = useState<CreateMenuState | null>(null)
   const [templateMenu, setTemplateMenu] = useState<TemplateMenuState | null>(null)
   const [inlineInput, setInlineInput] = useState<InlineInputState | null>(null)
   const [renamingPath, setRenamingPath] = useState<string | null>(null)
@@ -454,6 +462,9 @@ export function FileTree() {
   const lastSelectedPathRef = useRef<string | null>(null)
   const treeInitializedRef = useRef(false)
   const draggingPathsRef = useRef<string[] | null>(null)
+  const createMenuRef = useRef<HTMLDivElement>(null)
+  const templateMenuRef = useRef<HTMLDivElement>(null)
+  const contextMenuRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     treeInitializedRef.current = false
@@ -532,8 +543,17 @@ export function FileTree() {
     setExpandedDirs(new Set())
   }
 
+  const closeAllMenus = useCallback(() => {
+    setContextMenu(null)
+    setCreateMenu(null)
+    setTemplateMenu(null)
+  }, [])
+
+  const isAnyMenuOpen = contextMenu !== null || createMenu !== null || templateMenu !== null
+
   const handleItemClick = useCallback(
     (node: FileTreeNode, e: React.MouseEvent) => {
+      closeAllMenus()
       const normalized = normalizeNodePath(node.path)
 
       if (e.ctrlKey || e.metaKey) {
@@ -569,7 +589,7 @@ export function FileTree() {
         void handleOpenFile(node.path)
       }
     },
-    [handleToggleExpand, visibleNodes]
+    [handleToggleExpand, visibleNodes, closeAllMenus]
   )
 
   const getDeleteTargets = useCallback(
@@ -829,6 +849,7 @@ export function FileTree() {
 
   const startCreate = (mode: 'create-file' | 'create-folder', parentDir: string) => {
     setContextMenu(null)
+    setCreateMenu(null)
     setTemplateMenu(null)
     setExpandedDirs((prev) => {
       const next = new Set(prev)
@@ -843,23 +864,84 @@ export function FileTree() {
     setError(null)
   }
 
+  const openCreateMenu = (parentDir: string, x: number, y: number) => {
+    setContextMenu(null)
+    setTemplateMenu(null)
+    setCreateMenu({ parentDir, x, y })
+    setError(null)
+  }
+
+  const openTemplateSubmenu = (parentDir: string, anchor: HTMLElement) => {
+    const rect = anchor.getBoundingClientRect()
+    setTemplateMenu({ parentDir, x: rect.right + 1, y: rect.top })
+    setError(null)
+  }
+
+  const closeTemplateSubmenu = () => {
+    setTemplateMenu(null)
+  }
+
+  const handleCreateMenuMouseLeave = (e: React.MouseEvent) => {
+    const related = e.relatedTarget as Node | null
+    if (related && templateMenuRef.current?.contains(related)) return
+    closeTemplateSubmenu()
+  }
+
+  const handleTemplateMenuMouseLeave = (e: React.MouseEvent) => {
+    const related = e.relatedTarget as Node | null
+    if (related && createMenuRef.current?.contains(related)) return
+    closeTemplateSubmenu()
+  }
+
+  const expandParentDir = useCallback((parentDir: string) => {
+    setExpandedDirs((prev) => {
+      const next = new Set(prev)
+      next.add(normalizeNodePath(parentDir))
+      return next
+    })
+  }, [])
+
+  const selectTreePaths = useCallback((paths: string[]) => {
+    if (paths.length === 0) return
+    const normalized = paths.map((path) => normalizeNodePath(path))
+    setSelectedPaths(new Set(normalized))
+    lastSelectedPathRef.current = normalized[normalized.length - 1] ?? null
+  }, [])
+
+  const importFromFile = async (parentDir: string) => {
+    setCreateMenu(null)
+    setContextMenu(null)
+    setTemplateMenu(null)
+
+    try {
+      const picked = await window.compass.fs.pickFiles()
+      if (!picked || picked.length === 0) return
+
+      const createdPaths = await window.compass.fs.importFiles(parentDir, picked)
+      if (createdPaths.length === 0) return
+
+      expandParentDir(parentDir)
+      await refreshTree()
+      selectTreePaths(createdPaths)
+      await handleOpenFile(createdPaths[0])
+      setError(null)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t('explorer.importFailed'))
+    }
+  }
+
   const getToolbarCreateParentDir = () =>
     resolveCreateParentFromSelection(
       selectedPaths,
       lastSelectedPathRef.current,
       rootedTree,
-      workspaceRoot
+      workspaceRoot!
     )
-
-  const openTemplateMenu = (parentDir: string, x: number, y: number) => {
-    setContextMenu(null)
-    setTemplateMenu({ parentDir, x, y })
-    setError(null)
-  }
 
   const createFromTemplate = async (parentDir: string, templateId: DocTemplateId) => {
     setTemplateMenu(null)
     setContextMenu(null)
+    setCreateMenu(null)
     const templates = listDocTemplates(locale)
     const template = templates.find((item) => item.id === templateId)
     if (!template) return
@@ -870,12 +952,9 @@ export function FileTree() {
     try {
       const createdPath = await window.compass.fs.createFile(parentDir, fileName)
       await window.compass.fs.writeFile(createdPath, template.body)
-      setExpandedDirs((prev) => {
-        const next = new Set(prev)
-        next.add(normalizeNodePath(parentDir))
-        return next
-      })
+      expandParentDir(parentDir)
       await refreshTree()
+      selectTreePaths([createdPath])
       await handleOpenFile(createdPath)
       setError(null)
     } catch (err) {
@@ -885,6 +964,7 @@ export function FileTree() {
 
   const startRename = (node: FileTreeNode) => {
     setContextMenu(null)
+    setCreateMenu(null)
     setTemplateMenu(null)
     setRenamingPath(node.path)
     setError(null)
@@ -897,10 +977,12 @@ export function FileTree() {
       if (inlineInput.mode === 'create-file') {
         createdPath = await window.compass.fs.createFile(inlineInput.parentDir, name)
         await refreshTree()
+        selectTreePaths([createdPath])
         await handleOpenFile(createdPath)
       } else {
         createdPath = await window.compass.fs.createDirectory(inlineInput.parentDir, name)
         await refreshTree()
+        selectTreePaths([createdPath])
       }
       setInlineInput(null)
       setError(null)
@@ -941,16 +1023,36 @@ export function FileTree() {
   const handleContentClick = () => {
     setSelectedPaths(new Set())
     lastSelectedPathRef.current = null
+    closeAllMenus()
   }
 
   useEffect(() => {
-    const closeMenu = () => {
-      setContextMenu(null)
-      setTemplateMenu(null)
+    if (!isAnyMenuOpen) return
+
+    const handlePointerDown = (event: MouseEvent) => {
+      const target = event.target as Node
+      if (createMenuRef.current?.contains(target)) return
+      if (templateMenuRef.current?.contains(target)) return
+      if (contextMenuRef.current?.contains(target)) return
+      closeAllMenus()
     }
-    window.addEventListener('click', closeMenu)
-    return () => window.removeEventListener('click', closeMenu)
-  }, [])
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') closeAllMenus()
+    }
+
+    const handleScroll = () => closeAllMenus()
+
+    document.addEventListener('mousedown', handlePointerDown)
+    document.addEventListener('keydown', handleKeyDown)
+    window.addEventListener('scroll', handleScroll, true)
+
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown)
+      document.removeEventListener('keydown', handleKeyDown)
+      window.removeEventListener('scroll', handleScroll, true)
+    }
+  }, [isAnyMenuOpen, closeAllMenus])
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -1002,28 +1104,21 @@ export function FileTree() {
           </button>
           <button
             className="btn-icon"
-            title={t('explorer.newFile')}
-            onClick={() => startCreate('create-file', getToolbarCreateParentDir())}
+            title={t('explorer.newMenu')}
+            onClick={(e) => {
+              e.stopPropagation()
+              const rect = (e.currentTarget as HTMLButtonElement).getBoundingClientRect()
+              openCreateMenu(getToolbarCreateParentDir(), rect.left, rect.bottom + 4)
+            }}
           >
-            📄
+            <NewFileIcon />
           </button>
           <button
             className="btn-icon"
             title={t('explorer.newFolder')}
             onClick={() => startCreate('create-folder', getToolbarCreateParentDir())}
           >
-            📁
-          </button>
-          <button
-            className="btn-icon"
-            title={t('explorer.newFromTemplate')}
-            onClick={(e) => {
-              e.stopPropagation()
-              const rect = (e.currentTarget as HTMLButtonElement).getBoundingClientRect()
-              openTemplateMenu(getToolbarCreateParentDir(), rect.left, rect.bottom + 4)
-            }}
-          >
-            📝
+            <NewFolderIcon />
           </button>
           <button className="btn-icon" title={t('explorer.refresh')} onClick={() => void refreshTree()}>
             ↻
@@ -1044,7 +1139,9 @@ export function FileTree() {
         {inlineInput && (
           <div className="file-tree-create-bar" onClick={(e) => e.stopPropagation()}>
             <span className="file-tree-create-label">
-              {inlineInput.mode === 'create-file' ? t('explorer.newFile') : t('explorer.newFolder')}
+              {inlineInput.mode === 'create-file'
+                ? t('explorer.newEmptyFile')
+                : t('explorer.newFolder')}
               {' · '}
               {inlineInput.parentDir === workspaceRoot
                 ? workspaceName
@@ -1093,23 +1190,21 @@ export function FileTree() {
 
       {contextMenu && (
         <div
+          ref={contextMenuRef}
           className="file-tree-context-menu"
           style={{ left: contextMenu.x, top: contextMenu.y }}
           onClick={(e) => e.stopPropagation()}
         >
-          <button onClick={() => startCreate('create-file', parentDir)}>
-            {t('explorer.newFile')}
-          </button>
-          <button onClick={() => startCreate('create-folder', parentDir)}>
-            {t('explorer.newFolder')}
-          </button>
           <button
             onClick={(e) => {
               e.stopPropagation()
-              openTemplateMenu(parentDir, contextMenu.x, contextMenu.y)
+              openCreateMenu(parentDir, contextMenu.x, contextMenu.y)
             }}
           >
-            {t('explorer.newFromTemplate')}
+            {t('explorer.newMenu')}
+          </button>
+          <button onClick={() => startCreate('create-folder', parentDir)}>
+            {t('explorer.newFolder')}
           </button>
           {contextMenu.node && (
             <>
@@ -1149,11 +1244,39 @@ export function FileTree() {
         </div>
       )}
 
-      {templateMenu && (
+      {createMenu && (
         <div
+          ref={createMenuRef}
           className="file-tree-context-menu"
+          style={{ left: createMenu.x, top: createMenu.y }}
+          onClick={(e) => e.stopPropagation()}
+          onMouseLeave={handleCreateMenuMouseLeave}
+        >
+          <button onClick={() => startCreate('create-file', createMenu.parentDir)}>
+            {t('explorer.newEmptyFile')}
+          </button>
+          <button onClick={() => void importFromFile(createMenu.parentDir)}>
+            {t('explorer.newFromFile')}
+          </button>
+          <button
+            type="button"
+            className={`context-menu-has-submenu${
+              templateMenu && templateMenu.parentDir === createMenu.parentDir ? ' active' : ''
+            }`}
+            onMouseEnter={(e) => openTemplateSubmenu(createMenu.parentDir, e.currentTarget)}
+          >
+            {t('explorer.newFromTemplate')}
+          </button>
+        </div>
+      )}
+
+      {templateMenu && createMenu && templateMenu.parentDir === createMenu.parentDir && (
+        <div
+          ref={templateMenuRef}
+          className="file-tree-context-menu file-tree-context-submenu"
           style={{ left: templateMenu.x, top: templateMenu.y }}
           onClick={(e) => e.stopPropagation()}
+          onMouseLeave={handleTemplateMenuMouseLeave}
         >
           {docTemplates.map((template) => (
             <button
