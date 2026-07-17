@@ -6,6 +6,7 @@ const EXTENSION_MAP: Record<string, string> = {
   py: 'python',
   json: 'json',
   md: 'markdown',
+  markdown: 'markdown',
   html: 'html',
   htm: 'html',
   css: 'css',

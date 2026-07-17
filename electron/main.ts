@@ -15,7 +15,9 @@ import {
   renamePath,
   resolveChatContext,
   previewWorkspaceActions,
-  writeFileContent
+  writeBinaryFile,
+  writeFileContent,
+  readBinaryFile
 } from './services/filesystem'
 import { cancelChat, cancelInlineCompletion, completeInline, streamChat } from './services/ai-client'
 import { runAgent, resolveAgentApproval, resolveAgentContinue } from './services/agent-runner'
@@ -28,6 +30,10 @@ import {
   addRecentWorkspaceRoot,
   removeRecentWorkspaceRoot
 } from './services/settings'
+import {
+  getWorkspaceSettings,
+  setWorkspaceSettings
+} from './services/workspace-settings'
 import {
   buildProjectIndex,
   ensureProjectIndex,
@@ -67,11 +73,12 @@ function createWindow(): void {
     minHeight: 600,
     title: 'Compass',
     icon: appIcon,
-    webPreferences: {
+      webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false
+      sandbox: false,
+      webviewTag: true
     }
   })
 
@@ -289,6 +296,17 @@ function registerIpcHandlers(): void {
     }
   )
 
+  ipcMain.handle(
+    'fs:writeBinaryFile',
+    async (_event, filePath: string, base64: string) => {
+      await writeBinaryFile(filePath, base64)
+    }
+  )
+
+  ipcMain.handle('fs:readBinaryFile', async (_event, filePath: string) => {
+    return readBinaryFile(filePath)
+  })
+
   ipcMain.handle('fs:createFile', async (_event, parentDir: string, name: string) => {
     return createFile(parentDir, name)
   })
@@ -372,6 +390,17 @@ function registerIpcHandlers(): void {
   ipcMain.handle('workspace:setLast', async (_event, workspaceRoot: string | null) => {
     await setLastWorkspaceRoot(workspaceRoot)
   })
+
+  ipcMain.handle('workspace:getSettings', async (_event, workspaceRoot: string) => {
+    return getWorkspaceSettings(workspaceRoot)
+  })
+
+  ipcMain.handle(
+    'workspace:setSettings',
+    async (_event, workspaceRoot: string, settings: import('../src/types').WorkspaceSettings) => {
+      return setWorkspaceSettings(workspaceRoot, settings)
+    }
+  )
 
   ipcMain.handle('ai:chat', async (event, request: ChatRequest) => {
     if (request.mode === 'agent') {

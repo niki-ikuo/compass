@@ -24,6 +24,14 @@ export interface OpenFile {
   isPreview?: boolean
   previewOriginal?: string
   isNewPreview?: boolean
+  /** テキスト以外のタブ表示（画像 / PDF / ブラウザ） */
+  viewKind?: 'text' | 'image' | 'pdf' | 'browser'
+  mediaMimeType?: string
+  mediaBase64?: string
+  /** ブラウザタブの URL */
+  browserUrl?: string
+  /** ブラウザタブのページタイトル */
+  browserTitle?: string
 }
 
 export interface FileTreeNode {
@@ -49,10 +57,19 @@ export interface ChatSelectionRef {
   text: string
 }
 
+/** チャット参照の解決結果種別（テキスト / PDF 抽出 / 画像） */
+export type ResolvedContextKind = 'text' | 'pdf' | 'image'
+
 export interface ResolvedContextFile {
   relativePath: string
+  /** テキスト本文。画像の場合は空文字 */
   content: string
   truncated: boolean
+  kind?: ResolvedContextKind
+  /** 画像の MIME（kind === 'image'） */
+  mimeType?: string
+  /** 画像の base64（kind === 'image'） */
+  base64?: string
 }
 
 export interface ResolvedFolderContext {
@@ -68,6 +85,9 @@ export interface ResolvedChatContext {
 }
 
 export type ChatMode = 'edit' | 'ask' | 'agent'
+
+/** 用途プリセット（何の専門家として振る舞うか）。Ask/Edit/Agent とは直交 */
+export type UseCasePreset = 'code' | 'document' | 'data' | 'general'
 
 /** Agent ランの概念的ライフサイクル（UI / ランナー共有） */
 export type AgentRunState =
@@ -169,6 +189,13 @@ export function normalizeChatMode(mode: unknown): ChatMode | undefined {
   return undefined
 }
 
+export function normalizeUseCasePreset(preset: unknown): UseCasePreset | undefined {
+  if (preset === 'code' || preset === 'document' || preset === 'data' || preset === 'general') {
+    return preset
+  }
+  return undefined
+}
+
 export function normalizeAgentSteps(raw: unknown): AgentToolStep[] | undefined {
   if (!Array.isArray(raw) || raw.length === 0) return undefined
   const steps: AgentToolStep[] = []
@@ -210,6 +237,8 @@ export interface ChatMessage {
   content: string
   timestamp: number
   mode?: ChatMode
+  /** 送信時の用途プリセット（user メッセージから復元） */
+  preset?: UseCasePreset
   /** Agent モード時のツールステップ（永続化） */
   agentSteps?: AgentToolStep[]
 }
@@ -259,6 +288,19 @@ export interface AppSettings {
   autoOpenAgentPreview: boolean
   /** 新しいターミナルを開くときの初期シェル（powershell / cmd / bash / wsl） */
   defaultShellId: string
+  /** 新規チャット / 起動時の用途プリセット初期値 */
+  defaultUseCasePreset: UseCasePreset
+  /**
+   * 送信成功時に defaultUseCasePreset を最後に使った用途で更新するか。
+   * false のときは設定画面の値のみ。
+   */
+  rememberLastUseCasePreset: boolean
+}
+
+/** ワークスペース固有設定（`.compass/settings.json`） */
+export interface WorkspaceSettings {
+  /** フォルダ既定の用途。未設定時はアプリの defaultUseCasePreset に従う */
+  defaultUseCasePreset?: UseCasePreset
 }
 
 export interface ChatRequestMessage {
@@ -272,6 +314,8 @@ export interface ChatRequest {
   messages: ChatRequestMessage[]
   workspaceRoot?: string
   mode?: ChatMode
+  /** 用途プリセット（未指定は code） */
+  preset?: UseCasePreset
   context?: {
     filePath?: string
     fileContent?: string
@@ -423,6 +467,9 @@ export interface CompassAPI {
     readDir: (dirPath: string) => Promise<FileTreeNode[]>
     readFile: (filePath: string, encoding?: FileEncoding) => Promise<DecodedFileContent>
     writeFile: (filePath: string, content: string, encoding?: FileEncoding) => Promise<void>
+    /** base64 バイナリ書き込み（貼り付け画像・PDF 用） */
+    writeBinaryFile: (filePath: string, base64: string) => Promise<void>
+    readBinaryFile: (filePath: string) => Promise<{ base64: string; size: number }>
     createFile: (parentDir: string, name: string) => Promise<string>
     createDirectory: (parentDir: string, name: string) => Promise<string>
     rename: (targetPath: string, newName: string) => Promise<string>
@@ -477,6 +524,11 @@ export interface CompassAPI {
     addRecent: (workspaceRoot: string) => Promise<void>
     removeRecent: (workspaceRoot: string) => Promise<void>
     setLast: (workspaceRoot: string | null) => Promise<void>
+    getSettings: (workspaceRoot: string) => Promise<WorkspaceSettings>
+    setSettings: (
+      workspaceRoot: string,
+      settings: WorkspaceSettings
+    ) => Promise<WorkspaceSettings>
   }
   shell: {
     quit: () => Promise<void>
@@ -556,5 +608,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   locale: DEFAULT_LOCALE,
   inlineCompletionsEnabled: true,
   autoOpenAgentPreview: false,
-  defaultShellId: 'powershell'
+  defaultShellId: 'powershell',
+  defaultUseCasePreset: 'code',
+  rememberLastUseCasePreset: false
 }

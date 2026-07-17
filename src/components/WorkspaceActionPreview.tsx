@@ -2,6 +2,12 @@ import { useState } from 'react'
 import type { ActionPreviewItem, WorkspaceAction } from '@/types'
 import { computeLineDiff } from '@/utils/code-blocks'
 import { getApplyErrorTone } from '@/utils/apply-error'
+import { isMarkdownFile } from '@/utils/language'
+import {
+  compactDiffLines,
+  diffMarkdownHeadings,
+  type CompactDiffEntry
+} from '@/utils/markdown-outline'
 import { useI18n, t } from '@/i18n'
 
 interface WorkspaceActionPreviewProps {
@@ -12,6 +18,65 @@ interface WorkspaceActionPreviewProps {
   applyError?: string | null
   /** Agent approval pending + apply failed → send error back to the loop */
   onAskAgentFix?: () => void
+}
+
+function DocumentDiffContent({
+  oldContent,
+  newContent
+}: {
+  oldContent: string
+  newContent: string
+}) {
+  const { t } = useI18n()
+  const headingChanges = diffMarkdownHeadings(oldContent, newContent)
+  const compact = compactDiffLines(computeLineDiff(oldContent, newContent), 1)
+
+  return (
+    <div className="diff-content nested document-diff">
+      {headingChanges.length > 0 && (
+        <div className="document-diff-headings">
+          <div className="document-diff-headings-title">{t('diff.headingChanges')}</div>
+          <ul className="document-diff-heading-list">
+            {headingChanges.map((change, index) => (
+              <li
+                key={`${change.kind}-${change.level}-${change.text}-${index}`}
+                className={`document-diff-heading document-diff-${change.kind}`}
+              >
+                <span className="document-diff-heading-mark">
+                  {change.kind === 'added' ? '+' : '−'}
+                </span>
+                <span className="document-diff-heading-level">{'#'.repeat(change.level)}</span>
+                <span className="document-diff-heading-text">{change.text}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {compact.map((entry, i) => (
+        <CompactDiffLine key={i} entry={entry} />
+      ))}
+    </div>
+  )
+}
+
+function CompactDiffLine({ entry }: { entry: CompactDiffEntry }) {
+  const { t } = useI18n()
+  if (entry.type === 'skip') {
+    return (
+      <div className="diff-line diff-skip">
+        <span className="diff-prefix">…</span>
+        <span className="diff-text">{t('diff.omittedLines', { count: entry.count })}</span>
+      </div>
+    )
+  }
+  return (
+    <div className={`diff-line diff-${entry.type}`}>
+      <span className="diff-prefix">
+        {entry.type === 'add' ? '+' : entry.type === 'remove' ? '-' : ' '}
+      </span>
+      <span className="diff-text">{entry.content}</span>
+    </div>
+  )
 }
 
 function ActionItemPreview({
@@ -67,11 +132,16 @@ function ActionItemPreview({
 
   if (item.type !== 'writeFile') return null
 
-  const diff = computeLineDiff(item.oldContent, item.newContent)
-  const meta = item.isNew ? t('preview.fileNew') : t('preview.fileUpdate')
+  const isMarkdown = isMarkdownFile(item.relativePath)
+  const diff = isMarkdown ? null : computeLineDiff(item.oldContent, item.newContent)
+  const meta = item.isNew
+    ? t('preview.fileNew')
+    : isMarkdown
+      ? t('preview.fileUpdateDocument')
+      : t('preview.fileUpdate')
 
   return (
-    <div className="action-preview-item write">
+    <div className={`action-preview-item write${isMarkdown ? ' document' : ''}`}>
       <button
         type="button"
         className="action-preview-header clickable"
@@ -89,18 +159,21 @@ function ActionItemPreview({
           <span className="action-preview-meta">{meta}</span>
         </div>
       </button>
-      {expanded && (
-        <div className="diff-content nested">
-          {diff.map((line, i) => (
-            <div key={i} className={`diff-line diff-${line.type}`}>
-              <span className="diff-prefix">
-                {line.type === 'add' ? '+' : line.type === 'remove' ? '-' : ' '}
-              </span>
-              <span className="diff-text">{line.content}</span>
-            </div>
-          ))}
-        </div>
-      )}
+      {expanded &&
+        (isMarkdown ? (
+          <DocumentDiffContent oldContent={item.oldContent} newContent={item.newContent} />
+        ) : (
+          <div className="diff-content nested">
+            {diff?.map((line, i) => (
+              <div key={i} className={`diff-line diff-${line.type}`}>
+                <span className="diff-prefix">
+                  {line.type === 'add' ? '+' : line.type === 'remove' ? '-' : ' '}
+                </span>
+                <span className="diff-text">{line.content}</span>
+              </div>
+            ))}
+          </div>
+        ))}
     </div>
   )
 }

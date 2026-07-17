@@ -41,6 +41,16 @@ export const ja = {
   'settings.terminal': 'ターミナル',
   'settings.defaultShell': '初期シェル',
   'settings.defaultShellHint': '新しいターミナルを開くときに使うシェルです',
+  'settings.defaultUseCasePreset': 'デフォルトの用途プリセット',
+  'settings.defaultUseCasePresetHint': '新規チャット開始時に選ばれる用途です（ワークスペース既定がある場合はそちら優先）',
+  'settings.workspaceUseCasePreset': 'ワークスペースの既定用途',
+  'settings.workspaceUseCasePresetHint':
+    'このフォルダを開いたときの用途初期値です。.compass/settings.json に保存されます',
+  'settings.workspaceUseCasePresetFollowApp': 'アプリ設定に従う',
+  'settings.workspaceUseCasePresetNeedFolder': 'フォルダを開くとワークスペース既定を設定できます',
+  'settings.rememberLastUseCasePreset': '最後に使った用途を覚える',
+  'settings.rememberLastUseCasePresetHint':
+    'オンにすると、送信成功時にデフォルトの用途をそのときの選択で更新します',
   'settings.saveFailed': '保存に失敗しました',
 
   // themes
@@ -94,6 +104,7 @@ export const ja = {
   'menu.zoomIn': '拡大',
   'menu.zoomOut': '縮小',
   'menu.terminal': 'ターミナル',
+  'menu.newBrowserTab': '新しいブラウザタブ',
   'menu.about': 'バージョン情報',
   'menu.aboutDetail': 'バージョン {version}',
   'menu.toggleExplorer': 'エクスプローラの開閉',
@@ -115,6 +126,7 @@ export const ja = {
   'explorer.collapseAll': 'すべて折りたたむ',
   'explorer.newFile': '新規ファイル',
   'explorer.newFolder': '新規フォルダ',
+  'explorer.newFromTemplate': 'テンプレートから新規…',
   'explorer.refresh': '更新',
   'explorer.rename': '名前の変更',
   'explorer.searchInFolder': 'フォルダ内を検索',
@@ -130,6 +142,11 @@ export const ja = {
   'explorer.defaultNewFolder': '新しいフォルダ',
   'explorer.noFolder': 'フォルダが開かれていません',
   'explorer.openFolderHint': 'メニューから「フォルダを開く」を選択',
+
+  'template.meetingNotes': '議事録',
+  'template.procedure': '手順書',
+  'template.planMemo': '企画メモ',
+  'template.dataMemo': 'データメモ',
 
   // search
   'search.workspace': 'ワークスペース',
@@ -180,7 +197,10 @@ export const ja = {
     '送信前に Ask / Edit / Agent を選べます。Ask は説明のみ、Edit はファイル変更を提案、Agent はツールで調査・変更提案（承認後に適用）します',
   'chat.emptyContext': '現在のファイルが自動的にコンテキストに含まれます',
   'chat.emptyPasteHint':
-    'エディタでコピーした選択行をチャットに貼ると、自動で参照カプセルになります',
+    'エディタの選択行、スクリーンショット、PDF をチャットに貼ると参照できます',
+  'chat.pasteMediaNeedsWorkspace':
+    '画像や PDF を貼るには、先にフォルダを開いてください',
+  'chat.pasteMediaFailed': '貼り付けたファイルの保存に失敗しました',
   'chat.you': 'あなた',
   'chat.ai': 'AI',
   'chat.modelOf': '{provider} のモデル',
@@ -189,6 +209,15 @@ export const ja = {
   'chat.placeholderAsk': '質問を入力... (Enterで送信, Shift+Enterで改行)',
   'chat.placeholderAgent': 'コードベースを調査・説明... (Enterで送信, Shift+Enterで改行)',
   'chat.sendMode': '送信モード',
+  'chat.useCasePreset': '用途',
+  'chat.preset.code': 'コード',
+  'chat.preset.codeDesc': '実装・レビュー・リファクタ',
+  'chat.preset.document': '文書',
+  'chat.preset.documentDesc': '企画・議事・手順の推敲',
+  'chat.preset.data': 'データ',
+  'chat.preset.dataDesc': 'CSV / JSON / YAML の整理',
+  'chat.preset.general': '一般',
+  'chat.preset.generalDesc': 'メモ整理・タスク分解',
   'chat.editModeTitle': 'このメッセージを Edit モードで送信（ファイルの作成・変更を提案）',
   'chat.askModeTitle': 'このメッセージを Ask モードで送信（質問への回答のみ）',
   'chat.agentModeTitle':
@@ -276,9 +305,28 @@ export const ja = {
   'editor.editTab': '編集',
   'editor.previewTab': 'プレビュー',
   'editor.splitTab': '分割',
+  'editor.outline': '見出し',
+  'editor.outlineEmpty': '見出しがありません',
   'editor.addToChat': 'チャットに追加',
   'editor.copyChatRef': 'チャット参照をコピー',
   'editor.triggerInlineSuggest': 'インライン補完をトリガー',
+  'editor.mediaTooLarge': 'ファイルが大きすぎます（上限 約 {maxMb}MB）',
+  'editor.imageLabel': '画像',
+  'editor.pdfLabel': 'PDF',
+  'editor.openMediaFailed': 'メディアファイルを開けませんでした',
+
+  'browser.newTab': 'ブラウザ',
+  'browser.back': '戻る',
+  'browser.forward': '進む',
+  'browser.reload': '再読み込み',
+  'browser.stop': '読み込み中止',
+  'browser.go': '移動',
+  'browser.addressPlaceholder': 'URL を入力、または検索',
+  'browser.label': 'ブラウザ',
+
+  'diff.headingChanges': '見出しの変更',
+  'diff.omittedLines': '省略 {count} 行',
+  'preview.fileUpdateDocument': '文書を更新',
 
   // status
   'status.apiUnset': 'API未設定',
@@ -367,18 +415,36 @@ export const ja = {
   'search.writeFailed': '書き込みに失敗しました',
 
   // AI (electron)
+  'ai.preset.code.role':
+    'あなたはコーディングアシスタントです。日本語で回答してください。コード・依存関係・プロジェクト構造インデックス(.compass)を重視して回答してください。',
+  'ai.preset.document.role':
+    'あなたは文書編集アシスタントです。日本語で回答してください。Markdown / テキストの推敲・構成・要約を主とし、見出し階層・用語の一貫・読みやすさを優先してください。「正しい実装」より読者向けの明確さを重視し、変更時は差分が読みやすい小さな patch を推奨し全文書き換えは避けてください。',
+  'ai.preset.data.role':
+    'あなたはデータ整理アシスタントです。日本語で回答してください。CSV / JSON / YAML を構造として扱い、列名・型・欠損・重複・ネストの説明を優先してください。変更時はスキーマ破壊を避け（列順・キー名の勝手な変更禁止）、大きな表は要約と代表例で示し、必要なら対象行・キーを明示してください。',
+  'ai.preset.general.role':
+    'あなたは汎用ワークスペースアシスタントです。日本語で回答してください。フォルダ内のメモ・タスク・雑多なテキストの整理・分類・次アクション提示を主とし、断定しすぎず、過剰な技術用語を避けてください。',
+  'ai.preset.document.reminder': '[文書向け] 見出し階層を壊さない。小さな差分を優先。',
+  'ai.preset.data.reminder': '[データ向け] 列名・キー名・列順を勝手に変えない。',
+  'ai.preset.general.reminder': '[一般向け] 短く整理し、次のアクションを示す。',
   'ai.editSystemPrompt':
-    'あなたはコーディングアシスタントです。日本語で回答してください。Editモードでは、ファイル/フォルダの作成・変更・削除は必ず```compass-actions```コードブロック内のJSONだけで返してください。通常の```css```や```html```などのコードブロックでファイル全体を提示してはいけません。説明文は短くし、実際の変更内容はcompass-actionsに含めてください。形式は {"actions":[{"type":"mkdir","path":"relative/path"},{"type":"applyPatch","path":"relative/file.ts","patch":"@@ -10,3 +10,4 @@\\n context\\n-old\\n+new\\n context"},{"type":"writeFile","path":"relative/file.ts","content":"..."},{"type":"deleteFile","path":"relative/file.ts"},{"type":"deleteDir","path":"relative/folder"}]} とし、既存ファイルの修正は全文 writeFile より applyPatch（unified diff の hunk）を優先してください。patch は @@ -start,count +start,count @@ 形式の unified diff のみ（*** Begin Patch / *** Update File: は禁止）。同一ファイルへの変更は1つの applyPatch にまとめてください。pathはワークスペース直下からの相対パス（例: style.css。フォルダ名を重複して含めない）のみ使用してください。プロジェクト構造インデックス(.compass)が提供された場合は、ファイル間の関係を踏まえて回答してください。',
+    'Editモードでは、ファイル/フォルダの作成・変更・削除は必ず```compass-actions```コードブロック内のJSONだけで返してください。通常の```css```や```html```などのコードブロックでファイル全体を提示してはいけません。説明文は短くし、実際の変更内容はcompass-actionsに含めてください。形式は {"actions":[{"type":"mkdir","path":"relative/path"},{"type":"applyPatch","path":"relative/file.ts","patch":"@@ -10,3 +10,4 @@\\n context\\n-old\\n+new\\n context"},{"type":"writeFile","path":"relative/file.ts","content":"..."},{"type":"deleteFile","path":"relative/file.ts"},{"type":"deleteDir","path":"relative/folder"}]} とし、既存ファイルの修正は全文 writeFile より applyPatch（unified diff の hunk）を優先してください。patch は @@ -start,count +start,count @@ 形式の unified diff のみ（*** Begin Patch / *** Update File: は禁止）。同一ファイルへの変更は1つの applyPatch にまとめてください。pathはワークスペース直下からの相対パス（例: style.css。フォルダ名を重複して含めない）のみ使用してください。プロジェクト構造インデックス(.compass)が提供された場合は、ファイル間の関係を踏まえて回答してください。',
   'ai.askSystemPrompt':
-    'あなたはコーディングアシスタントです。日本語で回答してください。現在はAskモードです。コードの説明、質問への回答、調査、レビューのみを行い、ワークスペースへのファイル作成・変更・削除は行わないでください。```compass-actions```コードブロックは絶対に出力しないでください。コード例は通常の```コードブロックで示し、ユーザーが手動で適用できるようにしてください。プロジェクト構造インデックス(.compass)が提供された場合は、ファイル間の関係を踏まえて回答してください。',
+    '現在はAskモードです。説明、質問への回答、調査、レビューのみを行い、ワークスペースへのファイル作成・変更・削除は行わないでください。```compass-actions```コードブロックは絶対に出力しないでください。コード例や文言例は通常の```コードブロックで示し、ユーザーが手動で適用できるようにしてください。プロジェクト構造インデックス(.compass)が提供された場合は、ファイル間の関係を踏まえて回答してください。',
   'ai.agentSystemPrompt':
-    'あなたはコーディングアシスタントの Agent です。日本語で回答してください。ツール（readFile / listDir / search / proposeActions / verify / exec / updateTodo / checkpoint / remember）でワークスペースを調査・変更提案・検証・短いコマンド実行ができます。パスはすべてワークスペースルートからの相対パスです。ルートは "." を使い、ワークスペースフォルダ名そのものをサブパスにしないでください。ファイル変更は proposeActions で提案し、ユーザーがプレビュー承認するまで適用されません。proposeActions の actions は必ず JSON 配列として渡し、JSON 文字列や一塊の文字列にしないでください。既存ファイルの修正は applyPatch（unified diff・変更 hunk のみ）を優先し、大きな全文 writeFile は避けてください。patch は @@ -start,count +start,count @@ 形式のみ。*** Begin Patch / *** Update File: 形式は禁止。同一ファイルへの変更は1つの applyPatch にまとめてください。新規ファイルやごく短い全置換だけ writeFile を使ってください。変更が適用されたら、終了前に verify（test / lint / typecheck）で確かめてください。失敗したら proposeActions で直し、再度 verify する定石を守ってください。verify が解決できない場合のみ exec で同等のコマンドを実行してください。スクリプトが無く verify がスキップされただけなら、最終回答では触れないでください（タイムラインに表示済み）。実際に実行して失敗したときだけ検証結果を書いてください。exec はビルドやアドホックな短命非対話コマンド向けです。ワークスペース全体の削除（例: rm -rf .）などの危険コマンドは拒否され、rm や git reset --hard などの書き込み系はユーザー承認後のみ実行されます。ユーザー用ターミナルとは別です。Windows では Git Bash があればそこで実行されます（なければ cmd.exe）。同じファイルを再読するとキャッシュヒット（アウトラインのみ）になることがあります。全文が必要なら force=true を渡してください。複数ステップの作業では早めに updateTodo でチェックリストを作り、進捗に応じて更新してください。重要な発見・原因・契約は remember で作業メモリに残してください。ターン／ツール上限の直前や長い調査の区切りでは checkpoint に短い再開要約（何が済み、何が残るか）を残してください。Continue 後は計画と作業メモリを優先して続けてください。必要なツールを使い、最後に簡潔な結論をテキストで返してください。',
+    'Agent としてツール（readFile / listDir / search / proposeActions / verify / exec / updateTodo / checkpoint / remember）でワークスペースを調査・変更提案・検証・短いコマンド実行ができます。パスはすべてワークスペースルートからの相対パスです。ルートは "." を使い、ワークスペースフォルダ名そのものをサブパスにしないでください。ファイル変更は proposeActions で提案し、ユーザーがプレビュー承認するまで適用されません。proposeActions の actions は必ず JSON 配列として渡し、JSON 文字列や一塊の文字列にしないでください。既存ファイルの修正は applyPatch（unified diff・変更 hunk のみ）を優先し、大きな全文 writeFile は避けてください。patch は @@ -start,count +start,count @@ 形式のみ。*** Begin Patch / *** Update File: 形式は禁止。同一ファイルへの変更は1つの applyPatch にまとめてください。新規ファイルやごく短い全置換だけ writeFile を使ってください。変更が適用されたら、終了前に verify（test / lint / typecheck）で確かめてください。失敗したら proposeActions で直し、再度 verify する定石を守ってください。verify が解決できない場合のみ exec で同等のコマンドを実行してください。スクリプトが無く verify がスキップされただけなら、最終回答では触れないでください（タイムラインに表示済み）。実際に実行して失敗したときだけ検証結果を書いてください。exec はビルドやアドホックな短命非対話コマンド向けです。ワークスペース全体の削除（例: rm -rf .）などの危険コマンドは拒否され、rm や git reset --hard などの書き込み系はユーザー承認後のみ実行されます。ユーザー用ターミナルとは別です。Windows では Git Bash があればそこで実行されます（なければ cmd.exe）。同じファイルを再読するとキャッシュヒット（アウトラインのみ）になることがあります。全文が必要なら force=true を渡してください。複数ステップの作業では早めに updateTodo でチェックリストを作り、進捗に応じて更新してください。重要な発見・原因・契約は remember で作業メモリに残してください。ターン／ツール上限の直前や長い調査の区切りでは checkpoint に短い再開要約（何が済み、何が残るか）を残してください。Continue 後は計画と作業メモリを優先して続けてください。必要なツールを使い、最後に簡潔な結論をテキストで返してください。',
   'ai.userRefsHeader': '[ユーザーが指定したファイル/フォルダ]',
   'ai.userRefsIntro': '以下はエクスプローラーから明示的に指定されたコンテキストです。',
   'ai.folderHeading': '## フォルダ: {path}',
   'ai.structureHeading': '### 構造',
   'ai.truncated': '- ... (省略)',
   'ai.fileHeading': '## ファイル: {path}',
+  'ai.pdfHeading': '## PDF（抽出テキスト）: {path}',
+  'ai.pdfNoText':
+    '（PDF からテキストを抽出できませんでした。スキャン画像や埋め込みフォントの可能性があります）',
+  'ai.imageHeading': '## 画像: {path}',
+  'ai.imageAttachedNote': '（この画像はビジョン入力として添付されています）',
+  'ai.imageTooLarge': '（画像が大きすぎるため添付できませんでした。上限: 約 {maxMb}MB）',
+  'ai.imageLimitReached': '（画像の添付上限 {max} 枚に達したためスキップしました）',
   'ai.currentFile': '[現在のファイル: {path}]',
   'ai.selectionsHeader': '[ユーザーが指定した選択行]',
   'ai.selectionText': '選択テキスト',
@@ -460,6 +526,17 @@ export const en: Record<MessageKey, string> = {
   'settings.terminal': 'Terminal',
   'settings.defaultShell': 'Default shell',
   'settings.defaultShellHint': 'Shell used when opening a new terminal',
+  'settings.defaultUseCasePreset': 'Default use-case preset',
+  'settings.defaultUseCasePresetHint':
+    'Preset used when starting a new chat (workspace default wins when set)',
+  'settings.workspaceUseCasePreset': 'Workspace default use case',
+  'settings.workspaceUseCasePresetHint':
+    'Initial use case when this folder is open. Saved to .compass/settings.json',
+  'settings.workspaceUseCasePresetFollowApp': 'Follow app setting',
+  'settings.workspaceUseCasePresetNeedFolder': 'Open a folder to set a workspace default',
+  'settings.rememberLastUseCasePreset': 'Remember last use-case preset',
+  'settings.rememberLastUseCasePresetHint':
+    'When on, a successful send updates the default preset to the one you used',
   'settings.saveFailed': 'Failed to save settings',
 
   'theme.dark': 'Dark',
@@ -510,6 +587,7 @@ export const en: Record<MessageKey, string> = {
   'menu.zoomIn': 'Zoom In',
   'menu.zoomOut': 'Zoom Out',
   'menu.terminal': 'Terminal',
+  'menu.newBrowserTab': 'New Browser Tab',
   'menu.about': 'About',
   'menu.aboutDetail': 'Version {version}',
   'menu.toggleExplorer': 'Toggle Explorer',
@@ -529,6 +607,7 @@ export const en: Record<MessageKey, string> = {
   'explorer.collapseAll': 'Collapse All',
   'explorer.newFile': 'New File',
   'explorer.newFolder': 'New Folder',
+  'explorer.newFromTemplate': 'New from Template…',
   'explorer.refresh': 'Refresh',
   'explorer.rename': 'Rename',
   'explorer.searchInFolder': 'Find in Folder',
@@ -544,6 +623,11 @@ export const en: Record<MessageKey, string> = {
   'explorer.defaultNewFolder': 'New Folder',
   'explorer.noFolder': 'No folder open',
   'explorer.openFolderHint': 'Choose "Open Folder" from the menu',
+
+  'template.meetingNotes': 'Meeting notes',
+  'template.procedure': 'Procedure',
+  'template.planMemo': 'Plan memo',
+  'template.dataMemo': 'Data memo',
 
   'search.workspace': 'Workspace',
   'search.entireWorkspace': 'Entire workspace',
@@ -592,7 +676,9 @@ export const en: Record<MessageKey, string> = {
     'Choose Ask / Edit / Agent before sending. Ask explains; Edit proposes file changes; Agent inspects with tools and proposes changes (apply after approval)',
   'chat.emptyContext': 'The current file is included as context automatically',
   'chat.emptyPasteHint':
-    'Paste a selection copied from the editor to create a reference chip',
+    'Paste editor selections, screenshots, or PDFs into chat to attach them as references',
+  'chat.pasteMediaNeedsWorkspace': 'Open a folder before pasting images or PDFs',
+  'chat.pasteMediaFailed': 'Failed to save the pasted file',
   'chat.you': 'You',
   'chat.ai': 'AI',
   'chat.modelOf': '{provider} model',
@@ -601,6 +687,15 @@ export const en: Record<MessageKey, string> = {
   'chat.placeholderAsk': 'Ask a question... (Enter to send, Shift+Enter for newline)',
   'chat.placeholderAgent': 'Explore or explain the codebase... (Enter to send, Shift+Enter for newline)',
   'chat.sendMode': 'Send mode',
+  'chat.useCasePreset': 'Use case',
+  'chat.preset.code': 'Code',
+  'chat.preset.codeDesc': 'Implement, review, refactor',
+  'chat.preset.document': 'Document',
+  'chat.preset.documentDesc': 'Draft plans, notes, procedures',
+  'chat.preset.data': 'Data',
+  'chat.preset.dataDesc': 'Organize CSV / JSON / YAML',
+  'chat.preset.general': 'General',
+  'chat.preset.generalDesc': 'Sort notes and break down tasks',
   'chat.editModeTitle': 'Send in Edit mode (propose create/update files)',
   'chat.askModeTitle': 'Send in Ask mode (answers only)',
   'chat.agentModeTitle':
@@ -687,9 +782,28 @@ export const en: Record<MessageKey, string> = {
   'editor.editTab': 'Edit',
   'editor.previewTab': 'Preview',
   'editor.splitTab': 'Split',
+  'editor.outline': 'Outline',
+  'editor.outlineEmpty': 'No headings',
   'editor.addToChat': 'Add to Chat',
   'editor.copyChatRef': 'Copy Chat Reference',
   'editor.triggerInlineSuggest': 'Trigger inline suggestion',
+  'editor.mediaTooLarge': 'File is too large (limit about {maxMb}MB)',
+  'editor.imageLabel': 'Image',
+  'editor.pdfLabel': 'PDF',
+  'editor.openMediaFailed': 'Failed to open media file',
+
+  'browser.newTab': 'Browser',
+  'browser.back': 'Back',
+  'browser.forward': 'Forward',
+  'browser.reload': 'Reload',
+  'browser.stop': 'Stop',
+  'browser.go': 'Go',
+  'browser.addressPlaceholder': 'Enter a URL or search',
+  'browser.label': 'Browser',
+
+  'diff.headingChanges': 'Heading changes',
+  'diff.omittedLines': '{count} lines omitted',
+  'preview.fileUpdateDocument': 'Update document',
 
   'status.apiUnset': 'API not set',
   'status.connected': 'Connected',
@@ -771,18 +885,36 @@ export const en: Record<MessageKey, string> = {
   'search.readFailed': 'Failed to read',
   'search.writeFailed': 'Failed to write',
 
+  'ai.preset.code.role':
+    'You are a coding assistant. Respond in English. Focus on code, dependencies, and the project structure index (.compass) when available.',
+  'ai.preset.document.role':
+    'You are a document-editing assistant. Respond in English. Prioritize drafting, structuring, and summarizing Markdown/text; keep heading hierarchy, terminology, and readability consistent. Prefer clarity for readers over "correct implementation," and prefer small readable patches over full-file rewrites.',
+  'ai.preset.data.role':
+    'You are a data-organization assistant. Respond in English. Treat CSV / JSON / YAML as structured data; prioritize column names, types, missing values, duplicates, and nesting. Avoid schema-breaking changes (do not reorder columns or rename keys casually). For large tables, summarize with representative examples and name target rows/keys when needed.',
+  'ai.preset.general.role':
+    'You are a general workspace assistant. Respond in English. Help organize notes, tasks, and mixed text in the folder: classify, structure, and suggest next actions without over-asserting. Avoid unnecessary technical jargon.',
+  'ai.preset.document.reminder': '[Document] Do not break heading hierarchy. Prefer small patches.',
+  'ai.preset.data.reminder': '[Data] Do not rename columns/keys or reorder columns casually.',
+  'ai.preset.general.reminder': '[General] Keep it short; suggest clear next actions.',
   'ai.editSystemPrompt':
-    'You are a coding assistant. Respond in English. In Edit mode, create/update/delete files and folders only via a ```compass-actions``` JSON code block. Do not present full file contents in normal ```css``` / ```html``` (etc.) code blocks. Keep explanations short; put the actual changes in compass-actions. Format: {"actions":[{"type":"mkdir","path":"relative/path"},{"type":"applyPatch","path":"relative/file.ts","patch":"@@ -10,3 +10,4 @@\\n context\\n-old\\n+new\\n context"},{"type":"writeFile","path":"relative/file.ts","content":"..."},{"type":"deleteFile","path":"relative/file.ts"},{"type":"deleteDir","path":"relative/folder"}]}. Prefer applyPatch (unified-diff hunks) for edits to existing files over full writeFile rewrites. The patch must be unified diff with @@ -start,count +start,count @@ hunks only—never Cursor/OpenAI *** Begin Patch / *** Update File: wrappers. Combine all edits to the same file into one applyPatch. Paths must be relative to the workspace root (e.g. style.css; do not duplicate folder names). If a project structure index (.compass) is provided, use file relationships in your answer.',
+    'In Edit mode, create/update/delete files and folders only via a ```compass-actions``` JSON code block. Do not present full file contents in normal ```css``` / ```html``` (etc.) code blocks. Keep explanations short; put the actual changes in compass-actions. Format: {"actions":[{"type":"mkdir","path":"relative/path"},{"type":"applyPatch","path":"relative/file.ts","patch":"@@ -10,3 +10,4 @@\\n context\\n-old\\n+new\\n context"},{"type":"writeFile","path":"relative/file.ts","content":"..."},{"type":"deleteFile","path":"relative/file.ts"},{"type":"deleteDir","path":"relative/folder"}]}. Prefer applyPatch (unified-diff hunks) for edits to existing files over full writeFile rewrites. The patch must be unified diff with @@ -start,count +start,count @@ hunks only—never Cursor/OpenAI *** Begin Patch / *** Update File: wrappers. Combine all edits to the same file into one applyPatch. Paths must be relative to the workspace root (e.g. style.css; do not duplicate folder names). If a project structure index (.compass) is provided, use file relationships in your answer.',
   'ai.askSystemPrompt':
-    'You are a coding assistant. Respond in English. You are in Ask mode. Only explain code, answer questions, investigate, and review. Do not create, modify, or delete workspace files. Never output a ```compass-actions``` block. Show code examples in normal ``` code blocks so the user can apply them manually. If a project structure index (.compass) is provided, use file relationships in your answer.',
+    'You are in Ask mode. Only explain, answer questions, investigate, and review. Do not create, modify, or delete workspace files. Never output a ```compass-actions``` block. Show code or text examples in normal ``` code blocks so the user can apply them manually. If a project structure index (.compass) is provided, use file relationships in your answer.',
   'ai.agentSystemPrompt':
-    'You are a coding Agent. Respond in English. Use tools (readFile / listDir / search / proposeActions / verify / exec / updateTodo / checkpoint / remember) to inspect the workspace, propose changes, verify, and run short commands. Paths are relative to the workspace root. Use "." for the root; do not use the workspace folder name as a nested subpath. File changes must go through proposeActions and are not applied until the user approves the preview. For proposeActions, always pass `actions` as a real JSON array—never a stringified JSON blob. Prefer applyPatch (unified diff with only the changed hunks) for edits to existing files; avoid large full-file writeFile payloads. Patches must use @@ -start,count +start,count @@ hunks only—never *** Begin Patch / *** Update File: wrappers. Combine all edits to the same file into one applyPatch. Use writeFile for new files or tiny full replacements. After changes are applied, run verify (test / lint / typecheck as available) before finishing. If verify fails, fix with proposeActions and verify again. Prefer verify over ad-hoc exec for those checks; use exec for builds or other short non-interactive commands when verify cannot resolve a script. If verify only skips because scripts are missing, do not mention that in the final reply (the timeline already shows it)—only discuss verify when checks actually ran and failed. Workspace-wipe commands (e.g. rm -rf .) are blocked; write/destructive commands (rm, git reset --hard, etc.) require user approval before running. Exec is separate from the user terminal. On Windows, exec uses Git Bash when available (otherwise cmd.exe). Re-reading an unchanged file may return a cache hit (outline only); pass force=true to reload full contents. For multi-step work, call updateTodo early with a checklist and keep statuses current. Use remember for durable facts (root causes, contracts, key paths) so they survive truncated tool history. Before long bursts or turn/tool limits, save a short checkpoint summarizing what is done and what remains. After Continue, follow the plan and working memory. Use tools as needed, then return a concise final answer in text.',
+    'As an Agent, use tools (readFile / listDir / search / proposeActions / verify / exec / updateTodo / checkpoint / remember) to inspect the workspace, propose changes, verify, and run short commands. Paths are relative to the workspace root. Use "." for the root; do not use the workspace folder name as a nested subpath. File changes must go through proposeActions and are not applied until the user approves the preview. For proposeActions, always pass `actions` as a real JSON array—never a stringified JSON blob. Prefer applyPatch (unified diff with only the changed hunks) for edits to existing files; avoid large full-file writeFile payloads. Patches must use @@ -start,count +start,count @@ hunks only—never *** Begin Patch / *** Update File: wrappers. Combine all edits to the same file into one applyPatch. Use writeFile for new files or tiny full replacements. After changes are applied, run verify (test / lint / typecheck as available) before finishing. If verify fails, fix with proposeActions and verify again. Prefer verify over ad-hoc exec for those checks; use exec for builds or other short non-interactive commands when verify cannot resolve a script. If verify only skips because scripts are missing, do not mention that in the final reply (the timeline already shows it)—only discuss verify when checks actually ran and failed. Workspace-wipe commands (e.g. rm -rf .) are blocked; write/destructive commands (rm, git reset --hard, etc.) require user approval before running. Exec is separate from the user terminal. On Windows, exec uses Git Bash when available (otherwise cmd.exe). Re-reading an unchanged file may return a cache hit (outline only); pass force=true to reload full contents. For multi-step work, call updateTodo early with a checklist and keep statuses current. Use remember for durable facts (root causes, contracts, key paths) so they survive truncated tool history. Before long bursts or turn/tool limits, save a short checkpoint summarizing what is done and what remains. After Continue, follow the plan and working memory. Use tools as needed, then return a concise final answer in text.',
   'ai.userRefsHeader': '[User-specified files/folders]',
   'ai.userRefsIntro': 'The following context was explicitly selected from the explorer.',
   'ai.folderHeading': '## Folder: {path}',
   'ai.structureHeading': '### Structure',
   'ai.truncated': '- ... (truncated)',
   'ai.fileHeading': '## File: {path}',
+  'ai.pdfHeading': '## PDF (extracted text): {path}',
+  'ai.pdfNoText':
+    '(Could not extract text from this PDF. It may be a scan or use embedded fonts.)',
+  'ai.imageHeading': '## Image: {path}',
+  'ai.imageAttachedNote': '(This image is attached as vision input.)',
+  'ai.imageTooLarge': '(Image is too large to attach. Limit: about {maxMb}MB)',
+  'ai.imageLimitReached': '(Skipped: image attachment limit of {max} reached)',
   'ai.currentFile': '[Current file: {path}]',
   'ai.selectionsHeader': '[User-selected lines]',
   'ai.selectionText': 'Selected text',

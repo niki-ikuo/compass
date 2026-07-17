@@ -28,7 +28,8 @@ import type {
   AgentResolveApprovalRequest,
   AgentNeedContinueEvent,
   AgentResolveContinueRequest,
-  AgentNeedExecApprovalEvent
+  AgentNeedExecApprovalEvent,
+  WorkspaceSettings
 } from '../src/types'
 
 const compassAPI = {
@@ -40,6 +41,10 @@ const compassAPI = {
       ipcRenderer.invoke('fs:readFile', filePath, encoding),
     writeFile: (filePath: string, content: string, encoding?: FileEncoding): Promise<void> =>
       ipcRenderer.invoke('fs:writeFile', filePath, content, encoding),
+    writeBinaryFile: (filePath: string, base64: string): Promise<void> =>
+      ipcRenderer.invoke('fs:writeBinaryFile', filePath, base64),
+    readBinaryFile: (filePath: string): Promise<{ base64: string; size: number }> =>
+      ipcRenderer.invoke('fs:readBinaryFile', filePath),
     createFile: (parentDir: string, name: string): Promise<string> =>
       ipcRenderer.invoke('fs:createFile', parentDir, name),
     createDirectory: (parentDir: string, name: string): Promise<string> =>
@@ -154,7 +159,14 @@ const compassAPI = {
     removeRecent: (workspaceRoot: string): Promise<void> =>
       ipcRenderer.invoke('workspace:removeRecent', workspaceRoot),
     setLast: (workspaceRoot: string | null): Promise<void> =>
-      ipcRenderer.invoke('workspace:setLast', workspaceRoot)
+      ipcRenderer.invoke('workspace:setLast', workspaceRoot),
+    getSettings: (workspaceRoot: string): Promise<WorkspaceSettings> =>
+      ipcRenderer.invoke('workspace:getSettings', workspaceRoot),
+    setSettings: (
+      workspaceRoot: string,
+      settings: WorkspaceSettings
+    ): Promise<WorkspaceSettings> =>
+      ipcRenderer.invoke('workspace:setSettings', workspaceRoot, settings)
   },
   shell: {
     quit: (): Promise<void> => ipcRenderer.invoke('shell:quit'),

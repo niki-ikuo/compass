@@ -11,6 +11,11 @@ import {
   ensureInlineCompletionsRegistered
 } from '@/utils/inline-completions'
 import { MarkdownPreview } from './MarkdownPreview'
+import { MarkdownOutline } from './MarkdownOutline'
+import { MediaViewer } from './MediaViewer'
+import { BrowserViewer } from './BrowserViewer'
+import { isMediaOpenFile } from '@/utils/media-context'
+import { isBrowserOpenFile } from '@/utils/browser-tab'
 import { buildWorkspaceIndex } from '@/utils/project-index'
 import {
   buildSelectionDragPayload,
@@ -352,6 +357,36 @@ export function CodeEditor() {
     )
   }
 
+  if (isBrowserOpenFile(activeFile)) {
+    return (
+      <div className="editor-container">
+        <BrowserViewer
+          key={activeFile.path}
+          path={activeFile.path}
+          initialUrl={activeFile.browserUrl || 'about:blank'}
+        />
+      </div>
+    )
+  }
+
+  if (
+    isMediaOpenFile(activeFile) &&
+    activeFile.mediaBase64 &&
+    activeFile.mediaMimeType &&
+    (activeFile.viewKind === 'image' || activeFile.viewKind === 'pdf')
+  ) {
+    return (
+      <div className="editor-container">
+        <MediaViewer
+          path={activeFile.path}
+          viewKind={activeFile.viewKind}
+          mimeType={activeFile.mediaMimeType}
+          base64={activeFile.mediaBase64}
+        />
+      </div>
+    )
+  }
+
   if (isPreview) {
     return (
       <div className="editor-container preview-mode">
@@ -458,6 +493,7 @@ export function CodeEditor() {
 
   const showEditor = !isMarkdown || markdownViewMode === 'edit' || markdownViewMode === 'split'
   const showPreviewPane = isMarkdown && (markdownViewMode === 'preview' || markdownViewMode === 'split')
+  const showOutline = isMarkdown && showEditor
 
   return (
     <div className="editor-container">
@@ -484,7 +520,11 @@ export function CodeEditor() {
         </div>
       )}
 
-      <div className={`editor-body ${markdownViewMode === 'split' ? 'split' : ''}`}>
+      <div className={`editor-body ${markdownViewMode === 'split' ? 'split' : ''}${showOutline ? ' with-outline' : ''}`}>
+        {showOutline && (
+          <MarkdownOutline content={activeFile.content} filePath={activeFile.path} />
+        )}
+
         {showEditor && (
           <div className={`editor-pane ${markdownViewMode === 'split' ? 'half' : 'full'}`}>
             <Editor

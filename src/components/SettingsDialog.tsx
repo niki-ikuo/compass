@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useAppStore } from '@/stores/app-store'
-import type { AppSettings, ColorThemeId, LlmProviderId, TerminalShell } from '@/types'
-import { DEFAULT_SETTINGS } from '@/types'
+import type { AppSettings, ColorThemeId, LlmProviderId, TerminalShell, UseCasePreset } from '@/types'
+import { DEFAULT_SETTINGS, normalizeUseCasePreset } from '@/types'
 import { COLOR_THEMES, getColorThemeLabel } from '@/utils/color-theme'
 import {
   LLM_PROVIDERS,
@@ -46,12 +46,18 @@ export function SettingsDialog() {
   const { t } = useI18n()
   const settingsOpen = useAppStore((s) => s.settingsOpen)
   const settings = useAppStore((s) => s.settings)
+  const workspaceRoot = useAppStore((s) => s.workspaceRoot)
+  const workspaceDefaultUseCasePreset = useAppStore((s) => s.workspaceDefaultUseCasePreset)
+  const setWorkspaceDefaultUseCasePreset = useAppStore((s) => s.setWorkspaceDefaultUseCasePreset)
   const setSettingsOpen = useAppStore((s) => s.setSettingsOpen)
   const setSettings = useAppStore((s) => s.setSettings)
   const setApiConnected = useAppStore((s) => s.setApiConnected)
 
   const [form, setForm] = useState<AppSettings>({ ...DEFAULT_SETTINGS })
   const [openSnapshot, setOpenSnapshot] = useState<AppSettings>({ ...DEFAULT_SETTINGS })
+  /** '' = アプリ設定に従う */
+  const [workspacePresetForm, setWorkspacePresetForm] = useState<'' | UseCasePreset>('')
+  const [workspacePresetSnapshot, setWorkspacePresetSnapshot] = useState<'' | UseCasePreset>('')
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
   const [shells, setShells] = useState<TerminalShell[]>([])
@@ -64,10 +70,18 @@ export function SettingsDialog() {
         providerKeys: { ...settings.providerKeys },
         inlineCompletionsEnabled: settings.inlineCompletionsEnabled !== false,
         autoOpenAgentPreview: settings.autoOpenAgentPreview === true,
-        defaultShellId: settings.defaultShellId || DEFAULT_SETTINGS.defaultShellId
+        defaultShellId: settings.defaultShellId || DEFAULT_SETTINGS.defaultShellId,
+        defaultUseCasePreset:
+          normalizeUseCasePreset(settings.defaultUseCasePreset) ??
+          DEFAULT_SETTINGS.defaultUseCasePreset,
+        rememberLastUseCasePreset: settings.rememberLastUseCasePreset === true
       }
       setForm(snapshot)
       setOpenSnapshot(snapshot)
+      const wsPreset =
+        normalizeUseCasePreset(workspaceDefaultUseCasePreset) ?? ('' as const)
+      setWorkspacePresetForm(wsPreset)
+      setWorkspacePresetSnapshot(wsPreset)
       setMessage('')
       void window.compass.terminal.listShells().then(setShells)
     }
@@ -118,6 +132,15 @@ export function SettingsDialog() {
       await window.compass.settings.set(toSave)
       setSettings(toSave)
       setLocale(toSave.locale)
+
+      if (workspaceRoot) {
+        const nextWs = workspacePresetForm
+          ? { defaultUseCasePreset: workspacePresetForm }
+          : {}
+        const saved = await window.compass.workspace.setSettings(workspaceRoot, nextWs)
+        setWorkspaceDefaultUseCasePreset(saved.defaultUseCasePreset ?? null)
+      }
+
       const provider = getLlmProvider(toSave.providerId)
       setApiConnected(provider.requiresApiKey ? (toSave.apiKey ? true : null) : true)
       setSettingsOpen(false)
@@ -133,6 +156,7 @@ export function SettingsDialog() {
       ...openSnapshot,
       providerKeys: { ...openSnapshot.providerKeys }
     })
+    setWorkspacePresetForm(workspacePresetSnapshot)
     restoreColorTheme(openSnapshot.colorTheme)
     setMessage('')
   }
@@ -218,6 +242,95 @@ export function SettingsDialog() {
           </label>
 
           <p className="modal-section-title">{t('settings.llm')}</p>
+
+          <label>
+            {t('settings.defaultUseCasePreset')}
+            <select
+              value={
+                normalizeUseCasePreset(form.defaultUseCasePreset) ??
+                DEFAULT_SETTINGS.defaultUseCasePreset
+              }
+              onChange={(e) =>
+                setForm({
+                  ...form,
+                  defaultUseCasePreset:
+                    normalizeUseCasePreset(e.target.value) ??
+                    DEFAULT_SETTINGS.defaultUseCasePreset
+                })
+              }
+            >
+              {(
+                [
+                  { id: 'code', labelKey: 'chat.preset.code', descKey: 'chat.preset.codeDesc' },
+                  {
+                    id: 'document',
+                    labelKey: 'chat.preset.document',
+                    descKey: 'chat.preset.documentDesc'
+                  },
+                  { id: 'data', labelKey: 'chat.preset.data', descKey: 'chat.preset.dataDesc' },
+                  {
+                    id: 'general',
+                    labelKey: 'chat.preset.general',
+                    descKey: 'chat.preset.generalDesc'
+                  }
+                ] as const
+              ).map((option) => (
+                <option key={option.id} value={option.id}>
+                  {t(option.labelKey)} — {t(option.descKey)}
+                </option>
+              ))}
+            </select>
+            <span className="field-hint">{t('settings.defaultUseCasePresetHint')}</span>
+          </label>
+
+          <label>
+            {t('settings.workspaceUseCasePreset')}
+            <select
+              value={workspacePresetForm}
+              disabled={!workspaceRoot}
+              onChange={(e) => {
+                const value = e.target.value
+                if (!value) {
+                  setWorkspacePresetForm('')
+                  return
+                }
+                setWorkspacePresetForm(normalizeUseCasePreset(value) ?? '')
+              }}
+            >
+              <option value="">{t('settings.workspaceUseCasePresetFollowApp')}</option>
+              {(
+                [
+                  { id: 'code', labelKey: 'chat.preset.code' },
+                  { id: 'document', labelKey: 'chat.preset.document' },
+                  { id: 'data', labelKey: 'chat.preset.data' },
+                  { id: 'general', labelKey: 'chat.preset.general' }
+                ] as const
+              ).map((option) => (
+                <option key={option.id} value={option.id}>
+                  {t(option.labelKey)}
+                </option>
+              ))}
+            </select>
+            <span className="field-hint">
+              {workspaceRoot
+                ? t('settings.workspaceUseCasePresetHint')
+                : t('settings.workspaceUseCasePresetNeedFolder')}
+            </span>
+          </label>
+
+          <label className="settings-checkbox-label">
+            <input
+              type="checkbox"
+              checked={form.rememberLastUseCasePreset === true}
+              onChange={(e) =>
+                setForm({ ...form, rememberLastUseCasePreset: e.target.checked })
+              }
+            />
+            <span>
+              {t('settings.rememberLastUseCasePreset')}
+              <span className="field-hint">{t('settings.rememberLastUseCasePresetHint')}</span>
+            </span>
+          </label>
 
           <label>
             {t('settings.provider')}

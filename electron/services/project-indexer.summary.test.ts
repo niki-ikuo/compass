@@ -9,6 +9,8 @@ function file(
     imports: string[]
     exports: string[]
     symbols: Array<{ name: string; kind: string; line: number }>
+    headings: Array<{ level: number; text: string; line: number }>
+    summary: string
   }> = {}
 ) {
   return {
@@ -17,7 +19,9 @@ function file(
     lines: overrides.lines ?? 100,
     imports: overrides.imports ?? [],
     exports: overrides.exports ?? [],
-    symbols: overrides.symbols ?? []
+    symbols: overrides.symbols ?? [],
+    ...(overrides.headings ? { headings: overrides.headings } : {}),
+    ...(overrides.summary ? { summary: overrides.summary } : {})
   }
 }
 
@@ -60,5 +64,30 @@ describe('buildSummary', () => {
       []
     )
     expect(summary).toContain('hidden(function@L7)')
+  })
+
+  it('includes a Documents section with markdown headings and summary', () => {
+    const summary = buildSummary(
+      [
+        file('docs/guide.md', {
+          language: 'markdown',
+          lines: 40,
+          headings: [
+            { level: 1, text: 'Guide', line: 1 },
+            { level: 2, text: 'Setup', line: 5 }
+          ],
+          summary: 'How to install Compass.'
+        }),
+        file('src/app.ts', {
+          exports: ['run'],
+          symbols: [{ name: 'run', kind: 'function', line: 1 }]
+        })
+      ],
+      []
+    )
+    expect(summary).toContain('## Documents')
+    expect(summary).toContain('docs/guide.md')
+    expect(summary).toContain('headings: # Guide > ## Setup')
+    expect(summary).toContain('summary: How to install Compass.')
   })
 })

@@ -7,6 +7,7 @@ import {
   type KeyboardEvent as ReactKeyboardEvent
 } from 'react'
 import { detectMentionKind, isStructuredMention, type ChatMentionKind } from '@/utils/chat-mentions'
+import { hasClipboardMedia } from '@/utils/clipboard-media'
 
 export interface ChatInputComposerHandle {
   focus: () => void
@@ -22,6 +23,8 @@ interface ChatInputComposerProps {
   className?: string
   /** エディタ選択のコピーを検出したら true を返して通常貼り付けを抑止 */
   onPasteSelection?: (dataTransfer: DataTransfer) => boolean
+  /** 画像・PDF の貼り付け */
+  onPasteMedia?: (dataTransfer: DataTransfer) => void | Promise<void>
 }
 
 const MENTION_TOKEN_RE = /@\[([^\]\n]+)\]/g
@@ -184,7 +187,16 @@ function insertNodesAtCaret(editor: HTMLElement, nodes: Node[]) {
 
 export const ChatInputComposer = forwardRef<ChatInputComposerHandle, ChatInputComposerProps>(
   function ChatInputComposer(
-    { value, onChange, onSubmit, placeholder, disabled, className, onPasteSelection },
+    {
+      value,
+      onChange,
+      onSubmit,
+      placeholder,
+      disabled,
+      className,
+      onPasteSelection,
+      onPasteMedia
+    },
     ref
   ) {
     const editorRef = useRef<HTMLDivElement>(null)
@@ -296,13 +308,18 @@ export const ChatInputComposer = forwardRef<ChatInputComposerHandle, ChatInputCo
         }}
         onKeyDown={handleKeyDown}
         onPaste={(event) => {
-          if (onPasteSelection?.(event.clipboardData)) {
-            event.preventDefault()
+          const clipboard = event.clipboardData
+          // Always take over paste so we can strip HTML / handle media & mentions.
+          event.preventDefault()
+
+          if (hasClipboardMedia(clipboard)) {
+            void onPasteMedia?.(clipboard)
             return
           }
 
-          event.preventDefault()
-          const text = event.clipboardData.getData('text/plain')
+          if (onPasteSelection?.(clipboard)) return
+
+          const text = clipboard.getData('text/plain')
           if (!text) return
 
           const editor = editorRef.current

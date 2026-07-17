@@ -14,8 +14,10 @@ import type {
   AgentNeedExecApprovalEvent,
   AgentToolStep,
   ChatMode,
-  ChatSelectionRef
+  ChatSelectionRef,
+  UseCasePreset
 } from '@/types'
+import { normalizeUseCasePreset } from '@/types'
 import { AgentStepTimeline } from './AgentStepTimeline'
 import { AnimatedStatus } from './AnimatedEllipsis'
 import {
@@ -43,6 +45,16 @@ import { getLlmProvider, getModelOptions, getProviderLabel, isAgentModeAvailable
 import { parseAgentToolsUnsupportedError } from '@/utils/agent-tools'
 import { formatActionPreviewError } from '@/utils/apply-error'
 import { resolveLastSentChatMode } from '@/utils/chat-mode'
+import { resolveEffectiveUseCasePreset } from '@/utils/use-case-preset'
+import {
+  buildPastedMediaFileName,
+  classifyMediaFile,
+  collectClipboardMedia,
+  hasClipboardMedia
+} from '@/utils/clipboard-media'
+import { join } from '@/utils/path'
+import { isMediaOpenFile } from '@/utils/media-context'
+import { isBrowserOpenFile } from '@/utils/browser-tab'
 import { useI18n, getDateLocale } from '@/i18n'
 
 function selectionRefKey(ref: ChatSelectionRef): string {
@@ -60,10 +72,26 @@ const CHAT_MODE_OPTIONS: { id: ChatMode; label: string; titleKey: 'chat.askModeT
     { id: 'agent', label: 'Agent', titleKey: 'chat.agentModeTitle' }
   ]
 
+const USE_CASE_PRESET_OPTIONS: {
+  id: UseCasePreset
+  labelKey: 'chat.preset.code' | 'chat.preset.document' | 'chat.preset.data' | 'chat.preset.general'
+  descKey:
+    | 'chat.preset.codeDesc'
+    | 'chat.preset.documentDesc'
+    | 'chat.preset.dataDesc'
+    | 'chat.preset.generalDesc'
+}[] = [
+  { id: 'code', labelKey: 'chat.preset.code', descKey: 'chat.preset.codeDesc' },
+  { id: 'document', labelKey: 'chat.preset.document', descKey: 'chat.preset.documentDesc' },
+  { id: 'data', labelKey: 'chat.preset.data', descKey: 'chat.preset.dataDesc' },
+  { id: 'general', labelKey: 'chat.preset.general', descKey: 'chat.preset.generalDesc' }
+]
+
 export function ChatPanel() {
   const { t } = useI18n()
   const [input, setInput] = useState('')
   const [sendMode, setSendMode] = useState<ChatMode>('edit')
+  const [sendPreset, setSendPreset] = useState<UseCasePreset>('code')
   const [modeMenuOpen, setModeMenuOpen] = useState(false)
   const [agentStreamStatus, setAgentStreamStatus] = useState<string | null>(null)
   const [pendingContinue, setPendingContinue] = useState<AgentNeedContinueEvent | null>(null)
@@ -172,7 +200,32 @@ export function ChatPanel() {
       lastSentModeRef.current = inherited
       setSendMode(inherited === 'agent' && !available ? 'edit' : inherited)
     }
+
+    const lastPreset = normalizeUseCasePreset(lastUser?.preset)
+    setSendPreset(
+      lastPreset ??
+        resolveEffectiveUseCasePreset({
+          workspacePreset: store.workspaceDefaultUseCasePreset,
+          appPreset: store.settings.defaultUseCasePreset
+        })
+    )
   }, [activeChatId])
+
+  const workspaceDefaultUseCasePreset = useAppStore((s) => s.workspaceDefaultUseCasePreset)
+
+  // ワークスペース既定やアプリ既定が変わったとき、履歴のないチャットの初期用途を合わせる
+  useEffect(() => {
+    const store = useAppStore.getState()
+    const session = store.getActiveChatSession()
+    const hasUser = (session?.messages ?? []).some((message) => message.role === 'user')
+    if (hasUser) return
+    setSendPreset(
+      resolveEffectiveUseCasePreset({
+        workspacePreset: workspaceDefaultUseCasePreset,
+        appPreset: store.settings.defaultUseCasePreset
+      })
+    )
+  }, [workspaceDefaultUseCasePreset, settings.defaultUseCasePreset])
 
   useLayoutEffect(() => {
     const container = messagesContainerRef.current
@@ -282,6 +335,11 @@ export function ChatPanel() {
     if (!text || isChatLoading) return
 
     const messageMode = overrides?.mode ?? sendMode
+    const messagePreset = resolveEffectiveUseCasePreset({
+      uiPreset: sendPreset,
+      workspacePreset: workspaceDefaultUseCasePreset,
+      appPreset: settings.defaultUseCasePreset
+    })
     if (messageMode === 'agent' && !isAgentModeAvailable(settings.providerId)) {
       setSendMode('edit')
       lastSentModeRef.current = 'edit'
@@ -311,7 +369,7 @@ export function ChatPanel() {
         revertWorkspacePreview()
       }
     }
-    addChatMessage('user', text, messageMode)
+    addChatMessage('user', text, messageMode, messagePreset)
     addChatMessage('assistant', '')
     stopRequestedRef.current = false
     setAgentStreamStatus(null)
@@ -471,6 +529,23 @@ export function ChatPanel() {
     unsubDone = window.compass.ai.onDone(async () => {
       finish()
 
+      if (settings.rememberLastUseCasePreset && messagePreset !== settings.defaultUseCasePreset) {
+        const next = {
+          ...settings,
+          defaultUseCasePreset: messagePreset,
+          providerKeys: {
+            ...settings.providerKeys,
+            [settings.providerId]: settings.apiKey
+          }
+        }
+        setSettings(next)
+        try {
+          await window.compass.settings.set(next)
+        } catch {
+          // ストアは更新済み。永続化失敗時は次回起動で戻る
+        }
+      }
+
       if (isEditMessage && workspaceRoot) {
         let actions = parseWorkspaceActions(accumulated)
         let usedInferredCodeBlock = false
@@ -583,9 +658,16 @@ export function ChatPanel() {
       messages: history,
       workspaceRoot: workspaceRoot ?? undefined,
       mode: messageMode,
+      preset: messagePreset,
       context: {
-        filePath: activeFile?.path,
-        fileContent: activeFile?.content,
+        filePath:
+          activeFile && !isMediaOpenFile(activeFile) && !isBrowserOpenFile(activeFile)
+            ? activeFile.path
+            : undefined,
+        fileContent:
+          activeFile && !isMediaOpenFile(activeFile) && !isBrowserOpenFile(activeFile)
+            ? activeFile.content
+            : undefined,
         selections: selectionsForRequest.length > 0 ? selectionsForRequest : undefined,
         references: chatContextRefs.length > 0 ? chatContextRefs : undefined
       }
@@ -718,6 +800,52 @@ export function ChatPanel() {
       insertMentionAtCursor(payload.mention)
     }
     return true
+  }
+
+  const handlePasteMedia = async (dataTransfer: DataTransfer): Promise<void> => {
+    if (!hasClipboardMedia(dataTransfer)) return
+    if (!workspaceRoot) {
+      window.alert(t('chat.pasteMediaNeedsWorkspace'))
+      return
+    }
+
+    const mediaItems = collectClipboardMedia(dataTransfer)
+    if (mediaItems.length === 0) return
+
+    try {
+      for (const item of mediaItems) {
+        const classified = classifyMediaFile(item.file)
+        if (!classified) continue
+
+        const fileName = buildPastedMediaFileName(classified, item.name)
+        const absolutePath = join(workspaceRoot, '.compass', 'pasted', fileName)
+        const buffer = await item.file.arrayBuffer()
+        const bytes = new Uint8Array(buffer)
+        let binary = ''
+        const chunk = 0x8000
+        for (let i = 0; i < bytes.length; i += chunk) {
+          binary += String.fromCharCode(...bytes.subarray(i, i + chunk))
+        }
+        const base64 = btoa(binary)
+
+        await window.compass.fs.writeBinaryFile(absolutePath, base64)
+
+        const ref = {
+          path: absolutePath,
+          name: fileName,
+          isDirectory: false
+        }
+        addChatContextRefs([ref])
+        insertContextMentionIntoInput(ref)
+      }
+
+      const tree = await window.compass.fs.readDir(workspaceRoot)
+      setFileTree(tree)
+    } catch (err) {
+      window.alert(
+        err instanceof Error ? err.message : t('chat.pasteMediaFailed')
+      )
+    }
   }
 
   const handleApplyCode = () => {
@@ -858,6 +986,30 @@ export function ChatPanel() {
               {modelOptions.map((model) => (
                 <option key={model} value={model}>
                   {model}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label
+            className="chat-preset-select"
+            title={t(
+              USE_CASE_PRESET_OPTIONS.find((option) => option.id === sendPreset)?.descKey ??
+                'chat.preset.codeDesc'
+            )}
+          >
+            <span className="chat-preset-select-label">{t('chat.useCasePreset')}</span>
+            <select
+              value={sendPreset}
+              onChange={(e) => {
+                const next = normalizeUseCasePreset(e.target.value) ?? 'code'
+                setSendPreset(next)
+              }}
+              disabled={isChatLoading}
+              aria-label={t('chat.useCasePreset')}
+            >
+              {USE_CASE_PRESET_OPTIONS.map((option) => (
+                <option key={option.id} value={option.id} title={t(option.descKey)}>
+                  {t(option.labelKey)}
                 </option>
               ))}
             </select>
@@ -1134,6 +1286,9 @@ export function ChatPanel() {
             onChange={setInput}
             onSubmit={() => void handleSend()}
             onPasteSelection={handlePasteSelection}
+            onPasteMedia={(data) => {
+              void handlePasteMedia(data)
+            }}
             placeholder={
               isEditSendMode
                 ? t('chat.placeholderEdit')

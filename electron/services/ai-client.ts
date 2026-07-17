@@ -1,15 +1,80 @@
 import type { WebContents } from 'electron'
-import type { ChatRequest, InlineCompletionRequest, InlineCompletionResult } from '../../src/types'
+import type {
+  ChatRequest,
+  InlineCompletionRequest,
+  InlineCompletionResult,
+  ResolvedContextFile,
+  UseCasePreset
+} from '../../src/types'
+import { normalizeUseCasePreset } from '../../src/types'
 import { t } from '../../src/i18n/runtime'
+import type { MessageKey } from '../../src/i18n/messages'
+import { composeSystemPrompt, getUseCasePresetReminderKey } from '../../src/utils/system-prompt'
+import {
+  toApiUserContent,
+  type ChatContentPart,
+  type ChatImageAttachment,
+  type UserMessagePayload
+} from '../../src/utils/chat-content-parts'
 import { getSettings } from './settings'
 import { ensureProjectIndex, getProjectIndexContext } from './project-indexer'
 import { resolveChatContext } from './filesystem'
 import { getLlmProvider, getProviderLabel } from '../../src/utils/llm-providers'
 
-function getSystemPrompt(mode: ChatRequest['mode']): string {
-  if (mode === 'ask') return t('ai.askSystemPrompt')
-  if (mode === 'agent') return t('ai.agentSystemPrompt')
-  return t('ai.editSystemPrompt')
+export type { ChatContentPart, ChatImageAttachment, UserMessagePayload }
+export { toApiUserContent }
+
+const PRESET_ROLE_KEYS: Record<UseCasePreset, MessageKey> = {
+  code: 'ai.preset.code.role',
+  document: 'ai.preset.document.role',
+  data: 'ai.preset.data.role',
+  general: 'ai.preset.general.role'
+}
+
+export { composeSystemPrompt }
+
+function appendResolvedFile(
+  parts: string[],
+  file: ResolvedContextFile,
+  images: ChatImageAttachment[]
+): void {
+  if (file.kind === 'image' && file.mimeType && file.base64) {
+    parts.push(t('ai.imageHeading', { path: file.relativePath }))
+    parts.push(t('ai.imageAttachedNote'))
+    parts.push('')
+    images.push({
+      relativePath: file.relativePath,
+      mimeType: file.mimeType,
+      base64: file.base64
+    })
+    return
+  }
+
+  const heading =
+    file.kind === 'pdf'
+      ? t('ai.pdfHeading', { path: file.relativePath })
+      : t('ai.fileHeading', { path: file.relativePath })
+  parts.push(`${heading}${file.truncated ? ' (truncated)' : ''}`)
+  const fence = file.kind === 'pdf' ? 'text' : (file.relativePath.split('.').pop() ?? '')
+  parts.push('```' + fence)
+  parts.push(file.content)
+  parts.push('```')
+  parts.push('')
+}
+
+export function getSystemPrompt(
+  mode: ChatRequest['mode'],
+  preset?: UseCasePreset | null
+): string {
+  const resolved = normalizeUseCasePreset(preset) ?? 'code'
+  const rolePrompt = t(PRESET_ROLE_KEYS[resolved])
+  const modePrompt =
+    mode === 'ask'
+      ? t('ai.askSystemPrompt')
+      : mode === 'agent'
+        ? t('ai.agentSystemPrompt')
+        : t('ai.editSystemPrompt')
+  return composeSystemPrompt(rolePrompt, modePrompt)
 }
 
 const INLINE_COMPLETION_MAX_TOKENS = 96
@@ -99,8 +164,9 @@ export function sanitizeInlineCompletion(raw: string): string {
   return text
 }
 
-export async function buildUserMessage(request: ChatRequest): Promise<string> {
+export async function buildUserMessagePayload(request: ChatRequest): Promise<UserMessagePayload> {
   const parts: string[] = []
+  const images: ChatImageAttachment[] = []
 
   if (request.workspaceRoot) {
     try {
@@ -133,24 +199,31 @@ export async function buildUserMessage(request: ChatRequest): Promise<string> {
         }
         if (folder.truncated) parts.push(t('ai.truncated'))
         for (const file of folder.files) {
-          const ext = file.relativePath.split('.').pop() ?? ''
-          parts.push(`### ${file.relativePath}${file.truncated ? ' (truncated)' : ''}`)
-          parts.push('```' + ext)
-          parts.push(file.content)
-          parts.push('```')
+          if (file.kind === 'image' && file.mimeType && file.base64) {
+            parts.push(`### ${file.relativePath}`)
+            parts.push(t('ai.imageAttachedNote'))
+            images.push({
+              relativePath: file.relativePath,
+              mimeType: file.mimeType,
+              base64: file.base64
+            })
+          } else {
+            const ext = file.kind === 'pdf' ? 'text' : (file.relativePath.split('.').pop() ?? '')
+            const label =
+              file.kind === 'pdf'
+                ? `${file.relativePath} (PDF)`
+                : file.relativePath
+            parts.push(`### ${label}${file.truncated ? ' (truncated)' : ''}`)
+            parts.push('```' + ext)
+            parts.push(file.content)
+            parts.push('```')
+          }
         }
         parts.push('')
       }
 
       for (const file of resolved.files) {
-        const ext = file.relativePath.split('.').pop() ?? ''
-        parts.push(
-          `${t('ai.fileHeading', { path: file.relativePath })}${file.truncated ? ' (truncated)' : ''}`
-        )
-        parts.push('```' + ext)
-        parts.push(file.content)
-        parts.push('```')
-        parts.push('')
+        appendResolvedFile(parts, file, images)
       }
     }
   }
@@ -197,6 +270,14 @@ export async function buildUserMessage(request: ChatRequest): Promise<string> {
     }
   }
 
+  const presetReminderKey = getUseCasePresetReminderKey(
+    normalizeUseCasePreset(request.preset) ?? 'code'
+  )
+  if (presetReminderKey) {
+    parts.push(t(presetReminderKey))
+    parts.push('')
+  }
+
   if (request.mode === 'edit') {
     parts.push(t('ai.editModeReminder'))
     parts.push('')
@@ -213,7 +294,12 @@ export async function buildUserMessage(request: ChatRequest): Promise<string> {
     parts.push(lastUser.content)
   }
 
-  return parts.join('\n')
+  return { text: parts.join('\n'), images }
+}
+
+export async function buildUserMessage(request: ChatRequest): Promise<string> {
+  const payload = await buildUserMessagePayload(request)
+  return payload.text
 }
 
 let activeAbortController: AbortController | null = null
@@ -417,15 +503,16 @@ export async function streamChat(
     }
 
     const history = request.messages.filter((m) => m.role !== 'system')
-    const apiMessages: Array<{ role: string; content: string }> = [
-      { role: 'system', content: getSystemPrompt(request.mode) }
+    const apiMessages: Array<{ role: string; content: string | ChatContentPart[] }> = [
+      { role: 'system', content: getSystemPrompt(request.mode, request.preset) }
     ]
 
     for (let i = 0; i < history.length - 1; i++) {
       apiMessages.push({ role: history[i].role, content: history[i].content })
     }
 
-    apiMessages.push({ role: 'user', content: await buildUserMessage(request) })
+    const userPayload = await buildUserMessagePayload(request)
+    apiMessages.push({ role: 'user', content: toApiUserContent(userPayload) })
 
     if (signal.aborted) {
       webContents.send('ai:aborted')

@@ -14,10 +14,13 @@ import { getSettings } from './settings'
 import {
   acquireChatAbortController,
   buildApiHeaders,
-  buildUserMessage,
+  buildUserMessagePayload,
+  getSystemPrompt,
   isAbortError,
-  releaseChatAbortController
+  releaseChatAbortController,
+  toApiUserContent
 } from './ai-client'
+import type { ChatContentPart } from '../../src/utils/chat-content-parts'
 import { previewWorkspaceActions, resolveInsideWorkspace } from './filesystem'
 import { searchWorkspace } from './workspace-search'
 import { runAgentExec, classifyAgentExecCommand } from './agent-exec'
@@ -60,9 +63,9 @@ import {
   type AgentReadCache
 } from './agent-read-cache'
 import {
+  getVerifyAfterApplyNudge,
   normalizeVerifyChecks,
-  runAgentVerify,
-  VERIFY_AFTER_APPLY_NUDGE
+  runAgentVerify
 } from './agent-verify'
 import { redactSecrets, redactSecretsInArgs } from '../../src/utils/redact'
 import { formatAgentToolsUnsupportedError } from '../../src/utils/agent-tools'
@@ -91,7 +94,7 @@ const MAX_PRIOR_STEP_OBSERVATION_CHARS = 3_000
 
 type ApiMessage = {
   role: string
-  content?: string | null
+  content?: string | ChatContentPart[] | null
   tool_calls?: ToolCall[]
   tool_call_id?: string
   name?: string
@@ -240,18 +243,24 @@ const AGENT_TOOLS = [
     function: {
       name: 'verify',
       description:
-        'Standard post-edit verification loop: run project test / lint / typecheck via known package scripts or safe fallbacks (e.g. tsc --noEmit, cargo test). Prefer this after proposeActions is applied. Pass checks to limit which suites run; default runs all that can be resolved. If a check is missing, fall back to exec with an explicit command. On failure, fix with proposeActions and verify again before finishing. If all checks are skipped because scripts are missing, do not narrate that skip in the final user-facing reply.',
+        'Post-edit verification. In code use-case: run project test / lint / typecheck via package scripts or safe fallbacks. In document use-case: check markdown heading structure on edited files. In data use-case: check CSV column counts and JSON/YAML shape. Prefer after proposeActions is applied. Pass paths to limit which files are checked for document/data; otherwise the last applied paths are used. On failure, fix with proposeActions and verify again. If all checks are skipped because scripts/files are missing, do not narrate that skip in the final user-facing reply.',
       parameters: {
         type: 'object',
         properties: {
           checks: {
             type: 'array',
             description:
-              'Which checks to run. Default: test, lint, and typecheck (skips any that cannot be resolved).',
+              'Code use-case only: which shell checks to run. Default: test, lint, and typecheck (skips any that cannot be resolved). Ignored for document/data light verify.',
             items: {
               type: 'string',
               enum: ['test', 'lint', 'typecheck']
             }
+          },
+          paths: {
+            type: 'array',
+            description:
+              'Relative file paths to check for document/data light verify. Defaults to paths from the last applied proposeActions.',
+            items: { type: 'string' }
           },
           cwd: {
             type: 'string',
@@ -260,7 +269,7 @@ const AGENT_TOOLS = [
           timeoutMs: {
             type: 'number',
             description:
-              'Per-check timeout in milliseconds (default 30000, max 120000). Applied to each resolved command.'
+              'Per-check timeout in milliseconds (default 30000, max 120000). Applied to each resolved shell command.'
           }
         }
       }
@@ -558,8 +567,15 @@ function sanitizeArgs(
           (c): c is string => c === 'test' || c === 'lint' || c === 'typecheck'
         )
       : undefined
+    const paths = Array.isArray(args.paths)
+      ? args.paths
+          .filter((p): p is string => typeof p === 'string')
+          .map((p) => p.slice(0, 200))
+          .slice(0, 40)
+      : undefined
     return redactSecretsInArgs({
       ...(checks && checks.length > 0 ? { checks } : {}),
+      ...(paths && paths.length > 0 ? { paths } : {}),
       ...(typeof args.cwd === 'string' ? { cwd: args.cwd.slice(0, 200) } : {}),
       ...(typeof args.timeoutMs === 'number' ? { timeoutMs: args.timeoutMs } : {})
     })
@@ -832,8 +848,9 @@ async function executeProposeActions(
   workspaceRoot: string,
   callId: string,
   args: Record<string, unknown>,
-  signal: AbortSignal
-): Promise<{ ok: boolean; summary: string; content: string }> {
+  signal: AbortSignal,
+  preset?: import('../../src/types').UseCasePreset | null
+): Promise<{ ok: boolean; summary: string; content: string; appliedPaths?: string[] }> {
   const parsed = parseProposeActions(args)
   if ('error' in parsed) {
     return {
@@ -893,7 +910,8 @@ async function executeProposeActions(
       return {
         ok: true,
         summary: `Applied ${normalized.length} action(s)`,
-        content: `${detail}\n\n${VERIFY_AFTER_APPLY_NUDGE}`
+        content: `${detail}\n\n${getVerifyAfterApplyNudge(preset)}`,
+        appliedPaths: normalized.map((a) => a.path)
       }
     }
     const detail =
@@ -987,17 +1005,24 @@ async function executeExec(
 async function executeVerify(
   workspaceRoot: string,
   args: Record<string, unknown>,
-  signal: AbortSignal
+  signal: AbortSignal,
+  preset?: import('../../src/types').UseCasePreset | null,
+  fallbackPaths?: string[]
 ): Promise<{ ok: boolean; summary: string; content: string }> {
   const checks = normalizeVerifyChecks(args.checks)
   const cwd = typeof args.cwd === 'string' ? args.cwd : undefined
   const timeoutMs = typeof args.timeoutMs === 'number' ? args.timeoutMs : undefined
+  const argPaths = Array.isArray(args.paths)
+    ? args.paths.filter((p): p is string => typeof p === 'string')
+    : undefined
   const result = await runAgentVerify({
     workspaceRoot,
     checks,
     cwd,
     timeoutMs,
-    signal
+    signal,
+    preset,
+    paths: argPaths && argPaths.length > 0 ? argPaths : fallbackPaths
   })
   return {
     ok: result.ok,
@@ -1015,7 +1040,9 @@ async function executeTool(
   signal: AbortSignal,
   plan: AgentPlanState,
   memory: AgentMemoryState,
-  readCache: AgentReadCache
+  readCache: AgentReadCache,
+  preset?: import('../../src/types').UseCasePreset | null,
+  lastAppliedPaths?: string[]
 ): Promise<{ ok: boolean; summary: string; content: string }> {
   switch (name) {
     case 'readFile':
@@ -1027,7 +1054,7 @@ async function executeTool(
     case 'exec':
       return executeExec(webContents, workspaceRoot, callId, args, signal)
     case 'verify':
-      return executeVerify(workspaceRoot, args, signal)
+      return executeVerify(workspaceRoot, args, signal, preset, lastAppliedPaths)
     case 'updateTodo':
       return applyUpdateTodo(plan, args)
     case 'checkpoint':
@@ -1231,15 +1258,19 @@ export async function runAgent(webContents: WebContents, request: ChatRequest): 
 
     const history = request.messages.filter((m) => m.role !== 'system')
     const apiMessages: ApiMessage[] = [
-      { role: 'system', content: t('ai.agentSystemPrompt') }
+      { role: 'system', content: getSystemPrompt('agent', request.preset) }
     ]
 
     appendHistoryMessages(apiMessages, history)
-    apiMessages.push({ role: 'user', content: await buildUserMessage(request) })
+    apiMessages.push({
+      role: 'user',
+      content: toApiUserContent(await buildUserMessagePayload(request))
+    })
 
     const plan = rebuildPlanFromHistory(history)
     const memory = rebuildMemoryFromHistory(history)
     const readCache = createAgentReadCache()
+    let lastAppliedPaths: string[] = []
 
     const url = `${settings.apiBaseUrl.replace(/\/$/, '')}/chat/completions`
     const headers = buildApiHeaders(settings)
@@ -1352,7 +1383,7 @@ export async function runAgent(webContents: WebContents, request: ChatRequest): 
           args: sanitized
         })
 
-        let result: { ok: boolean; summary: string; content: string }
+        let result: { ok: boolean; summary: string; content: string; appliedPaths?: string[] }
         try {
           if (call.function.name === 'proposeActions') {
             // Incomplete JSON (often max_tokens cut mid-writeFile) must not become a preview.
@@ -1367,11 +1398,16 @@ export async function runAgent(webContents: WebContents, request: ChatRequest): 
                 request.workspaceRoot,
                 call.id,
                 args,
-                signal
+                signal,
+                request.preset
               )
               if (result.ok) {
-                const paths = extractActionPaths(args)
+                const paths =
+                  result.appliedPaths && result.appliedPaths.length > 0
+                    ? result.appliedPaths
+                    : extractActionPaths(args)
                 invalidateCachedPaths(readCache, paths)
+                if (paths.length > 0) lastAppliedPaths = paths
               }
             }
           } else {
@@ -1384,7 +1420,9 @@ export async function runAgent(webContents: WebContents, request: ChatRequest): 
               signal,
               plan,
               memory,
-              readCache
+              readCache,
+              request.preset,
+              lastAppliedPaths
             )
           }
         } catch (err) {

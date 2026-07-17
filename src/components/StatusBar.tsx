@@ -6,6 +6,7 @@ import { buildWorkspaceIndex } from '@/utils/project-index'
 import { getLlmProvider } from '@/utils/llm-providers'
 import type { FileEncoding } from '@/types'
 import { useI18n, type MessageKey } from '@/i18n'
+import { isMediaOpenFile } from '@/utils/media-context'
 
 export function StatusBar() {
   const { t } = useI18n()
@@ -24,8 +25,18 @@ export function StatusBar() {
   const menuRef = useRef<HTMLDivElement>(null)
 
   const activeFile = openFiles.find((f) => f.path === activeFilePath) ?? null
-  const language = activeFilePath ? getLanguageFromPath(activeFilePath) : ''
-  const encodingLabel = activeFile ? getEncodingLabel(activeFile.encoding) : ''
+  const isMedia = activeFile ? isMediaOpenFile(activeFile) : false
+  const isBrowser = activeFile?.viewKind === 'browser'
+  const language = activeFilePath
+    ? isBrowser
+      ? t('browser.label')
+      : isMedia
+        ? activeFile?.viewKind === 'pdf'
+          ? t('editor.pdfLabel')
+          : t('editor.imageLabel')
+        : getLanguageFromPath(activeFilePath)
+    : ''
+  const encodingLabel = activeFile && !isMedia && !isBrowser ? getEncodingLabel(activeFile.encoding) : ''
   const provider = getLlmProvider(settings.providerId)
   const providerLabel = t(`provider.${provider.id}.label` as MessageKey)
 
@@ -86,10 +97,14 @@ export function StatusBar() {
         {activeFilePath ? getFileName(activeFilePath) : t('status.noFile')}
       </span>
       <span className="status-item">
-        Ln {cursorPosition.line}, Col {cursorPosition.column}
+        {isBrowser
+          ? activeFile?.browserUrl && activeFile.browserUrl !== 'about:blank'
+            ? activeFile.browserUrl
+            : t('browser.newTab')
+          : `Ln ${cursorPosition.line}, Col ${cursorPosition.column}`}
       </span>
       {language && <span className="status-item">{language}</span>}
-      {activeFile && (
+      {activeFile && !isMedia && !isBrowser && (
         <div className="status-encoding" ref={menuRef}>
           <button
             type="button"

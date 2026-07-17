@@ -2,8 +2,13 @@ import { mkdir, readdir, readFile, stat, writeFile } from 'fs/promises'
 import { dirname, extname, join, relative } from 'path'
 import { t } from '../../src/i18n/runtime'
 import type { IndexBuildResult, ProjectIndexContext } from '../../src/types'
+import {
+  extractMarkdownSummary,
+  parseMarkdownHeadings,
+  type MarkdownHeading
+} from '../../src/utils/markdown-outline'
 
-const INDEX_VERSION = 2
+const INDEX_VERSION = 3
 const COMPASS_DIR = '.compass'
 const IGNORED_DIRS = new Set([
   'node_modules',
@@ -30,6 +35,7 @@ const SOURCE_EXTENSIONS = new Set([
   'h',
   'json',
   'md',
+  'markdown',
   'css',
   'scss',
   'html',
@@ -50,6 +56,10 @@ interface IndexedFile {
   imports: string[]
   exports: string[]
   symbols: IndexedSymbol[]
+  /** Markdown のみ */
+  headings?: MarkdownHeading[]
+  /** Markdown のみ — 先頭段落の短い要約 */
+  summary?: string
 }
 
 interface GraphEdge {
@@ -66,6 +76,7 @@ function getLanguage(ext: string): string {
     jsx: 'javascript',
     py: 'python',
     md: 'markdown',
+    markdown: 'markdown',
     json: 'json',
     css: 'css',
     html: 'html'
@@ -275,6 +286,31 @@ function formatSymbolBrief(file: IndexedFile, max = 8): string {
   return parts.join(' | ')
 }
 
+function formatDocumentBrief(file: IndexedFile, maxHeadings = 8): string {
+  const parts: string[] = []
+  if (file.headings && file.headings.length > 0) {
+    const outline = file.headings
+      .slice(0, maxHeadings)
+      .map((h) => `${'#'.repeat(h.level)} ${h.text}`)
+      .join(' > ')
+    parts.push(`headings: ${outline}`)
+  }
+  if (file.summary) {
+    parts.push(`summary: ${file.summary}`)
+  }
+  return parts.join(' | ')
+}
+
+function formatFileBrief(file: IndexedFile, max = 8): string {
+  if (file.language === 'markdown') return formatDocumentBrief(file, max)
+  return formatSymbolBrief(file, max)
+}
+
+function documentScore(file: IndexedFile): number {
+  if (file.language !== 'markdown') return 0
+  return (file.headings?.length ?? 0) * 2 + (file.summary ? 5 : 0) + entryPointScore(file.path)
+}
+
 function pickEntryPoints(files: IndexedFile[], edges: GraphEdge[]): IndexedFile[] {
   const inbound = inboundImportCounts(edges)
   const ranked = files
@@ -313,7 +349,7 @@ export function buildSummary(files: IndexedFile[], edges: GraphEdge[]): string {
   if (entryPoints.length > 0) {
     lines.push('## Entry points')
     for (const file of entryPoints) {
-      const brief = formatSymbolBrief(file, 6)
+      const brief = formatFileBrief(file, 6)
       const fanIn = inbound.get(file.path) ?? 0
       const fanInLabel = fanIn > 0 ? `, importedBy:${fanIn}` : ''
       lines.push(
@@ -324,18 +360,43 @@ export function buildSummary(files: IndexedFile[], edges: GraphEdge[]): string {
     lines.push('')
   }
 
+  const documents = files
+    .filter(
+      (f) =>
+        f.language === 'markdown' &&
+        ((f.headings && f.headings.length > 0) || Boolean(f.summary))
+    )
+    .sort((a, b) => documentScore(b) - documentScore(a) || a.path.localeCompare(b.path))
+
+  if (documents.length > 0) {
+    lines.push('## Documents')
+    for (const file of documents.slice(0, 40)) {
+      const brief = formatDocumentBrief(file, 10)
+      lines.push(
+        `- ${file.path} (${t('ai.indexLines', { count: file.lines })})` +
+          (brief ? ` | ${brief}` : '')
+      )
+    }
+    if (documents.length > 40) {
+      lines.push(`- ... and ${documents.length - 40} more documents`)
+    }
+    lines.push('')
+  }
+
   lines.push('## File Overview')
 
-  // Prefer files with symbols/exports; keep a stable path sort within ties.
+  // Prefer files with symbols/exports/document outline; keep a stable path sort within ties.
   const overview = [...files].sort((a, b) => {
-    const sa = a.exports.length * 2 + a.symbols.length + entryPointScore(a.path)
-    const sb = b.exports.length * 2 + b.symbols.length + entryPointScore(b.path)
+    const sa =
+      a.exports.length * 2 + a.symbols.length + entryPointScore(a.path) + documentScore(a)
+    const sb =
+      b.exports.length * 2 + b.symbols.length + entryPointScore(b.path) + documentScore(b)
     if (sb !== sa) return sb - sa
     return a.path.localeCompare(b.path)
   })
 
   for (const file of overview.slice(0, 80)) {
-    const brief = formatSymbolBrief(file, 6)
+    const brief = formatFileBrief(file, 6)
     const importTargets = file.imports.filter((i) => i.startsWith('.')).slice(0, 4).join(', ')
     lines.push(
       `- ${file.path} (${file.language}, ${t('ai.indexLines', { count: file.lines })})` +
@@ -523,14 +584,23 @@ async function runBuildProjectIndex(
       const language = getLanguage(ext)
       const lines = content.split('\n').length
 
-      files.push({
+      const entry: IndexedFile = {
         path: relPath,
         language,
         lines,
         imports: extractImports(content, language),
         exports: extractExports(content, language),
         symbols: extractSymbols(content, language)
-      })
+      }
+
+      if (language === 'markdown') {
+        const headings = parseMarkdownHeadings(content).slice(0, 40)
+        const summary = extractMarkdownSummary(content, 200)
+        if (headings.length > 0) entry.headings = headings
+        if (summary) entry.summary = summary
+      }
+
+      files.push(entry)
     } catch {
       // skip unreadable files
     }
@@ -656,22 +726,13 @@ export async function getProjectIndexContext(
         ? [
             '## Related to current context',
             ...relatedFiles.map((f) => {
-              const exportBrief =
-                f.exports.length > 0
-                  ? `exports: ${f.exports.slice(0, 8).join(', ')}`
-                  : ''
-              const syms = f.symbols
-                .map((s) => `${s.name}(${s.kind}@L${s.line})`)
-                .slice(0, 8)
-                .join(', ')
+              const detail = formatFileBrief(f, 8)
               const imps = f.imports
                 .filter((i) => i.startsWith('.'))
                 .slice(0, 5)
                 .join(', ')
-              const detail = [exportBrief, syms ? `symbols: ${syms}` : '', imps ? `-> ${imps}` : '']
-                .filter(Boolean)
-                .join(' | ')
-              return `- ${f.path}: ${detail || 'no symbols'}`
+              const withImports = [detail, imps ? `-> ${imps}` : ''].filter(Boolean).join(' | ')
+              return `- ${f.path}: ${withImports || 'no symbols'}`
             })
           ].join('\n')
         : ''

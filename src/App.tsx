@@ -38,6 +38,8 @@ export function App() {
   const locale = useAppStore((s) => s.settings.locale)
   const getActiveFile = useAppStore((s) => s.getActiveFile)
   const markFileSaved = useAppStore((s) => s.markFileSaved)
+  const openFiles = useAppStore((s) => s.openFiles)
+  const openBrowserTab = useAppStore((s) => s.openBrowserTab)
 
   const openWorkspace = useCallback(
     async (folder: string) => {
@@ -49,11 +51,15 @@ export function App() {
 
       setWorkspaceRoot(folder)
       try {
-        const [tree, chatHistory] = await Promise.all([
+        const [tree, chatHistory, workspaceSettings] = await Promise.all([
           window.compass.fs.readDir(folder),
-          window.compass.chat.loadHistory(folder)
+          window.compass.chat.loadHistory(folder),
+          window.compass.workspace.getSettings(folder)
         ])
         setFileTree(tree)
+        useAppStore
+          .getState()
+          .setWorkspaceDefaultUseCasePreset(workspaceSettings.defaultUseCasePreset ?? null)
         restoreChatSessions(chatHistory.sessions, chatHistory.activeChatId)
         await window.compass.index.watch(folder)
         void buildWorkspaceIndex(folder)
@@ -61,6 +67,7 @@ export function App() {
       } catch (error) {
         await window.compass.index.unwatch()
         setWorkspaceRoot(null)
+        useAppStore.getState().setWorkspaceDefaultUseCasePreset(null)
         setFileTree([])
         throw error
       }
@@ -83,10 +90,37 @@ export function App() {
   const handleSave = useCallback(async () => {
     const activeFile = getActiveFile()
     if (!activeFile || activeFile.isPreview) return
+    if (
+      activeFile.viewKind === 'image' ||
+      activeFile.viewKind === 'pdf' ||
+      activeFile.viewKind === 'browser'
+    ) {
+      return
+    }
 
     await window.compass.fs.writeFile(activeFile.path, activeFile.content, activeFile.encoding)
     markFileSaved(activeFile.path)
   }, [getActiveFile, markFileSaved])
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!(event.ctrlKey || event.metaKey) || !event.shiftKey) return
+      if (event.key.toLowerCase() !== 'b') return
+      const target = event.target as HTMLElement | null
+      if (
+        target &&
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.isContentEditable)
+      ) {
+        return
+      }
+      event.preventDefault()
+      openBrowserTab()
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [openBrowserTab])
 
   useEffect(() => {
     document.title = workspaceRoot ? `Compass - ${workspaceRoot}` : 'Compass'
@@ -232,7 +266,7 @@ export function App() {
         onRightRatioChange={setChatPanelWidthRatio}
         left={<LeftSidebar />}
         center={
-          workspaceRoot ? (
+          workspaceRoot || openFiles.length > 0 ? (
             <EditorCenter />
           ) : (
             <WorkspaceWelcome

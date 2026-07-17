@@ -15,12 +15,19 @@ import type {
   LeftSidebarView,
   EditorRevealRequest,
   WorkspaceSearchResult,
-  AgentToolStep
+  AgentToolStep,
+  UseCasePreset
 } from '@/types'
-import { DEFAULT_SETTINGS, normalizeAgentSteps, normalizeChatMode } from '@/types'
+import {
+  DEFAULT_SETTINGS,
+  normalizeAgentSteps,
+  normalizeChatMode,
+  normalizeUseCasePreset
+} from '@/types'
 import { getLanguageFromPath } from '@/utils/language'
 import { generateId } from '@/utils/code-blocks'
 import { loadPanelLayout, savePanelLayout } from '@/utils/panel-layout'
+import { createBrowserTabPath, normalizeBrowserUrl } from '@/utils/browser-tab'
 import { t, isDefaultChatTitle } from '@/i18n'
 
 function createEmptyChatSession(): ChatSession {
@@ -44,10 +51,12 @@ function normalizeChatSession(session: ChatSession): ChatSession {
     messages: Array.isArray(session.messages)
       ? session.messages.map((message) => {
           const mode = normalizeChatMode(message.mode)
+          const preset = normalizeUseCasePreset(message.preset)
           const agentSteps = normalizeAgentSteps(message.agentSteps)
           return {
             ...message,
             mode: mode || undefined,
+            preset: preset || undefined,
             ...(agentSteps ? { agentSteps } : {})
           }
         })
@@ -286,6 +295,8 @@ function revertPreviewFileInOpenFiles(
 
 interface AppState {
   workspaceRoot: string | null
+  /** 開いているワークスペースの用途既定（`.compass/settings.json`）。未設定は null */
+  workspaceDefaultUseCasePreset: UseCasePreset | null
   fileTree: FileTreeNode[]
   openFiles: OpenFile[]
   activeFilePath: string | null
@@ -336,10 +347,22 @@ interface AppState {
   panelLayout: { fileTreeWidthRatio: number; chatWidthRatio: number; terminalHeight: number }
 
   setWorkspaceRoot: (root: string | null) => void
+  setWorkspaceDefaultUseCasePreset: (preset: UseCasePreset | null) => void
   restoreChatSessions: (sessions: ChatSession[], activeChatId: string | null) => void
   closeWorkspace: () => boolean
   setFileTree: (tree: FileTreeNode[]) => void
   openFile: (path: string, content: string, encoding?: FileEncoding) => void
+  openMediaFile: (
+    path: string,
+    viewKind: 'image' | 'pdf',
+    mimeType: string,
+    base64: string
+  ) => void
+  openBrowserTab: (url?: string) => void
+  updateBrowserTab: (
+    path: string,
+    patch: { browserUrl?: string; browserTitle?: string }
+  ) => void
   closeFile: (path: string) => void
   setActiveFile: (path: string) => void
   updateFileContent: (path: string, content: string) => void
@@ -354,7 +377,12 @@ interface AppState {
   closeChatSession: (id: string) => void
   reopenChatSession: (id: string) => void
   deleteChatSession: (id: string) => void
-  addChatMessage: (role: 'user' | 'assistant', content: string, mode?: ChatMode) => void
+  addChatMessage: (
+    role: 'user' | 'assistant',
+    content: string,
+    mode?: ChatMode,
+    preset?: UseCasePreset
+  ) => void
   updateLastAssistantMessage: (content: string, patch?: { agentSteps?: AgentToolStep[] }) => void
   setChatLoading: (loading: boolean) => void
   clearChat: () => void
@@ -417,6 +445,7 @@ const initialChatSession = createEmptyChatSession()
 
 export const useAppStore = create<AppState>((set, get) => ({
   workspaceRoot: null,
+  workspaceDefaultUseCasePreset: null,
   fileTree: [],
   openFiles: [],
   activeFilePath: null,
@@ -457,8 +486,12 @@ export const useAppStore = create<AppState>((set, get) => ({
   setWorkspaceRoot: (root) =>
     set((state) => ({
       workspaceRoot: root,
+      workspaceDefaultUseCasePreset: root ? state.workspaceDefaultUseCasePreset : null,
       chatSessions: state.chatSessions.map((session) => ({ ...session, contextRefs: [] }))
     })),
+
+  setWorkspaceDefaultUseCasePreset: (preset) =>
+    set({ workspaceDefaultUseCasePreset: normalizeUseCasePreset(preset) ?? null }),
 
   restoreChatSessions: (sessions, activeChatId) => {
     const normalized = sessions.map(normalizeChatSession)
@@ -516,6 +549,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
     set({
       workspaceRoot: null,
+      workspaceDefaultUseCasePreset: null,
       fileTree: [],
       openFiles: [],
       activeFilePath: null,
@@ -543,7 +577,17 @@ export const useAppStore = create<AppState>((set, get) => ({
         return {
           activeFilePath: path,
           openFiles: state.openFiles.map((f) =>
-            f.path === path ? { ...f, content, encoding, isDirty: false } : f
+            f.path === path
+              ? {
+                  ...f,
+                  content,
+                  encoding,
+                  isDirty: false,
+                  viewKind: 'text',
+                  mediaMimeType: undefined,
+                  mediaBase64: undefined
+                }
+              : f
           )
         }
       }
@@ -552,13 +596,66 @@ export const useAppStore = create<AppState>((set, get) => ({
         content,
         language: getLanguageFromPath(path),
         encoding,
-        isDirty: false
+        isDirty: false,
+        viewKind: 'text'
       }
       return {
         openFiles: [...state.openFiles, newFile],
         activeFilePath: path
       }
     }),
+
+  openMediaFile: (path, viewKind, mimeType, base64) =>
+    set((state) => {
+      const existing = state.openFiles.find((f) => f.path === path)
+      const mediaFile: OpenFile = {
+        path,
+        content: '',
+        language: viewKind === 'pdf' ? 'pdf' : 'image',
+        encoding: 'utf8',
+        isDirty: false,
+        viewKind,
+        mediaMimeType: mimeType,
+        mediaBase64: base64
+      }
+      if (existing) {
+        return {
+          activeFilePath: path,
+          openFiles: state.openFiles.map((f) => (f.path === path ? mediaFile : f))
+        }
+      }
+      return {
+        openFiles: [...state.openFiles, mediaFile],
+        activeFilePath: path
+      }
+    }),
+
+  openBrowserTab: (url) =>
+    set((state) => {
+      const path = createBrowserTabPath()
+      const browserUrl = normalizeBrowserUrl(url ?? '')
+      const tab: OpenFile = {
+        path,
+        content: '',
+        language: 'browser',
+        encoding: 'utf8',
+        isDirty: false,
+        viewKind: 'browser',
+        browserUrl,
+        browserTitle: undefined
+      }
+      return {
+        openFiles: [...state.openFiles, tab],
+        activeFilePath: path
+      }
+    }),
+
+  updateBrowserTab: (path, patch) =>
+    set((state) => ({
+      openFiles: state.openFiles.map((f) =>
+        f.path === path && f.viewKind === 'browser' ? { ...f, ...patch } : f
+      )
+    })),
 
   closeFile: (path) =>
     set((state) => {
@@ -587,6 +684,9 @@ export const useAppStore = create<AppState>((set, get) => ({
     })),
 
   reopenFileWithEncoding: async (path, encoding) => {
+    const current = get().openFiles.find((f) => f.path === path)
+    if (current?.viewKind === 'image' || current?.viewKind === 'pdf') return
+
     const decoded = await window.compass.fs.readFile(path, encoding)
     set((state) => ({
       openFiles: state.openFiles.map((f) =>
@@ -595,7 +695,10 @@ export const useAppStore = create<AppState>((set, get) => ({
               ...f,
               content: decoded.content,
               encoding: decoded.encoding,
-              isDirty: false
+              isDirty: false,
+              viewKind: 'text',
+              mediaMimeType: undefined,
+              mediaBase64: undefined
             }
           : f
       ),
@@ -779,7 +882,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     scheduleChatHistorySave(state.workspaceRoot)
   },
 
-  addChatMessage: (role, content, mode) => {
+  addChatMessage: (role, content, mode, preset) => {
     set((state) => ({
       chatSessions: updateActiveSession(state.chatSessions, state.activeChatId, (session) => {
         const messages: ChatMessage[] = [
@@ -789,7 +892,8 @@ export const useAppStore = create<AppState>((set, get) => ({
             role,
             content,
             timestamp: Date.now(),
-            ...(role === 'user' && mode ? { mode } : {})
+            ...(role === 'user' && mode ? { mode } : {}),
+            ...(role === 'user' && preset ? { preset } : {})
           }
         ]
         let title = session.title

@@ -16,6 +16,8 @@ import { t } from '../../src/i18n/runtime'
 import { normalizeWorkspaceActionPath } from '../../src/utils/workspace-actions'
 import { ApplyPatchError, applyUnifiedDiff } from '../../src/utils/apply-patch'
 import { decodeFileBuffer, encodeContent } from './encoding'
+import { getImageMimeType, isImagePath, isPdfPath } from '../../src/utils/media-context'
+import { extractPdfText } from '../../src/utils/pdf-text'
 
 const PATHED_ACTION_TYPES = new Set([
   'mkdir',
@@ -83,6 +85,10 @@ export async function materializeWorkspaceActions(
 const IGNORED_DIRS = new Set(['node_modules', '.git', 'dist', 'out', 'release', '.next', '.compass'])
 const MAX_FILE_BYTES = 32 * 1024
 const MAX_FOLDER_FILES = 25
+/** Vision 向け画像の上限（バイト） */
+const MAX_IMAGE_BYTES = 4 * 1024 * 1024
+const MAX_IMAGES_PER_REQUEST = 6
+const MAX_PDF_TEXT_CHARS = 48_000
 
 export async function readDirectory(dirPath: string): Promise<FileTreeNode[]> {
   const entries = await readdir(dirPath, { withFileTypes: true })
@@ -123,6 +129,32 @@ export async function writeFileContent(
   encoding: FileEncoding = 'utf8'
 ): Promise<void> {
   await writeFile(filePath, encodeContent(content, encoding))
+}
+
+/** base64 でバイナリを書き込む（親ディレクトリは必要なら作成） */
+export async function writeBinaryFile(filePath: string, base64: string): Promise<void> {
+  await mkdir(dirname(filePath), { recursive: true })
+  await writeFile(filePath, Buffer.from(base64, 'base64'))
+}
+
+const MAX_EDITOR_MEDIA_BYTES = 25 * 1024 * 1024
+
+export async function readBinaryFile(
+  filePath: string
+): Promise<{ base64: string; size: number }> {
+  const info = await stat(filePath)
+  if (!info.isFile()) {
+    throw new Error(t('fs.notAFile', { path: filePath }))
+  }
+  if (info.size > MAX_EDITOR_MEDIA_BYTES) {
+    throw new Error(
+      t('editor.mediaTooLarge', {
+        maxMb: Math.round(MAX_EDITOR_MEDIA_BYTES / (1024 * 1024))
+      })
+    )
+  }
+  const buffer = await readFile(filePath)
+  return { base64: buffer.toString('base64'), size: buffer.length }
 }
 
 function validateName(name: string): void {
@@ -368,11 +400,83 @@ async function readTextFileSafe(
     return {
       relativePath: toRelativePath(workspaceRoot, filePath),
       content: decoded.content,
-      truncated
+      truncated,
+      kind: 'text'
     }
   } catch {
     return null
   }
+}
+
+async function readPdfFileSafe(
+  filePath: string,
+  workspaceRoot: string
+): Promise<ResolvedContextFile | null> {
+  try {
+    const info = await stat(filePath)
+    if (!info.isFile()) return null
+    const buffer = await readFile(filePath)
+    const extracted = extractPdfText(buffer, MAX_PDF_TEXT_CHARS)
+    const relativePath = toRelativePath(workspaceRoot, filePath)
+    if (!extracted.text.trim()) {
+      return {
+        relativePath,
+        content: t('ai.pdfNoText'),
+        truncated: false,
+        kind: 'pdf'
+      }
+    }
+    return {
+      relativePath,
+      content: extracted.text,
+      truncated: extracted.truncated,
+      kind: 'pdf'
+    }
+  } catch {
+    return null
+  }
+}
+
+async function readImageFileSafe(
+  filePath: string,
+  workspaceRoot: string
+): Promise<ResolvedContextFile | null> {
+  try {
+    const mimeType = getImageMimeType(filePath)
+    if (!mimeType) return null
+    const info = await stat(filePath)
+    if (!info.isFile()) return null
+    if (info.size > MAX_IMAGE_BYTES) {
+      return {
+        relativePath: toRelativePath(workspaceRoot, filePath),
+        content: t('ai.imageTooLarge', {
+          maxMb: Math.round(MAX_IMAGE_BYTES / (1024 * 1024))
+        }),
+        truncated: true,
+        kind: 'text'
+      }
+    }
+    const buffer = await readFile(filePath)
+    return {
+      relativePath: toRelativePath(workspaceRoot, filePath),
+      content: '',
+      truncated: false,
+      kind: 'image',
+      mimeType,
+      base64: buffer.toString('base64')
+    }
+  } catch {
+    return null
+  }
+}
+
+async function readContextFile(
+  filePath: string,
+  workspaceRoot: string
+): Promise<ResolvedContextFile | null> {
+  if (isImagePath(filePath)) return readImageFileSafe(filePath, workspaceRoot)
+  if (isPdfPath(filePath)) return readPdfFileSafe(filePath, workspaceRoot)
+  return readTextFileSafe(filePath, workspaceRoot)
 }
 
 async function listFilesRecursive(dirPath: string): Promise<string[]> {
@@ -398,6 +502,24 @@ export async function resolveChatContext(
 ): Promise<ResolvedChatContext> {
   const files: ResolvedContextFile[] = []
   const folders: ResolvedFolderContext[] = []
+  let imageCount = 0
+
+  const acceptFile = (file: ResolvedContextFile | null): void => {
+    if (!file) return
+    if (file.kind === 'image') {
+      if (imageCount >= MAX_IMAGES_PER_REQUEST) {
+        files.push({
+          relativePath: file.relativePath,
+          content: t('ai.imageLimitReached', { max: MAX_IMAGES_PER_REQUEST }),
+          truncated: true,
+          kind: 'text'
+        })
+        return
+      }
+      imageCount += 1
+    }
+    files.push(file)
+  }
 
   for (const ref of references) {
     if (ref.isDirectory) {
@@ -408,8 +530,21 @@ export async function resolveChatContext(
       const folderFiles: ResolvedContextFile[] = []
 
       for (const filePath of selected) {
-        const file = await readTextFileSafe(filePath, workspaceRoot)
-        if (file) folderFiles.push(file)
+        const file = await readContextFile(filePath, workspaceRoot)
+        if (!file) continue
+        if (file.kind === 'image') {
+          if (imageCount >= MAX_IMAGES_PER_REQUEST) {
+            folderFiles.push({
+              relativePath: file.relativePath,
+              content: t('ai.imageLimitReached', { max: MAX_IMAGES_PER_REQUEST }),
+              truncated: true,
+              kind: 'text'
+            })
+            continue
+          }
+          imageCount += 1
+        }
+        folderFiles.push(file)
       }
 
       folders.push({
@@ -419,8 +554,8 @@ export async function resolveChatContext(
         truncated
       })
     } else {
-      const file = await readTextFileSafe(ref.path, workspaceRoot)
-      if (file) files.push(file)
+      const file = await readContextFile(ref.path, workspaceRoot)
+      acceptFile(file)
     }
   }
 

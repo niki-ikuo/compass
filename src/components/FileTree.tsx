@@ -17,9 +17,15 @@ import {
 import { formatContextMention } from '@/utils/chat-mentions'
 import { useI18n } from '@/i18n'
 import { basename } from '@/utils/path'
+import {
+  buildUniqueTemplateFileName,
+  listDocTemplates,
+  type DocTemplateId
+} from '@/utils/doc-templates'
 import { ConfirmDialog } from './ConfirmDialog'
 import { FileTreeNodeIcon } from './icons/FileTypeIcons'
 import { restoreWorkbenchFocus } from '@/utils/workbench-focus'
+import { openWorkspaceFile } from '@/utils/open-workspace-file'
 
 type InputMode = 'create-file' | 'create-folder' | 'rename'
 
@@ -27,6 +33,12 @@ interface ContextMenuState {
   x: number
   y: number
   node: FileTreeNode | null
+}
+
+interface TemplateMenuState {
+  x: number
+  y: number
+  parentDir: string
 }
 
 interface InlineInputState {
@@ -60,6 +72,32 @@ function canMoveInto(sourcePaths: string[], destDir: string): boolean {
   }
 
   return hasMovable
+}
+
+function listChildNames(nodes: FileTreeNode[], dirPath: string): string[] {
+  const target = normalizeNodePath(dirPath)
+  const walk = (list: FileTreeNode[]): string[] | null => {
+    for (const node of list) {
+      if (normalizeNodePath(node.path) === target) {
+        return (node.children ?? []).map((child) => child.name)
+      }
+      if (node.children) {
+        const found = walk(node.children)
+        if (found) return found
+      }
+    }
+    return null
+  }
+  return walk(nodes) ?? []
+}
+
+function resolveCreateParentDir(
+  node: FileTreeNode | null,
+  workspaceRoot: string
+): string {
+  if (!node) return workspaceRoot
+  if (node.isDirectory) return node.path
+  return parentDirPath(node.path) || workspaceRoot
 }
 
 function collectDirectoryPaths(nodes: FileTreeNode[]): string[] {
@@ -339,7 +377,7 @@ function FileTreeItem({
 }
 
 export function FileTree() {
-  const { t } = useI18n()
+  const { t, locale } = useI18n()
   const fileTree = useAppStore((s) => s.fileTree)
   const workspaceRoot = useAppStore((s) => s.workspaceRoot)
   const pendingWorkspacePreview = useAppStore((s) => s.pendingWorkspacePreview)
@@ -373,6 +411,7 @@ export function FileTree() {
   )
 
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
+  const [templateMenu, setTemplateMenu] = useState<TemplateMenuState | null>(null)
   const [inlineInput, setInlineInput] = useState<InlineInputState | null>(null)
   const [renamingPath, setRenamingPath] = useState<string | null>(null)
   const [pendingDeleteTargets, setPendingDeleteTargets] = useState<FileTreeNode[] | null>(null)
@@ -440,8 +479,7 @@ export function FileTree() {
       return
     }
 
-    const decoded = await window.compass.fs.readFile(path)
-    openFile(path, decoded.content, decoded.encoding)
+    await openWorkspaceFile(path)
   }
 
   const handleToggleExpand = useCallback((path: string) => {
@@ -759,6 +797,7 @@ export function FileTree() {
 
   const startCreate = (mode: 'create-file' | 'create-folder', parentDir: string) => {
     setContextMenu(null)
+    setTemplateMenu(null)
     setInlineInput({
       mode,
       parentDir,
@@ -767,8 +806,41 @@ export function FileTree() {
     setError(null)
   }
 
+  const openTemplateMenu = (parentDir: string, x: number, y: number) => {
+    setContextMenu(null)
+    setTemplateMenu({ parentDir, x, y })
+    setError(null)
+  }
+
+  const createFromTemplate = async (parentDir: string, templateId: DocTemplateId) => {
+    setTemplateMenu(null)
+    setContextMenu(null)
+    const templates = listDocTemplates(locale)
+    const template = templates.find((item) => item.id === templateId)
+    if (!template) return
+
+    const existingNames = listChildNames(rootedTree, parentDir)
+    const fileName = buildUniqueTemplateFileName(template.defaultFileName, existingNames)
+
+    try {
+      const createdPath = await window.compass.fs.createFile(parentDir, fileName)
+      await window.compass.fs.writeFile(createdPath, template.body)
+      setExpandedDirs((prev) => {
+        const next = new Set(prev)
+        next.add(normalizeNodePath(parentDir))
+        return next
+      })
+      await refreshTree()
+      await handleOpenFile(createdPath)
+      setError(null)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t('explorer.createFailed'))
+    }
+  }
+
   const startRename = (node: FileTreeNode) => {
     setContextMenu(null)
+    setTemplateMenu(null)
     setRenamingPath(node.path)
     setError(null)
   }
@@ -827,7 +899,10 @@ export function FileTree() {
   }
 
   useEffect(() => {
-    const closeMenu = () => setContextMenu(null)
+    const closeMenu = () => {
+      setContextMenu(null)
+      setTemplateMenu(null)
+    }
     window.addEventListener('click', closeMenu)
     return () => window.removeEventListener('click', closeMenu)
   }, [])
@@ -855,8 +930,8 @@ export function FileTree() {
     )
   }
 
-  const parentDir =
-    contextMenu?.node?.isDirectory ? contextMenu.node.path : workspaceRoot
+  const parentDir = resolveCreateParentDir(contextMenu?.node ?? null, workspaceRoot)
+  const docTemplates = listDocTemplates(locale)
 
   const deleteTargets = contextMenu ? getDeleteTargets(contextMenu.node) : []
   const chatAttachTargets = contextMenu ? getChatAttachTargets(contextMenu.node) : []
@@ -894,6 +969,17 @@ export function FileTree() {
             onClick={() => startCreate('create-folder', workspaceRoot)}
           >
             📁+
+          </button>
+          <button
+            className="btn-icon"
+            title={t('explorer.newFromTemplate')}
+            onClick={(e) => {
+              e.stopPropagation()
+              const rect = (e.currentTarget as HTMLButtonElement).getBoundingClientRect()
+              openTemplateMenu(workspaceRoot, rect.left, rect.bottom + 4)
+            }}
+          >
+            📝+
           </button>
           <button className="btn-icon" title={t('explorer.refresh')} onClick={() => void refreshTree()}>
             ↻
@@ -973,6 +1059,14 @@ export function FileTree() {
           <button onClick={() => startCreate('create-folder', parentDir)}>
             {t('explorer.newFolder')}
           </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              openTemplateMenu(parentDir, contextMenu.x, contextMenu.y)
+            }}
+          >
+            {t('explorer.newFromTemplate')}
+          </button>
           {contextMenu.node && (
             <>
               <div className="context-menu-separator" />
@@ -1008,6 +1102,23 @@ export function FileTree() {
               )}
             </>
           )}
+        </div>
+      )}
+
+      {templateMenu && (
+        <div
+          className="file-tree-context-menu"
+          style={{ left: templateMenu.x, top: templateMenu.y }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {docTemplates.map((template) => (
+            <button
+              key={template.id}
+              onClick={() => void createFromTemplate(templateMenu.parentDir, template.id)}
+            >
+              {t(template.labelKey)}
+            </button>
+          ))}
         </div>
       )}
 

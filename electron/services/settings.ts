@@ -2,8 +2,8 @@ import { safeStorage } from 'electron'
 import { readFile, writeFile, mkdir } from 'fs/promises'
 import { join } from 'path'
 import { app } from 'electron'
-import type { AppSettings, ColorThemeId, LlmProviderId } from '../../src/types'
-import { DEFAULT_SETTINGS } from '../../src/types'
+import type { AppSettings, ColorThemeId, LlmProviderId, UseCasePreset } from '../../src/types'
+import { DEFAULT_SETTINGS, normalizeUseCasePreset } from '../../src/types'
 import { isColorThemeId } from '../../src/utils/color-theme'
 import {
   getLlmProvider,
@@ -26,6 +26,8 @@ interface StoredSettings {
   inlineCompletionsEnabled: boolean
   autoOpenAgentPreview: boolean
   defaultShellId: string
+  defaultUseCasePreset: UseCasePreset
+  rememberLastUseCasePreset: boolean
   lastWorkspaceRoot: string | null
   recentWorkspaceRoots: string[]
 }
@@ -48,6 +50,14 @@ function resolveAutoOpenAgentPreview(value: unknown): boolean {
 
 function resolveDefaultShellId(value: unknown): string {
   return typeof value === 'string' && value.trim() ? value.trim() : DEFAULT_SETTINGS.defaultShellId
+}
+
+function resolveUseCasePreset(value: unknown): UseCasePreset {
+  return normalizeUseCasePreset(value) ?? DEFAULT_SETTINGS.defaultUseCasePreset
+}
+
+function resolveRememberLastUseCasePreset(value: unknown): boolean {
+  return typeof value === 'boolean' ? value : DEFAULT_SETTINGS.rememberLastUseCasePreset
 }
 
 function resolveProviderId(value: unknown, apiBaseUrl: string): LlmProviderId {
@@ -125,6 +135,10 @@ async function readStoredSettings(): Promise<StoredSettings> {
       inlineCompletionsEnabled: resolveInlineCompletionsEnabled(stored.inlineCompletionsEnabled),
       autoOpenAgentPreview: resolveAutoOpenAgentPreview(stored.autoOpenAgentPreview),
       defaultShellId: resolveDefaultShellId(stored.defaultShellId),
+      defaultUseCasePreset: resolveUseCasePreset(stored.defaultUseCasePreset),
+      rememberLastUseCasePreset: resolveRememberLastUseCasePreset(
+        stored.rememberLastUseCasePreset
+      ),
       lastWorkspaceRoot: stored.lastWorkspaceRoot ?? null,
       recentWorkspaceRoots:
         stored.recentWorkspaceRoots ??
@@ -144,6 +158,8 @@ async function readStoredSettings(): Promise<StoredSettings> {
       inlineCompletionsEnabled: DEFAULT_SETTINGS.inlineCompletionsEnabled,
       autoOpenAgentPreview: DEFAULT_SETTINGS.autoOpenAgentPreview,
       defaultShellId: DEFAULT_SETTINGS.defaultShellId,
+      defaultUseCasePreset: DEFAULT_SETTINGS.defaultUseCasePreset,
+      rememberLastUseCasePreset: DEFAULT_SETTINGS.rememberLastUseCasePreset,
       lastWorkspaceRoot: null,
       recentWorkspaceRoots: []
     }
@@ -185,7 +201,9 @@ function toAppSettings(stored: StoredSettings): AppSettings {
     locale: stored.locale,
     inlineCompletionsEnabled: stored.inlineCompletionsEnabled,
     autoOpenAgentPreview: stored.autoOpenAgentPreview,
-    defaultShellId: stored.defaultShellId
+    defaultShellId: stored.defaultShellId,
+    defaultUseCasePreset: stored.defaultUseCasePreset,
+    rememberLastUseCasePreset: stored.rememberLastUseCasePreset
   }
 }
 
@@ -229,7 +247,11 @@ export async function setSettings(settings: AppSettings): Promise<void> {
     locale,
     inlineCompletionsEnabled: resolveInlineCompletionsEnabled(settings.inlineCompletionsEnabled),
     autoOpenAgentPreview: resolveAutoOpenAgentPreview(settings.autoOpenAgentPreview),
-    defaultShellId: resolveDefaultShellId(settings.defaultShellId)
+    defaultShellId: resolveDefaultShellId(settings.defaultShellId),
+    defaultUseCasePreset: resolveUseCasePreset(settings.defaultUseCasePreset),
+    rememberLastUseCasePreset: resolveRememberLastUseCasePreset(
+      settings.rememberLastUseCasePreset
+    )
   })
   setLocale(locale)
 }

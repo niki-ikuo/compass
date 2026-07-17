@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAppStore } from '@/stores/app-store'
 import { toWorkspaceRelativePath } from '@/utils/workspace-actions'
 import { buildWorkspaceIndex } from '@/utils/project-index'
+import { openWorkspaceFile } from '@/utils/open-workspace-file'
 import type { WorkspaceSearchFileResult, WorkspaceSearchMatch } from '@/types'
 import { useI18n } from '@/i18n'
 
@@ -125,7 +126,6 @@ export function SearchPanel() {
   const setSearchError = useAppStore((s) => s.setSearchError)
   const setSearchReplaceOpen = useAppStore((s) => s.setSearchReplaceOpen)
   const setLeftSidebarView = useAppStore((s) => s.setLeftSidebarView)
-  const openFile = useAppStore((s) => s.openFile)
   const revealInEditor = useAppStore((s) => s.revealInEditor)
   const syncOpenFileContents = useAppStore((s) => s.syncOpenFileContents)
   const setFileTree = useAppStore((s) => s.setFileTree)
@@ -231,14 +231,13 @@ export function SearchPanel() {
     async (path: string, match: WorkspaceSearchMatch) => {
       const existing = openFiles.find((f) => f.path === path)
       if (!existing) {
-        const decoded = await window.compass.fs.readFile(path)
-        openFile(path, decoded.content, decoded.encoding)
+        await openWorkspaceFile(path)
       } else {
         useAppStore.getState().setActiveFile(path)
       }
       revealInEditor(path, match.line, match.column, match.endColumn)
     },
-    [openFiles, openFile, revealInEditor]
+    [openFiles, revealInEditor]
   )
 
   const handleReplaceAll = useCallback(async () => {

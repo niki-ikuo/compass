@@ -105,6 +105,7 @@ export function MenuBar({
   const barRef = useRef<HTMLDivElement>(null)
   const workspaceRoot = useAppStore((s) => s.workspaceRoot)
   const openSearchPanel = useAppStore((s) => s.openSearchPanel)
+  const openBrowserTab = useAppStore((s) => s.openBrowserTab)
 
   const closeMenu = useCallback(() => setOpenMenu(null), [])
 
@@ -197,6 +198,7 @@ export function MenuBar({
     { label: t('menu.zoomIn'), shortcut: 'Ctrl++', action: () => void window.compass.shell.view('zoomIn') },
     { label: t('menu.zoomOut'), shortcut: 'Ctrl+-', action: () => void window.compass.shell.view('zoomOut') },
     { separator: true, label: '', action: () => {} },
+    { label: t('menu.newBrowserTab'), shortcut: 'Ctrl+Shift+B', action: () => openBrowserTab() },
     { label: t('menu.terminal'), shortcut: 'Ctrl+`', action: workspaceRoot ? onToggleTerminal : () => {} }
   ]
 
