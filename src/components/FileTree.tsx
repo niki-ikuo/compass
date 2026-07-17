@@ -893,6 +893,14 @@ export function FileTree() {
     setError(null)
   }
 
+  /** 右クリックメニューから「新規…」をフライアウトで開く（親メニューは残す） */
+  const openCreateSubmenu = (parentDir: string, anchor: HTMLElement) => {
+    const rect = anchor.getBoundingClientRect()
+    setTemplateMenu(null)
+    setCreateMenu({ parentDir, x: rect.right + 1, y: rect.top })
+    setError(null)
+  }
+
   const openTemplateSubmenu = (parentDir: string, anchor: HTMLElement) => {
     const rect = anchor.getBoundingClientRect()
     setTemplateMenu({ parentDir, x: rect.right + 1, y: rect.top })
@@ -904,15 +912,37 @@ export function FileTree() {
     setTemplateMenu(null)
   }
 
+  const closeCreateSubmenu = () => {
+    setCreateMenu(null)
+    setTemplateMenu(null)
+  }
+
+  const handleContextMenuMouseLeave = (e: React.MouseEvent) => {
+    const related = e.relatedTarget as Node | null
+    if (related && createMenuRef.current?.contains(related)) return
+    if (related && templateMenuRef.current?.contains(related)) return
+    closeCreateSubmenu()
+  }
+
   const handleCreateMenuMouseLeave = (e: React.MouseEvent) => {
     const related = e.relatedTarget as Node | null
     if (related && templateMenuRef.current?.contains(related)) return
+    if (related && contextMenuRef.current?.contains(related)) {
+      closeTemplateSubmenu()
+      return
+    }
     closeTemplateSubmenu()
+    // 右クリック由来のフライアウトは、メニュー群から外れたら閉じる
+    if (contextMenu) closeCreateSubmenu()
   }
 
   const handleTemplateMenuMouseLeave = (e: React.MouseEvent) => {
     const related = e.relatedTarget as Node | null
     if (related && createMenuRef.current?.contains(related)) return
+    if (related && contextMenuRef.current?.contains(related)) {
+      closeTemplateSubmenu()
+      return
+    }
     closeTemplateSubmenu()
   }
 
@@ -1035,12 +1065,16 @@ export function FileTree() {
       setSelectedPaths(new Set([normalized]))
       lastSelectedPathRef.current = normalized
     }
+    setCreateMenu(null)
+    setTemplateMenu(null)
     setContextMenu({ x: e.clientX, y: e.clientY, node })
   }
 
   const handleRootContextMenu = (e: React.MouseEvent) => {
     if (!workspaceRoot) return
     e.preventDefault()
+    setCreateMenu(null)
+    setTemplateMenu(null)
     setContextMenu({ x: e.clientX, y: e.clientY, node: null })
   }
 
@@ -1217,23 +1251,31 @@ export function FileTree() {
           className="file-tree-context-menu"
           style={{ left: contextMenu.x, top: contextMenu.y }}
           onClick={(e) => e.stopPropagation()}
+          onMouseLeave={handleContextMenuMouseLeave}
         >
           <button
-            onClick={(e) => {
-              e.stopPropagation()
-              openCreateMenu(parentDir, contextMenu.x, contextMenu.y)
-            }}
+            type="button"
+            className={`context-menu-has-submenu${
+              createMenu && createMenu.parentDir === parentDir ? ' active' : ''
+            }`}
+            onMouseEnter={(e) => openCreateSubmenu(parentDir, e.currentTarget)}
           >
             {t('explorer.newMenu')}
           </button>
-          <button onClick={() => startCreate('create-folder', parentDir)}>
+          <button
+            onMouseEnter={closeCreateSubmenu}
+            onClick={() => startCreate('create-folder', parentDir)}
+          >
             {t('explorer.newFolder')}
           </button>
           {contextMenu.node && (
             <>
               <div className="context-menu-separator" />
               {canAddToChat && (
-                <button onClick={() => addTargetsToChat(contextMenu.node)}>
+                <button
+                  onMouseEnter={closeCreateSubmenu}
+                  onClick={() => addTargetsToChat(contextMenu.node)}
+                >
                   {chatAttachTargets.length > 1
                     ? t('explorer.addToChatMany', { count: chatAttachTargets.length })
                     : t('explorer.addToChat')}
@@ -1241,6 +1283,7 @@ export function FileTree() {
               )}
               {contextMenu.node.isDirectory && !contextMenu.node.isPreview && (
                 <button
+                  onMouseEnter={closeCreateSubmenu}
                   onClick={() => {
                     const path = contextMenu.node!.path
                     setContextMenu(null)
@@ -1251,12 +1294,19 @@ export function FileTree() {
                 </button>
               )}
               {canRename && (
-                <button onClick={() => startRename(contextMenu.node!)}>
+                <button
+                  onMouseEnter={closeCreateSubmenu}
+                  onClick={() => startRename(contextMenu.node!)}
+                >
                   {t('explorer.rename')}
                 </button>
               )}
               {canDelete && (
-                <button className="danger" onClick={() => requestDelete(contextMenu.node)}>
+                <button
+                  className="danger"
+                  onMouseEnter={closeCreateSubmenu}
+                  onClick={() => requestDelete(contextMenu.node)}
+                >
                   {deleteTargets.length > 1
                     ? t('explorer.deleteMany', { count: deleteTargets.length })
                     : t('common.delete')}
