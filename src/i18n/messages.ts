@@ -123,7 +123,6 @@ export const ja = {
   'welcome.recent': '最近開いたフォルダ',
 
   // explorer
-  'explorer.title': 'エクスプローラー',
   'explorer.expandAll': 'すべて展開',
   'explorer.collapseAll': 'すべて折りたたむ',
   'explorer.newFile': '新規ファイル',
@@ -185,7 +184,6 @@ export const ja = {
   'search.needFolder': 'フォルダを開いてから検索できます',
 
   // chat
-  'chat.title': 'AI チャット',
   'chat.newChat': '新しいチャット',
   'chat.history': 'チャット履歴',
   'chat.pastChats': '過去のチャット',
@@ -606,7 +604,6 @@ export const en: Record<MessageKey, string> = {
   'welcome.openFolder': 'Open Folder',
   'welcome.recent': 'Recent folders',
 
-  'explorer.title': 'Explorer',
   'explorer.expandAll': 'Expand All',
   'explorer.collapseAll': 'Collapse All',
   'explorer.newFile': 'New File',
@@ -666,7 +663,6 @@ export const en: Record<MessageKey, string> = {
   'search.noResults': 'No results found',
   'search.needFolder': 'Open a folder to search',
 
-  'chat.title': 'AI Chat',
   'chat.newChat': 'New Chat',
   'chat.history': 'Chat History',
   'chat.pastChats': 'Past chats',

@@ -977,7 +977,6 @@ export function ChatPanel() {
   return (
     <div className="chat-panel">
       <div className="panel-header chat-panel-header">
-        <span>{t('chat.title')}</span>
         <div className="chat-header-actions">
           <label
             className="chat-model-select"

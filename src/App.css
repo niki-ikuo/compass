@@ -416,7 +416,7 @@ body.is-resizing-panels * {
 .file-tree-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
 }
 
 .file-tree-toolbar {
@@ -1197,10 +1197,6 @@ body:has(.monaco-editor .find-widget.visible) .workbench-hover-container .action
 
 .chat-panel-header {
   gap: 8px;
-}
-
-.chat-panel-header > span {
-  flex-shrink: 0;
 }
 
 .chat-header-actions {

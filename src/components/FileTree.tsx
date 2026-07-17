@@ -993,7 +993,6 @@ export function FileTree() {
   return (
     <div className="file-tree">
       <div className="panel-header file-tree-header">
-        <span>{t('explorer.title')}</span>
         <div className="file-tree-toolbar">
           <button className="btn-icon" title={t('explorer.expandAll')} onClick={handleExpandAll}>
             ⊞
