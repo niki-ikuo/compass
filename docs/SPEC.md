@@ -127,6 +127,7 @@ MVP: whole-file replace or insert at cursor only.
 | Max tokens | 4096 |
 | Inline completions | ON |
 | Default shell | `powershell` (PowerShell / cmd / Git Bash / WSL) |
+| Default use-case preset | `code` (`document` / `data` / `general` also available — see [USE_CASE_PRESET.md](./USE_CASE_PRESET.md)) |
 
 ---
 
@@ -252,13 +253,15 @@ interface AppSettings {
 ## 10. Roadmap (v2+)
 
 ```
-Now (terminal / .compass structure index / Ask·Edit / multi-LLM / inline completions)
- └─ v2.0: Agent autonomy (tool loop, commands, multi-step)
+Now (terminal / .compass structure index / Ask·Edit·Agent / multi-LLM / inline completions)
+ ├─ Use-case presets (code / document / data / general) — spec: [USE_CASE_PRESET.md](./USE_CASE_PRESET.md)
+ └─ v2.0: Agent autonomy (tool loop, commands, multi-step) — plan: [AGENT_PLAN.md](./AGENT_PLAN.md)
      └─ v2.1: semantic codebase search (RAG / embeddings)
          └─ v3.0: MCP, plugins, native non–OpenAI APIs
 ```
 
-Phased build checklist for v2.0 Agent: [AGENT_PLAN.md](./AGENT_PLAN.md).
+Phased build checklist for v2.0 Agent: [AGENT_PLAN.md](./AGENT_PLAN.md).  
+Use-case presets (folder work beyond code): [USE_CASE_PRESET.md](./USE_CASE_PRESET.md).
 
 **Terminology**
 
@@ -267,6 +270,7 @@ Phased build checklist for v2.0 Agent: [AGENT_PLAN.md](./AGENT_PLAN.md).
 | Ask mode | Explain / review only; no workspace change proposals |
 | Edit mode | Propose create/change/delete as JSON; user previews and applies |
 | Agent | Tool-call loop. Phase 1–3: read tools, `proposeActions` (preview approval), restricted `exec` — see [AGENT_PLAN.md](./AGENT_PLAN.md) |
+| Use-case preset | *What kind of expert* (`code` / `document` / `data` / `general`). Orthogonal to Ask / Edit / Agent — see [USE_CASE_PRESET.md](./USE_CASE_PRESET.md) |
 
 ---
 

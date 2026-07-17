@@ -286,4 +286,5 @@ src/
 | [AGENT_PLAN.md](./AGENT_PLAN.md) | Phase checklist, open design decisions, deferred work |
 | [ARCHITECTURE.md](./ARCHITECTURE.md) | Process / IPC layout |
 | [SPEC.md](./SPEC.md) | Product boundaries Ask / Edit / Agent |
+| [USE_CASE_PRESET.md](./USE_CASE_PRESET.md) | Use-case presets (orthogonal to mode) |
 | [DEVELOPMENT.md](./DEVELOPMENT.md) | Where to edit code in day-to-day development |

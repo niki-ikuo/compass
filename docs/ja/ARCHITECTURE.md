@@ -104,6 +104,7 @@ Renderer からは `window.compass.*` を呼び出します。実装の正は `e
 | API Key | プロバイダ別に暗号化保存し、切替時に復元 |
 | モデル | 設定画面またはチャットヘッダから切替（自由入力可） |
 | 通信 | Main の `ai-client` が `/chat/completions` SSE で接続 |
+| 用途プリセット（予定） | Ask / Edit / Agent とは別軸。ヘッダで用途切替、設定にデフォルト — [USE_CASE_PRESET.md](./USE_CASE_PRESET.md) |
 
 Claude など OpenAI 非互換のネイティブ API は未対応。OpenRouter 経由で利用する。
 

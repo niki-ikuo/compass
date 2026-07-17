@@ -7,6 +7,7 @@ Developer docs for Compass. For product overview and install steps, see the root
 | Document | Contents |
 |----------|----------|
 | [SPEC.md](./SPEC.md) | Product spec (MVP scope, UI layout, requirements) |
+| [USE_CASE_PRESET.md](./USE_CASE_PRESET.md) | Use-case presets (code / document / data / general) |
 | [ARCHITECTURE.md](./ARCHITECTURE.md) | Process model, IPC, directory roles |
 | [DEVELOPMENT.md](./DEVELOPMENT.md) | Dev environment, commands, implementation notes |
 | [AGENT.md](./AGENT.md) | Agent runtime — tool loop, approvals, IPC, modules |

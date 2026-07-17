@@ -104,6 +104,7 @@ Relevant slices are added to chat context. This is **not** embedding-based RAG.
 | API keys | Encrypted per provider; restored on switch |
 | Models | Settings or chat header (free-form input allowed) |
 | Transport | Main `ai-client` connects via `/chat/completions` SSE |
+| Use-case presets (planned) | Orthogonal to Ask / Edit / Agent; header switch + settings default — [USE_CASE_PRESET.md](./USE_CASE_PRESET.md) |
 
 Native non–OpenAI-compatible APIs (e.g. Claude) are unsupported; use OpenRouter.
 
