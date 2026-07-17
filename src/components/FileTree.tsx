@@ -20,7 +20,8 @@ import { basename } from '@/utils/path'
 import {
   buildUniqueTemplateFileName,
   listDocTemplates,
-  type DocTemplateId
+  listEffectiveDocTemplates,
+  type DocTemplate
 } from '@/utils/doc-templates'
 import { ConfirmDialog } from './ConfirmDialog'
 import {
@@ -460,6 +461,7 @@ export function FileTree() {
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
   const [createMenu, setCreateMenu] = useState<CreateMenuState | null>(null)
   const [templateMenu, setTemplateMenu] = useState<TemplateMenuState | null>(null)
+  const [docTemplates, setDocTemplates] = useState<DocTemplate[]>(() => listDocTemplates(locale))
   const [inlineInput, setInlineInput] = useState<InlineInputState | null>(null)
   const [renamingPath, setRenamingPath] = useState<string | null>(null)
   const [pendingDeleteTargets, setPendingDeleteTargets] = useState<FileTreeNode[] | null>(null)
@@ -473,6 +475,18 @@ export function FileTree() {
   const createMenuRef = useRef<HTMLDivElement>(null)
   const templateMenuRef = useRef<HTMLDivElement>(null)
   const contextMenuRef = useRef<HTMLDivElement>(null)
+  const docTemplatesRef = useRef(docTemplates)
+  docTemplatesRef.current = docTemplates
+
+  useEffect(() => {
+    let cancelled = false
+    void listEffectiveDocTemplates(workspaceRoot, locale).then((list) => {
+      if (!cancelled) setDocTemplates(list)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [workspaceRoot, locale])
 
   useEffect(() => {
     treeInitializedRef.current = false
@@ -883,6 +897,7 @@ export function FileTree() {
     const rect = anchor.getBoundingClientRect()
     setTemplateMenu({ parentDir, x: rect.right + 1, y: rect.top })
     setError(null)
+    void listEffectiveDocTemplates(workspaceRoot, locale).then(setDocTemplates)
   }
 
   const closeTemplateSubmenu = () => {
@@ -946,12 +961,13 @@ export function FileTree() {
       workspaceRoot!
     )
 
-  const createFromTemplate = async (parentDir: string, templateId: DocTemplateId) => {
+  const createFromTemplate = async (parentDir: string, templateId: string) => {
     setTemplateMenu(null)
     setContextMenu(null)
     setCreateMenu(null)
-    const templates = listDocTemplates(locale)
-    const template = templates.find((item) => item.id === templateId)
+    const template =
+      docTemplatesRef.current.find((item) => item.id === templateId) ??
+      (await listEffectiveDocTemplates(workspaceRoot, locale)).find((item) => item.id === templateId)
     if (!template) return
 
     const existingNames = listChildNames(rootedTree, parentDir)
@@ -1086,7 +1102,6 @@ export function FileTree() {
   }
 
   const parentDir = resolveCreateParentDir(contextMenu?.node ?? null, workspaceRoot)
-  const docTemplates = listDocTemplates(locale)
 
   const deleteTargets = contextMenu ? getDeleteTargets(contextMenu.node) : []
   const chatAttachTargets = contextMenu ? getChatAttachTargets(contextMenu.node) : []
@@ -1291,7 +1306,7 @@ export function FileTree() {
               key={template.id}
               onClick={() => void createFromTemplate(templateMenu.parentDir, template.id)}
             >
-              {t(template.labelKey)}
+              {template.labelKey ? t(template.labelKey) : (template.label ?? template.id)}
             </button>
           ))}
         </div>

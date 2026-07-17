@@ -82,6 +82,7 @@
 | Open folder | Dialog picks workspace root |
 | Tree | Recursive listing; hide `node_modules` / `.git` |
 | File ops | Open, save, create (v1.1+) |
+| Doc templates | Built-in Markdown presets; workspace `templates/*.md` overrides same-name IDs and adds extras (label = first `#` heading or file name) |
 
 ### 4.3 AI chat
 
