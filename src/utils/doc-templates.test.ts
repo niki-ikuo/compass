@@ -1,14 +1,22 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { FileTreeNode } from '@/types'
 import {
+  buildSaveTemplateActions,
   buildUniqueTemplateFileName,
   DOC_TEMPLATE_IDS,
+  draftsFromEffectiveTemplates,
+  ensureUniqueTemplateId,
   extractTemplateLabelFromBody,
   getDocTemplate,
   listDocTemplates,
   listEffectiveDocTemplates,
   loadWorkspaceDocTemplates,
   mergeDocTemplates,
+  normalizeTemplateFileName,
+  parseTemplateFrontmatter,
+  reindexDraftOrders,
+  serializeWorkspaceTemplateMarkdown,
+  slugifyTemplateId,
   templateIdFromFileName,
   workspaceTemplateFromMarkdown,
   WORKSPACE_TEMPLATES_DIR
@@ -52,31 +60,79 @@ describe('doc-templates', () => {
       defaultFileName: 'weekly-report.md',
       label: '週次レポート',
       body: '# 週次レポート\n\n- 進捗:\n',
-      source: 'workspace'
+      source: 'workspace',
+      order: undefined,
+      storagePath: undefined
     })
     expect(templateIdFromFileName('Meeting-Notes.md')).toBe('Meeting-Notes')
   })
 
-  it('merges workspace overrides and appends extras', () => {
+  it('parses and serializes frontmatter metadata', () => {
+    const raw = [
+      '---',
+      'label: 週次レポート',
+      'fileName: weekly.md',
+      'order: 50',
+      '---',
+      '',
+      '# body',
+      ''
+    ].join('\n')
+
+    const parsed = workspaceTemplateFromMarkdown('weekly-report.md', raw, '/ws/.compass/templates/weekly-report.md')
+    expect(parsed).toMatchObject({
+      id: 'weekly-report',
+      label: '週次レポート',
+      defaultFileName: 'weekly.md',
+      body: '# body\n',
+      order: 50,
+      storagePath: '/ws/.compass/templates/weekly-report.md'
+    })
+
+    const serialized = serializeWorkspaceTemplateMarkdown({
+      id: 'weekly-report',
+      label: '週次レポート',
+      defaultFileName: 'weekly.md',
+      body: '# body\n',
+      order: 50
+    })
+    expect(parseTemplateFrontmatter(serialized).meta).toEqual({
+      label: '週次レポート',
+      fileName: 'weekly.md',
+      order: 50
+    })
+    expect(parseTemplateFrontmatter(serialized).body).toBe('# body\n')
+  })
+
+  it('merges workspace overrides and sorts by order', () => {
     const builtins = listDocTemplates('ja')
     const override = workspaceTemplateFromMarkdown(
       'meeting-notes.md',
-      '# 社内議事録\n\n- 日時:\n'
+      ['---', 'label: 社内議事録', 'fileName: notes.md', 'order: 250', '---', '', '# 社内議事録', ''].join(
+        '\n'
+      )
     )!
-    const extra = workspaceTemplateFromMarkdown('weekly.md', '# 週次\n')!
+    const extra = workspaceTemplateFromMarkdown(
+      'weekly.md',
+      ['---', 'label: 週次', 'order: 50', '---', '', '# 週次', ''].join('\n')
+    )!
     const merged = mergeDocTemplates(builtins, [extra, override])
 
-    expect(merged).toHaveLength(5)
-    expect(merged[0]).toMatchObject({
-      id: 'meeting-notes',
+    expect(merged.map((item) => item.id)).toEqual([
+      'weekly',
+      'procedure',
+      'plan-memo',
+      'meeting-notes',
+      'data-memo'
+    ])
+    expect(merged.find((item) => item.id === 'meeting-notes')).toMatchObject({
       source: 'workspace',
       label: '社内議事録',
-      body: expect.stringContaining('# 社内議事録')
+      defaultFileName: 'notes.md'
     })
-    expect(merged[4]).toMatchObject({ id: 'weekly', label: '週次' })
   })
 
-  it('loads workspace templates from templates/ and merges', async () => {
+  it('loads workspace templates from .compass/templates/ and merges', async () => {
     const nodes: FileTreeNode[] = [
       {
         name: 'meeting-notes.md',
@@ -111,11 +167,11 @@ describe('doc-templates', () => {
 
     const effective = await listEffectiveDocTemplates('/ws', 'ja', fs)
     expect(effective).toHaveLength(5)
-    expect(effective[0].body).toContain('# 上書き議事録')
+    expect(effective.find((t) => t.id === 'meeting-notes')?.body).toContain('# 上書き議事録')
     expect(effective.find((t) => t.id === 'incident')?.label).toBe('インシデント')
   })
 
-  it('falls back to builtins when templates/ is missing', async () => {
+  it('falls back to builtins when .compass/templates/ is missing', async () => {
     const fs = {
       readDir: vi.fn(async () => {
         throw new Error('ENOENT')
@@ -125,5 +181,45 @@ describe('doc-templates', () => {
     const list = await listEffectiveDocTemplates('/ws', 'en', fs)
     expect(list).toHaveLength(4)
     expect(list.every((t) => t.source === 'builtin')).toBe(true)
+  })
+
+  it('builds save actions for drafts and deletions', () => {
+    const actions = buildSaveTemplateActions(
+      [
+        {
+          id: 'weekly',
+          label: '週次',
+          defaultFileName: 'weekly.md',
+          body: '# 週次\n',
+          order: 0
+        }
+      ],
+      ['weekly', 'old']
+    )
+
+    expect(actions[0]).toEqual({ type: 'mkdir', path: WORKSPACE_TEMPLATES_DIR })
+    const write = actions.find((action) => action.type === 'writeFile')
+    expect(write).toMatchObject({
+      type: 'writeFile',
+      path: `${WORKSPACE_TEMPLATES_DIR}/weekly.md`
+    })
+    if (write?.type === 'writeFile') {
+      expect(write.content).toContain('label: 週次')
+      expect(write.content).toContain('# 週次')
+    }
+    expect(actions).toContainEqual({
+      type: 'deleteFile',
+      path: `${WORKSPACE_TEMPLATES_DIR}/old.md`
+    })
+  })
+
+  it('helps draft management helpers', () => {
+    expect(normalizeTemplateFileName('note')).toBe('note.md')
+    expect(slugifyTemplateId('週次 レポート.md')).toBe('template')
+    expect(ensureUniqueTemplateId('weekly', ['weekly', 'weekly-2'])).toBe('weekly-3')
+    const drafts = draftsFromEffectiveTemplates(listDocTemplates('en'), (t) => t.id)
+    expect(reindexDraftOrders(drafts.map((d) => ({ ...d, order: 999 }))).map((d) => d.order)).toEqual([
+      0, 100, 200, 300
+    ])
   })
 })

@@ -24,6 +24,7 @@ import {
   type DocTemplate
 } from '@/utils/doc-templates'
 import { ConfirmDialog } from './ConfirmDialog'
+import { TemplateManagerDialog } from './TemplateManagerDialog'
 import {
   NewFileIcon,
   NewFolderIcon,
@@ -462,6 +463,7 @@ export function FileTree() {
   const [createMenu, setCreateMenu] = useState<CreateMenuState | null>(null)
   const [templateMenu, setTemplateMenu] = useState<TemplateMenuState | null>(null)
   const [docTemplates, setDocTemplates] = useState<DocTemplate[]>(() => listDocTemplates(locale))
+  const [templateManagerOpen, setTemplateManagerOpen] = useState(false)
   const [inlineInput, setInlineInput] = useState<InlineInputState | null>(null)
   const [renamingPath, setRenamingPath] = useState<string | null>(null)
   const [pendingDeleteTargets, setPendingDeleteTargets] = useState<FileTreeNode[] | null>(null)
@@ -1340,6 +1342,17 @@ export function FileTree() {
           >
             {t('explorer.newFromTemplate')}
           </button>
+          <div className="context-menu-separator" />
+          <button
+            onClick={() => {
+              setCreateMenu(null)
+              setTemplateMenu(null)
+              setContextMenu(null)
+              setTemplateManagerOpen(true)
+            }}
+          >
+            {t('explorer.manageTemplates')}
+          </button>
         </div>
       )}
 
@@ -1361,6 +1374,15 @@ export function FileTree() {
           ))}
         </div>
       )}
+
+      <TemplateManagerDialog
+        open={templateManagerOpen && !!workspaceRoot}
+        workspaceRoot={workspaceRoot ?? ''}
+        onClose={() => setTemplateManagerOpen(false)}
+        onSaved={() => {
+          void listEffectiveDocTemplates(workspaceRoot, locale).then(setDocTemplates)
+        }}
+      />
 
       <ConfirmDialog
         open={pendingDeleteTargets !== null && pendingDeleteTargets.length > 0}
