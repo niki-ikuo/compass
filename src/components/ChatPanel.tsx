@@ -25,7 +25,7 @@ import {
 } from '@/utils/use-case-preset'
 import { AgentStepTimeline } from './AgentStepTimeline'
 import { AnimatedStatus } from './AnimatedEllipsis'
-import { ListIcon, PlusIcon, TrashIcon, CloseIcon } from './icons/ToolbarIcons'
+import { ChatHistoryIcon, PlusIcon, TrashIcon, CloseIcon } from './icons/ToolbarIcons'
 import {
   buildDisplayContentForActions,
   inferWorkspaceActionsFromCodeBlocks,
@@ -1019,7 +1019,7 @@ export function ChatPanel() {
               aria-expanded={historyOpen}
               aria-haspopup="listbox"
             >
-              <ListIcon />
+              <ChatHistoryIcon />
             </button>
             {historyOpen &&
               historyMenuPos &&

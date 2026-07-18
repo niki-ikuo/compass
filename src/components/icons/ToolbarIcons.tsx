@@ -240,6 +240,34 @@ export function ListIcon() {
   )
 }
 
+/** チャット履歴一覧 — 巻き戻し矢印付き時計 */
+export function ChatHistoryIcon() {
+  return (
+    <svg {...iconProps}>
+      <path
+        d="M2.5 8A5.5 5.5 0 1 0 4.2 4.2"
+        stroke="currentColor"
+        strokeWidth="1.2"
+        strokeLinecap="round"
+      />
+      <path
+        d="M2 2.5v3h3"
+        stroke="currentColor"
+        strokeWidth="1.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M8 5.5V8l1.8 1.2"
+        stroke="currentColor"
+        strokeWidth="1.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
 export function ChevronRightIcon() {
   return (
     <svg {...iconProps}>
