@@ -19,6 +19,7 @@ import type {
   WorkspaceReplaceResult,
   ChatSession,
   TerminalShell,
+  UseCasePreset,
   InlineCompletionRequest,
   InlineCompletionResult,
   AgentToolStartEvent,
@@ -269,7 +270,11 @@ const compassAPI = {
     unwatch: (): Promise<void> => ipcRenderer.invoke('index:unwatch'),
     getContext: (
       workspaceRoot: string,
-      options?: { currentFile?: string; referencePaths?: string[] }
+      options?: {
+        currentFile?: string
+        referencePaths?: string[]
+        preset?: UseCasePreset | null
+      }
     ): Promise<ProjectIndexContext | null> =>
       ipcRenderer.invoke('index:getContext', workspaceRoot, options),
     onUpdated: (callback: (result: IndexBuildResult) => void): (() => void) => {

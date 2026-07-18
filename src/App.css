@@ -1941,6 +1941,8 @@ body:has(.monaco-editor .find-widget.visible) .workbench-hover-container .action
   flex: 1;
   overflow-y: auto;
   padding: 12px;
+  /* Manual stick-to-bottom scroll; anchoring fights chunk updates and causes jitter. */
+  overflow-anchor: none;
 }
 
 .chat-empty {

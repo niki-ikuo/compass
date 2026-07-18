@@ -273,20 +273,22 @@ export function ChatPanel() {
     prevActiveChatIdRef.current = activeChatId
     prevMessageCountRef.current = chatMessages.length
 
-    // 復元・セッション切替・送信（user+assistant）は即時。
+    // 復元・セッション切替・送信（user+assistant）・ストリーミング中は即時。
+    // smooth をチャンクごとに重ねると縦にびくびく揺れる。
     // scrollIntoView は親まで巻き込んで一瞬上余白が開くことがあるため、コンテナだけ動かす。
     const shouldJump =
       !hasSettledScrollRef.current ||
       chatSwitched ||
       Math.abs(delta) > 1 ||
-      delta < 0
+      delta < 0 ||
+      isChatLoading
 
     hasSettledScrollRef.current = true
     container.scrollTo({
       top: container.scrollHeight,
       behavior: shouldJump ? 'auto' : 'smooth'
     })
-  }, [chatMessages, pendingWorkspacePreview, activeChatId])
+  }, [chatMessages, pendingWorkspacePreview, activeChatId, isChatLoading])
 
   useLayoutEffect(() => {
     if (!historyOpen) {

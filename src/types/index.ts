@@ -598,7 +598,11 @@ export interface CompassAPI {
     unwatch: () => Promise<void>
     getContext: (
       workspaceRoot: string,
-      options?: { currentFile?: string; referencePaths?: string[] }
+      options?: {
+        currentFile?: string
+        referencePaths?: string[]
+        preset?: UseCasePreset | null
+      }
     ) => Promise<ProjectIndexContext | null>
     onUpdated: (callback: (result: IndexBuildResult) => void) => () => void
     onStatus: (

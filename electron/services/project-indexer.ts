@@ -1,14 +1,20 @@
 import { mkdir, readdir, readFile, stat, writeFile } from 'fs/promises'
 import { dirname, extname, join, relative } from 'path'
 import { t } from '../../src/i18n/runtime'
-import type { IndexBuildResult, ProjectIndexContext } from '../../src/types'
+import type { IndexBuildResult, ProjectIndexContext, UseCasePreset } from '../../src/types'
+import {
+  extractDataSchema,
+  formatDataSchemaBrief,
+  isDataIndexPath,
+  type DataSchema
+} from '../../src/utils/data-outline'
 import {
   extractMarkdownSummary,
   parseMarkdownHeadings,
   type MarkdownHeading
 } from '../../src/utils/markdown-outline'
 
-const INDEX_VERSION = 3
+const INDEX_VERSION = 4
 const COMPASS_DIR = '.compass'
 const IGNORED_DIRS = new Set([
   'node_modules',
@@ -40,7 +46,9 @@ const SOURCE_EXTENSIONS = new Set([
   'scss',
   'html',
   'yaml',
-  'yml'
+  'yml',
+  'csv',
+  'tsv'
 ])
 
 interface IndexedSymbol {
@@ -60,6 +68,8 @@ interface IndexedFile {
   headings?: MarkdownHeading[]
   /** Markdown のみ — 先頭段落の短い要約 */
   summary?: string
+  /** CSV / JSON / YAML のデータスキーマ要約 */
+  dataSchema?: DataSchema
 }
 
 interface GraphEdge {
@@ -79,7 +89,11 @@ function getLanguage(ext: string): string {
     markdown: 'markdown',
     json: 'json',
     css: 'css',
-    html: 'html'
+    html: 'html',
+    yaml: 'yaml',
+    yml: 'yaml',
+    csv: 'csv',
+    tsv: 'tsv'
   }
   return map[ext] ?? (ext || 'text')
 }
@@ -301,14 +315,27 @@ function formatDocumentBrief(file: IndexedFile, maxHeadings = 8): string {
   return parts.join(' | ')
 }
 
+function formatDataBrief(file: IndexedFile, maxFields = 12): string {
+  if (!file.dataSchema) return ''
+  return formatDataSchemaBrief(file.dataSchema, maxFields)
+}
+
 function formatFileBrief(file: IndexedFile, max = 8): string {
   if (file.language === 'markdown') return formatDocumentBrief(file, max)
+  if (file.dataSchema) return formatDataBrief(file, max)
   return formatSymbolBrief(file, max)
 }
 
 function documentScore(file: IndexedFile): number {
   if (file.language !== 'markdown') return 0
   return (file.headings?.length ?? 0) * 2 + (file.summary ? 5 : 0) + entryPointScore(file.path)
+}
+
+function dataScore(file: IndexedFile): number {
+  if (!file.dataSchema || !isDataIndexPath(file.path)) return 0
+  const fields = file.dataSchema.fields.length
+  const rows = file.dataSchema.rowCount ?? 0
+  return fields * 3 + Math.min(rows, 50) + (file.dataSchema.sample ? 2 : 0)
 }
 
 function pickEntryPoints(files: IndexedFile[], edges: GraphEdge[]): IndexedFile[] {
@@ -383,14 +410,41 @@ export function buildSummary(files: IndexedFile[], edges: GraphEdge[]): string {
     lines.push('')
   }
 
+  const dataFiles = files
+    .filter((f) => Boolean(f.dataSchema) && isDataIndexPath(f.path))
+    .sort((a, b) => dataScore(b) - dataScore(a) || a.path.localeCompare(b.path))
+
+  if (dataFiles.length > 0) {
+    lines.push('## Data')
+    for (const file of dataFiles.slice(0, 40)) {
+      const brief = formatDataBrief(file, 12)
+      lines.push(
+        `- ${file.path} (${file.language}, ${t('ai.indexLines', { count: file.lines })})` +
+          (brief ? ` | ${brief}` : '')
+      )
+    }
+    if (dataFiles.length > 40) {
+      lines.push(`- ... and ${dataFiles.length - 40} more data files`)
+    }
+    lines.push('')
+  }
+
   lines.push('## File Overview')
 
-  // Prefer files with symbols/exports/document outline; keep a stable path sort within ties.
+  // Prefer files with symbols/exports/document/data outline; keep a stable path sort within ties.
   const overview = [...files].sort((a, b) => {
     const sa =
-      a.exports.length * 2 + a.symbols.length + entryPointScore(a.path) + documentScore(a)
+      a.exports.length * 2 +
+      a.symbols.length +
+      entryPointScore(a.path) +
+      documentScore(a) +
+      dataScore(a)
     const sb =
-      b.exports.length * 2 + b.symbols.length + entryPointScore(b.path) + documentScore(b)
+      b.exports.length * 2 +
+      b.symbols.length +
+      entryPointScore(b.path) +
+      documentScore(b) +
+      dataScore(b)
     if (sb !== sa) return sb - sa
     return a.path.localeCompare(b.path)
   })
@@ -600,6 +654,9 @@ async function runBuildProjectIndex(
         if (summary) entry.summary = summary
       }
 
+      const dataSchema = extractDataSchema(relPath, content)
+      if (dataSchema) entry.dataSchema = dataSchema
+
       files.push(entry)
     } catch {
       // skip unreadable files
@@ -684,9 +741,49 @@ export async function ensureProjectIndex(workspaceRoot: string): Promise<EnsureI
   return { ...result, rebuilt: true }
 }
 
+/** Pull a `## Heading` section (until the next `## `) out of summary.txt. */
+export function extractSummarySection(summary: string, heading: string): string | null {
+  const marker = heading.startsWith('## ') ? heading : `## ${heading}`
+  const start = summary.indexOf(marker)
+  if (start < 0) return null
+  const after = summary.slice(start + marker.length)
+  const next = after.search(/\n## /)
+  const body = (next >= 0 ? after.slice(0, next) : after).replace(/^\n+/, '').trimEnd()
+  return `${marker}\n${body}`.trim()
+}
+
+/** For the data use-case, put ## Data first and give it a larger share of the budget. */
+export function compactSummaryForPreset(
+  summary: string,
+  preset?: UseCasePreset | null,
+  maxChars = 5000
+): string {
+  if (preset !== 'data') {
+    return summary.slice(0, maxChars)
+  }
+
+  const dataSection = extractSummarySection(summary, '## Data')
+  if (!dataSection) {
+    return summary.slice(0, maxChars)
+  }
+
+  const dataBudget = Math.min(4500, Math.floor(maxChars * 0.7))
+  const restBudget = Math.max(800, maxChars - Math.min(dataSection.length, dataBudget) - 2)
+  const trimmedData = dataSection.slice(0, dataBudget)
+  const withoutData = summary
+    .replace(dataSection, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+  return `${trimmedData}\n\n${withoutData.slice(0, restBudget)}`.slice(0, maxChars)
+}
+
 export async function getProjectIndexContext(
   workspaceRoot: string,
-  options: { currentFile?: string; referencePaths?: string[] } = {}
+  options: {
+    currentFile?: string
+    referencePaths?: string[]
+    preset?: UseCasePreset | null
+  } = {}
 ): Promise<ProjectIndexContext | null> {
   try {
     const compassDir = getCompassDir(workspaceRoot)
@@ -700,6 +797,7 @@ export async function getProjectIndexContext(
     const meta = JSON.parse(metaRaw) as { indexedAt: string; fileCount: number }
     const files = JSON.parse(filesRaw) as IndexedFile[]
     const graph = JSON.parse(graphRaw) as { edges: GraphEdge[] }
+    const preset = options.preset ?? null
 
     const focusPaths = new Set<string>()
     const currentRel = options.currentFile
@@ -720,6 +818,24 @@ export async function getProjectIndexContext(
       }
     }
 
+    // Data use-case: also attach sibling data files in the same folder (no import graph).
+    if (preset === 'data') {
+      const focusDirs = new Set(
+        [...focusPaths].map((path) => {
+          const slash = path.lastIndexOf('/')
+          return slash >= 0 ? path.slice(0, slash) : ''
+        })
+      )
+      for (const file of files) {
+        if (!file.dataSchema || !isDataIndexPath(file.path)) continue
+        const slash = file.path.lastIndexOf('/')
+        const dir = slash >= 0 ? file.path.slice(0, slash) : ''
+        if (focusDirs.has(dir) || focusPaths.has(file.path)) {
+          related.add(file.path)
+        }
+      }
+    }
+
     const relatedFiles = files.filter((f) => related.has(f.path))
     const relatedSection =
       relatedFiles.length > 0
@@ -737,7 +853,9 @@ export async function getProjectIndexContext(
           ].join('\n')
         : ''
 
-    const compactSummary = summary.slice(0, 5000)
+    const summaryBudget = preset === 'data' ? 6000 : 5000
+    const compactSummary = compactSummaryForPreset(summary, preset, summaryBudget)
+    const contextBudget = preset === 'data' ? 10000 : 8000
     const aiContext = [
       t('ai.indexHeader'),
       `indexedAt: ${meta.indexedAt}`,
@@ -750,7 +868,7 @@ export async function getProjectIndexContext(
     return {
       indexedAt: meta.indexedAt,
       fileCount: meta.fileCount,
-      aiContext: aiContext.slice(0, 8000)
+      aiContext: aiContext.slice(0, contextBudget)
     }
   } catch {
     return null

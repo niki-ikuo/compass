@@ -70,6 +70,12 @@ import {
 } from './agent-verify'
 import { redactSecrets, redactSecretsInArgs } from '../../src/utils/redact'
 import { formatAgentToolsUnsupportedError } from '../../src/utils/agent-tools'
+import {
+  CONTEXT_BUDGET,
+  fitHistoryMessages,
+  pruneMessagesToTokenBudget,
+  truncateToTokenBudget
+} from '../../src/utils/context-budget'
 
 export { resolveAgentApproval, resolveAgentContinue }
 
@@ -81,7 +87,7 @@ const CONTINUE_TOOL_GRANT = 30
 const MAX_READ_BYTES = 200 * 1024
 const MAX_LIST_ENTRIES = 200
 const MAX_SEARCH_RESULTS = 30
-const MAX_TOOL_RESULT_CHARS = 80_000
+const MAX_TOOL_RESULT_CHARS = 24_000
 /**
  * Agent tool-call arguments (especially writeFile content) need more headroom than
  * chat answers. Settings default (4096) cuts ~300-line rewrites mid-JSON.
@@ -447,13 +453,31 @@ function appendHistoryMessages(
   apiMessages: ApiMessage[],
   history: ChatRequestMessage[]
 ): void {
-  for (let i = 0; i < history.length - 1; i++) {
-    const msg = history[i]
+  const prior = history.slice(0, -1)
+  const fitted = fitHistoryMessages(
+    prior.map((msg) => ({
+      role: msg.role,
+      content: msg.content,
+      agentSteps: msg.agentSteps
+    })),
+    {
+      totalTokens: CONTEXT_BUDGET.historyTokens,
+      perMessageTokens: CONTEXT_BUDGET.perHistoryMessageTokens
+    }
+  )
+
+  for (const msg of fitted) {
     apiMessages.push({ role: msg.role, content: msg.content })
     if (msg.role !== 'assistant' || !msg.agentSteps?.length) continue
-    const prior = buildPriorAgentContext(msg.agentSteps)
-    if (prior) {
-      apiMessages.push({ role: 'user', content: prior })
+    const priorCtx = buildPriorAgentContext(msg.agentSteps)
+    if (priorCtx) {
+      apiMessages.push({
+        role: 'user',
+        content: truncateToTokenBudget(
+          priorCtx,
+          Math.floor(CONTEXT_BUDGET.perHistoryMessageTokens / 2)
+        )
+      })
     }
   }
 }
@@ -1313,6 +1337,8 @@ export async function runAgent(webContents: WebContents, request: ChatRequest): 
       send('ai:step', {
         label: t('ai.agentStepThinking', { turn: String(turn + 1) })
       })
+
+      pruneMessagesToTokenBudget(apiMessages, CONTEXT_BUDGET.totalInputTokens)
 
       const body: Record<string, unknown> = {
         model: settings.model,

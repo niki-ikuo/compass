@@ -477,6 +477,10 @@ export const ja = {
   'ai.folderHeading': '## フォルダ: {path}',
   'ai.structureHeading': '### 構造',
   'ai.truncated': '- ... (省略)',
+  'ai.contextTruncated': '\n…(コンテキスト予算のため省略)',
+  'ai.contextOmittedHead': '…(コンテキスト予算のため前方を省略)\n',
+  'ai.contextOmittedRefs': '\n…(コンテキスト予算のため、追加の参照ファイルは省略)',
+  'ai.contextOmittedImages': '\n…(コンテキスト予算のため、一部の画像は省略)',
   'ai.fileHeading': '## ファイル: {path}',
   'ai.pdfHeading': '## PDF（抽出テキスト）: {path}',
   'ai.pdfNoText':
@@ -990,6 +994,10 @@ export const en: Record<MessageKey, string> = {
   'ai.folderHeading': '## Folder: {path}',
   'ai.structureHeading': '### Structure',
   'ai.truncated': '- ... (truncated)',
+  'ai.contextTruncated': '\n…(truncated to fit context budget)',
+  'ai.contextOmittedHead': '…(earlier context omitted to fit budget)\n',
+  'ai.contextOmittedRefs': '\n…(additional referenced files omitted to fit context budget)',
+  'ai.contextOmittedImages': '\n…(some images omitted to fit context budget)',
   'ai.fileHeading': '## File: {path}',
   'ai.pdfHeading': '## PDF (extracted text): {path}',
   'ai.pdfNoText':

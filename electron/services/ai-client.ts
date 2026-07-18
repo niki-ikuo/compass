@@ -17,6 +17,14 @@ import {
   type ChatImageAttachment,
   type UserMessagePayload
 } from '../../src/utils/chat-content-parts'
+import {
+  CONTEXT_BUDGET,
+  estimateTokens,
+  fitHistoryMessages,
+  pruneMessagesToTokenBudget,
+  truncateKeepingEnd,
+  truncateToTokenBudget
+} from '../../src/utils/context-budget'
 import { getSettings } from './settings'
 import { ensureProjectIndex, getProjectIndexContext } from './project-indexer'
 import { resolveChatContext } from './filesystem'
@@ -37,19 +45,34 @@ export { composeSystemPrompt }
 function appendResolvedFile(
   parts: string[],
   file: ResolvedContextFile,
-  images: ChatImageAttachment[]
-): void {
+  images: ChatImageAttachment[],
+  budget: { refsTokensLeft: number; imagesLeft: number }
+): 'added' | 'skipped-budget' | 'skipped-image' {
   if (file.kind === 'image' && file.mimeType && file.base64) {
+    if (budget.imagesLeft <= 0) return 'skipped-image'
+    let base64 = file.base64
+    if (base64.length > CONTEXT_BUDGET.maxImageBase64Chars) {
+      return 'skipped-image'
+    }
     parts.push(t('ai.imageHeading', { path: file.relativePath }))
     parts.push(t('ai.imageAttachedNote'))
     parts.push('')
     images.push({
       relativePath: file.relativePath,
       mimeType: file.mimeType,
-      base64: file.base64
+      base64
     })
-    return
+    budget.imagesLeft -= 1
+    return 'added'
   }
+
+  const content = truncateToTokenBudget(
+    file.content,
+    Math.min(CONTEXT_BUDGET.perRefFileTokens, budget.refsTokensLeft),
+    t('ai.contextTruncated')
+  )
+  const cost = estimateTokens(content)
+  if (cost > budget.refsTokensLeft) return 'skipped-budget'
 
   const heading =
     file.kind === 'pdf'
@@ -58,9 +81,11 @@ function appendResolvedFile(
   parts.push(`${heading}${file.truncated ? ' (truncated)' : ''}`)
   const fence = file.kind === 'pdf' ? 'text' : (file.relativePath.split('.').pop() ?? '')
   parts.push('```' + fence)
-  parts.push(file.content)
+  parts.push(content)
   parts.push('```')
   parts.push('')
+  budget.refsTokensLeft -= cost
+  return 'added'
 }
 
 export function getSystemPrompt(
@@ -185,6 +210,12 @@ export function sanitizeInlineCompletion(raw: string): string {
 export async function buildUserMessagePayload(request: ChatRequest): Promise<UserMessagePayload> {
   const parts: string[] = []
   const images: ChatImageAttachment[] = []
+  const refBudget = {
+    refsTokensLeft: CONTEXT_BUDGET.refsTokens,
+    imagesLeft: CONTEXT_BUDGET.maxImages
+  }
+  let omittedRefs = false
+  let omittedImages = false
 
   if (request.workspaceRoot) {
     try {
@@ -195,7 +226,8 @@ export async function buildUserMessagePayload(request: ChatRequest): Promise<Use
 
     const indexContext = await getProjectIndexContext(request.workspaceRoot, {
       currentFile: request.context?.filePath,
-      referencePaths: request.context?.references?.map((r) => r.path)
+      referencePaths: request.context?.references?.map((r) => r.path),
+      preset: request.preset
     })
     if (indexContext) {
       parts.push(indexContext.aiContext)
@@ -210,6 +242,10 @@ export async function buildUserMessagePayload(request: ChatRequest): Promise<Use
       parts.push(t('ai.userRefsIntro'))
 
       for (const folder of resolved.folders) {
+        if (refBudget.refsTokensLeft <= 0) {
+          omittedRefs = true
+          break
+        }
         parts.push(t('ai.folderHeading', { path: folder.relativePath }))
         parts.push(t('ai.structureHeading'))
         for (const filePath of folder.structure.slice(0, 40)) {
@@ -217,40 +253,39 @@ export async function buildUserMessagePayload(request: ChatRequest): Promise<Use
         }
         if (folder.truncated) parts.push(t('ai.truncated'))
         for (const file of folder.files) {
-          if (file.kind === 'image' && file.mimeType && file.base64) {
-            parts.push(`### ${file.relativePath}`)
-            parts.push(t('ai.imageAttachedNote'))
-            images.push({
-              relativePath: file.relativePath,
-              mimeType: file.mimeType,
-              base64: file.base64
-            })
-          } else {
-            const ext = file.kind === 'pdf' ? 'text' : (file.relativePath.split('.').pop() ?? '')
-            const label =
-              file.kind === 'pdf'
-                ? `${file.relativePath} (PDF)`
-                : file.relativePath
-            parts.push(`### ${label}${file.truncated ? ' (truncated)' : ''}`)
-            parts.push('```' + ext)
-            parts.push(file.content)
-            parts.push('```')
-          }
+          const result = appendResolvedFile(parts, file, images, refBudget)
+          if (result === 'skipped-budget') omittedRefs = true
+          if (result === 'skipped-image') omittedImages = true
+          if (refBudget.refsTokensLeft <= 0 && result === 'skipped-budget') break
         }
         parts.push('')
       }
 
       for (const file of resolved.files) {
-        appendResolvedFile(parts, file, images)
+        if (refBudget.refsTokensLeft <= 0 && file.kind !== 'image') {
+          omittedRefs = true
+          break
+        }
+        const result = appendResolvedFile(parts, file, images, refBudget)
+        if (result === 'skipped-budget') omittedRefs = true
+        if (result === 'skipped-image') omittedImages = true
       }
     }
   }
 
+  if (omittedRefs) parts.push(t('ai.contextOmittedRefs'))
+  if (omittedImages) parts.push(t('ai.contextOmittedImages'))
+
   if (request.context?.filePath && request.context.fileContent !== undefined) {
     const ext = request.context.filePath.split('.').pop() ?? ''
+    const fileBody = truncateToTokenBudget(
+      request.context.fileContent,
+      CONTEXT_BUDGET.currentFileTokens,
+      t('ai.contextTruncated')
+    )
     parts.push(t('ai.currentFile', { path: request.context.filePath }))
     parts.push('```' + ext)
-    parts.push(request.context.fileContent)
+    parts.push(fileBody)
     parts.push('```')
     parts.push('')
   }
@@ -282,7 +317,9 @@ export async function buildUserMessagePayload(request: ChatRequest): Promise<Use
       const ext = sel.path.split('.').pop() ?? ''
       parts.push(`## ${label}`)
       parts.push('```' + ext)
-      parts.push(sel.text)
+      parts.push(
+        truncateToTokenBudget(sel.text, CONTEXT_BUDGET.perRefFileTokens, t('ai.contextTruncated'))
+      )
       parts.push('```')
       parts.push('')
     }
@@ -312,7 +349,16 @@ export async function buildUserMessagePayload(request: ChatRequest): Promise<Use
     parts.push(lastUser.content)
   }
 
-  return { text: parts.join('\n'), images }
+  let text = parts.join('\n')
+  if (estimateTokens(text) > CONTEXT_BUDGET.userPayloadTokens) {
+    text = truncateKeepingEnd(
+      text,
+      CONTEXT_BUDGET.userPayloadTokens,
+      t('ai.contextOmittedHead')
+    )
+  }
+
+  return { text, images }
 }
 
 export async function buildUserMessage(request: ChatRequest): Promise<string> {
@@ -542,16 +588,23 @@ export async function streamChat(
     }
 
     const history = request.messages.filter((m) => m.role !== 'system')
+    const priorHistory = fitHistoryMessages(
+      history.slice(0, -1).map((m) => ({ role: m.role, content: m.content })),
+      {
+        totalTokens: CONTEXT_BUDGET.historyTokens,
+        perMessageTokens: CONTEXT_BUDGET.perHistoryMessageTokens
+      }
+    )
     const apiMessages: Array<{ role: string; content: string | ChatContentPart[] }> = [
-      { role: 'system', content: getSystemPrompt(request.mode, request.preset) }
+      { role: 'system', content: getSystemPrompt(request.mode, request.preset) },
+      ...priorHistory,
+      {
+        role: 'user',
+        content: toApiUserContent(await buildUserMessagePayload(request))
+      }
     ]
 
-    for (let i = 0; i < history.length - 1; i++) {
-      apiMessages.push({ role: history[i].role, content: history[i].content })
-    }
-
-    const userPayload = await buildUserMessagePayload(request)
-    apiMessages.push({ role: 'user', content: toApiUserContent(userPayload) })
+    pruneMessagesToTokenBudget(apiMessages, CONTEXT_BUDGET.totalInputTokens)
 
     if (signal.aborted) {
       send('ai:aborted')

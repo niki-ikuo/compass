@@ -3,7 +3,7 @@ import { join } from 'path'
 import appIcon from '../resources/icon.ico?asset'
 import packageJson from '../package.json'
 import { t } from '../src/i18n/runtime'
-import type { FileEncoding } from '../src/types'
+import type { FileEncoding, UseCasePreset } from '../src/types'
 import { nextZoomLevel } from './view-zoom'
 import {
   applyWorkspaceActions,
@@ -539,7 +539,11 @@ function registerIpcHandlers(): void {
     async (
       _event,
       workspaceRoot: string,
-      options?: { currentFile?: string; referencePaths?: string[] }
+      options?: {
+        currentFile?: string
+        referencePaths?: string[]
+        preset?: UseCasePreset | null
+      }
     ) => {
       return getProjectIndexContext(workspaceRoot, options)
     }
