@@ -127,6 +127,7 @@ function shouldIgnoreTerminalKeyTarget(target: EventTarget | null): boolean {
         '.file-tree',
         '.search-panel',
         '.terminal-tab',
+        '.terminal-tab-add',
         '.terminal-shell-select',
         '.menu-bar'
       ].join(', ')
@@ -706,15 +707,6 @@ export function TerminalPanel() {
               </span>
             </button>
           ))}
-          <button
-            type="button"
-            className="terminal-tab-add"
-            onClick={() => createTab()}
-            title={t('terminal.new')}
-            aria-label={t('terminal.new')}
-          >
-            <PlusIcon />
-          </button>
         </div>
 
         <div className="terminal-panel-actions">
@@ -734,12 +726,12 @@ export function TerminalPanel() {
           )}
           <button
             type="button"
-            className="terminal-panel-btn"
-            onClick={() => setShowTerminal(false)}
-            title={t('terminal.closePanel')}
-            aria-label={t('terminal.closePanel')}
+            className="terminal-tab-add"
+            onClick={() => createTab()}
+            title={t('terminal.new')}
+            aria-label={t('terminal.new')}
           >
-            <CloseIcon />
+            <PlusIcon />
           </button>
         </div>
       </div>
