@@ -400,6 +400,14 @@ interface AppState {
     preset?: UseCasePreset,
     model?: string
   ) => void
+  /** user + 空の assistant を1回の更新で追加（送信時の二重スクロール防止） */
+  addChatExchange: (
+    chatId: string,
+    userContent: string,
+    mode?: ChatMode,
+    preset?: UseCasePreset,
+    model?: string
+  ) => void
   updateLastAssistantMessage: (
     chatId: string,
     content: string,
@@ -961,22 +969,69 @@ export const useAppStore = create<AppState>((set, get) => ({
     scheduleChatHistorySave(get().workspaceRoot)
   },
 
-  updateLastAssistantMessage: (chatId, content, patch) => {
+  addChatExchange: (chatId, userContent, mode, preset, model) => {
+    const trimmedModel = typeof model === 'string' ? model.trim() : ''
+    const now = Date.now()
     set((state) => ({
       chatSessions: updateSessionById(state.chatSessions, chatId, (session) => {
-        const messages = [...session.messages]
-        const lastIdx = messages.length - 1
-        if (lastIdx >= 0 && messages[lastIdx].role === 'assistant') {
-          messages[lastIdx] = {
-            ...messages[lastIdx],
-            content,
-            ...(patch?.agentSteps !== undefined ? { agentSteps: patch.agentSteps } : {})
+        const messages: ChatMessage[] = [
+          ...session.messages,
+          {
+            id: generateId(),
+            role: 'user',
+            content: userContent,
+            timestamp: now,
+            ...(mode ? { mode } : {}),
+            ...(preset ? { preset } : {}),
+            ...(trimmedModel ? { model: trimmedModel } : {})
+          },
+          {
+            id: generateId(),
+            role: 'assistant',
+            content: '',
+            timestamp: now
           }
+        ]
+        let title = session.title
+        if (isDefaultChatTitle(session.title) && userContent.trim()) {
+          const trimmed = userContent.trim()
+          title = trimmed.length > 24 ? `${trimmed.slice(0, 24)}…` : trimmed
         }
-        return { ...session, messages, updatedAt: Date.now() }
+        return { ...session, messages, title, updatedAt: now }
       })
     }))
     scheduleChatHistorySave(get().workspaceRoot)
+  },
+
+  updateLastAssistantMessage: (chatId, content, patch) => {
+    let changed = false
+    set((state) => {
+      const session = state.chatSessions.find((item) => item.id === chatId)
+      if (!session) return state
+      const lastIdx = session.messages.length - 1
+      const last = lastIdx >= 0 ? session.messages[lastIdx] : null
+      if (!last || last.role !== 'assistant') return state
+      const stepsUnchanged =
+        patch?.agentSteps === undefined || patch.agentSteps === last.agentSteps
+      if (last.content === content && stepsUnchanged) return state
+
+      changed = true
+      return {
+        chatSessions: updateSessionById(state.chatSessions, chatId, (current) => {
+          const messages = [...current.messages]
+          const idx = messages.length - 1
+          if (idx >= 0 && messages[idx].role === 'assistant') {
+            messages[idx] = {
+              ...messages[idx],
+              content,
+              ...(patch?.agentSteps !== undefined ? { agentSteps: patch.agentSteps } : {})
+            }
+          }
+          return { ...current, messages, updatedAt: Date.now() }
+        })
+      }
+    })
+    if (changed) scheduleChatHistorySave(get().workspaceRoot)
   },
 
   setChatLoading: (chatId, loading) =>

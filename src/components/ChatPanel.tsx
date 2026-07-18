@@ -103,7 +103,6 @@ export function ChatPanel() {
     null
   )
   const messagesContainerRef = useRef<HTMLDivElement>(null)
-  const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputComposerRef = useRef<ChatInputComposerHandle>(null)
   const historyRef = useRef<HTMLDivElement>(null)
   const historyButtonRef = useRef<HTMLButtonElement>(null)
@@ -124,6 +123,7 @@ export function ChatPanel() {
   const lastApplyError = useAppStore((s) => s.lastApplyError)
   const pendingAgentApprovalId = useAppStore((s) => s.pendingAgentApprovalId)
   const addChatMessage = useAppStore((s) => s.addChatMessage)
+  const addChatExchange = useAppStore((s) => s.addChatExchange)
   const updateLastAssistantMessage = useAppStore((s) => s.updateLastAssistantMessage)
   const setChatLoading = useAppStore((s) => s.setChatLoading)
   const getActiveFile = useAppStore((s) => s.getActiveFile)
@@ -263,20 +263,19 @@ export function ChatPanel() {
     prevActiveChatIdRef.current = activeChatId
     prevMessageCountRef.current = chatMessages.length
 
-    // 復元・セッション切替・大量差分は即時。通常の1通追加やストリーム更新だけ smooth。
+    // 復元・セッション切替・送信（user+assistant）は即時。
+    // scrollIntoView は親まで巻き込んで一瞬上余白が開くことがあるため、コンテナだけ動かす。
     const shouldJump =
       !hasSettledScrollRef.current ||
       chatSwitched ||
       Math.abs(delta) > 1 ||
       delta < 0
 
-    if (shouldJump) {
-      container.scrollTop = container.scrollHeight
-      hasSettledScrollRef.current = true
-      return
-    }
-
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    hasSettledScrollRef.current = true
+    container.scrollTo({
+      top: container.scrollHeight,
+      behavior: shouldJump ? 'auto' : 'smooth'
+    })
   }, [chatMessages, pendingWorkspacePreview, activeChatId])
 
   useLayoutEffect(() => {
@@ -405,8 +404,7 @@ export function ChatPanel() {
     if (!isEditMessage) {
       setPendingCode(null)
     }
-    addChatMessage(chatId, 'user', text, messageMode, messagePreset, settings.model)
-    addChatMessage(chatId, 'assistant', '')
+    addChatExchange(chatId, text, messageMode, messagePreset, settings.model)
     stopRequestedChatIdsRef.current.delete(chatId)
     setAgentStreamStatusFor(chatId, null)
     setPendingContinueFor(chatId, null)
@@ -576,8 +574,8 @@ export function ChatPanel() {
 
       unsubStep = window.compass.ai.onStep((eventChatId, event) => {
         if (!isThisChat(eventChatId)) return
+        // ステータス行は agentStreamStatus で描画。空 content の再同期はスクロールを余計に走らせる。
         setAgentStreamStatusFor(chatId, event.label)
-        syncAssistant(accumulated)
       })
     }
 
@@ -1221,7 +1219,6 @@ export function ChatPanel() {
             </div>
           )
         })}
-        <div ref={messagesEndRef} />
       </div>
 
       {isActiveChatPreview && pendingWorkspacePreview && (
