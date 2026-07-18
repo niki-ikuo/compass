@@ -86,6 +86,8 @@ export function CodeEditor() {
 
   const [markdownViewMode, setMarkdownViewMode] = useState<MarkdownViewMode>('edit')
   const [isApplying, setIsApplying] = useState(false)
+  // null = 言語既定（Markdown: on / それ以外: off）。Alt+Z で一時上書き
+  const [wordWrapOverride, setWordWrapOverride] = useState<'on' | 'off' | null>(null)
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null)
   const selectionPayloadRef = useRef<ReturnType<typeof buildSelectionDragPayload> | null>(null)
 
@@ -97,6 +99,13 @@ export function CodeEditor() {
   const previewFiles = openFiles.filter((f) => f.isPreview)
   const previewIndex = previewFiles.findIndex((f) => f.path === activeFilePath)
   const hasMultiplePreviews = previewFiles.length > 1
+  const wordWrap = (wordWrapOverride ?? (isMarkdown ? 'on' : 'off')) as 'on' | 'off'
+  const wordWrapRef = useRef(wordWrap)
+  wordWrapRef.current = wordWrap
+
+  useEffect(() => {
+    setWordWrapOverride(null)
+  }, [activeFilePath])
 
   const activeSelectionPayload = useMemo(() => {
     if (!editorSelection || !activeFilePath || isPreview) return null
@@ -118,9 +127,9 @@ export function CodeEditor() {
         enabled: inlineCompletionsEnabled !== false
       },
       minimap: { enabled: !isMarkdown || markdownViewMode !== 'split' },
-      wordWrap: (isMarkdown ? 'on' : 'off') as 'on' | 'off'
+      wordWrap
     }),
-    [inlineCompletionsEnabled, isMarkdown, markdownViewMode]
+    [inlineCompletionsEnabled, isMarkdown, markdownViewMode, wordWrap]
   )
 
   useEffect(() => {
@@ -171,6 +180,19 @@ export function CodeEditor() {
         keybindings: [KeyMod.Alt | KeyCode.Backslash],
         run: () => {
           void ed.getAction('editor.action.inlineSuggest.trigger')?.run()
+        }
+      })
+
+      // 折り返し一時切替（Alt+Z）— VS Code / Cursor 互換。ファイル切替で既定に戻る
+      ed.addAction({
+        id: 'compass.toggleWordWrap',
+        label: t('editor.toggleWordWrap'),
+        keybindings: [KeyMod.Alt | KeyCode.KeyZ],
+        run: () => {
+          const next = wordWrapRef.current === 'on' ? 'off' : 'on'
+          wordWrapRef.current = next
+          ed.updateOptions({ wordWrap: next })
+          setWordWrapOverride(next)
         }
       })
 
