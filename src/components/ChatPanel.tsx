@@ -84,6 +84,7 @@ export function ChatPanel() {
   const [sendMode, setSendMode] = useState<ChatMode>('edit')
   const [sendPreset, setSendPreset] = useState<UseCasePreset>(DEFAULT_USE_CASE_PRESET)
   const [modeMenuOpen, setModeMenuOpen] = useState(false)
+  const [presetMenuOpen, setPresetMenuOpen] = useState(false)
   const [agentStreamStatusByChat, setAgentStreamStatusByChat] = useState<
     Record<string, string | null>
   >({})
@@ -108,6 +109,7 @@ export function ChatPanel() {
   const historyButtonRef = useRef<HTMLButtonElement>(null)
   const historyDropdownRef = useRef<HTMLDivElement>(null)
   const modePickerRef = useRef<HTMLDivElement>(null)
+  const presetPickerRef = useRef<HTMLDivElement>(null)
   const stopRequestedChatIdsRef = useRef(new Set<string>())
   const lastSentModeRef = useRef<ChatMode>('edit')
   const prevActiveChatIdRef = useRef<string | null>(null)
@@ -170,6 +172,9 @@ export function ChatPanel() {
   const isActiveChatPreview = pendingWorkspacePreview?.chatId === activeChatId
   const activeModeOption =
     modeOptions.find((option) => option.id === sendMode) ?? modeOptions[0]
+  const activePresetOption =
+    USE_CASE_PRESET_OPTIONS.find((option) => option.id === sendPreset) ??
+    USE_CASE_PRESET_OPTIONS[0]
 
   const setAgentStreamStatusFor = (chatId: string, status: string | null) => {
     setAgentStreamStatusByChat((prev) => {
@@ -316,15 +321,20 @@ export function ChatPanel() {
   }, [historyOpen])
 
   useEffect(() => {
-    if (!modeMenuOpen) return
+    if (!modeMenuOpen && !presetMenuOpen) return
 
     const handlePointerDown = (event: MouseEvent) => {
       const target = event.target as Node
       if (modePickerRef.current?.contains(target)) return
+      if (presetPickerRef.current?.contains(target)) return
       setModeMenuOpen(false)
+      setPresetMenuOpen(false)
     }
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setModeMenuOpen(false)
+      if (event.key === 'Escape') {
+        setModeMenuOpen(false)
+        setPresetMenuOpen(false)
+      }
     }
 
     document.addEventListener('mousedown', handlePointerDown)
@@ -333,10 +343,13 @@ export function ChatPanel() {
       document.removeEventListener('mousedown', handlePointerDown)
       document.removeEventListener('keydown', handleKeyDown)
     }
-  }, [modeMenuOpen])
+  }, [modeMenuOpen, presetMenuOpen])
 
   useEffect(() => {
-    if (isChatLoading) setModeMenuOpen(false)
+    if (isChatLoading) {
+      setModeMenuOpen(false)
+      setPresetMenuOpen(false)
+    }
   }, [isChatLoading])
 
   const formatHistoryTime = (timestamp: number) => {
@@ -1049,30 +1062,6 @@ export function ChatPanel() {
               ))}
             </select>
           </label>
-          <label
-            className="chat-preset-select"
-            title={t(
-              USE_CASE_PRESET_OPTIONS.find((option) => option.id === sendPreset)?.descKey ??
-                'chat.preset.codeDesc'
-            )}
-          >
-            <span className="chat-preset-select-label">{t('chat.useCasePreset')}</span>
-            <select
-              value={sendPreset}
-              onChange={(e) => {
-                const next = normalizeUseCasePreset(e.target.value) ?? DEFAULT_USE_CASE_PRESET
-                setSendPreset(next)
-              }}
-              disabled={isChatLoading}
-              aria-label={t('chat.useCasePreset')}
-            >
-              {USE_CASE_PRESET_OPTIONS.map((option) => (
-                <option key={option.id} value={option.id} title={t(option.descKey)}>
-                  {t(option.labelKey)}
-                </option>
-              ))}
-            </select>
-          </label>
           <div className="chat-history-menu" ref={historyRef}>
             <button
               ref={historyButtonRef}
@@ -1359,61 +1348,131 @@ export function ChatPanel() {
             disabled={isChatLoading}
           />
           <div className="chat-input-footer">
-            <div className="chat-mode-picker" ref={modePickerRef}>
-              <button
-                type="button"
-                className={`chat-mode-trigger mode-${sendMode}`}
-                onClick={() => setModeMenuOpen((open) => !open)}
-                disabled={isChatLoading}
-                title={
-                  !agentModeAvailable
-                    ? t('chat.agentModeUnavailable')
-                    : t(activeModeOption.titleKey)
-                }
-                aria-label={t('chat.sendMode')}
-                aria-haspopup="listbox"
-                aria-expanded={modeMenuOpen}
-              >
-                <span className="chat-mode-dot" aria-hidden="true" />
-                <span className="chat-mode-trigger-label">{activeModeOption.label}</span>
-                <span className="chat-mode-chevron" aria-hidden="true">
-                  ▾
-                </span>
-              </button>
-              {modeMenuOpen ? (
-                <div className="chat-mode-menu" role="listbox" aria-label={t('chat.sendMode')}>
-                  {modeOptions.map((option) => {
-                    const selected = option.id === sendMode
-                    return (
-                      <button
-                        key={option.id}
-                        type="button"
-                        role="option"
-                        aria-selected={selected}
-                        className={`chat-mode-menu-item mode-${option.id}${
-                          selected ? ' selected' : ''
-                        }`}
-                        title={t(option.titleKey)}
-                        onClick={() => {
-                          setSendMode(option.id)
-                          setModeMenuOpen(false)
-                        }}
-                      >
-                        <span className="chat-mode-dot" aria-hidden="true" />
-                        <span>{option.label}</span>
-                        {selected ? (
-                          <span className="chat-mode-menu-check" aria-hidden="true">
-                            ✓
+            <div className="chat-input-footer-controls">
+              <div className="chat-mode-picker" ref={modePickerRef}>
+                <button
+                  type="button"
+                  className={`chat-mode-trigger mode-${sendMode}`}
+                  onClick={() => {
+                    setPresetMenuOpen(false)
+                    setModeMenuOpen((open) => !open)
+                  }}
+                  disabled={isChatLoading}
+                  title={
+                    !agentModeAvailable
+                      ? t('chat.agentModeUnavailable')
+                      : t(activeModeOption.titleKey)
+                  }
+                  aria-label={t('chat.sendMode')}
+                  aria-haspopup="listbox"
+                  aria-expanded={modeMenuOpen}
+                >
+                  <span className="chat-mode-dot" aria-hidden="true" />
+                  <span className="chat-mode-trigger-label">{activeModeOption.label}</span>
+                  <span className="chat-mode-chevron" aria-hidden="true">
+                    ▾
+                  </span>
+                </button>
+                {modeMenuOpen ? (
+                  <div className="chat-mode-menu" role="listbox" aria-label={t('chat.sendMode')}>
+                    {modeOptions.map((option) => {
+                      const selected = option.id === sendMode
+                      return (
+                        <button
+                          key={option.id}
+                          type="button"
+                          role="option"
+                          aria-selected={selected}
+                          className={`chat-mode-menu-item mode-${option.id}${
+                            selected ? ' selected' : ''
+                          }`}
+                          title={t(option.titleKey)}
+                          onClick={() => {
+                            setSendMode(option.id)
+                            setModeMenuOpen(false)
+                          }}
+                        >
+                          <span className="chat-mode-dot" aria-hidden="true" />
+                          <span>{option.label}</span>
+                          {selected ? (
+                            <span className="chat-mode-menu-check" aria-hidden="true">
+                              ✓
+                            </span>
+                          ) : null}
+                        </button>
+                      )
+                    })}
+                    {!agentModeAvailable ? (
+                      <p className="chat-mode-menu-hint">{t('chat.agentModeUnavailable')}</p>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
+              <div className="chat-preset-picker" ref={presetPickerRef}>
+                <button
+                  type="button"
+                  className={`chat-preset-trigger preset-${sendPreset}`}
+                  onClick={() => {
+                    setModeMenuOpen(false)
+                    setPresetMenuOpen((open) => !open)
+                  }}
+                  disabled={isChatLoading}
+                  title={t(activePresetOption.descKey)}
+                  aria-label={t('chat.useCasePreset')}
+                  aria-haspopup="listbox"
+                  aria-expanded={presetMenuOpen}
+                >
+                  <span className="chat-preset-dot" aria-hidden="true" />
+                  <span className="chat-preset-trigger-label">
+                    {t(activePresetOption.labelKey)}
+                  </span>
+                  <span className="chat-preset-chevron" aria-hidden="true">
+                    ▾
+                  </span>
+                </button>
+                {presetMenuOpen ? (
+                  <div
+                    className="chat-preset-menu"
+                    role="listbox"
+                    aria-label={t('chat.useCasePreset')}
+                  >
+                    {USE_CASE_PRESET_OPTIONS.map((option) => {
+                      const selected = option.id === sendPreset
+                      return (
+                        <button
+                          key={option.id}
+                          type="button"
+                          role="option"
+                          aria-selected={selected}
+                          className={`chat-preset-menu-item preset-${option.id}${
+                            selected ? ' selected' : ''
+                          }`}
+                          title={t(option.descKey)}
+                          onClick={() => {
+                            setSendPreset(option.id)
+                            setPresetMenuOpen(false)
+                          }}
+                        >
+                          <span className="chat-preset-dot" aria-hidden="true" />
+                          <span className="chat-preset-menu-item-text">
+                            <span className="chat-preset-menu-item-label">
+                              {t(option.labelKey)}
+                            </span>
+                            <span className="chat-preset-menu-item-desc">
+                              {t(option.descKey)}
+                            </span>
                           </span>
-                        ) : null}
-                      </button>
-                    )
-                  })}
-                  {!agentModeAvailable ? (
-                    <p className="chat-mode-menu-hint">{t('chat.agentModeUnavailable')}</p>
-                  ) : null}
-                </div>
-              ) : null}
+                          {selected ? (
+                            <span className="chat-preset-menu-check" aria-hidden="true">
+                              ✓
+                            </span>
+                          ) : null}
+                        </button>
+                      )
+                    })}
+                  </div>
+                ) : null}
+              </div>
             </div>
             {isChatLoading ? (
               <button
