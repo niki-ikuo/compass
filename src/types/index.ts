@@ -254,7 +254,19 @@ export interface ChatSession {
   isOpen: boolean
 }
 
-export type ColorThemeId = 'dark' | 'light' | 'midnight' | 'high-contrast'
+export type ColorThemeId =
+  | 'dark'
+  | 'light'
+  | 'midnight'
+  | 'high-contrast'
+  | 'high-contrast-light'
+  | 'nord'
+  | 'monokai'
+  | 'solarized-dark'
+  | 'solarized-light'
+  | 'forest'
+  | 'sand'
+  | 'ocean'
 
 export type LlmProviderId =
   | 'openai'
