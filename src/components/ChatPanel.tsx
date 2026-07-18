@@ -103,6 +103,7 @@ export function ChatPanel() {
     null
   )
   const messagesContainerRef = useRef<HTMLDivElement>(null)
+  const chatTabsRef = useRef<HTMLDivElement>(null)
   const inputComposerRef = useRef<ChatInputComposerHandle>(null)
   const historyRef = useRef<HTMLDivElement>(null)
   const historyButtonRef = useRef<HTMLButtonElement>(null)
@@ -318,6 +319,15 @@ export function ChatPanel() {
       document.removeEventListener('keydown', handleKeyDown)
     }
   }, [historyOpen])
+
+  const openChatTabsKey = openChatSessions.map((session) => `${session.id}:${session.title}`).join('|')
+
+  useLayoutEffect(() => {
+    const el = chatTabsRef.current
+    if (!el || !activeChatId) return
+    const activeTab = el.querySelector<HTMLElement>('.chat-tab.active')
+    activeTab?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' })
+  }, [activeChatId, openChatTabsKey])
 
   useEffect(() => {
     if (!modeMenuOpen && !presetMenuOpen) return
@@ -1040,7 +1050,32 @@ export function ChatPanel() {
 
   return (
     <div className="chat-panel">
-      <div className="panel-header chat-panel-header">
+      <div className="chat-tabs-bar">
+        <div className="chat-tabs" ref={chatTabsRef}>
+          {openChatSessions.map((session) => (
+            <div
+              key={session.id}
+              className={`chat-tab${session.id === activeChatId ? ' active' : ''}${
+                loadingChatIds.includes(session.id) ? ' loading' : ''
+              }`}
+              onClick={() => setActiveChatSession(session.id)}
+              title={session.title}
+            >
+              <span className="chat-tab-title">{session.title}</span>
+              <button
+                type="button"
+                className="chat-tab-close"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  closeChatSession(session.id)
+                }}
+                title={t('chat.closeTab')}
+              >
+                <CloseIcon />
+              </button>
+            </div>
+          ))}
+        </div>
         <div className="chat-header-actions">
           <div className="chat-history-menu" ref={historyRef}>
             <button
@@ -1126,32 +1161,6 @@ export function ChatPanel() {
             <TrashIcon />
           </button>
         </div>
-      </div>
-
-      <div className="chat-tabs">
-        {openChatSessions.map((session) => (
-          <div
-            key={session.id}
-            className={`chat-tab${session.id === activeChatId ? ' active' : ''}${
-              loadingChatIds.includes(session.id) ? ' loading' : ''
-            }`}
-            onClick={() => setActiveChatSession(session.id)}
-            title={session.title}
-          >
-            <span className="chat-tab-title">{session.title}</span>
-            <button
-              type="button"
-              className="chat-tab-close"
-              onClick={(e) => {
-                e.stopPropagation()
-                closeChatSession(session.id)
-              }}
-              title={t('chat.closeTab')}
-            >
-              <CloseIcon />
-            </button>
-          </div>
-        ))}
       </div>
 
       <div className="chat-messages" ref={messagesContainerRef}>

@@ -1,3 +1,4 @@
+import { useLayoutEffect, useRef } from 'react'
 import { useAppStore } from '@/stores/app-store'
 import { getFileName } from '@/utils/language'
 import { isBrowserOpenFile } from '@/utils/browser-tab'
@@ -42,11 +43,20 @@ export function TabBar() {
   const activeFilePath = useAppStore((s) => s.activeFilePath)
   const setActiveFile = useAppStore((s) => s.setActiveFile)
   const closeFile = useAppStore((s) => s.closeFile)
+  const tabBarRef = useRef<HTMLDivElement>(null)
+  const openTabsKey = openFiles.map((file) => file.path).join('|')
+
+  useLayoutEffect(() => {
+    const el = tabBarRef.current
+    if (!el || !activeFilePath) return
+    const activeTab = el.querySelector<HTMLElement>('.tab.active')
+    activeTab?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' })
+  }, [activeFilePath, openTabsKey])
 
   if (openFiles.length === 0) return null
 
   return (
-    <div className="tab-bar">
+    <div className="tab-bar" ref={tabBarRef}>
       {openFiles.map((file) => {
         const draggable = canDragTabToChat(file)
         return (
@@ -83,7 +93,6 @@ export function TabBar() {
               }
             >
               {file.isPreview && <span className="tab-preview-badge">P</span>}
-              {isBrowserOpenFile(file) && <span className="tab-browser-badge">B</span>}
               {file.isDirty && !file.isPreview && <span className="dirty-dot">●</span>}
               {tabLabel(file, {
                 browser: t('browser.newTab'),

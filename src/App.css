@@ -873,21 +873,6 @@ body.is-resizing-panels * {
   color: var(--icon-command-hover);
 }
 
-.tab-browser-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 14px;
-  height: 14px;
-  padding: 0 3px;
-  border-radius: 3px;
-  background: var(--bg-hover);
-  color: var(--text-secondary);
-  font-size: 9px;
-  font-weight: 700;
-  line-height: 1;
-}
-
 .browser-viewer {
   display: flex;
   flex-direction: column;
@@ -1494,18 +1479,23 @@ body:has(.monaco-editor .find-widget.visible) .workbench-hover-container .action
   height: 100%;
 }
 
-.chat-panel-header {
-  gap: 8px;
+.chat-tabs-bar {
+  display: flex;
+  align-items: stretch;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-tertiary);
 }
 
 .chat-header-actions {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 6px;
+  gap: 4px;
   position: relative;
-  min-width: 0;
-  flex: 1;
+  flex-shrink: 0;
+  padding: 0 8px;
+  background: var(--bg-secondary);
+  border-left: 1px solid var(--border);
 }
 
 .chat-model-select {
@@ -1656,38 +1646,34 @@ body:has(.monaco-editor .find-widget.visible) .workbench-hover-container .action
 
 .chat-tabs {
   display: flex;
-  gap: 2px;
-  padding: 4px 8px 0;
+  flex: 1;
+  min-width: 0;
   overflow-x: auto;
-  border-bottom: 1px solid var(--border);
-  background: var(--bg-secondary);
+  overflow-y: hidden;
 }
 
 .chat-tab {
   display: flex;
   align-items: center;
-  gap: 4px;
-  max-width: 160px;
-  padding: 4px 6px 4px 8px;
-  border: 1px solid transparent;
-  border-bottom: none;
-  border-radius: 4px 4px 0 0;
-  background: transparent;
+  gap: 6px;
+  padding: 6px 12px;
+  border-right: 1px solid var(--border);
+  background: var(--bg-secondary);
   color: var(--text-secondary);
-  font-size: 11px;
+  font-size: 12px;
+  white-space: nowrap;
   cursor: pointer;
   flex-shrink: 0;
 }
 
 .chat-tab:hover {
-  background: var(--bg-hover);
   color: var(--text-primary);
 }
 
 .chat-tab.active {
   background: var(--bg-primary);
-  border-color: var(--border);
   color: var(--text-primary);
+  border-bottom: 2px solid var(--accent);
 }
 
 .chat-tab.loading .chat-tab-title::after {
@@ -1742,11 +1728,8 @@ body:has(.monaco-editor .find-widget.visible) .workbench-hover-container .action
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: var(--icon-size);
-  height: var(--icon-size);
-  padding: 0;
+  padding: 0 1px;
   border: none;
-  border-radius: 3px;
   background: transparent;
   color: var(--icon-command);
   cursor: pointer;
@@ -1759,7 +1742,6 @@ body:has(.monaco-editor .find-widget.visible) .workbench-hover-container .action
 }
 
 .chat-tab-close:hover {
-  background: var(--bg-hover);
   color: var(--icon-command-hover);
 }
 
