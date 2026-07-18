@@ -323,6 +323,8 @@ export interface ChatRequestMessage {
 }
 
 export interface ChatRequest {
+  /** 並行チャット用。ストリーム／キャンセルの宛先セッション */
+  chatId: string
   messages: ChatRequestMessage[]
   workspaceRoot?: string
   mode?: ChatMode
@@ -517,20 +519,22 @@ export interface CompassAPI {
   }
   ai: {
     chat: (request: ChatRequest) => Promise<void>
-    cancel: () => Promise<boolean>
+    cancel: (chatId?: string) => Promise<boolean>
     complete: (request: InlineCompletionRequest) => Promise<InlineCompletionResult>
     cancelComplete: () => Promise<boolean>
-    onChunk: (callback: (chunk: string) => void) => () => void
-    onDone: (callback: () => void) => () => void
-    onAborted: (callback: () => void) => () => void
-    onError: (callback: (error: string) => void) => () => void
-    onToolStart: (callback: (event: AgentToolStartEvent) => void) => () => void
-    onToolResult: (callback: (event: AgentToolResultEvent) => void) => () => void
-    onStep: (callback: (event: AgentStepEvent) => void) => () => void
-    onNeedApproval: (callback: (event: AgentNeedApprovalEvent) => void) => () => void
+    onChunk: (callback: (chatId: string, chunk: string) => void) => () => void
+    onDone: (callback: (chatId: string) => void) => () => void
+    onAborted: (callback: (chatId: string) => void) => () => void
+    onError: (callback: (chatId: string, error: string) => void) => () => void
+    onToolStart: (callback: (chatId: string, event: AgentToolStartEvent) => void) => () => void
+    onToolResult: (callback: (chatId: string, event: AgentToolResultEvent) => void) => () => void
+    onStep: (callback: (chatId: string, event: AgentStepEvent) => void) => () => void
+    onNeedApproval: (callback: (chatId: string, event: AgentNeedApprovalEvent) => void) => () => void
     resolveApproval: (request: AgentResolveApprovalRequest) => Promise<boolean>
-    onNeedExecApproval: (callback: (event: AgentNeedExecApprovalEvent) => void) => () => void
-    onNeedContinue: (callback: (event: AgentNeedContinueEvent) => void) => () => void
+    onNeedExecApproval: (
+      callback: (chatId: string, event: AgentNeedExecApprovalEvent) => void
+    ) => () => void
+    onNeedContinue: (callback: (chatId: string, event: AgentNeedContinueEvent) => void) => () => void
     resolveContinue: (request: AgentResolveContinueRequest) => Promise<boolean>
   }
   settings: {

@@ -84,11 +84,15 @@ export function ChatPanel() {
   const [sendMode, setSendMode] = useState<ChatMode>('edit')
   const [sendPreset, setSendPreset] = useState<UseCasePreset>(DEFAULT_USE_CASE_PRESET)
   const [modeMenuOpen, setModeMenuOpen] = useState(false)
-  const [agentStreamStatus, setAgentStreamStatus] = useState<string | null>(null)
-  const [pendingContinue, setPendingContinue] = useState<AgentNeedContinueEvent | null>(null)
-  const [pendingExecApproval, setPendingExecApproval] = useState<AgentNeedExecApprovalEvent | null>(
-    null
-  )
+  const [agentStreamStatusByChat, setAgentStreamStatusByChat] = useState<
+    Record<string, string | null>
+  >({})
+  const [pendingContinueByChat, setPendingContinueByChat] = useState<
+    Record<string, AgentNeedContinueEvent | null>
+  >({})
+  const [pendingExecApprovalByChat, setPendingExecApprovalByChat] = useState<
+    Record<string, AgentNeedExecApprovalEvent | null>
+  >({})
   const [agentEditFallback, setAgentEditFallback] = useState<{ prompt: string } | null>(null)
   const [pendingCode, setPendingCode] = useState<{ code: string; language: string } | null>(null)
   const [isDragOver, setIsDragOver] = useState(false)
@@ -104,7 +108,7 @@ export function ChatPanel() {
   const historyButtonRef = useRef<HTMLButtonElement>(null)
   const historyDropdownRef = useRef<HTMLDivElement>(null)
   const modePickerRef = useRef<HTMLDivElement>(null)
-  const stopRequestedRef = useRef(false)
+  const stopRequestedChatIdsRef = useRef(new Set<string>())
   const lastSentModeRef = useRef<ChatMode>('edit')
   const prevActiveChatIdRef = useRef<string | null>(null)
   const prevMessageCountRef = useRef(-1)
@@ -113,7 +117,7 @@ export function ChatPanel() {
   const chatSessions = useAppStore((s) => s.chatSessions)
   const activeChatId = useAppStore((s) => s.activeChatId)
   const activeChat = useAppStore((s) => s.getActiveChatSession())
-  const isChatLoading = useAppStore((s) => s.isChatLoading)
+  const loadingChatIds = useAppStore((s) => s.loadingChatIds)
   const pendingWorkspacePreview = useAppStore((s) => s.pendingWorkspacePreview)
   const lastApplyError = useAppStore((s) => s.lastApplyError)
   const pendingAgentApprovalId = useAppStore((s) => s.pendingAgentApprovalId)
@@ -151,6 +155,12 @@ export function ChatPanel() {
 
   const chatMessages = activeChat?.messages ?? []
   const chatContextRefs = activeChat?.contextRefs ?? []
+  const isChatLoading = Boolean(activeChatId && loadingChatIds.includes(activeChatId))
+  const agentStreamStatus = activeChatId ? (agentStreamStatusByChat[activeChatId] ?? null) : null
+  const pendingContinue = activeChatId ? (pendingContinueByChat[activeChatId] ?? null) : null
+  const pendingExecApproval = activeChatId
+    ? (pendingExecApprovalByChat[activeChatId] ?? null)
+    : null
   const agentModeAvailable = isAgentModeAvailable(settings.providerId)
   const modeOptions = CHAT_MODE_OPTIONS.filter(
     (option) => option.id !== 'agent' || agentModeAvailable
@@ -160,6 +170,28 @@ export function ChatPanel() {
   const isActiveChatPreview = pendingWorkspacePreview?.chatId === activeChatId
   const activeModeOption =
     modeOptions.find((option) => option.id === sendMode) ?? modeOptions[0]
+
+  const setAgentStreamStatusFor = (chatId: string, status: string | null) => {
+    setAgentStreamStatusByChat((prev) => {
+      if (prev[chatId] === status) return prev
+      return { ...prev, [chatId]: status }
+    })
+  }
+  const setPendingContinueFor = (chatId: string, event: AgentNeedContinueEvent | null) => {
+    setPendingContinueByChat((prev) => {
+      if (prev[chatId] === event) return prev
+      return { ...prev, [chatId]: event }
+    })
+  }
+  const setPendingExecApprovalFor = (
+    chatId: string,
+    event: AgentNeedExecApprovalEvent | null
+  ) => {
+    setPendingExecApprovalByChat((prev) => {
+      if (prev[chatId] === event) return prev
+      return { ...prev, [chatId]: event }
+    })
+  }
 
   useEffect(() => {
     if (sendMode === 'agent' && !agentModeAvailable) {
@@ -172,7 +204,6 @@ export function ChatPanel() {
     setPendingCode(null)
     setPinnedSelections([])
     setAgentEditFallback(null)
-    setPendingExecApproval(null)
     const store = useAppStore.getState()
     const session = store.getActiveChatSession()
     const lastUser = [...(session?.messages ?? [])]
@@ -323,7 +354,8 @@ export function ChatPanel() {
 
   const handleSend = async (overrides?: { text?: string; mode?: ChatMode }) => {
     const text = (overrides?.text ?? input).trim()
-    if (!text || isChatLoading) return
+    const chatId = activeChatId
+    if (!text || !chatId || loadingChatIds.includes(chatId)) return
 
     const messageMode = overrides?.mode ?? sendMode
     const messagePreset = resolveEffectiveUseCasePreset({
@@ -342,6 +374,8 @@ export function ChatPanel() {
     const isEditMessage = messageMode === 'edit'
     const isAgentMessage = messageMode === 'agent'
     const selectionsForRequest = buildSelectionsForRequest()
+    const historyMessages = chatMessages
+    const historyContextRefs = chatContextRefs
 
     lastSentModeRef.current = messageMode
     if (messageMode !== sendMode) {
@@ -352,21 +386,19 @@ export function ChatPanel() {
       setInput('')
     }
     setPinnedSelections([])
-    if (isEditMessage) {
+    if (pendingWorkspacePreview?.chatId === chatId) {
       setPendingWorkspacePreview(null)
-    } else {
-      setPendingCode(null)
-      if (pendingWorkspacePreview?.chatId === activeChatId) {
-        revertWorkspacePreview()
-      }
     }
-    addChatMessage('user', text, messageMode, messagePreset)
-    addChatMessage('assistant', '')
-    stopRequestedRef.current = false
-    setAgentStreamStatus(null)
-    setPendingContinue(null)
-    setPendingExecApproval(null)
-    setChatLoading(true)
+    if (!isEditMessage) {
+      setPendingCode(null)
+    }
+    addChatMessage(chatId, 'user', text, messageMode, messagePreset)
+    addChatMessage(chatId, 'assistant', '')
+    stopRequestedChatIdsRef.current.delete(chatId)
+    setAgentStreamStatusFor(chatId, null)
+    setPendingContinueFor(chatId, null)
+    setPendingExecApprovalFor(chatId, null)
+    setChatLoading(chatId, true)
 
     const activeFile = getActiveFile()
 
@@ -374,9 +406,10 @@ export function ChatPanel() {
       await ensureWorkspaceIndex(workspaceRoot)
     }
 
-    if (stopRequestedRef.current) {
-      setChatLoading(false)
-      updateLastAssistantMessage(t('chat.aborted'))
+    if (stopRequestedChatIdsRef.current.has(chatId)) {
+      stopRequestedChatIdsRef.current.delete(chatId)
+      setChatLoading(chatId, false)
+      updateLastAssistantMessage(chatId, t('chat.aborted'))
       return
     }
 
@@ -393,6 +426,8 @@ export function ChatPanel() {
     let unsubNeedContinue: (() => void) | undefined
     let unsubStep: (() => void) | undefined
     let settled = false
+
+    const isThisChat = (eventChatId: string) => eventChatId === chatId
 
     const cleanup = () => {
       unsubChunk?.()
@@ -411,17 +446,23 @@ export function ChatPanel() {
       if (settled) return
       settled = true
       cleanup()
-      setAgentStreamStatus(null)
-      setPendingContinue(null)
-      setPendingExecApproval(null)
-      setChatLoading(false)
+      stopRequestedChatIdsRef.current.delete(chatId)
+      setAgentStreamStatusFor(chatId, null)
+      setPendingContinueFor(chatId, null)
+      setPendingExecApprovalFor(chatId, null)
+      setChatLoading(chatId, false)
     }
 
     const syncAssistant = (content: string, steps = agentSteps) => {
-      updateLastAssistantMessage(content, steps.length > 0 ? { agentSteps: steps } : undefined)
+      updateLastAssistantMessage(
+        chatId,
+        content,
+        steps.length > 0 ? { agentSteps: steps } : undefined
+      )
     }
 
-    unsubChunk = window.compass.ai.onChunk((chunk) => {
+    unsubChunk = window.compass.ai.onChunk((eventChatId, chunk) => {
+      if (!isThisChat(eventChatId)) return
       accumulated += chunk
       if (isEditMessage) {
         const display = stripAllCompassActionsContent(accumulated)
@@ -432,7 +473,8 @@ export function ChatPanel() {
     })
 
     if (isAgentMessage) {
-      unsubToolStart = window.compass.ai.onToolStart((event) => {
+      unsubToolStart = window.compass.ai.onToolStart((eventChatId, event) => {
+        if (!isThisChat(eventChatId)) return
         agentSteps = [
           ...agentSteps.filter((s) => s.id !== event.id),
           {
@@ -445,7 +487,8 @@ export function ChatPanel() {
         syncAssistant(accumulated || t('chat.generating'))
       })
 
-      unsubToolResult = window.compass.ai.onToolResult((event) => {
+      unsubToolResult = window.compass.ai.onToolResult((eventChatId, event) => {
+        if (!isThisChat(eventChatId)) return
         agentSteps = agentSteps.map((step) =>
           step.id === event.id
             ? {
@@ -460,12 +503,17 @@ export function ChatPanel() {
         syncAssistant(accumulated || t('chat.generating'))
       })
 
-      unsubNeedApproval = window.compass.ai.onNeedApproval((event) => {
-        setPendingContinue(null)
-        setPendingExecApproval(null)
+      unsubNeedApproval = window.compass.ai.onNeedApproval((eventChatId, event) => {
+        if (!isThisChat(eventChatId)) return
+        setPendingContinueFor(chatId, null)
+        setPendingExecApprovalFor(chatId, null)
         setPendingAgentApprovalId(event.id)
-        setPendingWorkspacePreview({ actions: event.actions, items: event.items })
-        setAgentStreamStatus(t('chat.agentWaitingApproval'))
+        setPendingWorkspacePreview({
+          chatId,
+          actions: event.actions,
+          items: event.items
+        })
+        setAgentStreamStatusFor(chatId, t('chat.agentWaitingApproval'))
         agentSteps = agentSteps.map((step) =>
           step.id === event.id
             ? {
@@ -478,10 +526,11 @@ export function ChatPanel() {
         syncAssistant(accumulated.trim() || t('chat.reviewProposal'))
       })
 
-      unsubNeedExecApproval = window.compass.ai.onNeedExecApproval((event) => {
-        setPendingContinue(null)
-        setPendingExecApproval(event)
-        setAgentStreamStatus(t('chat.agentWaitingExecApproval'))
+      unsubNeedExecApproval = window.compass.ai.onNeedExecApproval((eventChatId, event) => {
+        if (!isThisChat(eventChatId)) return
+        setPendingContinueFor(chatId, null)
+        setPendingExecApprovalFor(chatId, event)
+        setAgentStreamStatusFor(chatId, t('chat.agentWaitingExecApproval'))
         agentSteps = agentSteps.map((step) =>
           step.id === event.id
             ? {
@@ -494,9 +543,10 @@ export function ChatPanel() {
         syncAssistant(accumulated.trim() || t('chat.agentWaitingExecApproval'))
       })
 
-      unsubNeedContinue = window.compass.ai.onNeedContinue((event) => {
-        setPendingExecApproval(null)
-        setPendingContinue(event)
+      unsubNeedContinue = window.compass.ai.onNeedContinue((eventChatId, event) => {
+        if (!isThisChat(eventChatId)) return
+        setPendingExecApprovalFor(chatId, null)
+        setPendingContinueFor(chatId, event)
         const status =
           event.reason === 'tools'
             ? t('chat.agentNeedContinueTools', {
@@ -507,17 +557,19 @@ export function ChatPanel() {
                 turns: String(event.turnsUsed),
                 tools: String(event.toolsUsed)
               })
-        setAgentStreamStatus(status)
+        setAgentStreamStatusFor(chatId, status)
         syncAssistant(accumulated.trim() || status)
       })
 
-      unsubStep = window.compass.ai.onStep((event) => {
-        setAgentStreamStatus(event.label)
+      unsubStep = window.compass.ai.onStep((eventChatId, event) => {
+        if (!isThisChat(eventChatId)) return
+        setAgentStreamStatusFor(chatId, event.label)
         syncAssistant(accumulated)
       })
     }
 
-    unsubDone = window.compass.ai.onDone(async () => {
+    unsubDone = window.compass.ai.onDone(async (eventChatId) => {
+      if (!isThisChat(eventChatId)) return
       finish()
 
       if (settings.rememberLastUseCasePreset && messagePreset !== settings.defaultUseCasePreset) {
@@ -554,40 +606,46 @@ export function ChatPanel() {
 
         if (actions.length > 0) {
           try {
-            updateLastAssistantMessage(displayContent || t('chat.reviewProposal'))
+            updateLastAssistantMessage(chatId, displayContent || t('chat.reviewProposal'))
 
             const normalizedActions = normalizeWorkspaceActions(workspaceRoot, actions)
             const items = await window.compass.fs.previewActions(workspaceRoot, normalizedActions)
-            setPendingWorkspacePreview({ actions: normalizedActions, items })
+            setPendingWorkspacePreview({
+              chatId,
+              actions: normalizedActions,
+              items
+            })
           } catch (error) {
             const message = error instanceof Error ? error.message : t('chat.previewFailed')
             updateLastAssistantMessage(
+              chatId,
               displayContent
                 ? `${displayContent}\n\n${formatActionPreviewError(message, t)}`
                 : formatActionPreviewError(message, t)
             )
           }
         } else if (displayContent !== accumulated.trim()) {
-          updateLastAssistantMessage(displayContent)
+          updateLastAssistantMessage(chatId, displayContent)
         }
       } else if (isAgentMessage) {
         syncAssistant(accumulated.trim())
       }
     })
 
-    unsubAborted = window.compass.ai.onAborted(() => {
+    unsubAborted = window.compass.ai.onAborted((eventChatId) => {
+      if (!isThisChat(eventChatId)) return
       finish()
       if (isEditMessage) {
         const display = stripAllCompassActionsContent(accumulated).trim()
-        updateLastAssistantMessage(display || t('chat.aborted'))
+        updateLastAssistantMessage(chatId, display || t('chat.aborted'))
       } else if (isAgentMessage) {
-        const approvalId = useAppStore.getState().pendingAgentApprovalId
-        if (approvalId) {
+        const state = useAppStore.getState()
+        if (state.pendingWorkspacePreview?.chatId === chatId && state.pendingAgentApprovalId) {
           setPendingAgentApprovalId(null)
           revertWorkspacePreview()
         }
-        setPendingContinue(null)
-        setPendingExecApproval(null)
+        setPendingContinueFor(chatId, null)
+        setPendingExecApprovalFor(chatId, null)
         agentSteps = agentSteps.map((step) =>
           step.status === 'running' ||
           step.status === 'waiting_approval' ||
@@ -597,17 +655,20 @@ export function ChatPanel() {
         )
         syncAssistant(accumulated.trim() || t('chat.aborted'))
       } else {
-        updateLastAssistantMessage(accumulated.trim() || t('chat.aborted'))
+        updateLastAssistantMessage(chatId, accumulated.trim() || t('chat.aborted'))
       }
     })
 
-    unsubError = window.compass.ai.onError((error) => {
+    unsubError = window.compass.ai.onError((eventChatId, error) => {
+      if (!isThisChat(eventChatId)) return
       finish()
       const toolsUnsupportedMessage = parseAgentToolsUnsupportedError(error)
       if (isAgentMessage && toolsUnsupportedMessage) {
-        setSendMode('edit')
-        lastSentModeRef.current = 'edit'
-        setAgentEditFallback({ prompt: text })
+        if (useAppStore.getState().activeChatId === chatId) {
+          setSendMode('edit')
+          lastSentModeRef.current = 'edit'
+          setAgentEditFallback({ prompt: text })
+        }
         agentSteps = agentSteps.map((step) =>
           step.status === 'running' ||
           step.status === 'waiting_approval' ||
@@ -630,12 +691,12 @@ export function ChatPanel() {
         )
         syncAssistant(t('chat.errorPrefix', { error }))
       } else {
-        updateLastAssistantMessage(t('chat.errorPrefix', { error }))
+        updateLastAssistantMessage(chatId, t('chat.errorPrefix', { error }))
       }
     })
 
     const history = [
-      ...chatMessages.map((m) => ({
+      ...historyMessages.map((m) => ({
         role: m.role,
         content: m.content,
         ...(isAgentMessage && m.agentSteps && m.agentSteps.length > 0
@@ -646,6 +707,7 @@ export function ChatPanel() {
     ]
 
     await window.compass.ai.chat({
+      chatId,
       messages: history,
       workspaceRoot: workspaceRoot ?? undefined,
       mode: messageMode,
@@ -666,15 +728,15 @@ export function ChatPanel() {
             ? activeFile.content
             : undefined,
         selections: selectionsForRequest.length > 0 ? selectionsForRequest : undefined,
-        references: chatContextRefs.length > 0 ? chatContextRefs : undefined
+        references: historyContextRefs.length > 0 ? historyContextRefs : undefined
       }
     })
   }
 
   const handleStop = () => {
-    if (!isChatLoading) return
-    stopRequestedRef.current = true
-    void window.compass.ai.cancel()
+    if (!activeChatId || !loadingChatIds.includes(activeChatId)) return
+    stopRequestedChatIdsRef.current.add(activeChatId)
+    void window.compass.ai.cancel(activeChatId)
   }
 
   const insertMentionAtCursor = (mention: string) => {
@@ -866,11 +928,12 @@ export function ChatPanel() {
   }
 
   const appendAssistantNote = (note: string) => {
+    if (!activeChatId) return
     const last = chatMessages[chatMessages.length - 1]
     if (last?.role === 'assistant') {
-      updateLastAssistantMessage(`${last.content}\n\n${note}`)
+      updateLastAssistantMessage(activeChatId, `${last.content}\n\n${note}`)
     } else {
-      addChatMessage('assistant', note)
+      addChatMessage(activeChatId, 'assistant', note)
     }
   }
 
@@ -897,24 +960,24 @@ export function ChatPanel() {
 
   const handleAgentContinue = () => {
     const event = pendingContinue
-    if (!event) return
-    setPendingContinue(null)
-    setAgentStreamStatus(t('chat.generating'))
+    if (!event || !activeChatId) return
+    setPendingContinueFor(activeChatId, null)
+    setAgentStreamStatusFor(activeChatId, t('chat.generating'))
     void window.compass.ai.resolveContinue({ id: event.id, continue: true })
   }
 
   const handleAgentStopContinue = () => {
     const event = pendingContinue
-    if (!event) return
-    setPendingContinue(null)
+    if (!event || !activeChatId) return
+    setPendingContinueFor(activeChatId, null)
     void window.compass.ai.resolveContinue({ id: event.id, continue: false })
   }
 
   const handleAllowExec = () => {
     const event = pendingExecApproval
-    if (!event) return
-    setPendingExecApproval(null)
-    setAgentStreamStatus(t('chat.generating'))
+    if (!event || !activeChatId) return
+    setPendingExecApprovalFor(activeChatId, null)
+    setAgentStreamStatusFor(activeChatId, t('chat.generating'))
     void window.compass.ai.resolveApproval({
       id: event.id,
       approved: true,
@@ -924,8 +987,8 @@ export function ChatPanel() {
 
   const handleDenyExec = () => {
     const event = pendingExecApproval
-    if (!event) return
-    setPendingExecApproval(null)
+    if (!event || !activeChatId) return
+    setPendingExecApprovalFor(activeChatId, null)
     void window.compass.ai.resolveApproval({
       id: event.id,
       approved: false,
@@ -1082,7 +1145,6 @@ export function ChatPanel() {
             className="btn-icon"
             onClick={() => createChatSession()}
             title={t('chat.newChat')}
-            disabled={isChatLoading}
           >
             <PlusIcon />
           </button>
@@ -1101,7 +1163,9 @@ export function ChatPanel() {
         {openChatSessions.map((session) => (
           <div
             key={session.id}
-            className={`chat-tab${session.id === activeChatId ? ' active' : ''}`}
+            className={`chat-tab${session.id === activeChatId ? ' active' : ''}${
+              loadingChatIds.includes(session.id) ? ' loading' : ''
+            }`}
             onClick={() => setActiveChatSession(session.id)}
             title={session.title}
           >

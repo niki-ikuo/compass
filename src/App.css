@@ -1709,6 +1709,28 @@ body:has(.monaco-editor .find-widget.visible) .workbench-hover-container .action
   color: var(--text-primary);
 }
 
+.chat-tab.loading .chat-tab-title::after {
+  content: '';
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  margin-left: 5px;
+  border-radius: 50%;
+  background: var(--accent);
+  vertical-align: middle;
+  animation: chat-tab-pulse 1s ease-in-out infinite;
+}
+
+@keyframes chat-tab-pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
 .chat-tab-mode {
   flex-shrink: 0;
   width: 14px;

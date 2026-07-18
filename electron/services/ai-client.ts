@@ -320,26 +320,44 @@ export async function buildUserMessage(request: ChatRequest): Promise<string> {
   return payload.text
 }
 
-let activeAbortController: AbortController | null = null
+const activeAbortControllers = new Map<string, AbortController>()
 let activeCompleteAbortController: AbortController | null = null
 
-export function cancelChat(): boolean {
-  if (!activeAbortController) return false
-  activeAbortController.abort()
+export function cancelChat(chatId?: string): boolean {
+  if (chatId) {
+    const controller = activeAbortControllers.get(chatId)
+    if (!controller) return false
+    controller.abort()
+    return true
+  }
+  if (activeAbortControllers.size === 0) return false
+  for (const controller of activeAbortControllers.values()) {
+    controller.abort()
+  }
   return true
 }
 
-export function acquireChatAbortController(): AbortController {
-  activeAbortController?.abort()
+export function acquireChatAbortController(chatId: string): AbortController {
+  activeAbortControllers.get(chatId)?.abort()
   const controller = new AbortController()
-  activeAbortController = controller
+  activeAbortControllers.set(chatId, controller)
   return controller
 }
 
-export function releaseChatAbortController(controller: AbortController): void {
-  if (activeAbortController === controller) {
-    activeAbortController = null
+export function releaseChatAbortController(chatId: string, controller: AbortController): void {
+  if (activeAbortControllers.get(chatId) === controller) {
+    activeAbortControllers.delete(chatId)
   }
+}
+
+/** Renderer へ chatId 付きで AI イベントを送る */
+export function sendAiEvent(
+  webContents: WebContents,
+  channel: string,
+  chatId: string,
+  ...args: unknown[]
+): void {
+  webContents.send(channel, chatId, ...args)
 }
 
 export function cancelInlineCompletion(): boolean {
@@ -498,25 +516,28 @@ export async function streamChat(
   webContents: WebContents,
   request: ChatRequest
 ): Promise<void> {
-  const abortController = acquireChatAbortController()
+  const chatId = request.chatId?.trim() || `anon-${Date.now()}`
+  const abortController = acquireChatAbortController(chatId)
   const { signal } = abortController
+  const send = (channel: string, ...args: unknown[]) =>
+    sendAiEvent(webContents, channel, chatId, ...args)
 
   try {
     const settings = await getSettings()
 
     if (signal.aborted) {
-      webContents.send('ai:aborted')
+      send('ai:aborted')
       return
     }
 
     const provider = getLlmProvider(settings.providerId)
     if (provider.requiresApiKey && !settings.apiKey) {
-      webContents.send('ai:error', t('ai.missingApiKey', { provider: getProviderLabel(provider.id) }))
+      send('ai:error', t('ai.missingApiKey', { provider: getProviderLabel(provider.id) }))
       return
     }
 
     if (!settings.apiBaseUrl.trim()) {
-      webContents.send('ai:error', t('ai.missingBaseUrl'))
+      send('ai:error', t('ai.missingBaseUrl'))
       return
     }
 
@@ -533,7 +554,7 @@ export async function streamChat(
     apiMessages.push({ role: 'user', content: toApiUserContent(userPayload) })
 
     if (signal.aborted) {
-      webContents.send('ai:aborted')
+      send('ai:aborted')
       return
     }
 
@@ -554,15 +575,12 @@ export async function streamChat(
 
     if (!response.ok) {
       const errorText = await response.text()
-      webContents.send(
-        'ai:error',
-        t('ai.apiError', { status: response.status, body: errorText })
-      )
+      send('ai:error', t('ai.apiError', { status: response.status, body: errorText }))
       return
     }
 
     if (!response.body) {
-      webContents.send('ai:error', t('ai.noResponseBody'))
+      send('ai:error', t('ai.noResponseBody'))
       return
     }
 
@@ -595,7 +613,7 @@ export async function streamChat(
             const parsed = JSON.parse(data)
             const content = parsed.choices?.[0]?.delta?.content
             if (content) {
-              webContents.send('ai:chunk', content)
+              send('ai:chunk', content)
             }
           } catch {
             // skip malformed SSE chunks
@@ -607,18 +625,18 @@ export async function streamChat(
     }
 
     if (signal.aborted) {
-      webContents.send('ai:aborted')
+      send('ai:aborted')
     } else {
-      webContents.send('ai:done')
+      send('ai:done')
     }
   } catch (err) {
     if (isAbortError(err) || signal.aborted) {
-      webContents.send('ai:aborted')
+      send('ai:aborted')
       return
     }
     const message = err instanceof Error ? err.message : t('common.unknownError')
-    webContents.send('ai:error', message)
+    send('ai:error', message)
   } finally {
-    releaseChatAbortController(abortController)
+    releaseChatAbortController(chatId, abortController)
   }
 }

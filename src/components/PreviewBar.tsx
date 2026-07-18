@@ -44,8 +44,9 @@ export function PreviewBar() {
       const state = useAppStore.getState()
       const session = state.getActiveChatSession()
       const last = session?.messages[session.messages.length - 1]
-      if (last?.role === 'assistant') {
+      if (last?.role === 'assistant' && state.activeChatId) {
         state.updateLastAssistantMessage(
+          state.activeChatId,
           `${last.content}\n\n${tSync('chat.applied', { count: itemCount })}`
         )
       }
@@ -55,7 +56,7 @@ export function PreviewBar() {
       const state = useAppStore.getState()
       const session = state.getActiveChatSession()
       const last = session?.messages[session.messages.length - 1]
-      if (last?.role === 'assistant') {
+      if (last?.role === 'assistant' && state.activeChatId) {
         const hint = state.pendingAgentApprovalId
           ? isWarning
             ? tSync('chat.patchMismatchAskAgentHint')
@@ -64,6 +65,7 @@ export function PreviewBar() {
             ? tSync('chat.patchMismatchRetryHint')
             : tSync('chat.applyRetryHint')
         state.updateLastAssistantMessage(
+          state.activeChatId,
           `${last.content}\n\n${
             isWarning ? tSync('chat.patchMismatchError', { message }) : tSync('chat.fileOpError', { message })
           }\n${hint}`

@@ -18,6 +18,7 @@ import {
   getSystemPrompt,
   isAbortError,
   releaseChatAbortController,
+  sendAiEvent,
   toApiUserContent
 } from './ai-client'
 import type { ChatContentPart } from '../../src/utils/chat-content-parts'
@@ -459,6 +460,7 @@ function appendHistoryMessages(
 
 async function offerAgentContinue(
   webContents: WebContents,
+  chatId: string,
   signal: AbortSignal,
   payload: {
     reason: 'turns' | 'tools'
@@ -467,13 +469,13 @@ async function offerAgentContinue(
   }
 ): Promise<boolean> {
   const id = randomUUID()
-  webContents.send('ai:needContinue', {
+  sendAiEvent(webContents, 'ai:needContinue', chatId, {
     id,
     reason: payload.reason,
     turnsUsed: payload.turnsUsed,
     toolsUsed: payload.toolsUsed
   })
-  webContents.send('ai:step', {
+  sendAiEvent(webContents, 'ai:step', chatId, {
     label:
       payload.reason === 'tools'
         ? t('ai.agentStepNeedContinueTools')
@@ -845,6 +847,7 @@ function summarizeProposeActionsRejection(detail: string): string {
 
 async function executeProposeActions(
   webContents: WebContents,
+  chatId: string,
   workspaceRoot: string,
   callId: string,
   args: Record<string, unknown>,
@@ -892,12 +895,12 @@ async function executeProposeActions(
     return { ok: false, summary: 'aborted', content: 'Error: aborted before approval' }
   }
 
-  webContents.send('ai:needApproval', {
+  sendAiEvent(webContents, 'ai:needApproval', chatId, {
     id: callId,
     actions: normalized,
     items
   })
-  webContents.send('ai:step', { label: t('ai.agentStepWaitingApproval') })
+  sendAiEvent(webContents, 'ai:step', chatId, { label: t('ai.agentStepWaitingApproval') })
 
   try {
     const decision = await waitForApproval(callId, signal)
@@ -933,6 +936,7 @@ async function executeProposeActions(
 
 async function executeExec(
   webContents: WebContents,
+  chatId: string,
   workspaceRoot: string,
   callId: string,
   args: Record<string, unknown>,
@@ -957,14 +961,14 @@ async function executeExec(
     }
 
     const cwdLabel = (cwd && cwd.trim()) || '.'
-    webContents.send('ai:needExecApproval', {
+    sendAiEvent(webContents, 'ai:needExecApproval', chatId, {
       id: callId,
       command: redactSecrets(command),
       cwd: cwdLabel,
       reason: risk.reason,
       riskKind: risk.kind
     })
-    webContents.send('ai:step', { label: t('ai.agentStepWaitingExecApproval') })
+    sendAiEvent(webContents, 'ai:step', chatId, { label: t('ai.agentStepWaitingExecApproval') })
 
     try {
       const decision = await waitForApproval(callId, signal)
@@ -1033,6 +1037,7 @@ async function executeVerify(
 
 async function executeTool(
   webContents: WebContents,
+  chatId: string,
   workspaceRoot: string,
   callId: string,
   name: string,
@@ -1052,7 +1057,7 @@ async function executeTool(
     case 'search':
       return executeSearch(workspaceRoot, args)
     case 'exec':
-      return executeExec(webContents, workspaceRoot, callId, args, signal)
+      return executeExec(webContents, chatId, workspaceRoot, callId, args, signal)
     case 'verify':
       return executeVerify(workspaceRoot, args, signal, preset, lastAppliedPaths)
     case 'updateTodo':
@@ -1099,6 +1104,7 @@ function isToolsUnsupportedApiError(status: number, body: string): boolean {
 
 async function streamAgentTurn(
   webContents: WebContents,
+  chatId: string,
   url: string,
   headers: Record<string, string>,
   body: Record<string, unknown>,
@@ -1176,7 +1182,7 @@ async function streamAgentTurn(
 
           if (typeof delta.content === 'string' && delta.content) {
             content += delta.content
-            webContents.send('ai:chunk', delta.content)
+            sendAiEvent(webContents, 'ai:chunk', chatId, delta.content)
           }
 
           if (Array.isArray(delta.tool_calls)) {
@@ -1220,24 +1226,27 @@ async function streamAgentTurn(
  * Turn/tool budgets can be extended via user Continue (re-injects plan + memory).
  */
 export async function runAgent(webContents: WebContents, request: ChatRequest): Promise<void> {
-  const abortController = acquireChatAbortController()
+  const chatId = request.chatId?.trim() || `anon-${Date.now()}`
+  const abortController = acquireChatAbortController(chatId)
   const { signal } = abortController
+  const send = (channel: string, ...args: unknown[]) =>
+    sendAiEvent(webContents, channel, chatId, ...args)
 
   try {
     if (!request.workspaceRoot) {
-      webContents.send('ai:error', t('ai.agentNeedsWorkspace'))
+      send('ai:error', t('ai.agentNeedsWorkspace'))
       return
     }
 
     const settings = await getSettings()
     if (signal.aborted) {
-      webContents.send('ai:aborted')
+      send('ai:aborted')
       return
     }
 
     const provider = getLlmProvider(settings.providerId)
     if (provider.agentToolsSupport === 'unsupported') {
-      webContents.send(
+      send(
         'ai:error',
         formatAgentToolsUnsupportedError(
           provider.id === 'ollama'
@@ -1248,11 +1257,11 @@ export async function runAgent(webContents: WebContents, request: ChatRequest): 
       return
     }
     if (provider.requiresApiKey && !settings.apiKey) {
-      webContents.send('ai:error', t('ai.missingApiKey', { provider: getProviderLabel(provider.id) }))
+      send('ai:error', t('ai.missingApiKey', { provider: getProviderLabel(provider.id) }))
       return
     }
     if (!settings.apiBaseUrl.trim()) {
-      webContents.send('ai:error', t('ai.missingBaseUrl'))
+      send('ai:error', t('ai.missingBaseUrl'))
       return
     }
 
@@ -1281,18 +1290,18 @@ export async function runAgent(webContents: WebContents, request: ChatRequest): 
 
     while (true) {
       if (signal.aborted) {
-        webContents.send('ai:aborted')
+        send('ai:aborted')
         return
       }
 
       if (turn >= turnBudget) {
-        const shouldContinue = await offerAgentContinue(webContents, signal, {
+        const shouldContinue = await offerAgentContinue(webContents, chatId, signal, {
           reason: 'turns',
           turnsUsed: turn,
           toolsUsed: toolCallsUsed
         })
         if (!shouldContinue) {
-          webContents.send('ai:done')
+          send('ai:done')
           return
         }
         turnBudget += CONTINUE_TURN_GRANT
@@ -1300,7 +1309,7 @@ export async function runAgent(webContents: WebContents, request: ChatRequest): 
         injectOrientationAfterContinue(apiMessages, plan, memory)
       }
 
-      webContents.send('ai:step', {
+      send('ai:step', {
         label: t('ai.agentStepThinking', { turn: String(turn + 1) })
       })
 
@@ -1316,35 +1325,35 @@ export async function runAgent(webContents: WebContents, request: ChatRequest): 
 
       let turnResult: StreamTurnResult
       try {
-        turnResult = await streamAgentTurn(webContents, url, headers, body, signal)
+        turnResult = await streamAgentTurn(webContents, chatId, url, headers, body, signal)
       } catch (err) {
         if (isAbortError(err) || signal.aborted) {
-          webContents.send('ai:aborted')
+          send('ai:aborted')
           return
         }
         const message = err instanceof Error ? err.message : t('common.unknownError')
-        webContents.send('ai:error', message)
+        send('ai:error', message)
         return
       }
 
       if (signal.aborted) {
-        webContents.send('ai:aborted')
+        send('ai:aborted')
         return
       }
 
       if (turnResult.toolCalls.length === 0) {
-        webContents.send('ai:done')
+        send('ai:done')
         return
       }
 
       while (toolCallsUsed + turnResult.toolCalls.length > toolBudget) {
-        const shouldContinue = await offerAgentContinue(webContents, signal, {
+        const shouldContinue = await offerAgentContinue(webContents, chatId, signal, {
           reason: 'tools',
           turnsUsed: turn + 1,
           toolsUsed: toolCallsUsed
         })
         if (!shouldContinue) {
-          webContents.send('ai:done')
+          send('ai:done')
           return
         }
         turnBudget += CONTINUE_TURN_GRANT
@@ -1360,7 +1369,7 @@ export async function runAgent(webContents: WebContents, request: ChatRequest): 
 
       for (const call of turnResult.toolCalls) {
         if (signal.aborted) {
-          webContents.send('ai:aborted')
+          send('ai:aborted')
           return
         }
 
@@ -1377,7 +1386,7 @@ export async function runAgent(webContents: WebContents, request: ChatRequest): 
         )
         const sanitized = sanitizeArgs(args, call.function.name)
 
-        webContents.send('ai:toolStart', {
+        send('ai:toolStart', {
           id: call.id,
           name: call.function.name,
           args: sanitized
@@ -1395,6 +1404,7 @@ export async function runAgent(webContents: WebContents, request: ChatRequest): 
             } else {
               result = await executeProposeActions(
                 webContents,
+                chatId,
                 request.workspaceRoot,
                 call.id,
                 args,
@@ -1413,6 +1423,7 @@ export async function runAgent(webContents: WebContents, request: ChatRequest): 
           } else {
             result = await executeTool(
               webContents,
+              chatId,
               request.workspaceRoot,
               call.id,
               call.function.name,
@@ -1427,7 +1438,7 @@ export async function runAgent(webContents: WebContents, request: ChatRequest): 
           }
         } catch (err) {
           if (isAbortError(err) || signal.aborted) {
-            webContents.send('ai:aborted')
+            send('ai:aborted')
             return
           }
           throw err
@@ -1438,7 +1449,7 @@ export async function runAgent(webContents: WebContents, request: ChatRequest): 
         }
 
         const observation = truncatePersistedObservation(result.content)
-        webContents.send('ai:toolResult', {
+        send('ai:toolResult', {
           id: call.id,
           name: call.function.name,
           ok: result.ok,
@@ -1458,13 +1469,13 @@ export async function runAgent(webContents: WebContents, request: ChatRequest): 
     }
   } catch (err) {
     if (isAbortError(err) || signal.aborted) {
-      webContents.send('ai:aborted')
+      send('ai:aborted')
       return
     }
     const message = err instanceof Error ? err.message : t('common.unknownError')
-    webContents.send('ai:error', message)
+    send('ai:error', message)
   } finally {
-    releaseChatAbortController(abortController)
+    releaseChatAbortController(chatId, abortController)
   }
 }
 

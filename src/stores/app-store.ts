@@ -105,9 +105,16 @@ function updateActiveSession(
   updater: (session: ChatSession) => ChatSession
 ): ChatSession[] {
   if (!activeChatId) return sessions
-  return sessions.map((session) =>
-    session.id === activeChatId ? updater(session) : session
-  )
+  return updateSessionById(sessions, activeChatId, updater)
+}
+
+function updateSessionById(
+  sessions: ChatSession[],
+  chatId: string | null | undefined,
+  updater: (session: ChatSession) => ChatSession
+): ChatSession[] {
+  if (!chatId) return sessions
+  return sessions.map((session) => (session.id === chatId ? updater(session) : session))
 }
 
 function normalizePath(filePath: string): string {
@@ -303,7 +310,8 @@ interface AppState {
   activeFilePath: string | null
   chatSessions: ChatSession[]
   activeChatId: string | null
-  isChatLoading: boolean
+  /** 生成中のチャットセッション ID（並行実行可） */
+  loadingChatIds: string[]
   settings: AppSettings
   settingsOpen: boolean
   showFileTree: boolean
@@ -380,13 +388,19 @@ interface AppState {
   reopenChatSession: (id: string) => void
   deleteChatSession: (id: string) => void
   addChatMessage: (
+    chatId: string,
     role: 'user' | 'assistant',
     content: string,
     mode?: ChatMode,
     preset?: UseCasePreset
   ) => void
-  updateLastAssistantMessage: (content: string, patch?: { agentSteps?: AgentToolStep[] }) => void
-  setChatLoading: (loading: boolean) => void
+  updateLastAssistantMessage: (
+    chatId: string,
+    content: string,
+    patch?: { agentSteps?: AgentToolStep[] }
+  ) => void
+  setChatLoading: (chatId: string, loading: boolean) => void
+  isChatLoading: (chatId?: string | null) => boolean
   clearChat: () => void
   setSettings: (settings: AppSettings) => void
   setSettingsOpen: (open: boolean) => void
@@ -415,7 +429,12 @@ interface AppState {
   setIndexStatus: (status: 'idle' | 'indexing' | 'ready' | 'error') => void
   setIndexMeta: (meta: { fileCount: number; relationCount: number; indexedAt: string } | null) => void
   setPendingWorkspacePreview: (
-    preview: { actions: WorkspaceAction[]; items: ActionPreviewItem[] } | null
+    preview: {
+      actions: WorkspaceAction[]
+      items: ActionPreviewItem[]
+      /** 省略時は activeChatId */
+      chatId?: string
+    } | null
   ) => void
   setPendingAgentApprovalId: (id: string | null) => void
   clearLastApplyError: () => void
@@ -453,7 +472,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   activeFilePath: null,
   chatSessions: [initialChatSession],
   activeChatId: initialChatSession.id,
-  isChatLoading: false,
+  loadingChatIds: [],
   settings: { ...DEFAULT_SETTINGS },
   settingsOpen: false,
   showFileTree: true,
@@ -537,6 +556,10 @@ export const useAppStore = create<AppState>((set, get) => ({
       get().revertWorkspacePreview()
     }
 
+    if (state.loadingChatIds.length > 0 && typeof window !== 'undefined' && window.compass?.ai) {
+      void window.compass.ai.cancel()
+    }
+
     const rootToSave = state.workspaceRoot
     const sessionsToSave = state.chatSessions
     const activeChatIdToSave = state.activeChatId
@@ -565,6 +588,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       searchSearching: false,
       searchError: null,
       editorRevealRequest: null,
+      loadingChatIds: [],
       chatSessions: state.chatSessions.map((session) => ({ ...session, contextRefs: [] }))
     })
     return true
@@ -904,9 +928,9 @@ export const useAppStore = create<AppState>((set, get) => ({
     scheduleChatHistorySave(state.workspaceRoot)
   },
 
-  addChatMessage: (role, content, mode, preset) => {
+  addChatMessage: (chatId, role, content, mode, preset) => {
     set((state) => ({
-      chatSessions: updateActiveSession(state.chatSessions, state.activeChatId, (session) => {
+      chatSessions: updateSessionById(state.chatSessions, chatId, (session) => {
         const messages: ChatMessage[] = [
           ...session.messages,
           {
@@ -929,9 +953,9 @@ export const useAppStore = create<AppState>((set, get) => ({
     scheduleChatHistorySave(get().workspaceRoot)
   },
 
-  updateLastAssistantMessage: (content, patch) => {
+  updateLastAssistantMessage: (chatId, content, patch) => {
     set((state) => ({
-      chatSessions: updateActiveSession(state.chatSessions, state.activeChatId, (session) => {
+      chatSessions: updateSessionById(state.chatSessions, chatId, (session) => {
         const messages = [...session.messages]
         const lastIdx = messages.length - 1
         if (lastIdx >= 0 && messages[lastIdx].role === 'assistant') {
@@ -947,7 +971,23 @@ export const useAppStore = create<AppState>((set, get) => ({
     scheduleChatHistorySave(get().workspaceRoot)
   },
 
-  setChatLoading: (loading) => set({ isChatLoading: loading }),
+  setChatLoading: (chatId, loading) =>
+    set((state) => {
+      const has = state.loadingChatIds.includes(chatId)
+      if (loading) {
+        if (has) return state
+        return { loadingChatIds: [...state.loadingChatIds, chatId] }
+      }
+      if (!has) return state
+      return { loadingChatIds: state.loadingChatIds.filter((id) => id !== chatId) }
+    }),
+
+  isChatLoading: (chatId) => {
+    const ids = get().loadingChatIds
+    if (chatId === undefined) return ids.length > 0
+    if (!chatId) return false
+    return ids.includes(chatId)
+  },
 
   clearChat: () => {
     if (get().pendingWorkspacePreview) {
@@ -1013,7 +1053,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       get().revertWorkspacePreview()
       return
     }
-    const chatId = get().activeChatId
+    const chatId = preview.chatId ?? get().activeChatId
     if (!chatId) return
     set({
       pendingWorkspacePreview: { chatId, actions: preview.actions, items: preview.items },

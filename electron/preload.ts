@@ -85,67 +85,95 @@ const compassAPI = {
   },
   ai: {
     chat: (request: ChatRequest): Promise<void> => ipcRenderer.invoke('ai:chat', request),
-    cancel: (): Promise<boolean> => ipcRenderer.invoke('ai:cancel'),
+    cancel: (chatId?: string): Promise<boolean> => ipcRenderer.invoke('ai:cancel', chatId),
     complete: (request: InlineCompletionRequest): Promise<InlineCompletionResult> =>
       ipcRenderer.invoke('ai:complete', request),
     cancelComplete: (): Promise<boolean> => ipcRenderer.invoke('ai:cancelComplete'),
-    onChunk: (callback: (chunk: string) => void): (() => void) => {
-      const handler = (_event: Electron.IpcRendererEvent, chunk: string): void => callback(chunk)
+    onChunk: (callback: (chatId: string, chunk: string) => void): (() => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, chatId: string, chunk: string): void =>
+        callback(chatId, chunk)
       ipcRenderer.on('ai:chunk', handler)
       return () => ipcRenderer.removeListener('ai:chunk', handler)
     },
-    onDone: (callback: () => void): (() => void) => {
-      const handler = (): void => callback()
+    onDone: (callback: (chatId: string) => void): (() => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, chatId: string): void => callback(chatId)
       ipcRenderer.on('ai:done', handler)
       return () => ipcRenderer.removeListener('ai:done', handler)
     },
-    onAborted: (callback: () => void): (() => void) => {
-      const handler = (): void => callback()
+    onAborted: (callback: (chatId: string) => void): (() => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, chatId: string): void => callback(chatId)
       ipcRenderer.on('ai:aborted', handler)
       return () => ipcRenderer.removeListener('ai:aborted', handler)
     },
-    onError: (callback: (error: string) => void): (() => void) => {
-      const handler = (_event: Electron.IpcRendererEvent, error: string): void => callback(error)
+    onError: (callback: (chatId: string, error: string) => void): (() => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, chatId: string, error: string): void =>
+        callback(chatId, error)
       ipcRenderer.on('ai:error', handler)
       return () => ipcRenderer.removeListener('ai:error', handler)
     },
-    onToolStart: (callback: (event: AgentToolStartEvent) => void): (() => void) => {
-      const handler = (_event: Electron.IpcRendererEvent, payload: AgentToolStartEvent): void =>
-        callback(payload)
+    onToolStart: (
+      callback: (chatId: string, event: AgentToolStartEvent) => void
+    ): (() => void) => {
+      const handler = (
+        _event: Electron.IpcRendererEvent,
+        chatId: string,
+        payload: AgentToolStartEvent
+      ): void => callback(chatId, payload)
       ipcRenderer.on('ai:toolStart', handler)
       return () => ipcRenderer.removeListener('ai:toolStart', handler)
     },
-    onToolResult: (callback: (event: AgentToolResultEvent) => void): (() => void) => {
-      const handler = (_event: Electron.IpcRendererEvent, payload: AgentToolResultEvent): void =>
-        callback(payload)
+    onToolResult: (
+      callback: (chatId: string, event: AgentToolResultEvent) => void
+    ): (() => void) => {
+      const handler = (
+        _event: Electron.IpcRendererEvent,
+        chatId: string,
+        payload: AgentToolResultEvent
+      ): void => callback(chatId, payload)
       ipcRenderer.on('ai:toolResult', handler)
       return () => ipcRenderer.removeListener('ai:toolResult', handler)
     },
-    onStep: (callback: (event: AgentStepEvent) => void): (() => void) => {
-      const handler = (_event: Electron.IpcRendererEvent, payload: AgentStepEvent): void =>
-        callback(payload)
+    onStep: (callback: (chatId: string, event: AgentStepEvent) => void): (() => void) => {
+      const handler = (
+        _event: Electron.IpcRendererEvent,
+        chatId: string,
+        payload: AgentStepEvent
+      ): void => callback(chatId, payload)
       ipcRenderer.on('ai:step', handler)
       return () => ipcRenderer.removeListener('ai:step', handler)
     },
-    onNeedApproval: (callback: (event: AgentNeedApprovalEvent) => void): (() => void) => {
-      const handler = (_event: Electron.IpcRendererEvent, payload: AgentNeedApprovalEvent): void =>
-        callback(payload)
+    onNeedApproval: (
+      callback: (chatId: string, event: AgentNeedApprovalEvent) => void
+    ): (() => void) => {
+      const handler = (
+        _event: Electron.IpcRendererEvent,
+        chatId: string,
+        payload: AgentNeedApprovalEvent
+      ): void => callback(chatId, payload)
       ipcRenderer.on('ai:needApproval', handler)
       return () => ipcRenderer.removeListener('ai:needApproval', handler)
     },
     resolveApproval: (request: AgentResolveApprovalRequest): Promise<boolean> =>
       ipcRenderer.invoke('ai:resolveApproval', request),
-    onNeedExecApproval: (callback: (event: AgentNeedExecApprovalEvent) => void): (() => void) => {
+    onNeedExecApproval: (
+      callback: (chatId: string, event: AgentNeedExecApprovalEvent) => void
+    ): (() => void) => {
       const handler = (
         _event: Electron.IpcRendererEvent,
+        chatId: string,
         payload: AgentNeedExecApprovalEvent
-      ): void => callback(payload)
+      ): void => callback(chatId, payload)
       ipcRenderer.on('ai:needExecApproval', handler)
       return () => ipcRenderer.removeListener('ai:needExecApproval', handler)
     },
-    onNeedContinue: (callback: (event: AgentNeedContinueEvent) => void): (() => void) => {
-      const handler = (_event: Electron.IpcRendererEvent, payload: AgentNeedContinueEvent): void =>
-        callback(payload)
+    onNeedContinue: (
+      callback: (chatId: string, event: AgentNeedContinueEvent) => void
+    ): (() => void) => {
+      const handler = (
+        _event: Electron.IpcRendererEvent,
+        chatId: string,
+        payload: AgentNeedContinueEvent
+      ): void => callback(chatId, payload)
       ipcRenderer.on('ai:needContinue', handler)
       return () => ipcRenderer.removeListener('ai:needContinue', handler)
     },

@@ -463,8 +463,8 @@ function registerIpcHandlers(): void {
     await streamChat(event.sender, request)
   })
 
-  ipcMain.handle('ai:cancel', () => {
-    return cancelChat()
+  ipcMain.handle('ai:cancel', (_event, chatId?: string) => {
+    return cancelChat(typeof chatId === 'string' ? chatId : undefined)
   })
 
   ipcMain.handle(
