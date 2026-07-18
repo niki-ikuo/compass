@@ -334,18 +334,36 @@ function resolveAgentApprovalIfPreviewCleared(
   void window.compass.ai.resolveApproval({ id, approved, detail })
 }
 
-function finalizePreviewFileInOpenFiles(openFiles: OpenFile[], filePath: string): OpenFile[] {
+function finalizePreviewFileInOpenFiles(
+  openFiles: OpenFile[],
+  filePath: string,
+  newContent?: string
+): OpenFile[] {
   const normalized = normalizePath(filePath)
   return openFiles.map((file) => {
-    if (normalizePath(file.path) !== normalized || !file.isPreview) return file
+    if (normalizePath(file.path) !== normalized) return file
+    // Preview tabs already hold newContent; non-preview open tabs stay stale unless synced.
+    if (!file.isPreview && newContent === undefined) return file
     return {
       ...file,
+      content: newContent !== undefined ? newContent : file.content,
       isPreview: false,
       previewOriginal: undefined,
       isNewPreview: false,
       isDirty: false
     }
   })
+}
+
+function appliedWriteContentByPath(
+  items: ActionPreviewItem[]
+): Map<string, string> {
+  const byPath = new Map<string, string>()
+  for (const item of items) {
+    if (item.type !== 'writeFile') continue
+    byPath.set(normalizePath(item.path).toLowerCase(), item.newContent)
+  }
+  return byPath
 }
 
 function revertPreviewFileInOpenFiles(
@@ -914,7 +932,6 @@ export const useAppStore = create<AppState>((set, get) => ({
   renameOpenFile: (oldPath, newPath) => {
     set((state) => {
       const oldNorm = oldPath.replace(/\\/g, '/')
-      const newNorm = newPath.replace(/\\/g, '/')
 
       const remapPath = (path: string): string => {
         const normalized = path.replace(/\\/g, '/')
@@ -1453,6 +1470,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       (item): item is Extract<ActionPreviewItem, { type: 'deleteFile' | 'deleteDir' }> =>
         item.type === 'deleteFile' || item.type === 'deleteDir'
     )
+    const writeContents = appliedWriteContentByPath(state.pendingWorkspacePreview.items)
 
     try {
       await window.compass.fs.applyActions(
@@ -1468,6 +1486,17 @@ export const useAppStore = create<AppState>((set, get) => ({
 
     set((s) => {
       let openFiles = s.openFiles.map((f) => {
+        const appliedContent = writeContents.get(normalizePath(f.path).toLowerCase())
+        if (appliedContent !== undefined) {
+          return {
+            ...f,
+            content: appliedContent,
+            isPreview: false,
+            previewOriginal: undefined,
+            isNewPreview: false,
+            isDirty: false
+          }
+        }
         if (!f.isPreview) return f
         return {
           ...f,
@@ -1540,7 +1569,11 @@ export const useAppStore = create<AppState>((set, get) => ({
     const appliedLabel = writeItem.relativePath.replace(/\\/g, '/')
     set((s) => {
       if (!s.pendingWorkspacePreview) return s
-      const openFiles = finalizePreviewFileInOpenFiles(s.openFiles, filePath)
+      const openFiles = finalizePreviewFileInOpenFiles(
+        s.openFiles,
+        filePath,
+        writeItem.newContent
+      )
       const pendingWorkspacePreview = removeFileFromPendingPreview(
         s.pendingWorkspacePreview,
         filePath

@@ -88,7 +88,7 @@ export async function loadChatHistory(workspaceRoot: string): Promise<WorkspaceC
 
 export async function saveChatHistory(
   workspaceRoot: string,
-  history: WorkspaceChatHistory
+  history: Omit<WorkspaceChatHistory, 'version'> & { version?: number }
 ): Promise<void> {
   const compassDir = join(workspaceRoot, COMPASS_DIR)
   await mkdir(compassDir, { recursive: true })

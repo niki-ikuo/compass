@@ -432,7 +432,6 @@ export function FileTree() {
   const fileTree = useAppStore((s) => s.fileTree)
   const workspaceRoot = useAppStore((s) => s.workspaceRoot)
   const pendingWorkspacePreview = useAppStore((s) => s.pendingWorkspacePreview)
-  const openFile = useAppStore((s) => s.openFile)
   const openPreviewFile = useAppStore((s) => s.openPreviewFile)
   const setActiveFile = useAppStore((s) => s.setActiveFile)
   const renameOpenFile = useAppStore((s) => s.renameOpenFile)
