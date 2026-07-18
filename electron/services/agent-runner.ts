@@ -1087,7 +1087,8 @@ function injectOrientationAfterContinue(
   apiMessages.push({ role: 'user', content: parts.join('\n\n') })
 }
 
-function isToolsUnsupportedApiError(status: number, body: string): boolean {
+/** Exported for unit tests — maps provider 400/404/422 bodies to tools-unsupported. */
+export function isToolsUnsupportedApiError(status: number, body: string): boolean {
   if (status !== 400 && status !== 404 && status !== 422) return false
   const b = body.toLowerCase()
   return (
