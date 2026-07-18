@@ -579,6 +579,7 @@ export interface CompassAPI {
       action: 'reload' | 'toggleDevTools' | 'resetZoom' | 'zoomIn' | 'zoomOut'
     ) => Promise<void>
     showAbout: () => Promise<void>
+    showItemInFolder: (targetPath: string) => Promise<void>
   }
   menu: {
     onOpenFolder: (callback: () => void) => () => void

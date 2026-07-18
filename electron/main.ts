@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog, Menu } from 'electron'
+import { app, BrowserWindow, ipcMain, dialog, Menu, shell } from 'electron'
 import { join } from 'path'
 import appIcon from '../resources/icon.ico?asset'
 import packageJson from '../package.json'
@@ -308,6 +308,13 @@ function registerIpcHandlers(): void {
       detail: t('menu.aboutDetail', { version: packageJson.version }),
       buttons: ['OK']
     })
+  })
+
+  ipcMain.handle('shell:showItemInFolder', (_event, targetPath: string) => {
+    if (typeof targetPath !== 'string' || targetPath.trim() === '') {
+      throw new Error('Invalid path')
+    }
+    shell.showItemInFolder(targetPath)
   })
 
   ipcMain.handle('fs:openFolder', async () => {

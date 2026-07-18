@@ -712,6 +712,20 @@ export function FileTree() {
     [getChatAttachTargets]
   )
 
+  const showItemInFolder = useCallback(
+    async (node: FileTreeNode) => {
+      setContextMenu(null)
+      if (node.isPreview) return
+      try {
+        await window.compass.shell.showItemInFolder(node.path)
+        setError(null)
+      } catch (err) {
+        setError(getErrorMessage(err, t('explorer.showInOsExplorerFailed')))
+      }
+    },
+    [t]
+  )
+
   const cancelPendingDelete = useCallback(() => {
     setPendingDeleteTargets(null)
     restoreWorkbenchFocus()
@@ -1152,6 +1166,7 @@ export function FileTree() {
     !isWorkspaceRootPath(contextMenu.node.path)
   const canDelete = deleteTargets.length > 0 && deleteTargets.every((n) => !n.isPreview)
   const canAddToChat = chatAttachTargets.length > 0
+  const canShowInOsExplorer = Boolean(contextMenu?.node && !contextMenu.node.isPreview)
   const isRootDropTarget = dropTargetPath === normalizeNodePath(workspaceRoot)
   const workspaceName = basename(workspaceRoot)
 
@@ -1297,6 +1312,14 @@ export function FileTree() {
                   }}
                 >
                   {t('explorer.searchInFolder')}
+                </button>
+              )}
+              {canShowInOsExplorer && (
+                <button
+                  onMouseEnter={closeCreateSubmenu}
+                  onClick={() => void showItemInFolder(contextMenu.node!)}
+                >
+                  {t('explorer.showInOsExplorer')}
                 </button>
               )}
               {canRename && (

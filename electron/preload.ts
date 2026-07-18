@@ -211,7 +211,9 @@ const compassAPI = {
     view: (
       action: 'reload' | 'toggleDevTools' | 'resetZoom' | 'zoomIn' | 'zoomOut'
     ): Promise<void> => ipcRenderer.invoke('shell:view', action),
-    showAbout: (): Promise<void> => ipcRenderer.invoke('shell:showAbout')
+    showAbout: (): Promise<void> => ipcRenderer.invoke('shell:showAbout'),
+    showItemInFolder: (targetPath: string): Promise<void> =>
+      ipcRenderer.invoke('shell:showItemInFolder', targetPath)
   },
   menu: {
     onOpenFolder: (callback: () => void): (() => void) => {
