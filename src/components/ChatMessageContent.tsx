@@ -1,11 +1,10 @@
 import { useState, type ReactNode } from 'react'
 import { AnimatedEllipsis, AnimatedStatus } from '@/components/AnimatedEllipsis'
+import { ChatMarkdown } from '@/components/ChatMarkdown'
 import {
   getCodeLabel,
   parseChatSegments,
-  parseInlineChatParts,
-  splitStreamingContent,
-  type InlineChatPart
+  splitStreamingContent
 } from '@/utils/chat-content'
 import { stripAllCompassActionsContent } from '@/utils/workspace-actions'
 import { useI18n } from '@/i18n'
@@ -15,52 +14,6 @@ interface ChatMessageContentProps {
   isStreaming?: boolean
   /** When true, skip the bare "…" placeholder (e.g. Agent already shows a status line). */
   hideStreamingPlaceholder?: boolean
-}
-
-function pathMentionIcon(kind: 'file' | 'folder' | 'selection'): string {
-  if (kind === 'folder') return '📁'
-  if (kind === 'selection') return '≡'
-  return '📄'
-}
-
-function renderInlineParts(parts: InlineChatPart[], keyPrefix: string): ReactNode[] {
-  return parts.map((part, index) => {
-    const key = `${keyPrefix}-${index}`
-    if (part.type === 'text') {
-      return <span key={key}>{part.content}</span>
-    }
-    if (part.type === 'path') {
-      return (
-        <span key={key} className={`chat-path-capsule kind-${part.kind}`} title={part.content}>
-          <span className="chat-path-capsule-icon" aria-hidden="true">
-            {pathMentionIcon(part.kind)}
-          </span>
-          <span className="chat-path-capsule-label">{part.content}</span>
-        </span>
-      )
-    }
-    return (
-      <code key={key} className="chat-inline-code">
-        {part.content}
-      </code>
-    )
-  })
-}
-
-function ChatText({
-  content,
-  showCursor
-}: {
-  content: string
-  showCursor?: boolean
-}) {
-  const parts = parseInlineChatParts(content)
-  return (
-    <p className="chat-text">
-      {renderInlineParts(parts, 't')}
-      {showCursor ? <span className="chat-streaming-cursor" aria-hidden="true" /> : null}
-    </p>
-  )
 }
 
 function CodeAccordion({
@@ -158,7 +111,7 @@ export function ChatMessageContent({
         </span>
       )
     }
-    return <ChatText content={sanitized} showCursor={isStreaming} />
+    return <ChatMarkdown content={sanitized} showCursor={isStreaming} />
   }
 
   return (
@@ -167,7 +120,7 @@ export function ChatMessageContent({
         if (segment.type === 'text') {
           const isLast = index === segments.length - 1 && !streamingCode
           return (
-            <ChatText
+            <ChatMarkdown
               key={index}
               content={segment.content}
               showCursor={Boolean(isStreaming && isLast)}
