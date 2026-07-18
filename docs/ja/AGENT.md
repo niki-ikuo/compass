@@ -283,7 +283,7 @@ src/
 
 | ドキュメント | 用途 |
 |--------------|------|
-| [AGENT_PLAN.md](./AGENT_PLAN.md) | Phase チェックリスト、未決事項、後回し項目 |
+| [AGENT_PLAN.md](./AGENT_PLAN.md) | Phase 0–4 出荷記録と後回し項目 |
 | [ARCHITECTURE.md](./ARCHITECTURE.md) | プロセス / IPC 全体像 |
 | [SPEC.md](./SPEC.md) | Ask / Edit / Agent の製品境界 |
 | [USE_CASE_PRESET.md](./USE_CASE_PRESET.md) | 用途プリセット（モードとは別軸） |

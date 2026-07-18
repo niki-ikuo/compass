@@ -20,21 +20,22 @@
 
 - テキストエディタ
 - ファイルツリー
-- AIチャット（サイドパネル）— **Ask**（説明のみ）/ **Edit**（ファイル変更の提案）/ **Agent**（読取専用ツールループ。書き込み・コマンドは後続 — [AGENT_PLAN.md](./AGENT_PLAN.md)）
+- AIチャット（サイドパネル）— **Ask**（説明のみ）/ **Edit**（ファイル変更の提案）/ **Agent**（ツールループ: 読取、`proposeActions` によるプレビュー承認、制限付き `exec`、`verify`、plan/memory — [AGENT.md](./AGENT.md)）
 - 現在ファイルをコンテキスト送信
-- AI提案の差分プレビュー＆適用（Edit は `compass-actions` → プレビュー → ユーザー承認）
+- AI提案の差分プレビュー＆適用（Edit は `compass-actions`、Agent は `proposeActions` → 同じプレビュー → ユーザー承認）
 - OpenAI互換API接続（マルチ LLM 切替: プロバイダプリセット・プロバイダ別 API Key・モデル選択）
 - 設定（APIキー等）
 - ターミナル統合（xterm.js + node-pty）
 - ワークスペース構造索引（`.compass/` — ファイル一覧、コード向け import グラフ等を AI コンテキストに付与）
+- チャット履歴のワークスペース永続化（`.compass/chat-history.json`）
 - 用途プリセット（`general` / `document` / `data` / `code`）— Ask / Edit / Agent とは別軸 — [USE_CASE_PRESET.md](./USE_CASE_PRESET.md)
 - インライン補完（ゴーストテキスト / Tab で確定。設定で ON/OFF）
 - 文書テンプレート（内蔵 Markdown 雛形、ワークスペース `.compass/templates/`）
 
-### 後回し（v2以降）
+### 後回し（後続）
 
-- **Agent の続き** — Phase 4 の UX / ガードレールは実装済み（適用失敗時の Agent 修正依頼、`verify` による test/lint/typecheck ループを含む）。後回し: tools 非対応時の自動 Edit フォールバック — [AGENT_PLAN.md](./AGENT_PLAN.md)
-- ベクトル検索 / RAG による意味検索（現状の `.compass` は構造索引であり埋め込み検索ではない）
+- **Agent の磨き込み** — tools 非対応時の自動 Edit フォールバック、プロバイダ別 Agent トグル非表示 — [AGENT_PLAN.md](./AGENT_PLAN.md) §7 後回し
+- ベクトル検索 / RAG による意味検索（現状の `.compass` は構造索引であり埋め込み検索ではない）— SPEC v2.1
 - MCP連携
 - Git統合
 
@@ -94,7 +95,7 @@
 | 入力 | マルチライン、Enter送信 / Shift+Enter改行 |
 | コンテキスト | ①現在開いているファイル全文 ②ユーザーが選択したテキスト（あれば） |
 | ストリーミング | トークン単位で逐次表示 |
-| 会話履歴 | セッション内保持（アプリ再起動でクリア） |
+| 会話履歴 | ワークスペースごとに `.compass/chat-history.json` へ永続化（再起動後も残る） |
 | システムプロンプト | 用途ロール（`general` / `document` / `data` / `code`）+ モード制約（Ask / Edit / Agent）。詳細は [USE_CASE_PRESET.md](./USE_CASE_PRESET.md) |
 
 **コンテキスト送信フォーマット例:**
@@ -254,18 +255,18 @@ interface AppSettings {
 
 ---
 
-## 10. v2以降の拡張ロードマップ
+## 10. ロードマップ
 
 ```
-現状（ターミナル / .compass 索引 / Ask・Edit・Agent / マルチ LLM / インライン補完 /
-     用途プリセット / 文書テンプレート まで実装）
- └─ v2.0: Agent 自律実行（ツールループ・コマンド実行・複数ステップ）— 段階計画: [AGENT_PLAN.md](./AGENT_PLAN.md)
-     └─ v2.1: ワークスペース意味検索（RAG / 埋め込み）、文書向け見出し・要約索引
-         └─ v3.0: MCP、プラグイン、非 OpenAI 互換ネイティブ API
+v2.0 出荷済み（ターミナル / .compass 索引 / Ask・Edit・Agent 自律実行 / マルチ LLM /
+     インライン補完 / 用途プリセット / 文書テンプレート / チャット履歴）
+ └─ v2.1: ワークスペース意味検索（RAG / 埋め込み）、文書向け見出し・要約索引
+     └─ v3.0: MCP、プラグイン、非 OpenAI 互換ネイティブ API
 ```
 
-v2.0 Agent の段階的実装チェックリスト: [AGENT_PLAN.md](./AGENT_PLAN.md)。  
-用途プリセット（コード専用から AI ワークスペースへ）: [USE_CASE_PRESET.md](./USE_CASE_PRESET.md)。
+v2.0 Agent Phase 0–4（出荷済み）と後回し項目: [AGENT_PLAN.md](./AGENT_PLAN.md)。  
+ランタイム詳細: [AGENT.md](./AGENT.md)。  
+用途プリセット: [USE_CASE_PRESET.md](./USE_CASE_PRESET.md)。
 
 **用語の区別**
 
@@ -273,7 +274,7 @@ v2.0 Agent の段階的実装チェックリスト: [AGENT_PLAN.md](./AGENT_PLAN
 |------|------|
 | Ask モード | 説明・レビューのみ。ワークスペース変更は提案しない |
 | Edit モード | ファイル作成・変更・削除を JSON で提案し、ユーザーがプレビュー承認して適用 |
-| Agent | ツール呼び出しループ。Phase 1–3: 読取、`proposeActions`（プレビュー承認）、制限付き `exec` — [AGENT_PLAN.md](./AGENT_PLAN.md) |
+| Agent | 出荷済みのツール呼び出しループ（Phase 0–4）: 読取、`proposeActions`（プレビュー承認）、制限付き `exec`、`verify`、plan/memory — [AGENT.md](./AGENT.md) |
 | 用途プリセット | 「何の専門家か」（`general` / `document` / `data` / `code`）。Ask / Edit / Agent とは別軸 — [USE_CASE_PRESET.md](./USE_CASE_PRESET.md) |
 
 ---
@@ -317,4 +318,4 @@ Compass はローカルフォルダ向けの **AI ワークスペース**。MVP 
 3. **コンテキスト付き AI チャット** — 現在のファイルと用途を理解した対話
 4. **提案の適用** — 承認後に AI の出力をワークスペースへ反映する
 
-本質は「エディタ + 文脈を持った AI + 変更の適用」。構造索引・用途プリセット・Edit（提案適用）・インライン補完まで実装済み。Agent のさらなる自律化・RAG は後続とする。
+本質は「エディタ + 文脈を持った AI + 変更の適用」。構造索引・用途プリセット・Ask / Edit / Agent（v2.0 Phase 0–4）・インライン補完まで実装済み。RAG・MCP は後続とする。

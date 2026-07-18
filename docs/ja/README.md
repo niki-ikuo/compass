@@ -11,7 +11,7 @@
 | [ARCHITECTURE.md](./ARCHITECTURE.md) | プロセス構成、IPC、ディレクトリ役割 |
 | [DEVELOPMENT.md](./DEVELOPMENT.md) | 開発環境、コマンド、実装時の注意点 |
 | [AGENT.md](./AGENT.md) | Agent ランタイム — ツールループ、承認、IPC、モジュール |
-| [AGENT_PLAN.md](./AGENT_PLAN.md) | v2.0 Agent モード — 段階的実装計画 |
+| [AGENT_PLAN.md](./AGENT_PLAN.md) | v2.0 Agent Phase 0–4（出荷済み）と後回し項目 |
 | [Contributing](../../CONTRIBUTING.ja.md) | コントリビューション案内（英語版: [CONTRIBUTING.md](../../CONTRIBUTING.md)） |
 | [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md) | 行動規範（英語版: [CODE_OF_CONDUCT.md](../../CODE_OF_CONDUCT.md)） |
 

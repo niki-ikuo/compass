@@ -20,21 +20,22 @@
 
 - Text editor
 - File tree
-- AI chat (side panel) — **Ask** (explain only) / **Edit** (propose file changes) / **Agent** (read-only tool loop; writes & commands come later — see [AGENT_PLAN.md](./AGENT_PLAN.md))
+- AI chat (side panel) — **Ask** (explain only) / **Edit** (propose file changes) / **Agent** (tool loop: read tools, `proposeActions` with preview approval, restricted `exec`, `verify`, plan/memory — see [AGENT.md](./AGENT.md))
 - Current file sent as context
-- Diff preview & apply for AI suggestions (Edit: `compass-actions` → preview → user approval)
+- Diff preview & apply for AI suggestions (Edit: `compass-actions`; Agent: `proposeActions` → same preview → user approval)
 - OpenAI-compatible API (multi-LLM: provider presets, per-provider API keys, model selection)
 - Settings (API keys, etc.)
 - Integrated terminal (xterm.js + node-pty)
 - Workspace structure index (`.compass/` — file list, import graph for code, etc. for AI context)
+- Chat history persisted per workspace (`.compass/chat-history.json`)
 - Use-case presets (`general` / `document` / `data` / `code`) — orthogonal to Ask / Edit / Agent; see [USE_CASE_PRESET.md](./USE_CASE_PRESET.md)
 - Inline completions (ghost text / Tab accept; toggle in Settings)
 - Doc templates (built-in Markdown presets; workspace `.compass/templates/`)
 
-### Deferred (v2+)
+### Deferred (later)
 
-- **Agent follow-ups** — Phase 4 UX/guardrails are implemented (including apply-failure → Ask Agent to fix, and the `verify` test/lint/typecheck loop); deferred: auto Edit fallback for tools-less providers — see [AGENT_PLAN.md](./AGENT_PLAN.md)
-- Vector search / RAG (`.compass` is a structure index, not embedding search)
+- **Agent polish** — auto Edit fallback for tools-less providers; hide Agent toggle per provider — see [AGENT_PLAN.md](./AGENT_PLAN.md) §7 Deferred
+- Vector search / RAG (`.compass` is a structure index, not embedding search) — SPEC v2.1
 - MCP
 - Git integration
 
@@ -94,7 +95,7 @@
 | Input | Multiline; Enter send / Shift+Enter newline |
 | Context | (1) full current file (2) user selection if any |
 | Streaming | Token-by-token display |
-| History | In-session only (cleared on restart) |
+| History | Persisted per workspace in `.compass/chat-history.json` (survives restart) |
 | System prompt | Use-case role (`general` / `document` / `data` / `code`) + mode constraints (Ask / Edit / Agent). See [USE_CASE_PRESET.md](./USE_CASE_PRESET.md) |
 
 **Example context format:**
@@ -254,18 +255,18 @@ interface AppSettings {
 
 ---
 
-## 10. Roadmap (v2+)
+## 10. Roadmap
 
 ```
-Now (terminal / .compass index / Ask·Edit·Agent / multi-LLM / inline completions /
-     use-case presets / doc templates)
- └─ v2.0: Agent autonomy (tool loop, commands, multi-step) — plan: [AGENT_PLAN.md](./AGENT_PLAN.md)
-     └─ v2.1: semantic workspace search (RAG / embeddings); heading/summary index for docs
-         └─ v3.0: MCP, plugins, native non–OpenAI APIs
+v2.0 shipped (terminal / .compass index / Ask·Edit·Agent autonomy / multi-LLM /
+     inline completions / use-case presets / doc templates / chat history)
+ └─ v2.1: semantic workspace search (RAG / embeddings); heading/summary index for docs
+     └─ v3.0: MCP, plugins, native non–OpenAI APIs
 ```
 
-Phased build checklist for v2.0 Agent: [AGENT_PLAN.md](./AGENT_PLAN.md).  
-Use-case presets (AI workspace beyond code-only): [USE_CASE_PRESET.md](./USE_CASE_PRESET.md).
+v2.0 Agent phases 0–4 (shipped) + deferred polish: [AGENT_PLAN.md](./AGENT_PLAN.md).  
+Runtime details: [AGENT.md](./AGENT.md).  
+Use-case presets: [USE_CASE_PRESET.md](./USE_CASE_PRESET.md).
 
 **Terminology**
 
@@ -273,7 +274,7 @@ Use-case presets (AI workspace beyond code-only): [USE_CASE_PRESET.md](./USE_CAS
 |------|---------|
 | Ask mode | Explain / review only; no workspace change proposals |
 | Edit mode | Propose create/change/delete as JSON; user previews and applies |
-| Agent | Tool-call loop. Phase 1–3: read tools, `proposeActions` (preview approval), restricted `exec` — see [AGENT_PLAN.md](./AGENT_PLAN.md) |
+| Agent | Shipped tool-call loop (Phases 0–4): read tools, `proposeActions` (preview approval), restricted `exec`, `verify`, plan/memory — see [AGENT.md](./AGENT.md) |
 | Use-case preset | *What kind of expert* (`general` / `document` / `data` / `code`). Orthogonal to Ask / Edit / Agent — see [USE_CASE_PRESET.md](./USE_CASE_PRESET.md) |
 
 ---
@@ -317,4 +318,4 @@ Compass is an **AI workspace** for local folders. MVP rests on four pillars:
 3. **Contextual AI chat** — dialogue that understands the current file and use case
 4. **Apply suggestions** — put AI output into the workspace after approval
 
-Core loop: “editor + contextual AI + apply changes.” Structure index, use-case presets, Edit (propose/apply), and inline completions are shipped; deeper Agent autonomy and RAG come later.
+Core loop: “editor + contextual AI + apply changes.” Structure index, use-case presets, Ask / Edit / Agent (v2.0 Phases 0–4), and inline completions are shipped; RAG and MCP come later.

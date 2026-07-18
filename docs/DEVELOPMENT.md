@@ -85,8 +85,8 @@ import { useAppStore } from '@/stores/app-store'
 5. **Workspace index (`.compass/`)**  
    Opening a folder builds and watches a structure index under `.compass/` (`files.json`, `graph.json`, etc.). See `project-indexer.ts` / `index-watcher.ts`. Not semantic search (RAG).
 
-6. **Ask / Edit**  
-   Ask is explain-only. Edit proposes changes via `compass-actions` and requires user approval. Separate from an autonomous Agent tool loop (see SPEC).
+6. **Ask / Edit / Agent**  
+   Ask is explain-only. Edit proposes changes via `compass-actions` and requires user approval. Agent is a separate tool-call loop (`agent-runner`) with preview-gated writes — see [AGENT.md](./AGENT.md).
 
 7. **Multi-LLM**  
    Assumes OpenAI-compatible endpoints. Provider presets live in `src/utils/llm-providers.ts`. API keys are encrypted per provider. Non-compatible APIs (e.g. Claude) go through OpenRouter.

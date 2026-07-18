@@ -85,8 +85,8 @@ import { useAppStore } from '@/stores/app-store'
 5. **ワークスペース索引（`.compass/`）**  
    フォルダオープン時に構造索引の構築・監視が走る。成果物はワークスペースの `.compass/`（`files.json` / `graph.json` 等）。関連は `project-indexer.ts` / `index-watcher.ts`。意味検索（RAG）ではない。
 
-6. **Ask / Edit**  
-   Ask は説明のみ。Edit は `compass-actions` による変更提案＋ユーザー承認。コマンド実行や複数ステップの自律ループ（SPEC 上の「Agent 自律実行」）とは別。
+6. **Ask / Edit / Agent**  
+   Ask は説明のみ。Edit は `compass-actions` による変更提案＋ユーザー承認。Agent は別経路のツール呼び出しループ（`agent-runner`、書き込みはプレビュー承認）— [AGENT.md](./AGENT.md)。
 
 7. **マルチ LLM**  
    OpenAI 互換エンドポイント前提。プロバイダ切替は `src/utils/llm-providers.ts` のプリセットを使う。API Key はプロバイダ別に暗号化保存される。Claude など非互換 API は OpenRouter 経由で利用する。

@@ -2,9 +2,9 @@
 
 **English** | [日本語](ja/AGENT_PLAN.md)
 
-Plan for v2.0 **Agent** autonomy (tool loops, commands, multi-step runs). For how the shipped runtime behaves, see [AGENT.md](./AGENT.md). Related: [SPEC.md](./SPEC.md) §10, [ARCHITECTURE.md](./ARCHITECTURE.md).
+Phased build record for **v2.0 Agent** autonomy (tool loops, commands, multi-step runs). **Phases 0–4 are shipped** in the current product (`package.json` version 2.0.x). For how the runtime behaves today, see [AGENT.md](./AGENT.md). Related: [SPEC.md](./SPEC.md) §10, [ARCHITECTURE.md](./ARCHITECTURE.md).
 
-Branch: `feature/ai-chat-agent`
+This document keeps the phase checklist, decided policies, and **remaining** deferred work. It is not a “not started” plan.
 
 ---
 
@@ -14,16 +14,16 @@ Branch: `feature/ai-chat-agent`
 |------|---------|--------|
 | **Ask** | Explain / review only; no workspace change proposals | Shipped |
 | **Edit** | Propose create/change/delete as JSON; user previews and applies | Shipped |
-| **Agent** | Cursor-style tool-call loops, optional command execution, multi-step automation | Not shipped |
+| **Agent** | Cursor-style tool-call loops, restricted command execution, multi-step automation (Phases 0–4) | Shipped (v2.0) |
 
 Agent is **not** “Edit but larger.” Edit stays a single-turn propose → human apply. Agent runs a loop: model → tool → observation → model … until done, cancelled, or error.
 
-### Non-goals (this plan / early phases)
+### Non-goals (still out of scope / later)
 
 - MCP / plugins (SPEC v3.0)
 - Semantic RAG (SPEC v2.1)
 - Cloud auth / multi-tenant (app remains local, workspace-scoped)
-- Auto-apply destructive changes without approval in Phase 1–2
+- Auto-apply destructive changes without approval
 
 ---
 
@@ -33,7 +33,7 @@ Agent is **not** “Edit but larger.” Edit stays a single-turn propose → hum
 2. **Workspace sandbox** — paths must resolve inside the open folder (`resolveInsideWorkspace`); no escape via `..`.
 3. **Human approval for writes** — reuse Edit’s preview → apply path (`previewActions` / `applyActions`).
 4. **Single cancellable run** — one AbortController-style cancel per Agent run (same spirit as `ai:cancel`).
-5. **OpenAI-compatible `tools` API** — prefer native tool calling over extending the `compass-actions` text protocol. Providers without tools need a later fallback.
+5. **OpenAI-compatible `tools` API** — native tool calling (not the `compass-actions` text protocol). Providers without tools get a clear error (auto Edit fallback still deferred).
 6. **Terminal split** — keep user PTY (xterm) separate from Agent’s short-lived controlled `exec`.
 
 ### Reusable assets
@@ -41,44 +41,42 @@ Agent is **not** “Edit but larger.” Edit stays a single-turn propose → hum
 | Asset | Path / area | Agent use |
 |-------|-------------|-----------|
 | Preview / apply | `WorkspaceAction`, `fs.previewActions` / `applyActions` | Write gate |
-| Search / structure index | `workspace-search`, `.compass` indexer | Early read tools |
+| Search / structure index | `workspace-search`, `.compass` indexer | Read tools |
 | SSE + IPC + abort | `ai-client`, `ai:chunk` / `ai:done` / `ai:cancel` | Stream + cancel |
 | Chat history | `.compass/chat-history.json` | Persist steps / mode |
-| Mode toggle UI | `ChatPanel`, `ChatMode` | Add `agent` formally |
+| Mode toggle UI | `ChatPanel`, `ChatMode` | `'agent'` is a first-class mode |
 
-Note: `normalizeChatMode` currently maps legacy `'agent'` → `'edit'`. That compatibility rule must be reversed when Agent ships.
+`ChatMode` includes `'agent'`; `normalizeChatMode` accepts it (no agent → edit remap).
 
 ---
 
-## 3. Phase 0 — Contract (before heavy implementation)
+## 3. Phase 0 — Contract — **Shipped**
 
-Define types and IPC before the loop so UI and Main stay aligned.
+Types and IPC defined so UI and Main stay aligned.
 
 ### Mode and run state
 
-- Restore `ChatMode` including `'agent'` (stop normalizing agent → edit for new sessions).
+- `ChatMode` includes `'agent'`.
 - Run lifecycle (conceptual):
 
 ```
 idle → thinking → tool_call → (waiting_approval)? → applying? → thinking → … → done | error | aborted
 ```
 
-### Suggested IPC events (extend existing AI channel)
+### IPC events (AI channel)
 
 | Event | Purpose |
 |-------|---------|
-| `ai:chunk` | Assistant text deltas (unchanged) |
+| `ai:chunk` | Assistant text deltas |
 | `ai:toolStart` | Tool name + args (sanitized for UI) |
 | `ai:toolResult` | Observation summary / success / error |
 | `ai:needApproval` | Pending write preview (pause loop) |
-| `ai:step` | Optional high-level step label |
+| `ai:step` | High-level step label |
 | `ai:done` / `ai:error` / `ai:aborted` | Terminal states |
-
-Exact names can change; the contract should include **enough events for a step timeline in chat**.
 
 ### Persistence
 
-**Decision:** Embed tool steps on `ChatMessage.agentSteps` (assistant messages). Ask/Edit transcripts ignore the field. History reload coerces in-flight `running` steps to `error`.
+Tool steps embed on `ChatMessage.agentSteps` (assistant messages). Ask/Edit transcripts ignore the field. History reload coerces in-flight `running` / `waiting_*` steps to `error`.
 
 ### Phase 2 write policy (decided)
 
@@ -90,91 +88,72 @@ Exact names can change; the contract should include **enough events for a step t
 | After apply | Return applied summary and **continue** |
 | Pause IPC | `ai:needApproval` + `ai:resolveApproval` |
 
-### Spec updates
-
-Document Ask / Edit / Agent boundaries in SPEC (and keep this plan as the build checklist).
-
-**Exit criteria:** TypeScript types + IPC stubs agreed; SPEC terminology updated; no full loop required yet.
+**Exit criteria:** Met.
 
 ---
 
-## 4. Phase 1 — Thin runtime (read-only tools)
+## 4. Phase 1 — Thin runtime (read-only tools) — **Shipped**
 
-**Goal:** Prove the tool loop end-to-end without mutating the workspace.
-
-### Tools (initial)
+End-to-end tool loop without mutating the workspace.
 
 | Tool | Behavior |
 |------|----------|
 | `readFile` | Read file under workspace (size limit) |
 | `listDir` | List directory |
-| `search` | Leverage existing workspace search / index |
+| `search` | Workspace search / index |
 
-### Implementation sketch
+- Runner: `electron/services/agent-runner.ts`
+- Max turns / max tools per run; stream text + tool events; cancel aborts HTTP and further tools
+- UI: Ask / Edit / Agent toggle; step timeline in chat
 
-- Prefer `electron/services/agent-runner.ts` (or equivalent) over growing `ai-client.ts` forever.
-- Max turns / max tools per run to avoid runaway loops.
-- Stream assistant text + emit tool events to Renderer.
-- Cancel aborts in-flight HTTP and stops further tools.
-
-### UI
-
-- Mode toggle: Ask / Edit / Agent.
-- Step timeline in chat (tool name, brief result).
-
-**Exit criteria:** User can ask Agent a question; Agent reads files via tools; steps visible; cancel works; no writes.
+**Exit criteria:** Met.
 
 ---
 
-## 5. Phase 2 — Writes + human approval
+## 5. Phase 2 — Writes + human approval — **Shipped**
 
-**Goal:** Multi-step edits with the same safety model as Edit.
-
-**Status:** Implemented on `feature/ai-chat-agent`.
-
-- Tool: `proposeActions({ actions: WorkspaceAction[] })` — prefer **`applyPatch`** (unified diff) for surgical edits to existing files; `writeFile` for new/small full files
+- Tool: `proposeActions({ actions: WorkspaceAction[] })` — prefer **`applyPatch`** for surgical edits; `writeFile` for new/small full files
 - Loop **pauses** and emits `ai:needApproval` with preview items
 - UI reuses Edit preview / PreviewBar; Apply or Reject calls `ai:resolveApproval`
-- Reject / apply both return an observation; the run **continues** (reject does not force-stop)
+- Reject / apply both return an observation; the run **continues**
 - Ask/Edit paths unchanged
 
-**Exit criteria:** Agent can plan → read → propose → user approve → apply, across multiple steps; Ask/Edit unchanged.
+**Exit criteria:** Met.
 
 ---
 
-## 6. Phase 3 — Restricted command execution
-
-**Goal:** Close the feedback loop (tests, lint, build) without equating Agent to a raw shell.
-
-**Status:** Implemented on `feature/ai-chat-agent`.
+## 6. Phase 3 — Restricted command execution — **Shipped**
 
 - Tool: `exec({ command, cwd?, timeoutMs? })` via `electron/services/agent-exec.ts`
 - cwd constrained to the workspace; default timeout 30s (max 120s); stdout/stderr capped (~64KB)
-- Non-interactive (`stdin` ignored); separate from the user PTY
+- Non-interactive; separate from the user PTY
 - **Shell:** Windows prefers Git Bash when installed (else `cmd.exe`); other platforms use `/bin/sh`
-- **Deny-list** blocks obvious dangerous patterns; cancel aborts and kills the child process when possible
+- **Deny-list** blocks dangerous patterns; cancel kills the child when possible
 
-**Exit criteria:** Safe commands run, output returns to the model, UI shows command steps; cancel kills the child process when possible.
+**Exit criteria:** Met.
 
 ---
 
-## 7. Phase 4 — UX and robustness
-
-**Status:** Implemented on `feature/ai-chat-agent`.
+## 7. Phase 4 — UX and robustness — **Shipped**
 
 - **Partial apply:** When the preview queue empties after per-file apply/reject, Agent approval resumes with an applied/rejected observation
-- **Apply failure → re-propose:** On apply error the preview stays for Retry; when Agent approval is pending, **Ask Agent to fix** clears the preview and returns the failure observation so the loop can re-propose
-- **Verify loop:** `verify` tool runs project test / lint / typecheck via package scripts (or safe fallbacks); prompts nudge fix → verify → fix after apply
+- **Apply failure → re-propose:** On apply error the preview stays for Retry; **Ask Agent to fix** clears the preview and returns the failure observation
+- **Verify loop:** `verify` tool runs project test / lint / typecheck via package scripts (or safe fallbacks)
 - **Progress / cancel:** `ai:step` status labels; `waiting_approval` step status; abort clears approval + running/waiting steps
-- **Tools-less providers:** Clear error (`ai.agentToolsUnsupported`) directing the user to Edit or a tools-capable model (no auto Edit fallback yet)
+- **Tools-less providers:** Clear error (`ai.agentToolsUnsupported`) directing the user to Edit or a tools-capable model
 - **History:** `waiting_approval` / `running` steps normalize safely on load
-- **Guardrails:** Turn limits, payload truncation, secret redaction in tool args/logs (`src/utils/redact.ts`) and `exec` output
-- **Plan layer:** `updateTodo` checklist + `checkpoint` resume summary; re-injected on Continue and into follow-up prior context (`electron/services/agent-plan.ts`)
-- **Context retention (pre-RAG):** working memory via auto-captured observations + `remember` tool (`agent-memory.ts`); smarter `.compass` summary with entry points / exports / symbols (`project-indexer.ts`); in-run `readFile` smart cache with `force=true` bypass (`agent-read-cache.ts`)
+- **Guardrails:** Turn limits, payload truncation, secret redaction (`src/utils/redact.ts`) and `exec` output
+- **Plan layer:** `updateTodo` + `checkpoint` (`electron/services/agent-plan.ts`)
+- **Context retention (pre-RAG):** `remember` + auto observations (`agent-memory.ts`); smarter `.compass` summary; in-run `readFile` cache (`agent-read-cache.ts`)
 
-**Exit criteria:** Stable enough for daily use on the primary providers Compass already supports.
+**Exit criteria:** Met for daily use on primary OpenAI-compatible providers.
 
-**Deferred:** Automatic Ask/Edit fallback when tools are unsupported; hide Agent toggle per provider.
+### Deferred (still open)
+
+| Item | Notes |
+|------|--------|
+| Auto Ask/Edit fallback when tools unsupported | Currently a clear error only |
+| Hide Agent toggle per provider | Optional UX polish |
 
 ---
 
@@ -182,47 +161,48 @@ Document Ask / Edit / Agent boundaries in SPEC (and keep this plan as the build 
 
 Aligned with SPEC:
 
-| Spec | Scope |
-|------|--------|
-| v2.1 | Semantic search / RAG / embeddings |
-| v3.0 | MCP, plugins, native non–OpenAI APIs |
-| Policy | Optional auto-approve for trusted read-only tools only |
+| Spec | Scope | Status |
+|------|--------|--------|
+| v2.1 | Semantic search / RAG / embeddings | Not started |
+| v3.0 | MCP, plugins, native non–OpenAI APIs | Not started |
+| Policy | Optional auto-approve for trusted read-only tools only | Not started |
 
 ---
 
 ## 9. Phase diagram
 
 ```
-Phase 0  Contract (types, IPC, SPEC, persistence)
+Phase 0  Contract (types, IPC, SPEC, persistence)     ✅ shipped
    ↓
-Phase 1  Read-only tool loop + step UI
+Phase 1  Read-only tool loop + step UI                 ✅ shipped
    ↓
-Phase 2  Writes via preview/apply + approval pause
+Phase 2  Writes via preview/apply + approval pause     ✅ shipped
    ↓
-Phase 3  Restricted exec (separate from user PTY)
+Phase 3  Restricted exec (separate from user PTY)      ✅ shipped
    ↓
-Phase 4  UX, limits, provider fallbacks
+Phase 4  UX, limits, provider errors, plan/memory      ✅ shipped (v2.0)
    ↓
-Phase 5  RAG → MCP / plugins (SPEC v2.1 / v3.0)
+Phase 5  RAG → MCP / plugins (SPEC v2.1 / v3.0)        ○ later
 ```
 
 ---
 
-## 10. First implementation slice (recommended order)
+## 10. Build order (historical)
 
-1. Update SPEC/types: Ask · Edit · Agent boundaries; restore `'agent'` mode.
-2. UI toggle for Agent (runner may still be stubbed).
-3. Main: max-N-turn read-only runner with one or two tools.
-4. Chat: render tool steps from new IPC events.
-5. Only then: write tools + approval pause.
+The order actually used to ship v2.0:
 
-Avoid shipping “commands + auto-apply writes” in one slice — cancel, approval, provider differences, and history will collide.
+1. SPEC/types: Ask · Edit · Agent boundaries; `'agent'` mode
+2. UI toggle for Agent
+3. Main: max-N-turn read-only runner
+4. Chat: tool steps from IPC events
+5. Write tools + approval pause
+6. Restricted `exec`, then Phase 4 UX / verify / plan / memory
+
+Avoid shipping “commands + auto-apply writes” in one slice — cancel, approval, provider differences, and history collide.
 
 ---
 
-## 11. Open decisions
-
-Record choices here as implementation proceeds:
+## 11. Decisions (record)
 
 | Topic | Options / notes | Decision |
 |-------|-----------------|----------|
