@@ -85,7 +85,7 @@ const CHAT_MODE_OPTIONS: { id: ChatMode; label: string; titleKey: 'chat.askModeT
 
 export function ChatPanel() {
   const { t } = useI18n()
-  const [input, setInput] = useState('')
+  const [canSend, setCanSend] = useState(false)
   const [sendMode, setSendMode] = useState<ChatMode>('edit')
   const [sendPreset, setSendPreset] = useState<UseCasePreset>(DEFAULT_USE_CASE_PRESET)
   const [modeMenuOpen, setModeMenuOpen] = useState(false)
@@ -385,8 +385,13 @@ export function ChatPanel() {
     }
   }
 
+  const clearInput = () => {
+    setCanSend(false)
+    inputComposerRef.current?.clear()
+  }
+
   const handleSend = async (overrides?: { text?: string; mode?: ChatMode }) => {
-    const text = (overrides?.text ?? input).trim()
+    const text = (overrides?.text ?? inputComposerRef.current?.getValue() ?? '').trim()
     const chatId = activeChatId
     if (!text || !chatId || loadingChatIds.includes(chatId)) return
 
@@ -400,7 +405,7 @@ export function ChatPanel() {
       setSendMode('edit')
       lastSentModeRef.current = 'edit'
       setAgentEditFallback({ prompt: text })
-      if (!overrides?.text) setInput('')
+      if (!overrides?.text) clearInput()
       return
     }
 
@@ -416,7 +421,7 @@ export function ChatPanel() {
     }
     setAgentEditFallback(null)
     if (!overrides?.text) {
-      setInput('')
+      clearInput()
     }
     setPinnedSelections([])
     if (pendingWorkspacePreview?.chatId === chatId) {
@@ -1423,8 +1428,7 @@ export function ChatPanel() {
         <div className="chat-input-box">
           <ChatInputComposer
             ref={inputComposerRef}
-            value={input}
-            onChange={setInput}
+            onCanSendChange={setCanSend}
             onSubmit={() => void handleSend()}
             onPasteSelection={handlePasteSelection}
             onPasteMedia={(data) => {
@@ -1598,7 +1602,7 @@ export function ChatPanel() {
                 type="button"
                 className="btn-send"
                 onClick={() => void handleSend()}
-                disabled={!input.trim()}
+                disabled={!canSend}
               >
                 {t('chat.send')}
               </button>

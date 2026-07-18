@@ -6,17 +6,31 @@ import {
   useState,
   type KeyboardEvent as ReactKeyboardEvent
 } from 'react'
-import { detectMentionKind, isStructuredMention, type ChatMentionKind } from '@/utils/chat-mentions'
+import {
+  detectMentionKind,
+  hasStructuredMention,
+  isStructuredMention,
+  type ChatMentionKind
+} from '@/utils/chat-mentions'
 import { hasClipboardMedia } from '@/utils/clipboard-media'
+
+/** これを超えるとパスカプセル化を避ける（大量テキスト対策） */
+const CAPSULE_RENDER_MAX_CHARS = 8_000
+const CAPSULE_RENDER_MAX_LINES = 120
 
 export interface ChatInputComposerHandle {
   focus: () => void
   insertMention: (token: string) => void
+  getValue: () => string
+  clear: () => void
 }
 
 interface ChatInputComposerProps {
-  value: string
-  onChange: (value: string) => void
+  /** 外部から内容を同期するときだけ使う。通常の入力中は DOM が正本 */
+  value?: string
+  onChange?: (value: string) => void
+  /** 送信可否が変わったときだけ通知（巨大文字列での親再レンダー抑制用） */
+  onCanSendChange?: (canSend: boolean) => void
   onSubmit: () => void
   placeholder?: string
   disabled?: boolean
@@ -28,6 +42,24 @@ interface ChatInputComposerProps {
 }
 
 const MENTION_TOKEN_RE = /@\[([^\]\n]+)\]/g
+
+function exceedsCapsuleBudget(text: string): boolean {
+  if (text.length > CAPSULE_RENDER_MAX_CHARS) return true
+  let lines = 1
+  for (let i = 0; i < text.length; i++) {
+    if (text.charCodeAt(i) === 10) {
+      lines++
+      if (lines > CAPSULE_RENDER_MAX_LINES) return true
+    }
+  }
+  return false
+}
+
+function canSendFromValue(text: string): boolean {
+  if (text.length === 0) return false
+  if (text.length >= 64) return true
+  return text.trim().length > 0
+}
 
 function mentionIcon(kind: ChatMentionKind): string {
   if (kind === 'folder') return '📁'
@@ -99,37 +131,190 @@ function serializeEditor(root: HTMLElement): string {
   return result
 }
 
+/** 選択範囲を除いた前後のシリアライズ（貼り付け置換用） */
+function serializeEditorSplitAtSelection(root: HTMLElement): { before: string; after: string } {
+  const sel = window.getSelection()
+  if (!sel || sel.rangeCount === 0 || !root.contains(sel.getRangeAt(0).commonAncestorContainer)) {
+    return { before: serializeEditor(root), after: '' }
+  }
+
+  const range = sel.getRangeAt(0)
+  let before = ''
+  let after = ''
+
+  const placeElement = (el: HTMLElement, token: string) => {
+    const elRange = document.createRange()
+    elRange.selectNode(el)
+    if (elRange.compareBoundaryPoints(Range.END_TO_START, range) <= 0) {
+      before += token
+    } else if (elRange.compareBoundaryPoints(Range.START_TO_END, range) >= 0) {
+      after += token
+    }
+  }
+
+  const walk = (node: Node, isRoot = false) => {
+    if (node.nodeType === Node.TEXT_NODE) {
+      const text = (node.textContent ?? '').replace(/\u00a0/g, ' ')
+      if (!text) return
+
+      if (range.startContainer === node && range.endContainer === node) {
+        before += text.slice(0, range.startOffset)
+        after += text.slice(range.endOffset)
+        return
+      }
+      if (range.startContainer === node) {
+        before += text.slice(0, range.startOffset)
+        return
+      }
+      if (range.endContainer === node) {
+        after += text.slice(range.endOffset)
+        return
+      }
+
+      const cp = range.comparePoint(node, 0)
+      if (cp < 0) before += text
+      else if (cp > 0) after += text
+      return
+    }
+
+    if (node.nodeType !== Node.ELEMENT_NODE) return
+    const el = node as HTMLElement
+
+    if (el.dataset.mention) {
+      placeElement(el, el.dataset.mention)
+      return
+    }
+
+    if (el.tagName === 'BR') {
+      placeElement(el, '\n')
+      return
+    }
+
+    const isBlock = el.tagName === 'DIV' || el.tagName === 'P'
+    if (isBlock && !isRoot) {
+      const elRange = document.createRange()
+      elRange.selectNode(el)
+      if (
+        elRange.compareBoundaryPoints(Range.END_TO_START, range) <= 0 &&
+        before.length > 0 &&
+        !before.endsWith('\n')
+      ) {
+        before += '\n'
+      }
+    }
+
+    for (const child of Array.from(el.childNodes)) {
+      walk(child)
+    }
+  }
+
+  walk(root, true)
+  return { before, after }
+}
+
+/** pre-wrap 前提: 改行は TextNode 内の \n で足りる（行ごとの <br> は作らない） */
+function appendPlainText(target: ParentNode, text: string) {
+  if (!text) return
+  target.appendChild(document.createTextNode(text))
+}
+
 function renderValueToEditor(root: HTMLElement, value: string) {
   root.replaceChildren()
   if (!value) return
 
+  if (exceedsCapsuleBudget(value) || !hasStructuredMention(value)) {
+    appendPlainText(root, value)
+    return
+  }
+
   let lastIndex = 0
   MENTION_TOKEN_RE.lastIndex = 0
   let match: RegExpExecArray | null
-
-  const appendText = (text: string) => {
-    const lines = text.split('\n')
-    lines.forEach((line, index) => {
-      if (index > 0) root.appendChild(document.createElement('br'))
-      if (line) root.appendChild(document.createTextNode(line))
-    })
-  }
+  const fragment = document.createDocumentFragment()
 
   while ((match = MENTION_TOKEN_RE.exec(value)) !== null) {
     if (match.index > lastIndex) {
-      appendText(value.slice(lastIndex, match.index))
+      appendPlainText(fragment, value.slice(lastIndex, match.index))
     }
     const inner = match[1]
     if (isStructuredMention(inner)) {
-      root.appendChild(createMentionElement(inner, detectMentionKind(inner)))
+      fragment.appendChild(createMentionElement(inner, detectMentionKind(inner)))
     } else {
-      appendText(match[0])
+      appendPlainText(fragment, match[0])
     }
     lastIndex = match.index + match[0].length
   }
 
   if (lastIndex < value.length) {
-    appendText(value.slice(lastIndex))
+    appendPlainText(fragment, value.slice(lastIndex))
+  }
+
+  root.appendChild(fragment)
+}
+
+function setCaretAtSerializedOffset(root: HTMLElement, offset: number) {
+  const selection = window.getSelection()
+  if (!selection) return
+
+  let remaining = Math.max(0, offset)
+
+  const placeAfter = (node: Node) => {
+    const range = document.createRange()
+    range.setStartAfter(node)
+    range.collapse(true)
+    selection.removeAllRanges()
+    selection.addRange(range)
+  }
+
+  const walk = (node: Node): boolean => {
+    if (node.nodeType === Node.TEXT_NODE) {
+      const text = (node.textContent ?? '').replace(/\u00a0/g, ' ')
+      if (remaining <= text.length) {
+        const range = document.createRange()
+        range.setStart(node, remaining)
+        range.collapse(true)
+        selection.removeAllRanges()
+        selection.addRange(range)
+        return true
+      }
+      remaining -= text.length
+      return false
+    }
+
+    if (node.nodeType !== Node.ELEMENT_NODE) return false
+    const el = node as HTMLElement
+
+    if (el.dataset.mention) {
+      const token = el.dataset.mention ?? ''
+      if (remaining <= token.length) {
+        placeAfter(el)
+        return true
+      }
+      remaining -= token.length
+      return false
+    }
+
+    if (el.tagName === 'BR') {
+      if (remaining <= 1) {
+        placeAfter(el)
+        return true
+      }
+      remaining -= 1
+      return false
+    }
+
+    for (const child of Array.from(el.childNodes)) {
+      if (walk(child)) return true
+    }
+    return false
+  }
+
+  if (!walk(root)) {
+    const range = document.createRange()
+    range.selectNodeContents(root)
+    range.collapse(false)
+    selection.removeAllRanges()
+    selection.addRange(range)
   }
 }
 
@@ -190,6 +375,7 @@ export const ChatInputComposer = forwardRef<ChatInputComposerHandle, ChatInputCo
     {
       value,
       onChange,
+      onCanSendChange,
       onSubmit,
       placeholder,
       disabled,
@@ -200,20 +386,41 @@ export const ChatInputComposer = forwardRef<ChatInputComposerHandle, ChatInputCo
     ref
   ) {
     const editorRef = useRef<HTMLDivElement>(null)
-    const emittingRef = useRef(false)
+    const valueRef = useRef(value ?? '')
+    const canSendRef = useRef(canSendFromValue(value ?? ''))
     const composingRef = useRef(false)
     const [isComposing, setIsComposing] = useState(false)
+    const [isEmpty, setIsEmpty] = useState(() => !canSendFromValue(value ?? ''))
 
-    const emitChange = () => {
+    const syncValue = (next: string) => {
+      valueRef.current = next
+      const empty = !canSendFromValue(next)
+      setIsEmpty((prev) => (prev === empty ? prev : empty))
+
+      const canSend = !empty
+      if (canSendRef.current !== canSend) {
+        canSendRef.current = canSend
+        onCanSendChange?.(canSend)
+      }
+
+      onChange?.(next)
+    }
+
+    const readEditorValue = () => {
       const editor = editorRef.current
-      if (!editor) return
-      emittingRef.current = true
-      onChange(serializeEditor(editor))
+      if (!editor) return valueRef.current
+      return serializeEditor(editor)
     }
 
     useImperativeHandle(ref, () => ({
       focus: () => {
         editorRef.current?.focus()
+      },
+      getValue: () => valueRef.current,
+      clear: () => {
+        const editor = editorRef.current
+        if (editor) editor.replaceChildren()
+        syncValue('')
       },
       insertMention: (token: string) => {
         const editor = editorRef.current
@@ -236,25 +443,20 @@ export const ChatInputComposer = forwardRef<ChatInputComposerHandle, ChatInputCo
         nodes.push(document.createTextNode(needsSpaceAfter ? ' ' : '\u00a0'))
 
         insertNodesAtCaret(editor, nodes)
-        emitChange()
+        syncValue(serializeEditor(editor))
       }
     }))
 
     useLayoutEffect(() => {
+      if (value === undefined) return
+      if (value === valueRef.current) return
       const editor = editorRef.current
       if (!editor) return
-
-      if (emittingRef.current) {
-        emittingRef.current = false
-        // 自分で emit した直後でも、空文字クリア時は DOM を同期
-        if (value === '' && serializeEditor(editor) !== '') {
-          editor.replaceChildren()
-        }
-        return
-      }
-
-      if (serializeEditor(editor) === value) return
+      valueRef.current = value
       renderValueToEditor(editor, value)
+      const empty = !canSendFromValue(value)
+      setIsEmpty(empty)
+      canSendRef.current = !empty
     }, [value])
 
     const handleKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
@@ -269,11 +471,9 @@ export const ChatInputComposer = forwardRef<ChatInputComposerHandle, ChatInputCo
       if (event.key === 'Enter' && event.shiftKey) {
         event.preventDefault()
         document.execCommand('insertLineBreak')
-        emitChange()
+        syncValue(readEditorValue())
       }
     }
-
-    const isEmpty = value.trim().length === 0 && !isComposing
 
     return (
       <div
@@ -281,7 +481,7 @@ export const ChatInputComposer = forwardRef<ChatInputComposerHandle, ChatInputCo
         className={[
           'chat-input',
           'chat-input-composer',
-          isEmpty ? 'is-empty' : '',
+          isEmpty && !isComposing ? 'is-empty' : '',
           className ?? ''
         ]
           .filter(Boolean)
@@ -295,7 +495,7 @@ export const ChatInputComposer = forwardRef<ChatInputComposerHandle, ChatInputCo
         suppressContentEditableWarning
         onInput={() => {
           if (composingRef.current) return
-          emitChange()
+          syncValue(readEditorValue())
         }}
         onCompositionStart={() => {
           composingRef.current = true
@@ -304,7 +504,7 @@ export const ChatInputComposer = forwardRef<ChatInputComposerHandle, ChatInputCo
         onCompositionEnd={() => {
           composingRef.current = false
           setIsComposing(false)
-          emitChange()
+          syncValue(readEditorValue())
         }}
         onKeyDown={handleKeyDown}
         onPaste={(event) => {
@@ -325,22 +525,25 @@ export const ChatInputComposer = forwardRef<ChatInputComposerHandle, ChatInputCo
           const editor = editorRef.current
           if (!editor) return
 
-          document.execCommand('insertText', false, text)
+          // insertText は改行ごとに DOM を増やすため使わない。
+          // pre-wrap + 単一 TextNode（必要なら capsule）へ直接描画する。
+          const { before, after } = serializeEditorSplitAtSelection(editor)
+          const next = before + text + after
+          const caretOffset = before.length + text.length
 
-          const next = serializeEditor(editor)
-          if (/@\[[^\]\n]+\]/.test(next)) {
-            renderValueToEditor(editor, next)
-            const selection = window.getSelection()
-            if (selection) {
-              const range = document.createRange()
-              range.selectNodeContents(editor)
-              range.collapse(false)
-              selection.removeAllRanges()
-              selection.addRange(range)
-            }
+          renderValueToEditor(editor, next)
+          setCaretAtSerializedOffset(editor, caretOffset)
+
+          // 大きい貼り付けは先に描画し、親/ローカルの React 更新は次フレームへ
+          if (exceedsCapsuleBudget(text)) {
+            valueRef.current = next
+            requestAnimationFrame(() => {
+              syncValue(next)
+            })
+            return
           }
 
-          emitChange()
+          syncValue(next)
         }}
       />
     )

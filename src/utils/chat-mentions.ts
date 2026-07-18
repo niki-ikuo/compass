@@ -66,3 +66,15 @@ export function isStructuredMention(inner: string): boolean {
   if (/^[^\s\\/]+\.\w{1,12}$/.test(value)) return true
   return false
 }
+
+const STRUCTURED_MENTION_IN_TEXT_RE = /@\[([^\]\n]+)\]/g
+
+/** 文字列中にパスらしい `@[...]` が1つでもあるか */
+export function hasStructuredMention(text: string): boolean {
+  STRUCTURED_MENTION_IN_TEXT_RE.lastIndex = 0
+  let match: RegExpExecArray | null
+  while ((match = STRUCTURED_MENTION_IN_TEXT_RE.exec(text)) !== null) {
+    if (isStructuredMention(match[1])) return true
+  }
+  return false
+}

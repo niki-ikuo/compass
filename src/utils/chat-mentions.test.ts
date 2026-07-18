@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   formatContextMention,
+  hasStructuredMention,
   isStructuredMention,
   detectMentionKind
 } from '@/utils/chat-mentions'
@@ -32,6 +33,18 @@ describe('isStructuredMention', () => {
     expect(isStructuredMention('todo')).toBe(false)
     expect(isStructuredMention('hello world')).toBe(false)
     expect(isStructuredMention('')).toBe(false)
+  })
+})
+
+describe('hasStructuredMention', () => {
+  it('detects path-like tokens embedded in prose', () => {
+    expect(hasStructuredMention('see @[src/foo.ts] please')).toBe(true)
+    expect(hasStructuredMention('folder @[docs/]')).toBe(true)
+  })
+
+  it('ignores non-path @[...] tokens', () => {
+    expect(hasStructuredMention('note @[todo] and @[hello world]')).toBe(false)
+    expect(hasStructuredMention('no mentions here')).toBe(false)
   })
 })
 

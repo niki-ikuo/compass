@@ -181,28 +181,31 @@ export function resolveSelectionFromClipboard(
   const plain = dataTransfer.getData('text/plain')
   if (!plain) return null
 
-  const trimmed = plain.trim()
-  const mentionMatch = trimmed.match(/^@\[([^\]]+)\]$/)
-  if (mentionMatch && isStructuredMention(mentionMatch[1])) {
-    const inner = mentionMatch[1]
-    if (detectMentionKind(inner) === 'selection') {
-      const rangeMatch = inner.match(/^(.*):(\d+)(?:-(\d+))?$/)
-      if (rangeMatch) {
-        const startLine = Number(rangeMatch[2])
-        const endLine = rangeMatch[3] ? Number(rangeMatch[3]) : startLine
-        return {
-          path: rangeMatch[1],
-          startLine,
-          endLine,
-          text: '',
-          mention: trimmed
+  // 単一行の短い @[...] だけメンション復元の対象。大量ペーストでは trim/比較を避ける。
+  if (plain.length <= 300 && !plain.includes('\n')) {
+    const trimmed = plain.trim()
+    const mentionMatch = trimmed.match(/^@\[([^\]]+)\]$/)
+    if (mentionMatch && isStructuredMention(mentionMatch[1])) {
+      const inner = mentionMatch[1]
+      if (detectMentionKind(inner) === 'selection') {
+        const rangeMatch = inner.match(/^(.*):(\d+)(?:-(\d+))?$/)
+        if (rangeMatch) {
+          const startLine = Number(rangeMatch[2])
+          const endLine = rangeMatch[3] ? Number(rangeMatch[3]) : startLine
+          return {
+            path: rangeMatch[1],
+            startLine,
+            endLine,
+            text: '',
+            mention: trimmed
+          }
         }
       }
     }
   }
 
   const last = lastCopiedSelection
-  if (last && last.text === plain) {
+  if (last && last.text.length === plain.length && last.text === plain) {
     const substantial = plain.length >= 40 || plain.includes('\n')
     const stillSelected = options?.liveSelectionText === plain
     if (substantial || stillSelected) {
@@ -210,7 +213,12 @@ export function resolveSelectionFromClipboard(
     }
   }
 
-  if (options?.livePayload && options.liveSelectionText && options.liveSelectionText === plain) {
+  if (
+    options?.livePayload &&
+    options.liveSelectionText &&
+    options.liveSelectionText.length === plain.length &&
+    options.liveSelectionText === plain
+  ) {
     return options.livePayload
   }
 
