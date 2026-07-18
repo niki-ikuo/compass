@@ -563,6 +563,12 @@ body.is-resizing-panels * {
   cursor: col-resize !important;
 }
 
+/* webview / iframe steal host mousemove during drag — disable hit-testing while resizing */
+body.is-resizing-panels webview,
+body.is-resizing-panels iframe {
+  pointer-events: none !important;
+}
+
 .panel-header {
   display: flex;
   align-items: center;
@@ -3821,6 +3827,11 @@ body.is-resizing-terminal {
 
 body.is-resizing-terminal * {
   cursor: row-resize !important;
+}
+
+body.is-resizing-terminal webview,
+body.is-resizing-terminal iframe {
+  pointer-events: none !important;
 }
 
 .terminal-panel-header {
