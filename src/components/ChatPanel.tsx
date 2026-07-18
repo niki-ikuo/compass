@@ -405,7 +405,7 @@ export function ChatPanel() {
     if (!isEditMessage) {
       setPendingCode(null)
     }
-    addChatMessage(chatId, 'user', text, messageMode, messagePreset)
+    addChatMessage(chatId, 'user', text, messageMode, messagePreset, settings.model)
     addChatMessage(chatId, 'assistant', '')
     stopRequestedChatIdsRef.current.delete(chatId)
     setAgentStreamStatusFor(chatId, null)
@@ -1044,24 +1044,6 @@ export function ChatPanel() {
     <div className="chat-panel">
       <div className="panel-header chat-panel-header">
         <div className="chat-header-actions">
-          <label
-            className="chat-model-select"
-            title={t('chat.modelOf', { provider: getProviderLabel(provider.id) })}
-          >
-            <span className="chat-model-select-label">{getProviderLabel(provider.id)}</span>
-            <select
-              value={settings.model}
-              onChange={(e) => void handleModelChange(e.target.value)}
-              disabled={isChatLoading}
-              aria-label={t('chat.llmModel')}
-            >
-              {modelOptions.map((model) => (
-                <option key={model} value={model}>
-                  {model}
-                </option>
-              ))}
-            </select>
-          </label>
           <div className="chat-history-menu" ref={historyRef}>
             <button
               ref={historyButtonRef}
@@ -1186,16 +1168,40 @@ export function ChatPanel() {
         {chatMessages.map((msg, index) => {
           const isLast = index === chatMessages.length - 1
           const isStreaming = isLast && msg.role === 'assistant' && isChatLoading
+          const requestMeta =
+            msg.role === 'assistant' && index > 0 && chatMessages[index - 1]?.role === 'user'
+              ? chatMessages[index - 1]
+              : null
+          const requestMode = requestMeta?.mode
+          const requestPreset = normalizeUseCasePreset(requestMeta?.preset)
+          const requestPresetOption = requestPreset
+            ? USE_CASE_PRESET_OPTIONS.find((option) => option.id === requestPreset)
+            : undefined
+          const requestModeLabel = requestMode
+            ? (CHAT_MODE_OPTIONS.find((option) => option.id === requestMode)?.label ?? requestMode)
+            : null
+          const requestModel =
+            typeof requestMeta?.model === 'string' && requestMeta.model.trim()
+              ? requestMeta.model.trim()
+              : null
 
           return (
             <div key={msg.id} className={`chat-message ${msg.role}`}>
               <div className="chat-role">
                 <span>{msg.role === 'user' ? t('chat.you') : t('chat.ai')}</span>
-                {msg.role === 'user' && msg.mode && (
-                  <span className={`chat-message-mode ${msg.mode}`}>
-                    {msg.mode === 'edit' ? 'Edit' : msg.mode === 'agent' ? 'Agent' : 'Ask'}
+                {requestModeLabel && requestMode ? (
+                  <span className={`chat-message-mode ${requestMode}`}>{requestModeLabel}</span>
+                ) : null}
+                {requestPresetOption ? (
+                  <span className={`chat-message-preset preset-${requestPresetOption.id}`}>
+                    {t(requestPresetOption.labelKey)}
                   </span>
-                )}
+                ) : null}
+                {requestModel ? (
+                  <span className="chat-message-model" title={requestModel}>
+                    {requestModel}
+                  </span>
+                ) : null}
               </div>
               <div className="chat-content">
                 {msg.role === 'assistant' && msg.agentSteps && msg.agentSteps.length > 0 && (
@@ -1473,6 +1479,24 @@ export function ChatPanel() {
                   </div>
                 ) : null}
               </div>
+              <label
+                className="chat-model-select"
+                title={t('chat.modelOf', { provider: getProviderLabel(provider.id) })}
+              >
+                <span className="chat-model-select-label">{getProviderLabel(provider.id)}</span>
+                <select
+                  value={settings.model}
+                  onChange={(e) => void handleModelChange(e.target.value)}
+                  disabled={isChatLoading}
+                  aria-label={t('chat.llmModel')}
+                >
+                  {modelOptions.map((model) => (
+                    <option key={model} value={model}>
+                      {model}
+                    </option>
+                  ))}
+                </select>
+              </label>
             </div>
             {isChatLoading ? (
               <button

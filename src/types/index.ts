@@ -239,6 +239,8 @@ export interface ChatMessage {
   mode?: ChatMode
   /** 送信時の用途プリセット（user メッセージから復元） */
   preset?: UseCasePreset
+  /** 送信時の LLM モデル（user メッセージから復元） */
+  model?: string
   /** Agent モード時のツールステップ（永続化） */
   agentSteps?: AgentToolStep[]
 }

@@ -53,11 +53,16 @@ function normalizeChatSession(session: ChatSession): ChatSession {
       ? session.messages.map((message) => {
           const mode = normalizeChatMode(message.mode)
           const preset = normalizeUseCasePreset(message.preset)
+          const model =
+            typeof message.model === 'string' && message.model.trim()
+              ? message.model.trim()
+              : undefined
           const agentSteps = normalizeAgentSteps(message.agentSteps)
           return {
             ...message,
             mode: mode || undefined,
             preset: preset || undefined,
+            model,
             ...(agentSteps ? { agentSteps } : {})
           }
         })
@@ -392,7 +397,8 @@ interface AppState {
     role: 'user' | 'assistant',
     content: string,
     mode?: ChatMode,
-    preset?: UseCasePreset
+    preset?: UseCasePreset,
+    model?: string
   ) => void
   updateLastAssistantMessage: (
     chatId: string,
@@ -928,7 +934,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     scheduleChatHistorySave(state.workspaceRoot)
   },
 
-  addChatMessage: (chatId, role, content, mode, preset) => {
+  addChatMessage: (chatId, role, content, mode, preset, model) => {
+    const trimmedModel = typeof model === 'string' ? model.trim() : ''
     set((state) => ({
       chatSessions: updateSessionById(state.chatSessions, chatId, (session) => {
         const messages: ChatMessage[] = [
@@ -939,7 +946,8 @@ export const useAppStore = create<AppState>((set, get) => ({
             content,
             timestamp: Date.now(),
             ...(role === 'user' && mode ? { mode } : {}),
-            ...(role === 'user' && preset ? { preset } : {})
+            ...(role === 'user' && preset ? { preset } : {}),
+            ...(role === 'user' && trimmedModel ? { model: trimmedModel } : {})
           }
         ]
         let title = session.title

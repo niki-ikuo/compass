@@ -1513,8 +1513,7 @@ body:has(.monaco-editor .find-widget.visible) .workbench-hover-container .action
   align-items: center;
   gap: 6px;
   min-width: 0;
-  flex: 1;
-  max-width: 100%;
+  max-width: min(220px, 100%);
   font-size: 11px;
   color: var(--text-secondary);
 }
@@ -1522,21 +1521,27 @@ body:has(.monaco-editor .find-widget.visible) .workbench-hover-container .action
 .chat-model-select-label {
   flex: 0 1 auto;
   min-width: 0;
+  max-width: 5.5em;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .chat-model-select select {
+  box-sizing: border-box;
   min-width: 4.5em;
-  flex: 1 1 0;
+  min-height: 24px;
+  flex: 1 1 auto;
   max-width: 100%;
-  padding: 2px 6px;
+  padding: 4px 8px;
   border: 1px solid var(--border);
-  border-radius: 4px;
+  border-radius: 6px;
   background: var(--bg-primary);
   color: var(--text-primary);
   font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  line-height: 1;
 }
 
 .chat-history-menu {
@@ -1952,6 +1957,7 @@ body:has(.monaco-editor .find-widget.visible) .workbench-hover-container .action
 .chat-role {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 6px;
   font-size: 11px;
   font-weight: 600;
@@ -1978,6 +1984,44 @@ body:has(.monaco-editor .find-widget.visible) .workbench-hover-container .action
 
 .chat-message-mode.agent {
   color: var(--chat-mode-agent);
+}
+
+.chat-message-preset {
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+}
+
+.chat-message-preset.preset-general {
+  color: color-mix(in srgb, #8b949e 85%, var(--text-secondary));
+}
+
+.chat-message-preset.preset-document {
+  color: color-mix(in srgb, #c9a66b 85%, var(--text-secondary));
+}
+
+.chat-message-preset.preset-data {
+  color: color-mix(in srgb, #9b8ec4 85%, var(--text-secondary));
+}
+
+.chat-message-preset.preset-code {
+  color: color-mix(in srgb, #6a9b78 85%, var(--text-secondary));
+}
+
+.chat-message-model {
+  max-width: 9em;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .chat-agent-stream-status {
@@ -2389,7 +2433,8 @@ body:has(.monaco-editor .find-widget.visible) .workbench-hover-container .action
 }
 
 .chat-input-footer .chat-mode-picker,
-.chat-input-footer .chat-preset-picker {
+.chat-input-footer .chat-preset-picker,
+.chat-input-footer .chat-model-select {
   flex-shrink: 0;
 }
 
