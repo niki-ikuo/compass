@@ -26,6 +26,32 @@ Installer: `Compass Setup x.y.z.exe` (Windows 10/11 x64)
 - Integrated terminal (xterm.js)
 - OpenAI-compatible API settings (multi-LLM: OpenAI / Gemini / DeepSeek / Groq / OpenRouter / Ollama / custom)
 
+## Use Cases
+
+### General
+
+Open a local folder of notes, docs, and data, then ask AI for a quick overview of the workspace.
+
+![General use case — workspace overview with AI chat](docs/assets/use-case-general.png)
+
+### Document
+
+Point the agent at a folder and generate manuals or docs from your project files.
+
+![Document use case — AI-generated game manual](docs/assets/use-case-document.png)
+
+### Data
+
+Ask questions about a CSV in natural language and get tables and summaries back.
+
+![Data use case — natural-language CSV analysis](docs/assets/use-case-data.png)
+
+### Code
+
+Describe an app or game and let the agent scaffold files you can preview and iterate on.
+
+![Code use case — Breakout-style game built with Agent](docs/assets/use-case-code.png)
+
 ## Requirements
 
 - Windows 10 / 11 (x64)
