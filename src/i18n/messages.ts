@@ -422,9 +422,12 @@ export const ja = {
   'fs.nameRequired': '名前を入力してください',
   'fs.invalidChars': '名前に使えない文字が含まれています',
   'fs.outsideWorkspace': 'ワークスペース外のパスは許可されていません: {path}',
-  'fs.fileExists': '同じ名前のファイルが既に存在します',
-  'fs.folderExists': '同じ名前のフォルダが既に存在します',
-  'fs.itemExists': '同じ名前の項目が既に存在します',
+  'fs.fileExists':
+    '「{name}」という名前のファイルは既にあります。別の名前を入力してください',
+  'fs.folderExists':
+    '「{name}」という名前のフォルダは既にあります。別の名前を入力してください',
+  'fs.itemExists':
+    '「{name}」という名前は既に使われています。別の名前を入力してください',
   'fs.destMustBeFolder': '移動先はフォルダである必要があります',
   'fs.cannotMoveIntoSelf': 'フォルダを自分自身またはその中には移動できません',
   'fs.notAFile': 'ファイルではありません: {path}',
@@ -927,9 +930,10 @@ export const en: Record<MessageKey, string> = {
   'fs.nameRequired': 'Enter a name',
   'fs.invalidChars': 'The name contains invalid characters',
   'fs.outsideWorkspace': 'Path outside the workspace is not allowed: {path}',
-  'fs.fileExists': 'A file with the same name already exists',
-  'fs.folderExists': 'A folder with the same name already exists',
-  'fs.itemExists': 'An item with the same name already exists',
+  'fs.fileExists': 'A file named "{name}" already exists. Enter a different name.',
+  'fs.folderExists':
+    'A folder named "{name}" already exists. Enter a different name.',
+  'fs.itemExists': '"{name}" is already in use. Enter a different name.',
   'fs.destMustBeFolder': 'Destination must be a folder',
   'fs.cannotMoveIntoSelf': 'Cannot move a folder into itself or its descendant',
   'fs.notAFile': 'Not a file: {path}',

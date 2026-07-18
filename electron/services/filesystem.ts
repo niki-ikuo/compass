@@ -203,7 +203,7 @@ export async function createFile(parentDir: string, name: string): Promise<strin
   validateName(name)
   const filePath = join(parentDir, name)
   if (await fileExists(filePath)) {
-    throw new Error(t('fs.fileExists'))
+    throw new Error(t('fs.fileExists', { name }))
   }
   await writeFile(filePath, '', 'utf-8')
   return filePath
@@ -213,7 +213,7 @@ export async function createDirectory(parentDir: string, name: string): Promise<
   validateName(name)
   const dirPath = join(parentDir, name)
   if (await fileExists(dirPath)) {
-    throw new Error(t('fs.folderExists'))
+    throw new Error(t('fs.folderExists', { name }))
   }
   await mkdir(dirPath)
   return dirPath
@@ -267,7 +267,7 @@ export async function renamePath(targetPath: string, newName: string): Promise<s
   const newPath = join(parentDir, newName)
   if (newPath === targetPath) return targetPath
   if (await fileExists(newPath)) {
-    throw new Error(t('fs.itemExists'))
+    throw new Error(t('fs.itemExists', { name: newName }))
   }
   await rename(targetPath, newPath)
   return newPath
@@ -294,9 +294,10 @@ export async function movePath(sourcePath: string, destDir: string): Promise<str
     throw new Error(t('fs.cannotMoveIntoSelf'))
   }
 
-  const newPath = join(destResolved, basename(sourceResolved))
+  const baseName = basename(sourceResolved)
+  const newPath = join(destResolved, baseName)
   if (await fileExists(newPath)) {
-    throw new Error(t('fs.itemExists'))
+    throw new Error(t('fs.itemExists', { name: baseName }))
   }
 
   await rename(sourceResolved, newPath)

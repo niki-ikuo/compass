@@ -24,6 +24,7 @@ import {
   type DocTemplate
 } from '@/utils/doc-templates'
 import { buildUniqueFileName } from '@/utils/unique-file-name'
+import { getErrorMessage } from '@/utils/error-message'
 import { ConfirmDialog } from './ConfirmDialog'
 import { TemplateManagerDialog } from './TemplateManagerDialog'
 import {
@@ -747,7 +748,7 @@ export function FileTree() {
       await refreshTree()
       setError(null)
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('explorer.deleteFailed'))
+      setError(getErrorMessage(err, t('explorer.deleteFailed')))
       await refreshTree()
     } finally {
       restoreWorkbenchFocus()
@@ -865,7 +866,7 @@ export function FileTree() {
         }
         setError(null)
       } catch (err) {
-        setError(err instanceof Error ? err.message : t('explorer.moveFailed'))
+        setError(getErrorMessage(err, t('explorer.moveFailed')))
         await refreshTree()
       }
     },
@@ -985,7 +986,7 @@ export function FileTree() {
       await handleOpenFile(createdPaths[0])
       setError(null)
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('explorer.importFailed'))
+      setError(getErrorMessage(err, t('explorer.importFailed')))
     }
   }
 
@@ -1018,7 +1019,7 @@ export function FileTree() {
       await handleOpenFile(createdPath)
       setError(null)
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('explorer.createFailed'))
+      setError(getErrorMessage(err, t('explorer.createFailed')))
     }
   }
 
@@ -1047,7 +1048,7 @@ export function FileTree() {
       setInlineInput(null)
       setError(null)
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('explorer.createFailed'))
+      setError(getErrorMessage(err, t('explorer.createFailed')))
     }
   }
 
@@ -1059,7 +1060,7 @@ export function FileTree() {
       setRenamingPath(null)
       setError(null)
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('explorer.renameFailed'))
+      setError(getErrorMessage(err, t('explorer.renameFailed')))
     }
   }
 

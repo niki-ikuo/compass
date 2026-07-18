@@ -12,6 +12,7 @@ import {
   slugifyTemplateId,
   type WorkspaceTemplateDraft
 } from '@/utils/doc-templates'
+import { getErrorMessage } from '@/utils/error-message'
 import { CloseIcon } from './icons/ToolbarIcons'
 
 interface TemplateManagerDialogProps {
@@ -66,7 +67,7 @@ export function TemplateManagerDialog({
         setDirty(false)
       } catch (err) {
         if (!cancelled) {
-          setError(err instanceof Error ? err.message : t('templateManager.loadFailed'))
+          setError(getErrorMessage(err, t('templateManager.loadFailed')))
         }
       } finally {
         if (!cancelled) setLoading(false)
@@ -188,7 +189,7 @@ export function TemplateManagerDialog({
       onSaved()
       onClose()
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('templateManager.saveFailed'))
+      setError(getErrorMessage(err, t('templateManager.saveFailed')))
     } finally {
       setSaving(false)
     }
