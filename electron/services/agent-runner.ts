@@ -41,6 +41,7 @@ import {
   applyCheckpoint,
   applyUpdateTodo,
   formatAgentPlanForModel,
+  formatOpenTodosNudge,
   rebuildPlanFromSteps,
   sanitizeCheckpointArgs,
   sanitizeUpdateTodoArgs,
@@ -98,6 +99,8 @@ const MAX_PERSISTED_OBSERVATION_CHARS = 4_000
 /** フォローアップに載せる過去ツール文脈の合計上限 */
 const MAX_PRIOR_CONTEXT_CHARS = 24_000
 const MAX_PRIOR_STEP_OBSERVATION_CHARS = 3_000
+/** text-only 終了時に open todo がある場合の再促し上限（無限ループ防止） */
+const MAX_OPEN_TODO_NUDGES = 2
 
 type ApiMessage = {
   role: string
@@ -287,7 +290,7 @@ const AGENT_TOOLS = [
     function: {
       name: 'updateTodo',
       description:
-        'Maintain an explicit checklist for multi-step work. Call early with the plan, then update statuses as you progress (especially before hitting turn/tool limits). Pass todos as a JSON array of { id, content, status }. status is pending | in_progress | done | cancelled. Default replaces the full list; set merge=true to patch by id.',
+        'Maintain an explicit checklist for multi-step work and multi-ask user messages. Call early: when the user has multiple discrete requests, list each one before other work; then update statuses as you progress (especially before hitting turn/tool limits). Do not finish with text while any item is pending or in_progress. Pass todos as a JSON array of { id, content, status }. status is pending | in_progress | done | cancelled. Default replaces the full list; set merge=true to patch by id.',
       parameters: {
         type: 'object',
         properties: {
@@ -1312,6 +1315,7 @@ export async function runAgent(webContents: WebContents, request: ChatRequest): 
     let turnBudget = MAX_AGENT_TURNS
     let toolBudget = MAX_TOOL_CALLS
     let turn = 0
+    let openTodoNudges = 0
 
     while (true) {
       if (signal.aborted) {
@@ -1369,6 +1373,19 @@ export async function runAgent(webContents: WebContents, request: ChatRequest): 
       }
 
       if (turnResult.toolCalls.length === 0) {
+        if (openTodoNudges < MAX_OPEN_TODO_NUDGES) {
+          const openTodoNudge = formatOpenTodosNudge(plan)
+          if (openTodoNudge) {
+            openTodoNudges++
+            apiMessages.push({
+              role: 'assistant',
+              content: turnResult.content || null
+            })
+            apiMessages.push({ role: 'user', content: openTodoNudge })
+            turn++
+            continue
+          }
+        }
         send('ai:done')
         return
       }

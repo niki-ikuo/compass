@@ -330,4 +330,87 @@ describe('runAgent tool loop', () => {
       'alpha beta'
     )
   })
+
+  it('nudges and continues when finishing with open todos, then done after closing them', async () => {
+    const root = makeTempRoot('open-todo-nudge')
+    tempRoots.push(root)
+
+    const fetchMock = vi.mocked(fetch)
+    fetchMock
+      .mockResolvedValueOnce(
+        sseResponse(
+          toolCallTurn(
+            'updateTodo',
+            {
+              todos: [
+                { id: '1', content: 'First ask', status: 'done' },
+                { id: '2', content: 'Second ask', status: 'pending' }
+              ]
+            },
+            'call_todo_1'
+          )
+        )
+      )
+      .mockResolvedValueOnce(sseResponse(textTurn('Finished the first ask only.')))
+      .mockResolvedValueOnce(
+        sseResponse(
+          toolCallTurn(
+            'updateTodo',
+            {
+              merge: true,
+              todos: [{ id: '2', content: 'Second ask', status: 'done' }]
+            },
+            'call_todo_2'
+          )
+        )
+      )
+      .mockResolvedValueOnce(sseResponse(textTurn('Both asks are done.')))
+
+    const { webContents, events } = createWebContents()
+    await runAgent(
+      webContents,
+      baseRequest(root, { messages: [{ role: 'user', content: 'Do A and B' }] })
+    )
+
+    expect(events.some((e) => e.channel === 'ai:done')).toBe(true)
+    expect(events.some((e) => e.channel === 'ai:error')).toBe(false)
+    expect(fetchMock).toHaveBeenCalledTimes(4)
+
+    const thirdBody = JSON.parse(String(fetchMock.mock.calls[2][1]?.body)) as {
+      messages: Array<{ role: string; content: string | null }>
+    }
+    const nudgeMsg = thirdBody.messages.find(
+      (m) => m.role === 'user' && typeof m.content === 'string' && m.content.includes('Open todos remain')
+    )
+    expect(nudgeMsg?.content).toContain('Second ask')
+  })
+
+  it('stops after max open-todo nudges even if todos remain open', async () => {
+    const root = makeTempRoot('open-todo-nudge-cap')
+    tempRoots.push(root)
+
+    const fetchMock = vi.mocked(fetch)
+    fetchMock
+      .mockResolvedValueOnce(
+        sseResponse(
+          toolCallTurn(
+            'updateTodo',
+            {
+              todos: [{ id: '1', content: 'Never finishes', status: 'pending' }]
+            },
+            'call_todo'
+          )
+        )
+      )
+      .mockResolvedValueOnce(sseResponse(textTurn('Stopping early 1.')))
+      .mockResolvedValueOnce(sseResponse(textTurn('Stopping early 2.')))
+      .mockResolvedValueOnce(sseResponse(textTurn('Stopping early 3.')))
+
+    const { webContents, events } = createWebContents()
+    await runAgent(webContents, baseRequest(root))
+
+    expect(events.some((e) => e.channel === 'ai:done')).toBe(true)
+    // updateTodo + 3 text-only attempts (2 nudges then forced done)
+    expect(fetchMock).toHaveBeenCalledTimes(4)
+  })
 })

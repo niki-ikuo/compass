@@ -2,8 +2,11 @@ import { describe, expect, it } from 'vitest'
 import {
   applyCheckpoint,
   applyUpdateTodo,
+  countOpenTodos,
   createAgentPlanState,
   formatAgentPlanForModel,
+  formatOpenTodosNudge,
+  getOpenTodos,
   rebuildPlanFromSteps,
   sanitizeCheckpointArgs,
   sanitizeUpdateTodoArgs
@@ -101,6 +104,45 @@ describe('formatAgentPlanForModel', () => {
     expect(text).toContain('Halfway through.')
     expect(text).toContain('1 done / 1 remaining')
     expect(text).toContain('Next')
+  })
+})
+
+describe('open todo helpers', () => {
+  it('counts pending and in_progress only', () => {
+    const state = createAgentPlanState()
+    applyUpdateTodo(state, {
+      todos: [
+        { id: '1', content: 'Done', status: 'done' },
+        { id: '2', content: 'Next', status: 'pending' },
+        { id: '3', content: 'Working', status: 'in_progress' },
+        { id: '4', content: 'Skipped', status: 'cancelled' }
+      ]
+    })
+    expect(countOpenTodos(state)).toBe(2)
+    expect(getOpenTodos(state).map((t) => t.id)).toEqual(['2', '3'])
+  })
+
+  it('formatOpenTodosNudge returns null when nothing is open', () => {
+    const state = createAgentPlanState()
+    applyUpdateTodo(state, {
+      todos: [{ id: '1', content: 'Done', status: 'done' }]
+    })
+    expect(formatOpenTodosNudge(state)).toBeNull()
+    expect(formatOpenTodosNudge(createAgentPlanState())).toBeNull()
+  })
+
+  it('formatOpenTodosNudge lists remaining open items', () => {
+    const state = createAgentPlanState()
+    applyUpdateTodo(state, {
+      todos: [
+        { id: '1', content: 'Done', status: 'done' },
+        { id: '2', content: 'Still open', status: 'pending' }
+      ]
+    })
+    const nudge = formatOpenTodosNudge(state)
+    expect(nudge).toContain('Open todos remain')
+    expect(nudge).toContain('Still open')
+    expect(nudge).not.toContain('Done')
   })
 })
 

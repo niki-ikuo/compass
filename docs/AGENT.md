@@ -89,7 +89,10 @@ while true:
   ai:step "Thinking turn N"
   POST /chat/completions (stream, tools=AGENT_TOOLS, tool_choice=auto)
   streamAgentTurn → content deltas + accumulated tool_calls
-  if no tool_calls → ai:done; return
+  if no tool_calls:
+    if open todos (pending/in_progress) and open-todo nudges < 2
+      → append assistant text + user nudge; continue loop
+    else → ai:done; return
   if tools would exceed budget → ask Continue
   append assistant(+tool_calls) to messages
   for each tool_call:
@@ -101,7 +104,7 @@ while true:
   turn++
 ```
 
-Natural completion: a turn with **no** `tool_calls`. Agent does not call an explicit “finish” tool.
+Natural completion: a turn with **no** `tool_calls`, unless the plan still has open todos — then the runtime injects a user-role nudge (max **2** per run) and continues. Agent does not call an explicit “finish” tool.
 
 ### 4.3 One SSE turn (`streamAgentTurn`)
 

@@ -89,7 +89,10 @@ while true:
   ai:step「Thinking turn N」
   POST /chat/completions (stream, tools=AGENT_TOOLS, tool_choice=auto)
   streamAgentTurn → テキスト差分 + tool_calls 累積
-  if tool_calls なし → ai:done; return
+  if tool_calls なし:
+    if open todo（pending/in_progress）があり open-todo nudge が 2 回未満
+      → assistant テキスト + user nudge を追加してループ継続
+    else → ai:done; return
   if ツール予算超過 → Continue 確認
   assistant(+tool_calls) を messages に追加
   for each tool_call:
@@ -101,7 +104,7 @@ while true:
   turn++
 ```
 
-自然終了は **tool_calls のないターン**。「finish」専用ツールはない。
+自然終了は **tool_calls のないターン**。ただし計画に未完了 todo が残っている場合は、ランタイムが user ロールの nudge を注入して継続する（1 ランあたり最大 **2** 回）。「finish」専用ツールはない。
 
 ### 4.3 1 ターンの SSE（`streamAgentTurn`）
 

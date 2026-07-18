@@ -139,6 +139,32 @@ export function formatTodosList(todos: AgentTodoItem[]): string {
     .join('\n')
 }
 
+/** Todos still awaiting work (pending or in_progress). */
+export function getOpenTodos(state: AgentPlanState): AgentTodoItem[] {
+  return state.todos.filter((t) => t.status === 'pending' || t.status === 'in_progress')
+}
+
+export function countOpenTodos(state: AgentPlanState): number {
+  return getOpenTodos(state).length
+}
+
+/**
+ * User-role nudge when the model tries to finish with open todos.
+ * Returns null when there is nothing open.
+ */
+export function formatOpenTodosNudge(state: AgentPlanState): string | null {
+  const open = getOpenTodos(state)
+  if (open.length === 0) return null
+  return [
+    '[Agent] Open todos remain. Do not finish yet.',
+    'Continue with tools until each item is done or cancelled; call updateTodo as you progress.',
+    'Only finish with text when nothing is left open.',
+    '',
+    `Open todos (${open.length}):`,
+    formatTodosList(open)
+  ].join('\n')
+}
+
 /**
  * Compact plan state for Continue / follow-up injection.
  * Returns null when there is nothing useful to remind the model about.
