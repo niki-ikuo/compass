@@ -649,12 +649,12 @@ export const DEFAULT_SETTINGS: AppSettings = {
   providerKeys: {},
   model: 'gpt-4o-mini',
   temperature: 0.2,
-  maxTokens: 4096,
-  colorTheme: 'dark',
+  maxTokens: 32768,
+  colorTheme: 'light',
   locale: DEFAULT_LOCALE,
   inlineCompletionsEnabled: true,
-  autoOpenAgentPreview: false,
+  autoOpenAgentPreview: true,
   defaultShellId: 'powershell',
   defaultUseCasePreset: 'general',
-  rememberLastUseCasePreset: false
+  rememberLastUseCasePreset: true
 }
