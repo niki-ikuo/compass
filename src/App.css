@@ -633,6 +633,14 @@ body.is-resizing-panels * {
   border-bottom: 2px solid var(--accent);
 }
 
+.tab.draggable {
+  cursor: grab;
+}
+
+.tab.draggable:active {
+  cursor: grabbing;
+}
+
 .tab-name {
   display: flex;
   align-items: center;
