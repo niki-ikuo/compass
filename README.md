@@ -2,8 +2,6 @@
 
 **English** | [日本語](README.ja.md)
 
-![Compass — AI workspace with Edit mode diff preview](docs/assets/screenshot.png)
-
 An AI workspace for Windows. Open a local folder and work with AI on notes, documents, data, and code.
 
 Open a folder → edit files → ask the AI → apply suggestions.
