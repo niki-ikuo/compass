@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
 import { useAppStore } from '@/stores/app-store'
 import { getFileName } from '@/utils/language'
 import { isBrowserOpenFile } from '@/utils/browser-tab'
@@ -8,6 +8,11 @@ import {
   serializeChatContextRefs,
   toChatContextRef
 } from '@/utils/chat-context-drag'
+import {
+  EDITOR_TAB_REORDER_MIME,
+  hasTabReorderDrag,
+  resolveTabDropIndex
+} from '@/utils/tab-reorder'
 import { useI18n } from '@/i18n'
 import { CloseIcon } from './icons/ToolbarIcons'
 import type { OpenFile } from '@/types'
@@ -43,7 +48,11 @@ export function TabBar() {
   const activeFilePath = useAppStore((s) => s.activeFilePath)
   const setActiveFile = useAppStore((s) => s.setActiveFile)
   const closeFile = useAppStore((s) => s.closeFile)
+  const reorderOpenFile = useAppStore((s) => s.reorderOpenFile)
   const tabBarRef = useRef<HTMLDivElement>(null)
+  const dragPathRef = useRef<string | null>(null)
+  const [dragPath, setDragPath] = useState<string | null>(null)
+  const [dropIndex, setDropIndex] = useState<number | null>(null)
   const openTabsKey = openFiles.map((file) => file.path).join('|')
 
   useLayoutEffect(() => {
@@ -53,33 +62,89 @@ export function TabBar() {
     activeTab?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' })
   }, [activeFilePath, openTabsKey])
 
+  const clearDragState = () => {
+    dragPathRef.current = null
+    setDragPath(null)
+    setDropIndex(null)
+  }
+
   if (openFiles.length === 0) return null
 
   return (
-    <div className="tab-bar" ref={tabBarRef}>
-      {openFiles.map((file) => {
-        const draggable = canDragTabToChat(file)
+    <div
+      className="tab-bar"
+      ref={tabBarRef}
+      onDragOver={(e) => {
+        if (!hasTabReorderDrag(e.dataTransfer, EDITOR_TAB_REORDER_MIME)) return
+        e.preventDefault()
+        e.dataTransfer.dropEffect = 'move'
+        // バー末端へのドロップ（最後のタブより右）
+        if (e.target === e.currentTarget) {
+          setDropIndex(openFiles.length)
+        }
+      }}
+      onDrop={(e) => {
+        if (!hasTabReorderDrag(e.dataTransfer, EDITOR_TAB_REORDER_MIME)) return
+        e.preventDefault()
+        const fromPath =
+          dragPathRef.current || e.dataTransfer.getData(EDITOR_TAB_REORDER_MIME)
+        const toIndex = dropIndex
+        clearDragState()
+        if (!fromPath || toIndex === null) return
+        reorderOpenFile(fromPath, toIndex)
+      }}
+      onDragLeave={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+          setDropIndex(null)
+        }
+      }}
+    >
+      {openFiles.map((file, index) => {
+        const chatDraggable = canDragTabToChat(file)
+        const showDropBefore = dropIndex === index
         return (
           <div
             key={file.path}
-            className={`tab ${file.path === activeFilePath ? 'active' : ''}${file.isPreview ? ' preview-tab' : ''}${isBrowserOpenFile(file) ? ' browser-tab' : ''}${isSettingsOpenFile(file) ? ' settings-tab-item' : ''}${draggable ? ' draggable' : ''}`}
-            draggable={draggable}
+            className={`tab${file.path === activeFilePath ? ' active' : ''}${file.isPreview ? ' preview-tab' : ''}${isBrowserOpenFile(file) ? ' browser-tab' : ''}${isSettingsOpenFile(file) ? ' settings-tab-item' : ''} draggable${dragPath === file.path ? ' tab-dragging' : ''}${showDropBefore ? ' tab-drop-before' : ''}`}
+            draggable
             onClick={() => setActiveFile(file.path)}
             onDragStart={(e) => {
-              if (!canDragTabToChat(file)) {
-                e.preventDefault()
-                return
+              dragPathRef.current = file.path
+              setDragPath(file.path)
+              e.dataTransfer.setData(EDITOR_TAB_REORDER_MIME, file.path)
+              e.dataTransfer.effectAllowed = chatDraggable ? 'copyMove' : 'move'
+              if (chatDraggable) {
+                const ref = toChatContextRef({
+                  path: file.path,
+                  name: getFileName(file.path),
+                  isDirectory: false
+                })
+                const payload = serializeChatContextRefs([ref])
+                e.dataTransfer.setData(CHAT_CONTEXT_DRAG_MIME, payload)
+                // Unicode パス向けフォールバック（カスタム MIME が空になる環境対策）
+                e.dataTransfer.setData('text/plain', payload)
               }
-              const ref = toChatContextRef({
-                path: file.path,
-                name: getFileName(file.path),
-                isDirectory: false
-              })
-              const payload = serializeChatContextRefs([ref])
-              e.dataTransfer.setData(CHAT_CONTEXT_DRAG_MIME, payload)
-              // Unicode パス向けフォールバック（カスタム MIME が空になる環境対策）
-              e.dataTransfer.setData('text/plain', payload)
-              e.dataTransfer.effectAllowed = 'copy'
+            }}
+            onDragEnd={clearDragState}
+            onDragOver={(e) => {
+              if (!hasTabReorderDrag(e.dataTransfer, EDITOR_TAB_REORDER_MIME)) return
+              e.preventDefault()
+              e.stopPropagation()
+              e.dataTransfer.dropEffect = 'move'
+              const rect = e.currentTarget.getBoundingClientRect()
+              setDropIndex(resolveTabDropIndex(e.clientX, rect.left, rect.width, index))
+            }}
+            onDrop={(e) => {
+              if (!hasTabReorderDrag(e.dataTransfer, EDITOR_TAB_REORDER_MIME)) return
+              e.preventDefault()
+              e.stopPropagation()
+              const rect = e.currentTarget.getBoundingClientRect()
+              const toIndex = resolveTabDropIndex(e.clientX, rect.left, rect.width, index)
+              const fromPath =
+                dragPathRef.current || e.dataTransfer.getData(EDITOR_TAB_REORDER_MIME)
+              clearDragState()
+              if (!fromPath) return
+              reorderOpenFile(fromPath, toIndex)
             }}
           >
             <span
@@ -111,6 +176,7 @@ export function TabBar() {
           </div>
         )
       })}
+      {dropIndex === openFiles.length && <div className="tab-drop-end" aria-hidden />}
     </div>
   )
 }

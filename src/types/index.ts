@@ -311,6 +311,23 @@ export interface AppSettings {
   rememberLastUseCasePreset: boolean
 }
 
+/** 永続化するエディタタブの種別（設定・プレビューは対象外） */
+export type PersistedEditorViewKind = 'text' | 'image' | 'pdf' | 'browser'
+
+/** `.compass/open-editors.json` に保存するタブ1件 */
+export interface PersistedOpenTab {
+  path: string
+  viewKind: PersistedEditorViewKind
+  browserUrl?: string
+}
+
+/** ワークスペースで開いていたエディタタブ（`.compass/open-editors.json`） */
+export interface WorkspaceOpenEditors {
+  version: number
+  activeFilePath: string | null
+  openTabs: PersistedOpenTab[]
+}
+
 /** ワークスペース固有設定（`.compass/settings.json`） */
 export interface WorkspaceSettings {
   /** フォルダ既定の用途。未設定時はアプリの defaultUseCasePreset に従う */
@@ -596,6 +613,10 @@ export interface CompassAPI {
       workspaceRoot: string,
       history: { activeChatId: string | null; sessions: ChatSession[] }
     ) => Promise<void>
+  }
+  openEditors: {
+    load: (workspaceRoot: string) => Promise<WorkspaceOpenEditors>
+    save: (workspaceRoot: string, editors: WorkspaceOpenEditors) => Promise<void>
   }
   terminal: {
     listShells: () => Promise<TerminalShell[]>

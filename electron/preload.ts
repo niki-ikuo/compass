@@ -29,7 +29,8 @@ import type {
   AgentNeedContinueEvent,
   AgentResolveContinueRequest,
   AgentNeedExecApprovalEvent,
-  WorkspaceSettings
+  WorkspaceSettings,
+  WorkspaceOpenEditors
 } from '../src/types'
 
 const compassAPI = {
@@ -298,6 +299,12 @@ const compassAPI = {
       workspaceRoot: string,
       history: { activeChatId: string | null; sessions: ChatSession[] }
     ): Promise<void> => ipcRenderer.invoke('chat:saveHistory', workspaceRoot, history)
+  },
+  openEditors: {
+    load: (workspaceRoot: string): Promise<WorkspaceOpenEditors> =>
+      ipcRenderer.invoke('openEditors:load', workspaceRoot),
+    save: (workspaceRoot: string, editors: WorkspaceOpenEditors): Promise<void> =>
+      ipcRenderer.invoke('openEditors:save', workspaceRoot, editors)
   },
   terminal: (() => {
     type DataCallback = (id: string, data: string) => void

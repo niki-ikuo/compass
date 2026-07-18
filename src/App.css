@@ -833,12 +833,32 @@ body.is-resizing-panels * {
   border-bottom: 2px solid var(--accent);
 }
 
-.tab.draggable {
+.tab.draggable,
+.chat-tab.draggable {
   cursor: grab;
 }
 
-.tab.draggable:active {
+.tab.draggable:active,
+.chat-tab.draggable:active {
   cursor: grabbing;
+}
+
+.tab.tab-dragging,
+.chat-tab.tab-dragging {
+  opacity: 0.45;
+}
+
+.tab.tab-drop-before,
+.chat-tab.tab-drop-before {
+  box-shadow: inset 2px 0 0 0 var(--accent);
+}
+
+.tab-drop-end {
+  flex-shrink: 0;
+  width: 2px;
+  align-self: stretch;
+  background: var(--accent);
+  margin: 2px 0;
 }
 
 .tab-name {

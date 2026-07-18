@@ -12,6 +12,7 @@ import { applyColorTheme } from '@/utils/color-theme'
 import { getLlmProvider } from '@/utils/llm-providers'
 import { setLocale } from '@/i18n'
 import { registerWheelZoomListener } from '@/utils/wheel-zoom'
+import { restoreOpenEditors } from '@/utils/restore-open-editors'
 
 export function App() {
   const showFileTree = useAppStore((s) => s.showFileTree)
@@ -51,16 +52,21 @@ export function App() {
 
       setWorkspaceRoot(folder)
       try {
-        const [tree, chatHistory, workspaceSettings] = await Promise.all([
+        const [tree, chatHistory, workspaceSettings, openEditors] = await Promise.all([
           window.compass.fs.readDir(folder),
           window.compass.chat.loadHistory(folder),
-          window.compass.workspace.getSettings(folder)
+          window.compass.workspace.getSettings(folder),
+          window.compass.openEditors.load(folder)
         ])
         setFileTree(tree)
         useAppStore
           .getState()
           .setWorkspaceDefaultUseCasePreset(workspaceSettings.defaultUseCasePreset ?? null)
         restoreChatSessions(chatHistory.sessions, chatHistory.activeChatId)
+        // 起動・フォルダ切替後のみ復元（同一 WS の再読み込みでタブを二重化しない）
+        if (useAppStore.getState().openFiles.length === 0) {
+          await restoreOpenEditors(openEditors)
+        }
         await window.compass.index.watch(folder)
         void buildWorkspaceIndex(folder)
         await window.compass.workspace.addRecent(folder)

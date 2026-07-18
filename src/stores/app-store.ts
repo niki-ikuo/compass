@@ -16,7 +16,9 @@ import type {
   EditorRevealRequest,
   WorkspaceSearchResult,
   AgentToolStep,
-  UseCasePreset
+  UseCasePreset,
+  PersistedOpenTab,
+  WorkspaceOpenEditors
 } from '@/types'
 import {
   DEFAULT_SETTINGS,
@@ -29,6 +31,7 @@ import { generateId } from '@/utils/code-blocks'
 import { loadPanelLayout, savePanelLayout } from '@/utils/panel-layout'
 import { createBrowserTabPath, normalizeBrowserUrl } from '@/utils/browser-tab'
 import { SETTINGS_TAB_PATH } from '@/utils/settings-tab'
+import { moveItemByDropIndex, reorderOpenSessionsById } from '@/utils/tab-reorder'
 import { t, isDefaultChatTitle } from '@/i18n'
 
 function createEmptyChatSession(): ChatSession {
@@ -102,6 +105,90 @@ export async function flushChatHistorySave(): Promise<void> {
     activeChatId: state.activeChatId,
     sessions: state.chatSessions
   })
+}
+
+let openEditorsSaveTimer: ReturnType<typeof setTimeout> | null = null
+let openEditorsSaveSuspended = false
+
+function toPersistedOpenEditors(state: {
+  openFiles: OpenFile[]
+  activeFilePath: string | null
+}): WorkspaceOpenEditors {
+  const openTabs: PersistedOpenTab[] = []
+  for (const file of state.openFiles) {
+    if (file.isPreview || file.viewKind === 'settings') continue
+    if (file.viewKind === 'browser') {
+      openTabs.push({
+        path: file.path,
+        viewKind: 'browser',
+        browserUrl: file.browserUrl ?? 'about:blank'
+      })
+      continue
+    }
+    if (file.viewKind === 'image' || file.viewKind === 'pdf') {
+      openTabs.push({ path: file.path, viewKind: file.viewKind })
+      continue
+    }
+    openTabs.push({ path: file.path, viewKind: 'text' })
+  }
+
+  let activeFilePath = state.activeFilePath
+  if (activeFilePath && !openTabs.some((tab) => tab.path === activeFilePath)) {
+    activeFilePath = openTabs[openTabs.length - 1]?.path ?? null
+  }
+
+  return { version: 1, activeFilePath, openTabs }
+}
+
+function scheduleOpenEditorsSave(workspaceRoot: string | null): void {
+  if (
+    openEditorsSaveSuspended ||
+    !workspaceRoot ||
+    typeof window === 'undefined' ||
+    !window.compass?.openEditors
+  ) {
+    return
+  }
+
+  if (openEditorsSaveTimer) clearTimeout(openEditorsSaveTimer)
+  openEditorsSaveTimer = setTimeout(() => {
+    openEditorsSaveTimer = null
+    const state = useAppStore.getState()
+    if (!state.workspaceRoot || openEditorsSaveSuspended) return
+    void window.compass.openEditors.save(
+      state.workspaceRoot,
+      toPersistedOpenEditors(state)
+    )
+  }, 500)
+}
+
+export async function flushOpenEditorsSave(): Promise<void> {
+  if (openEditorsSaveTimer) {
+    clearTimeout(openEditorsSaveTimer)
+    openEditorsSaveTimer = null
+  }
+  const state = useAppStore.getState()
+  if (
+    !state.workspaceRoot ||
+    typeof window === 'undefined' ||
+    !window.compass?.openEditors
+  ) {
+    return
+  }
+  await window.compass.openEditors.save(state.workspaceRoot, toPersistedOpenEditors(state))
+}
+
+export async function withOpenEditorsSaveSuspended<T>(fn: () => Promise<T>): Promise<T> {
+  openEditorsSaveSuspended = true
+  if (openEditorsSaveTimer) {
+    clearTimeout(openEditorsSaveTimer)
+    openEditorsSaveTimer = null
+  }
+  try {
+    return await fn()
+  } finally {
+    openEditorsSaveSuspended = false
+  }
 }
 
 function updateActiveSession(
@@ -380,6 +467,8 @@ interface AppState {
   ) => void
   closeFile: (path: string) => void
   setActiveFile: (path: string) => void
+  /** エディタタブを dropIndex（移動前の挿入位置）へ並べ替え */
+  reorderOpenFile: (fromPath: string, dropIndex: number) => void
   updateFileContent: (path: string, content: string) => void
   setFileEncoding: (path: string, encoding: FileEncoding) => void
   reopenFileWithEncoding: (path: string, encoding: FileEncoding) => Promise<void>
@@ -389,6 +478,8 @@ interface AppState {
   removePaths: (targetPath: string) => void
   createChatSession: () => void
   setActiveChatSession: (id: string) => void
+  /** 開いているチャットタブを dropIndex（開いているタブ内の挿入位置）へ並べ替え */
+  reorderChatSession: (fromId: string, dropIndexAmongOpen: number) => void
   closeChatSession: (id: string) => void
   reopenChatSession: (id: string) => void
   deleteChatSession: (id: string) => void
@@ -577,14 +668,22 @@ export const useAppStore = create<AppState>((set, get) => ({
     const rootToSave = state.workspaceRoot
     const sessionsToSave = state.chatSessions
     const activeChatIdToSave = state.activeChatId
+    const openEditorsToSave = toPersistedOpenEditors(state)
     if (chatHistorySaveTimer) {
       clearTimeout(chatHistorySaveTimer)
       chatHistorySaveTimer = null
+    }
+    if (openEditorsSaveTimer) {
+      clearTimeout(openEditorsSaveTimer)
+      openEditorsSaveTimer = null
     }
     void window.compass.chat.saveHistory(rootToSave, {
       activeChatId: activeChatIdToSave,
       sessions: sessionsToSave
     })
+    if (typeof window !== 'undefined' && window.compass?.openEditors) {
+      void window.compass.openEditors.save(rootToSave, openEditorsToSave)
+    }
 
     set({
       workspaceRoot: null,
@@ -610,7 +709,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   setFileTree: (tree) => set({ fileTree: tree }),
 
-  openFile: (path, content, encoding = 'utf8') =>
+  openFile: (path, content, encoding = 'utf8') => {
     set((state) => {
       const existing = state.openFiles.find((f) => f.path === path)
       if (existing) {
@@ -643,9 +742,11 @@ export const useAppStore = create<AppState>((set, get) => ({
         openFiles: [...state.openFiles, newFile],
         activeFilePath: path
       }
-    }),
+    })
+    scheduleOpenEditorsSave(get().workspaceRoot)
+  },
 
-  openMediaFile: (path, viewKind, mimeType, base64) =>
+  openMediaFile: (path, viewKind, mimeType, base64) => {
     set((state) => {
       const existing = state.openFiles.find((f) => f.path === path)
       const mediaFile: OpenFile = {
@@ -668,9 +769,11 @@ export const useAppStore = create<AppState>((set, get) => ({
         openFiles: [...state.openFiles, mediaFile],
         activeFilePath: path
       }
-    }),
+    })
+    scheduleOpenEditorsSave(get().workspaceRoot)
+  },
 
-  openBrowserTab: (url) =>
+  openBrowserTab: (url) => {
     set((state) => {
       const path = createBrowserTabPath()
       const browserUrl = normalizeBrowserUrl(url ?? '')
@@ -688,7 +791,9 @@ export const useAppStore = create<AppState>((set, get) => ({
         openFiles: [...state.openFiles, tab],
         activeFilePath: path
       }
-    }),
+    })
+    scheduleOpenEditorsSave(get().workspaceRoot)
+  },
 
   openSettingsTab: () =>
     set((state) => {
@@ -710,14 +815,18 @@ export const useAppStore = create<AppState>((set, get) => ({
       }
     }),
 
-  updateBrowserTab: (path, patch) =>
+  updateBrowserTab: (path, patch) => {
     set((state) => ({
       openFiles: state.openFiles.map((f) =>
         f.path === path && f.viewKind === 'browser' ? { ...f, ...patch } : f
       )
-    })),
+    }))
+    if (patch.browserUrl !== undefined) {
+      scheduleOpenEditorsSave(get().workspaceRoot)
+    }
+  },
 
-  closeFile: (path) =>
+  closeFile: (path) => {
     set((state) => {
       const filtered = state.openFiles.filter((f) => f.path !== path)
       let activeFilePath = state.activeFilePath
@@ -725,9 +834,24 @@ export const useAppStore = create<AppState>((set, get) => ({
         activeFilePath = filtered.length > 0 ? filtered[filtered.length - 1].path : null
       }
       return { openFiles: filtered, activeFilePath }
-    }),
+    })
+    scheduleOpenEditorsSave(get().workspaceRoot)
+  },
 
-  setActiveFile: (path) => set({ activeFilePath: path }),
+  setActiveFile: (path) => {
+    set({ activeFilePath: path })
+    scheduleOpenEditorsSave(get().workspaceRoot)
+  },
+
+  reorderOpenFile: (fromPath, dropIndex) => {
+    const state = get()
+    const fromIndex = state.openFiles.findIndex((f) => f.path === fromPath)
+    if (fromIndex < 0) return
+    const openFiles = moveItemByDropIndex(state.openFiles, fromIndex, dropIndex)
+    if (openFiles === state.openFiles) return
+    set({ openFiles })
+    scheduleOpenEditorsSave(state.workspaceRoot)
+  },
 
   updateFileContent: (path, content) =>
     set((state) => ({
@@ -787,7 +911,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       }
     }),
 
-  renameOpenFile: (oldPath, newPath) =>
+  renameOpenFile: (oldPath, newPath) => {
     set((state) => {
       const oldNorm = oldPath.replace(/\\/g, '/')
       const newNorm = newPath.replace(/\\/g, '/')
@@ -809,9 +933,11 @@ export const useAppStore = create<AppState>((set, get) => ({
         }),
         activeFilePath: state.activeFilePath ? remapPath(state.activeFilePath) : null
       }
-    }),
+    })
+    scheduleOpenEditorsSave(get().workspaceRoot)
+  },
 
-  removePaths: (targetPath) =>
+  removePaths: (targetPath) => {
     set((state) => {
       const normalized = targetPath.replace(/\\/g, '/')
       const filtered = state.openFiles.filter((f) => {
@@ -826,7 +952,9 @@ export const useAppStore = create<AppState>((set, get) => ({
         }
       }
       return { openFiles: filtered, activeFilePath }
-    }),
+    })
+    scheduleOpenEditorsSave(get().workspaceRoot)
+  },
 
   createChatSession: () => {
     const state = get()
@@ -850,6 +978,18 @@ export const useAppStore = create<AppState>((set, get) => ({
       get().revertWorkspacePreview()
     }
     set({ activeChatId: id })
+    scheduleChatHistorySave(state.workspaceRoot)
+  },
+
+  reorderChatSession: (fromId, dropIndexAmongOpen) => {
+    const state = get()
+    const chatSessions = reorderOpenSessionsById(
+      state.chatSessions,
+      fromId,
+      dropIndexAmongOpen
+    )
+    if (chatSessions === state.chatSessions) return
+    set({ chatSessions })
     scheduleChatHistorySave(state.workspaceRoot)
   },
 

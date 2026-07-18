@@ -61,6 +61,11 @@ import { join } from '@/utils/path'
 import { isMediaOpenFile } from '@/utils/media-context'
 import { isBrowserOpenFile } from '@/utils/browser-tab'
 import { isSettingsOpenFile } from '@/utils/settings-tab'
+import {
+  CHAT_TAB_REORDER_MIME,
+  hasTabReorderDrag,
+  resolveTabDropIndex
+} from '@/utils/tab-reorder'
 import { useI18n, getDateLocale } from '@/i18n'
 
 function selectionRefKey(ref: ChatSelectionRef): string {
@@ -102,6 +107,9 @@ export function ChatPanel() {
   const [historyMenuPos, setHistoryMenuPos] = useState<{ top: number; right: number } | null>(
     null
   )
+  const [chatTabDragId, setChatTabDragId] = useState<string | null>(null)
+  const [chatTabDropIndex, setChatTabDropIndex] = useState<number | null>(null)
+  const chatTabDragIdRef = useRef<string | null>(null)
   const messagesContainerRef = useRef<HTMLDivElement>(null)
   const chatTabsRef = useRef<HTMLDivElement>(null)
   const inputComposerRef = useRef<ChatInputComposerHandle>(null)
@@ -142,6 +150,7 @@ export function ChatPanel() {
   const addChatContextRefs = useAppStore((s) => s.addChatContextRefs)
   const createChatSession = useAppStore((s) => s.createChatSession)
   const setActiveChatSession = useAppStore((s) => s.setActiveChatSession)
+  const reorderChatSession = useAppStore((s) => s.reorderChatSession)
   const closeChatSession = useAppStore((s) => s.closeChatSession)
   const reopenChatSession = useAppStore((s) => s.reopenChatSession)
   const deleteChatSession = useAppStore((s) => s.deleteChatSession)
@@ -1051,15 +1060,81 @@ export function ChatPanel() {
   return (
     <div className="chat-panel">
       <div className="chat-tabs-bar">
-        <div className="chat-tabs" ref={chatTabsRef}>
-          {openChatSessions.map((session) => (
+        <div
+          className="chat-tabs"
+          ref={chatTabsRef}
+          onDragOver={(e) => {
+            if (!hasTabReorderDrag(e.dataTransfer, CHAT_TAB_REORDER_MIME)) return
+            e.preventDefault()
+            e.dataTransfer.dropEffect = 'move'
+            if (e.target === e.currentTarget) {
+              setChatTabDropIndex(openChatSessions.length)
+            }
+          }}
+          onDrop={(e) => {
+            if (!hasTabReorderDrag(e.dataTransfer, CHAT_TAB_REORDER_MIME)) return
+            e.preventDefault()
+            const fromId =
+              chatTabDragIdRef.current || e.dataTransfer.getData(CHAT_TAB_REORDER_MIME)
+            const toIndex = chatTabDropIndex
+            chatTabDragIdRef.current = null
+            setChatTabDragId(null)
+            setChatTabDropIndex(null)
+            if (!fromId || toIndex === null) return
+            reorderChatSession(fromId, toIndex)
+          }}
+          onDragLeave={(e) => {
+            if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+              setChatTabDropIndex(null)
+            }
+          }}
+        >
+          {openChatSessions.map((session, index) => (
             <div
               key={session.id}
-              className={`chat-tab${session.id === activeChatId ? ' active' : ''}${
+              className={`chat-tab draggable${session.id === activeChatId ? ' active' : ''}${
                 loadingChatIds.includes(session.id) ? ' loading' : ''
+              }${chatTabDragId === session.id ? ' tab-dragging' : ''}${
+                chatTabDropIndex === index ? ' tab-drop-before' : ''
               }`}
+              draggable
               onClick={() => setActiveChatSession(session.id)}
               title={session.title}
+              onDragStart={(e) => {
+                chatTabDragIdRef.current = session.id
+                setChatTabDragId(session.id)
+                e.dataTransfer.setData(CHAT_TAB_REORDER_MIME, session.id)
+                e.dataTransfer.effectAllowed = 'move'
+              }}
+              onDragEnd={() => {
+                chatTabDragIdRef.current = null
+                setChatTabDragId(null)
+                setChatTabDropIndex(null)
+              }}
+              onDragOver={(e) => {
+                if (!hasTabReorderDrag(e.dataTransfer, CHAT_TAB_REORDER_MIME)) return
+                e.preventDefault()
+                e.stopPropagation()
+                e.dataTransfer.dropEffect = 'move'
+                const rect = e.currentTarget.getBoundingClientRect()
+                setChatTabDropIndex(
+                  resolveTabDropIndex(e.clientX, rect.left, rect.width, index)
+                )
+              }}
+              onDrop={(e) => {
+                if (!hasTabReorderDrag(e.dataTransfer, CHAT_TAB_REORDER_MIME)) return
+                e.preventDefault()
+                e.stopPropagation()
+                const rect = e.currentTarget.getBoundingClientRect()
+                const toIndex = resolveTabDropIndex(e.clientX, rect.left, rect.width, index)
+                const fromId =
+                  chatTabDragIdRef.current || e.dataTransfer.getData(CHAT_TAB_REORDER_MIME)
+                chatTabDragIdRef.current = null
+                setChatTabDragId(null)
+                setChatTabDropIndex(null)
+                if (!fromId) return
+                reorderChatSession(fromId, toIndex)
+              }}
             >
               <span className="chat-tab-title">{session.title}</span>
               <button
@@ -1075,6 +1150,9 @@ export function ChatPanel() {
               </button>
             </div>
           ))}
+          {chatTabDropIndex === openChatSessions.length && (
+            <div className="tab-drop-end" aria-hidden />
+          )}
         </div>
         <div className="chat-header-actions">
           <div className="chat-history-menu" ref={historyRef}>
