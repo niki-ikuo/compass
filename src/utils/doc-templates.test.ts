@@ -40,8 +40,11 @@ describe('doc-templates', () => {
   it('builds unique file names', () => {
     expect(buildUniqueTemplateFileName('meeting-notes.md', [])).toBe('meeting-notes.md')
     expect(
-      buildUniqueTemplateFileName('meeting-notes.md', ['meeting-notes.md', 'Meeting-Notes-2.md'])
-    ).toBe('meeting-notes-3.md')
+      buildUniqueTemplateFileName('meeting-notes.md', [
+        'meeting-notes.md',
+        'Meeting-Notes (2).md'
+      ])
+    ).toBe('meeting-notes (3).md')
   })
 
   it('extracts label from first ATX heading', () => {

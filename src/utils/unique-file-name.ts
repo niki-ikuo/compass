@@ -1,6 +1,6 @@
 import { basename } from './path'
 
-/** `report.txt`, `report-2.txt`, ... */
+/** `report.txt`, `report (2).txt`, ...（Windows 風の連番） */
 export function buildUniqueFileName(
   preferredName: string,
   existingNames: Iterable<string>
@@ -15,9 +15,9 @@ export function buildUniqueFileName(
   const ext = hasExt ? normalized.slice(dot) : ''
 
   for (let i = 0; i < 100; i++) {
-    const suffix = i === 0 ? '' : `-${i + 1}`
+    const suffix = i === 0 ? '' : ` (${i + 1})`
     const name = `${stem}${suffix}${ext}`
     if (!existing.has(name.toLowerCase())) return name
   }
-  return `${stem}-${Date.now()}${ext}`
+  return `${stem} (${Date.now()})${ext}`
 }

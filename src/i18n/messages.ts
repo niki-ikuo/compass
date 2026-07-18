@@ -145,7 +145,8 @@ export const ja = {
   'explorer.importFailed': 'ファイルの取り込みに失敗しました',
   'explorer.createFailed': '作成に失敗しました',
   'explorer.renameFailed': '名前の変更に失敗しました',
-  'explorer.defaultNewFolder': '新しいフォルダ',
+  'explorer.defaultNewFolder': '新しいフォルダー',
+  'explorer.defaultNewTextFile': '新規 テキスト ドキュメント.txt',
   'explorer.noFolder': 'フォルダが開かれていません',
   'explorer.openFolderHint': 'メニューから「フォルダを開く」を選択',
 
@@ -659,6 +660,7 @@ export const en: Record<MessageKey, string> = {
   'explorer.createFailed': 'Failed to create',
   'explorer.renameFailed': 'Failed to rename',
   'explorer.defaultNewFolder': 'New Folder',
+  'explorer.defaultNewTextFile': 'New Text Document.txt',
   'explorer.noFolder': 'No folder open',
   'explorer.openFolderHint': 'Choose "Open Folder" from the menu',
 

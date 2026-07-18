@@ -622,7 +622,7 @@ export function reindexDraftOrders(drafts: WorkspaceTemplateDraft[]): WorkspaceT
   }))
 }
 
-/** `meeting-notes.md`, `meeting-notes-2.md`, ... */
+/** `meeting-notes.md`, `meeting-notes (2).md`, ... */
 export function buildUniqueTemplateFileName(
   preferredName: string,
   existingNames: Iterable<string>

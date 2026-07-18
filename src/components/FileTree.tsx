@@ -23,6 +23,7 @@ import {
   listEffectiveDocTemplates,
   type DocTemplate
 } from '@/utils/doc-templates'
+import { buildUniqueFileName } from '@/utils/unique-file-name'
 import { ConfirmDialog } from './ConfirmDialog'
 import { TemplateManagerDialog } from './TemplateManagerDialog'
 import {
@@ -880,10 +881,13 @@ export function FileTree() {
       next.add(normalizeNodePath(parentDir))
       return next
     })
+    const preferredName =
+      mode === 'create-file' ? t('explorer.defaultNewTextFile') : t('explorer.defaultNewFolder')
+    const defaultName = buildUniqueFileName(preferredName, listChildNames(rootedTree, parentDir))
     setInlineInput({
       mode,
       parentDir,
-      defaultName: mode === 'create-file' ? 'untitled.txt' : t('explorer.defaultNewFolder')
+      defaultName
     })
     setError(null)
   }
