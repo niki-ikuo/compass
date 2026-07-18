@@ -4,6 +4,7 @@ import appIcon from '../resources/icon.ico?asset'
 import packageJson from '../package.json'
 import { t } from '../src/i18n/runtime'
 import type { FileEncoding } from '../src/types'
+import { nextZoomLevel } from './view-zoom'
 import {
   applyWorkspaceActions,
   createDirectory,
@@ -65,43 +66,20 @@ import type {
 } from '../src/types'
 
 let mainWindow: BrowserWindow | null = null
-let currentZoomLevel = 0
-let lastWheelZoomAt = 0
-
-const ZOOM_STEP = 0.5
-const ZOOM_MIN = -3
-const ZOOM_MAX = 5
-const WHEEL_ZOOM_INTERVAL_MS = 120
-
-function clampZoomLevel(level: number): number {
-  return Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, level))
-}
 
 function applyViewZoom(
   webContents: Electron.WebContents,
   action: 'resetZoom' | 'zoomIn' | 'zoomOut'
 ): void {
-  switch (action) {
-    case 'resetZoom':
-      currentZoomLevel = 0
-      break
-    case 'zoomIn':
-      currentZoomLevel = clampZoomLevel(currentZoomLevel + ZOOM_STEP)
-      break
-    case 'zoomOut':
-      currentZoomLevel = clampZoomLevel(currentZoomLevel - ZOOM_STEP)
-      break
-  }
-  webContents.setZoomLevel(currentZoomLevel)
+  // Always read the live level so menu shortcuts cannot desync us.
+  const nextLevel = nextZoomLevel(webContents.getZoomLevel(), action)
+  webContents.setZoomLevel(nextLevel)
 }
 
-function registerWheelZoom(webContents: Electron.WebContents): void {
-  webContents.on('zoom-changed', (_event, zoomDirection) => {
-    const now = Date.now()
-    if (now - lastWheelZoomAt < WHEEL_ZOOM_INTERVAL_MS) return
-    lastWheelZoomAt = now
-    applyViewZoom(webContents, zoomDirection === 'in' ? 'zoomIn' : 'zoomOut')
-  })
+function zoomMenuClick(action: 'resetZoom' | 'zoomIn' | 'zoomOut'): void {
+  const webContents = mainWindow?.webContents
+  if (!webContents) return
+  applyViewZoom(webContents, action)
 }
 
 function createWindow(): void {
@@ -130,8 +108,6 @@ function createWindow(): void {
   if (process.platform !== 'darwin') {
     mainWindow.setMenuBarVisibility(false)
   }
-
-  registerWheelZoom(mainWindow.webContents)
 
   mainWindow.on('closed', () => {
     mainWindow = null
@@ -208,14 +184,36 @@ function createMenu(): void {
         { role: 'reload', label: t('menu.reload') },
         { role: 'toggleDevTools', label: t('menu.toggleDevTools') },
         { type: 'separator' },
-        { role: 'resetZoom', label: t('menu.resetZoom') },
-        { role: 'resetZoom', accelerator: 'CmdOrCtrl+num0', visible: false },
+        // Use click handlers (not role) so zoom always goes through applyViewZoom / getZoomLevel.
+        // Hidden accelerator aliases still need a label (Electron rejects items without label/role/type).
+        { label: t('menu.resetZoom'), accelerator: 'CmdOrCtrl+0', click: () => zoomMenuClick('resetZoom') },
+        {
+          label: t('menu.resetZoom'),
+          accelerator: 'CmdOrCtrl+num0',
+          visible: false,
+          click: () => zoomMenuClick('resetZoom')
+        },
         // Show Ctrl++; also bind Ctrl+= and numpad (default Plus alone often needs Shift on Win/Linux).
-        { role: 'zoomIn', label: t('menu.zoomIn'), accelerator: 'CmdOrCtrl+Plus' },
-        { role: 'zoomIn', accelerator: 'CmdOrCtrl+=', visible: false },
-        { role: 'zoomIn', accelerator: 'CmdOrCtrl+numadd', visible: false },
-        { role: 'zoomOut', label: t('menu.zoomOut') },
-        { role: 'zoomOut', accelerator: 'CmdOrCtrl+numsub', visible: false },
+        { label: t('menu.zoomIn'), accelerator: 'CmdOrCtrl+Plus', click: () => zoomMenuClick('zoomIn') },
+        {
+          label: t('menu.zoomIn'),
+          accelerator: 'CmdOrCtrl+=',
+          visible: false,
+          click: () => zoomMenuClick('zoomIn')
+        },
+        {
+          label: t('menu.zoomIn'),
+          accelerator: 'CmdOrCtrl+numadd',
+          visible: false,
+          click: () => zoomMenuClick('zoomIn')
+        },
+        { label: t('menu.zoomOut'), accelerator: 'CmdOrCtrl+-', click: () => zoomMenuClick('zoomOut') },
+        {
+          label: t('menu.zoomOut'),
+          accelerator: 'CmdOrCtrl+numsub',
+          visible: false,
+          click: () => zoomMenuClick('zoomOut')
+        },
         { type: 'separator' },
         {
           label: t('menu.terminal'),
@@ -318,9 +316,12 @@ function registerIpcHandlers(): void {
     return result.filePaths[0]
   })
 
-  ipcMain.handle('fs:readDir', async (_event, dirPath: string) => {
-    return readDirectory(dirPath)
-  })
+  ipcMain.handle(
+    'fs:readDir',
+    async (_event, dirPath: string, options?: { missingOk?: boolean }) => {
+      return readDirectory(dirPath, options)
+    }
+  )
 
   ipcMain.handle('fs:readFile', async (_event, filePath: string, encoding?: FileEncoding) => {
     return readFileContent(filePath, encoding)
@@ -591,9 +592,9 @@ function registerIpcHandlers(): void {
 
 app.whenReady().then(async () => {
   await getSettings()
+  registerIpcHandlers()
   createWindow()
   createMenu()
-  registerIpcHandlers()
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()

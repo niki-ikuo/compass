@@ -163,7 +163,9 @@ describe('doc-templates', () => {
 
     const workspace = await loadWorkspaceDocTemplates('/ws', fs)
     expect(workspace).toHaveLength(2)
-    expect(fs.readDir).toHaveBeenCalledWith(`/ws/${WORKSPACE_TEMPLATES_DIR}`)
+    expect(fs.readDir).toHaveBeenCalledWith(`/ws/${WORKSPACE_TEMPLATES_DIR}`, {
+      missingOk: true
+    })
 
     const effective = await listEffectiveDocTemplates('/ws', 'ja', fs)
     expect(effective).toHaveLength(5)
@@ -173,12 +175,13 @@ describe('doc-templates', () => {
 
   it('falls back to builtins when .compass/templates/ is missing', async () => {
     const fs = {
-      readDir: vi.fn(async () => {
-        throw new Error('ENOENT')
-      }),
+      readDir: vi.fn(async () => []),
       readFile: vi.fn()
     }
     const list = await listEffectiveDocTemplates('/ws', 'en', fs)
+    expect(fs.readDir).toHaveBeenCalledWith(`/ws/${WORKSPACE_TEMPLATES_DIR}`, {
+      missingOk: true
+    })
     expect(list).toHaveLength(4)
     expect(list.every((t) => t.source === 'builtin')).toBe(true)
   })

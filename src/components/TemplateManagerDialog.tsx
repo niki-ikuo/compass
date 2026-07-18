@@ -52,7 +52,7 @@ export function TemplateManagerDialog({
         const [effective, workspace] = await Promise.all([
           listEffectiveDocTemplates(workspaceRoot, locale),
           loadWorkspaceDocTemplates(workspaceRoot, {
-            readDir: (dirPath) => window.compass.fs.readDir(dirPath),
+            readDir: (dirPath, options) => window.compass.fs.readDir(dirPath, options),
             readFile: (filePath) => window.compass.fs.readFile(filePath)
           })
         ])

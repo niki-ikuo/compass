@@ -11,6 +11,7 @@ import { buildWorkspaceIndex } from '@/utils/project-index'
 import { applyColorTheme } from '@/utils/color-theme'
 import { getLlmProvider } from '@/utils/llm-providers'
 import { setLocale } from '@/i18n'
+import { registerWheelZoomListener } from '@/utils/wheel-zoom'
 
 export function App() {
   const showFileTree = useAppStore((s) => s.showFileTree)
@@ -121,6 +122,9 @@ export function App() {
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [openBrowserTab])
+
+  // Monaco / xterm が wheel を preventDefault しても Ctrl+wheel ズームが効くようにする
+  useEffect(() => registerWheelZoomListener(), [])
 
   useEffect(() => {
     document.title = workspaceRoot ? `Compass - ${workspaceRoot}` : 'Compass'

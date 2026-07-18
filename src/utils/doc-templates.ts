@@ -508,7 +508,10 @@ export function mergeDocTemplates(
 }
 
 export interface DocTemplateFs {
-  readDir: (dirPath: string) => Promise<FileTreeNode[]>
+  readDir: (
+    dirPath: string,
+    options?: { missingOk?: boolean }
+  ) => Promise<FileTreeNode[]>
   readFile: (filePath: string) => Promise<DecodedFileContent>
 }
 
@@ -520,7 +523,8 @@ export async function loadWorkspaceDocTemplates(
   const dir = join(workspaceRoot, WORKSPACE_TEMPLATES_DIR)
   let nodes: FileTreeNode[]
   try {
-    nodes = await fs.readDir(dir)
+    // missingOk: メイン側で ENOENT を空配列にするため、IPC エラーログも出ない
+    nodes = await fs.readDir(dir, { missingOk: true })
   } catch {
     return []
   }
@@ -554,7 +558,7 @@ export async function listEffectiveDocTemplates(
   const reader =
     fs ??
     ({
-      readDir: (dirPath) => window.compass.fs.readDir(dirPath),
+      readDir: (dirPath, options) => window.compass.fs.readDir(dirPath, options),
       readFile: (filePath) => window.compass.fs.readFile(filePath)
     } satisfies DocTemplateFs)
 

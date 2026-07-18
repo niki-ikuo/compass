@@ -35,8 +35,10 @@ import type {
 const compassAPI = {
   fs: {
     openFolder: (): Promise<string | null> => ipcRenderer.invoke('fs:openFolder'),
-    readDir: (dirPath: string): Promise<FileTreeNode[]> =>
-      ipcRenderer.invoke('fs:readDir', dirPath),
+    readDir: (
+      dirPath: string,
+      options?: { missingOk?: boolean }
+    ): Promise<FileTreeNode[]> => ipcRenderer.invoke('fs:readDir', dirPath, options),
     readFile: (filePath: string, encoding?: FileEncoding): Promise<DecodedFileContent> =>
       ipcRenderer.invoke('fs:readFile', filePath, encoding),
     writeFile: (filePath: string, content: string, encoding?: FileEncoding): Promise<void> =>

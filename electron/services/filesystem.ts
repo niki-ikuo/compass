@@ -91,8 +91,25 @@ const MAX_IMAGE_BYTES = 4 * 1024 * 1024
 const MAX_IMAGES_PER_REQUEST = 6
 const MAX_PDF_TEXT_CHARS = 48_000
 
-export async function readDirectory(dirPath: string): Promise<FileTreeNode[]> {
-  const entries = await readdir(dirPath, { withFileTypes: true })
+export type ReadDirOptions = {
+  /** ディレクトリが無いとき例外ではなく空配列を返す（任意フォルダの読み取り用） */
+  missingOk?: boolean
+}
+
+export async function readDirectory(
+  dirPath: string,
+  options?: ReadDirOptions
+): Promise<FileTreeNode[]> {
+  let entries
+  try {
+    entries = await readdir(dirPath, { withFileTypes: true })
+  } catch (err) {
+    if (options?.missingOk && (err as NodeJS.ErrnoException).code === 'ENOENT') {
+      return []
+    }
+    throw err
+  }
+
   const nodes: FileTreeNode[] = []
 
   const sorted = entries.sort((a, b) => {

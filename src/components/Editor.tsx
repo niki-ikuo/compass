@@ -37,6 +37,12 @@ const editorOptionsBase: editor.IStandaloneEditorConstructionOptions = {
   tabSize: 2,
   renderWhitespace: 'selection',
   bracketPairColorization: { enabled: true },
+  // Ctrl+wheel はアプリ全体ズームへ（App の capture listener）。Monaco フォントズームは使わない。
+  mouseWheelZoom: false,
+  scrollbar: {
+    // デフォルト true だと未スクロール時も wheel を consume し、Electron ズームが死ぬ
+    alwaysConsumeMouseWheel: false
+  },
   // インライン補完表示中に Suggest ウィジェットが勝つとゴーストが消えるため、自動サジェストは抑止
   quickSuggestions: false,
   suggestOnTriggerCharacters: false,

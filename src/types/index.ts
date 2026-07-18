@@ -466,7 +466,10 @@ export interface EditorRevealRequest {
 export interface CompassAPI {
   fs: {
     openFolder: () => Promise<string | null>
-    readDir: (dirPath: string) => Promise<FileTreeNode[]>
+    readDir: (
+      dirPath: string,
+      options?: { missingOk?: boolean }
+    ) => Promise<FileTreeNode[]>
     readFile: (filePath: string, encoding?: FileEncoding) => Promise<DecodedFileContent>
     writeFile: (filePath: string, content: string, encoding?: FileEncoding) => Promise<void>
     /** base64 バイナリ書き込み（貼り付け画像・PDF 用） */
