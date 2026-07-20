@@ -50,6 +50,10 @@ Describe an app or game and let the agent scaffold files you can preview and ite
 
 ![Code use case — Breakout-style game built with Agent](docs/assets/use-case-code.png)
 
+Android apps can also be created.
+
+![Code use case — Android Reversi app built with Agent](docs/assets/use-case-code-android.png)
+
 ## Requirements
 
 - Windows 10 / 11 (x64)

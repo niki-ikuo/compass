@@ -50,6 +50,10 @@ CSV を自然言語で質問し、表や集計結果をその場で得る。
 
 ![コード用途 — Agent で作成した Breakout 風ゲーム](docs/assets/use-case-code.png)
 
+Androidアプリも作成可能です
+
+![コード用途 — Agent で作成した Android リバーシアプリ](docs/assets/use-case-code-android.png)
+
 ## Requirements
 
 - Windows 10 / 11（x64）
