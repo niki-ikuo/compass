@@ -488,6 +488,26 @@ export interface WorkspaceReplaceResult {
 
 export type LeftSidebarView = 'explorer' | 'search'
 
+export interface HelpDocMeta {
+  id: string
+  title: string
+  keywords: string[]
+  category: string
+  related: string[]
+  commands: string[]
+}
+
+export interface HelpDoc extends HelpDocMeta {
+  body: string
+}
+
+export interface HelpSearchHit {
+  id: string
+  title: string
+  score: number
+  snippet: string
+}
+
 export interface EditorRevealRequest {
   id: number
   path: string
@@ -580,6 +600,12 @@ export interface CompassAPI {
     ) => Promise<void>
     showAbout: () => Promise<void>
     showItemInFolder: (targetPath: string) => Promise<void>
+    openExternal: (url: string) => Promise<void>
+  }
+  help: {
+    list: (locale: LocaleId) => Promise<HelpDocMeta[]>
+    get: (id: string, locale: LocaleId) => Promise<HelpDoc>
+    search: (query: string, locale: LocaleId) => Promise<HelpSearchHit[]>
   }
   menu: {
     onOpenFolder: (callback: () => void) => () => void
@@ -591,6 +617,7 @@ export interface CompassAPI {
     onReplaceInFile: (callback: () => void) => () => void
     onFindInFiles: (callback: () => void) => () => void
     onReplaceInFiles: (callback: () => void) => () => void
+    onOpenHelp: (callback: () => void) => () => void
   }
   index: {
     build: (workspaceRoot: string) => Promise<IndexBuildResult>

@@ -58,6 +58,12 @@
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true
-    }
+    },
+    "extraResources": [
+      {
+        "from": "helps",
+        "to": "helps"
+      }
+    ]
   }
 }

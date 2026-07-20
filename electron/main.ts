@@ -55,6 +55,7 @@ import {
   writeTerminal
 } from './services/terminal'
 import { replaceInWorkspace, searchWorkspace } from './services/workspace-search'
+import { getHelpDoc, listHelpDocs, searchHelpDocs } from './services/help'
 import type {
   AppSettings,
   ChatContextRef,
@@ -228,6 +229,12 @@ function createMenu(): void {
       label: t('menu.help'),
       submenu: [
         {
+          label: t('menu.openHelp'),
+          accelerator: 'F1',
+          click: () => mainWindow?.webContents.send('menu:open-help')
+        },
+        { type: 'separator' },
+        {
           label: t('menu.about'),
           click: () => {
             void dialog.showMessageBox(mainWindow!, {
@@ -315,6 +322,27 @@ function registerIpcHandlers(): void {
       throw new Error('Invalid path')
     }
     shell.showItemInFolder(targetPath)
+  })
+
+  ipcMain.handle('shell:openExternal', async (_event, url: string) => {
+    if (typeof url !== 'string' || !/^https?:\/\//i.test(url.trim())) {
+      throw new Error('Invalid URL')
+    }
+    await shell.openExternal(url.trim())
+  })
+
+  ipcMain.handle('help:list', async (_event, locale?: string) => listHelpDocs(locale))
+
+  ipcMain.handle('help:get', async (_event, id: string, locale?: string) => {
+    if (typeof id !== 'string' || id.trim() === '') {
+      throw new Error('Invalid help path')
+    }
+    return getHelpDoc(id, locale)
+  })
+
+  ipcMain.handle('help:search', async (_event, query: string, locale?: string) => {
+    if (typeof query !== 'string') return []
+    return searchHelpDocs(query, locale)
   })
 
   ipcMain.handle('fs:openFolder', async () => {

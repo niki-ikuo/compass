@@ -1,4 +1,4 @@
-import { useEffect, useCallback } from 'react'
+import { useEffect, useCallback, useState } from 'react'
 import { useAppStore } from '@/stores/app-store'
 import { LeftSidebar } from './components/LeftSidebar'
 import { ChatPanel } from './components/ChatPanel'
@@ -7,6 +7,7 @@ import { ResizableLayout } from './components/ResizableLayout'
 import { WorkspaceWelcome } from './components/WorkspaceWelcome'
 import { MenuBar } from './components/MenuBar'
 import { EditorCenter } from './components/EditorCenter'
+import { HelpDialog, type HelpCommandId } from './components/HelpDialog'
 import { buildWorkspaceIndex } from '@/utils/project-index'
 import { applyColorTheme } from '@/utils/color-theme'
 import { getLlmProvider } from '@/utils/llm-providers'
@@ -41,6 +42,11 @@ export function App() {
   const markFileSaved = useAppStore((s) => s.markFileSaved)
   const openFiles = useAppStore((s) => s.openFiles)
   const openBrowserTab = useAppStore((s) => s.openBrowserTab)
+  const [helpOpen, setHelpOpen] = useState(false)
+
+  const openHelp = useCallback(() => {
+    setHelpOpen(true)
+  }, [])
 
   const openWorkspace = useCallback(
     async (folder: string) => {
@@ -86,6 +92,24 @@ export function App() {
     if (!folder) return
     await openWorkspace(folder)
   }, [openWorkspace])
+
+  const handleHelpCommand = useCallback(
+    (command: HelpCommandId) => {
+      switch (command) {
+        case 'Open Settings':
+        case 'Open Provider':
+          openSettingsTab()
+          break
+        case 'Open Folder':
+          void handleOpenFolder()
+          break
+        case 'Focus Chat':
+          setShowChat(true)
+          break
+      }
+    },
+    [openSettingsTab, handleOpenFolder, setShowChat]
+  )
 
   const handleCloseFolder = useCallback(async () => {
     if (!closeWorkspace()) return
@@ -190,7 +214,8 @@ export function App() {
       window.compass.menu.onReplaceInFiles(() => {
         if (!useAppStore.getState().workspaceRoot) return
         openSearchPanel({ replace: true })
-      })
+      }),
+      window.compass.menu.onOpenHelp(() => openHelp())
     ]
     return () => unsubs.forEach((fn) => fn())
   }, [
@@ -199,7 +224,8 @@ export function App() {
     handleSave,
     openSettingsTab,
     setShowTerminal,
-    openSearchPanel
+    openSearchPanel,
+    openHelp
   ])
 
   useEffect(() => {
@@ -265,6 +291,7 @@ export function App() {
         onOpenFolder={() => void handleOpenFolder()}
         onCloseFolder={() => void handleCloseFolder()}
         onSave={() => void handleSave()}
+        onOpenHelp={() => openHelp()}
       />
 
       <ResizableLayout
@@ -289,6 +316,12 @@ export function App() {
       />
 
       <StatusBar />
+
+      <HelpDialog
+        open={helpOpen}
+        onClose={() => setHelpOpen(false)}
+        onCommand={handleHelpCommand}
+      />
     </div>
   )
 }

@@ -31,7 +31,11 @@ import type {
   AgentResolveContinueRequest,
   AgentNeedExecApprovalEvent,
   WorkspaceSettings,
-  WorkspaceOpenEditors
+  WorkspaceOpenEditors,
+  HelpDoc,
+  HelpDocMeta,
+  HelpSearchHit,
+  LocaleId
 } from '../src/types'
 
 const compassAPI = {
@@ -213,7 +217,15 @@ const compassAPI = {
     ): Promise<void> => ipcRenderer.invoke('shell:view', action),
     showAbout: (): Promise<void> => ipcRenderer.invoke('shell:showAbout'),
     showItemInFolder: (targetPath: string): Promise<void> =>
-      ipcRenderer.invoke('shell:showItemInFolder', targetPath)
+      ipcRenderer.invoke('shell:showItemInFolder', targetPath),
+    openExternal: (url: string): Promise<void> => ipcRenderer.invoke('shell:openExternal', url)
+  },
+  help: {
+    list: (locale: LocaleId): Promise<HelpDocMeta[]> => ipcRenderer.invoke('help:list', locale),
+    get: (id: string, locale: LocaleId): Promise<HelpDoc> =>
+      ipcRenderer.invoke('help:get', id, locale),
+    search: (query: string, locale: LocaleId): Promise<HelpSearchHit[]> =>
+      ipcRenderer.invoke('help:search', query, locale)
   },
   menu: {
     onOpenFolder: (callback: () => void): (() => void) => {
@@ -260,6 +272,11 @@ const compassAPI = {
       const handler = (): void => callback()
       ipcRenderer.on('menu:replace-in-files', handler)
       return () => ipcRenderer.removeListener('menu:replace-in-files', handler)
+    },
+    onOpenHelp: (callback: () => void): (() => void) => {
+      const handler = (): void => callback()
+      ipcRenderer.on('menu:open-help', handler)
+      return () => ipcRenderer.removeListener('menu:open-help', handler)
     }
   },
   index: {

@@ -17,6 +17,7 @@ interface MenuBarProps {
   onOpenFolder: () => void
   onCloseFolder: () => void
   onSave: () => void
+  onOpenHelp: () => void
 }
 
 type MenuId = 'file' | 'edit' | 'view' | 'help'
@@ -98,7 +99,8 @@ export function MenuBar({
   onOpenSettings,
   onOpenFolder,
   onCloseFolder,
-  onSave
+  onSave,
+  onOpenHelp
 }: MenuBarProps) {
   const { t } = useI18n()
   const [openMenu, setOpenMenu] = useState<MenuId | null>(null)
@@ -203,6 +205,8 @@ export function MenuBar({
   ]
 
   const helpItems: MenuItem[] = [
+    { label: t('menu.openHelp'), shortcut: 'F1', action: onOpenHelp },
+    { separator: true, label: '', action: () => {} },
     { label: t('menu.about'), action: () => void window.compass.shell.showAbout() }
   ]
 
