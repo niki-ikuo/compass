@@ -100,7 +100,8 @@ export function buildPastedMediaFileName(
 
 /**
  * クリップボード / OS ファイル貼り付けから画像・PDF を収集する。
- * items と files の両方を見て重複は除く。
+ * Win+Shift+S などは items と files の両方に同一画像が載ることがあり、
+ * File インスタンスの lastModified がずれると旧キーでは重複除外に失敗する。
  */
 export function collectClipboardMedia(data: DataTransfer): ClipboardMediaFile[] {
   const seen = new Set<string>()
@@ -110,7 +111,10 @@ export function collectClipboardMedia(data: DataTransfer): ClipboardMediaFile[] 
     if (!file) return
     const classified = classifyMediaFile(file)
     if (!classified) return
-    const key = `${file.name}:${file.size}:${file.type}:${file.lastModified}`
+    // 匿名クリップボード画像は name/lastModified が揺れるので mime+size で同一性を見る
+    const key = isGenericClipboardName(file.name)
+      ? `${classified.mimeType}:${file.size}`
+      : `${classified.mimeType}:${file.size}:${file.name}`
     if (seen.has(key)) return
     seen.add(key)
     out.push({
@@ -121,19 +125,24 @@ export function collectClipboardMedia(data: DataTransfer): ClipboardMediaFile[] 
     })
   }
 
+  let pushedFromItems = false
   const items = data.items
   if (items) {
     for (let i = 0; i < items.length; i++) {
       const item = items[i]
       if (item.kind !== 'file') continue
       push(item.getAsFile())
+      pushedFromItems = true
     }
   }
 
-  const files = data.files
-  if (files) {
-    for (let i = 0; i < files.length; i++) {
-      push(files[i] ?? null)
+  // items から file が取れた場合、files はほぼ同一内容のミラーなので読まない
+  if (!pushedFromItems) {
+    const files = data.files
+    if (files) {
+      for (let i = 0; i < files.length; i++) {
+        push(files[i] ?? null)
+      }
     }
   }
 

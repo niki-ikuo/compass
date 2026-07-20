@@ -113,6 +113,7 @@ export function ChatPanel() {
   const messagesContainerRef = useRef<HTMLDivElement>(null)
   const chatTabsRef = useRef<HTMLDivElement>(null)
   const inputComposerRef = useRef<ChatInputComposerHandle>(null)
+  const pasteMediaInFlightRef = useRef(false)
   const historyRef = useRef<HTMLDivElement>(null)
   const historyButtonRef = useRef<HTMLButtonElement>(null)
   const historyDropdownRef = useRef<HTMLDivElement>(null)
@@ -900,6 +901,7 @@ export function ChatPanel() {
 
   const handlePasteMedia = async (dataTransfer: DataTransfer): Promise<void> => {
     if (!hasClipboardMedia(dataTransfer)) return
+    if (pasteMediaInFlightRef.current) return
     if (!workspaceRoot) {
       window.alert(t('chat.pasteMediaNeedsWorkspace'))
       return
@@ -908,6 +910,7 @@ export function ChatPanel() {
     const mediaItems = collectClipboardMedia(dataTransfer)
     if (mediaItems.length === 0) return
 
+    pasteMediaInFlightRef.current = true
     try {
       for (const item of mediaItems) {
         const classified = classifyMediaFile(item.file)
@@ -941,6 +944,8 @@ export function ChatPanel() {
       window.alert(
         err instanceof Error ? err.message : t('chat.pasteMediaFailed')
       )
+    } finally {
+      pasteMediaInFlightRef.current = false
     }
   }
 

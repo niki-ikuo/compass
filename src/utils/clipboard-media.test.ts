@@ -1,8 +1,40 @@
 import { describe, expect, it } from 'vitest'
 import {
   buildPastedMediaFileName,
-  classifyMediaFile
+  classifyMediaFile,
+  collectClipboardMedia
 } from '@/utils/clipboard-media'
+
+function mockDataTransfer(opts: {
+  itemFiles?: File[]
+  files?: File[]
+}): DataTransfer {
+  const itemFiles = opts.itemFiles ?? []
+  const files = opts.files ?? []
+  return {
+    items: {
+      length: itemFiles.length,
+      [Symbol.iterator]: function* () {
+        for (let i = 0; i < itemFiles.length; i++) yield this[i]
+      },
+      ...Object.fromEntries(
+        itemFiles.map((file, i) => [
+          i,
+          {
+            kind: 'file' as const,
+            type: file.type,
+            getAsFile: () => file
+          }
+        ])
+      )
+    },
+    files: {
+      length: files.length,
+      item: (i: number) => files[i] ?? null,
+      ...files
+    }
+  } as unknown as DataTransfer
+}
 
 describe('classifyMediaFile', () => {
   it('classifies images by mime and extension', () => {
@@ -39,5 +71,27 @@ describe('buildPastedMediaFileName', () => {
     expect(
       buildPastedMediaFileName({ kind: 'pdf', extension: 'pdf' }, '仕様書.pdf')
     ).toBe('仕様書.pdf')
+  })
+})
+
+describe('collectClipboardMedia', () => {
+  it('dedupes Win+Shift+S style items+files mirrors with different lastModified', () => {
+    const a = new File([new Uint8Array([1, 2, 3, 4])], 'image.png', {
+      type: 'image/png',
+      lastModified: 1000
+    })
+    const b = new File([new Uint8Array([1, 2, 3, 4])], 'image.png', {
+      type: 'image/png',
+      lastModified: 1008
+    })
+    const result = collectClipboardMedia(mockDataTransfer({ itemFiles: [a], files: [b] }))
+    expect(result).toHaveLength(1)
+  })
+
+  it('still collects distinct OS files with different names', () => {
+    const a = new File([new Uint8Array([1])], 'a.png', { type: 'image/png' })
+    const b = new File([new Uint8Array([1, 2])], 'b.png', { type: 'image/png' })
+    const result = collectClipboardMedia(mockDataTransfer({ itemFiles: [a, b] }))
+    expect(result).toHaveLength(2)
   })
 })
