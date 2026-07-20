@@ -62,6 +62,7 @@ import type {
   ChatContextRef,
   ChatRequest,
   ChatSession,
+  HelpAskRequest,
   InlineCompletionRequest,
   WorkspaceAction,
   WorkspaceOpenEditors,
@@ -362,7 +363,7 @@ function registerIpcHandlers(): void {
     return searchHelpDocs(query, locale)
   })
 
-  ipcMain.handle('help:ask', async (_event, request: { question: string; locale: string; currentDocId?: string }) => {
+  ipcMain.handle('help:ask', async (_event, request: HelpAskRequest) => {
     return askHelp(request)
   })
 

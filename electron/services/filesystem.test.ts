@@ -192,9 +192,9 @@ describe('resolveChatContext', () => {
     writeFileSync(join(root, 'big.txt'), 'x'.repeat(40 * 1024), 'utf-8')
 
     const resolved = await resolveChatContext(root, [
-      { path: join(root, 'ok.md'), isDirectory: false },
-      { path: join(root, 'bin.dat'), isDirectory: false },
-      { path: join(root, 'big.txt'), isDirectory: false }
+      { path: join(root, 'ok.md'), name: 'ok.md', isDirectory: false },
+      { path: join(root, 'bin.dat'), name: 'bin.dat', isDirectory: false },
+      { path: join(root, 'big.txt'), name: 'big.txt', isDirectory: false }
     ])
 
     expect(resolved.files).toHaveLength(2)
@@ -221,7 +221,7 @@ describe('resolveChatContext', () => {
     writeFileSync(join(root, 'node_modules', 'pkg', 'index.js'), 'module.exports = {}\n', 'utf-8')
 
     const resolved = await resolveChatContext(root, [
-      { path: root, isDirectory: true }
+      { path: root, name: 'folder-ctx', isDirectory: true }
     ])
 
     expect(resolved.folders).toHaveLength(1)

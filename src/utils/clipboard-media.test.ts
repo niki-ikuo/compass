@@ -11,27 +11,23 @@ function mockDataTransfer(opts: {
 }): DataTransfer {
   const itemFiles = opts.itemFiles ?? []
   const files = opts.files ?? []
+  const items = itemFiles.map((file) => ({
+    kind: 'file' as const,
+    type: file.type,
+    getAsFile: () => file
+  }))
   return {
     items: {
-      length: itemFiles.length,
-      [Symbol.iterator]: function* () {
-        for (let i = 0; i < itemFiles.length; i++) yield this[i]
+      length: items.length,
+      [Symbol.iterator]: function* (): Generator<(typeof items)[number]> {
+        for (const item of items) yield item
       },
-      ...Object.fromEntries(
-        itemFiles.map((file, i) => [
-          i,
-          {
-            kind: 'file' as const,
-            type: file.type,
-            getAsFile: () => file
-          }
-        ])
-      )
+      ...Object.fromEntries(items.map((item, i) => [i, item]))
     },
     files: {
+      ...Object.fromEntries(files.map((file, i) => [i, file])),
       length: files.length,
-      item: (i: number) => files[i] ?? null,
-      ...files
+      item: (i: number) => files[i] ?? null
     }
   } as unknown as DataTransfer
 }
