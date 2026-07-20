@@ -42,3 +42,4 @@ Read this when you are stuck or already know what you want to do. Find pages by 
 - Keep each page short (about 300–500 lines max)
 - Link related pages heavily
 - Unimplemented features are marked clearly (no fake how-tos)
+- After you configure an API (or Ollama), use **AI Help** in the Help menu for answers grounded in these help articles

@@ -8,6 +8,10 @@ keywords:
   - 履歴
   - 用途
   - Claude
+  - 表示言語
+  - 英語
+  - 日本語
+  - Language
 category: troubleshooting
 related:
   - common-errors.md
@@ -29,6 +33,10 @@ related:
 ## Claude は使える？
 
 専用の「Claude」プロバイダはありません。**OpenRouter** などで Anthropic モデルを選ぶ方法が現実的です。→ [AI設定](../getting-started/ai-provider.md)
+
+## 英語と日本語の切り替えは？
+
+**設定 → 表示言語** で `日本語` / `English` を選びます。UI・ヘルプ記事・AIヘルプの回答言語がこれに合わせます。ヘルプを開いたまま切り替えた場合も、記事側はすぐ差し替わります。
 
 ## 自動保存はある？
 

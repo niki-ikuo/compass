@@ -48,6 +48,7 @@ import {
 } from '@/utils/chat-selection-drag'
 import { buildWorkspaceIndex, ensureWorkspaceIndex } from '@/utils/project-index'
 import { getLlmProvider, getModelOptions, getProviderLabel, isAgentModeAvailable } from '@/utils/llm-providers'
+import { refreshLlmConnection } from '@/utils/llm-connection'
 import { parseAgentToolsUnsupportedError } from '@/utils/agent-tools'
 import { formatActionPreviewError } from '@/utils/apply-error'
 import { resolveLastSentChatMode } from '@/utils/chat-mode'
@@ -159,7 +160,6 @@ export function ChatPanel() {
   const clearChatComposerInsertRequest = useAppStore((s) => s.clearChatComposerInsertRequest)
   const settings = useAppStore((s) => s.settings)
   const setSettings = useAppStore((s) => s.setSettings)
-  const setApiConnected = useAppStore((s) => s.setApiConnected)
 
   const openChatSessions = chatSessions.filter((session) => session.isOpen)
   const historySessions = [...chatSessions]
@@ -1061,9 +1061,7 @@ export function ChatPanel() {
     setSettings(next)
     try {
       await window.compass.settings.set(next)
-      setApiConnected(
-        getLlmProvider(next.providerId).requiresApiKey ? (next.apiKey ? true : null) : true
-      )
+      void refreshLlmConnection()
     } catch {
       // ストアは更新済み。永続化失敗時は次回起動で戻る
     }

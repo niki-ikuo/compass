@@ -18,7 +18,8 @@ import type {
   AgentToolStep,
   UseCasePreset,
   PersistedOpenTab,
-  WorkspaceOpenEditors
+  WorkspaceOpenEditors,
+  LlmConnectionState
 } from '@/types'
 import {
   DEFAULT_SETTINGS,
@@ -443,7 +444,7 @@ interface AppState {
   editorRevealRequest: EditorRevealRequest | null
   editorSelection: EditorSelection | null
   cursorPosition: { line: number; column: number }
-  apiConnected: boolean | null
+  llmConnection: LlmConnectionState
   indexStatus: 'idle' | 'indexing' | 'ready' | 'error'
   indexMeta: { fileCount: number; relationCount: number; indexedAt: string } | null
   pendingWorkspacePreview: {
@@ -548,7 +549,7 @@ interface AppState {
   clearEditorRevealRequest: () => void
   setEditorSelection: (selection: EditorSelection | null) => void
   setCursorPosition: (line: number, column: number) => void
-  setApiConnected: (connected: boolean | null) => void
+  setLlmConnection: (connection: LlmConnectionState) => void
   setIndexStatus: (status: 'idle' | 'indexing' | 'ready' | 'error') => void
   setIndexMeta: (meta: { fileCount: number; relationCount: number; indexedAt: string } | null) => void
   setPendingWorkspacePreview: (
@@ -617,7 +618,12 @@ export const useAppStore = create<AppState>((set, get) => ({
   editorRevealRequest: null,
   editorSelection: null,
   cursorPosition: { line: 1, column: 1 },
-  apiConnected: null,
+  llmConnection: {
+    status: 'incomplete',
+    error: null,
+    code: null,
+    method: null
+  },
   indexStatus: 'idle',
   indexMeta: null,
   pendingWorkspacePreview: null,
@@ -1264,7 +1270,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   clearEditorRevealRequest: () => set({ editorRevealRequest: null }),
   setEditorSelection: (selection) => set({ editorSelection: selection }),
   setCursorPosition: (line, column) => set({ cursorPosition: { line, column } }),
-  setApiConnected: (connected) => set({ apiConnected: connected }),
+  setLlmConnection: (connection) => set({ llmConnection: connection }),
   setIndexStatus: (status) => set({ indexStatus: status }),
   setIndexMeta: (meta) => set({ indexMeta: meta }),
 

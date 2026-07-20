@@ -8,12 +8,13 @@ import { WorkspaceWelcome } from './components/WorkspaceWelcome'
 import { MenuBar } from './components/MenuBar'
 import { EditorCenter } from './components/EditorCenter'
 import { HelpDialog, type HelpCommandId } from './components/HelpDialog'
+import { HelpAskDialog } from './components/HelpAskDialog'
 import { buildWorkspaceIndex } from '@/utils/project-index'
 import { applyColorTheme } from '@/utils/color-theme'
-import { getLlmProvider } from '@/utils/llm-providers'
 import { setLocale } from '@/i18n'
 import { registerWheelZoomListener } from '@/utils/wheel-zoom'
 import { restoreOpenEditors } from '@/utils/restore-open-editors'
+import { refreshLlmConnection } from '@/utils/llm-connection'
 
 export function App() {
   const showFileTree = useAppStore((s) => s.showFileTree)
@@ -35,18 +36,32 @@ export function App() {
   const closeWorkspace = useAppStore((s) => s.closeWorkspace)
   const setFileTree = useAppStore((s) => s.setFileTree)
   const setSettings = useAppStore((s) => s.setSettings)
-  const setApiConnected = useAppStore((s) => s.setApiConnected)
   const colorTheme = useAppStore((s) => s.settings.colorTheme)
   const locale = useAppStore((s) => s.settings.locale)
   const getActiveFile = useAppStore((s) => s.getActiveFile)
   const markFileSaved = useAppStore((s) => s.markFileSaved)
   const openFiles = useAppStore((s) => s.openFiles)
   const openBrowserTab = useAppStore((s) => s.openBrowserTab)
+  const llmConnected = useAppStore((s) => s.llmConnection.status === 'connected')
   const [helpOpen, setHelpOpen] = useState(false)
+  const [helpAskOpen, setHelpAskOpen] = useState(false)
+  const [helpDocId, setHelpDocId] = useState('index.md')
 
-  const openHelp = useCallback(() => {
+  const openHelp = useCallback((docId = 'index.md') => {
+    setHelpDocId(docId)
     setHelpOpen(true)
   }, [])
+
+  const openHelpAsk = useCallback(() => {
+    if (useAppStore.getState().llmConnection.status !== 'connected') return
+    setHelpAskOpen(true)
+  }, [])
+
+  useEffect(() => {
+    if (!llmConnected && helpAskOpen) {
+      setHelpAskOpen(false)
+    }
+  }, [llmConnected, helpAskOpen])
 
   const openWorkspace = useCallback(
     async (folder: string) => {
@@ -174,10 +189,7 @@ export function App() {
       setSettings(settings)
       applyColorTheme(settings.colorTheme)
       setLocale(settings.locale)
-      const provider = getLlmProvider(settings.providerId)
-      setApiConnected(
-        provider.requiresApiKey ? (settings.apiKey ? true : null) : true
-      )
+      void refreshLlmConnection()
 
       const lastWorkspace = await window.compass.workspace.getLast()
       if (!lastWorkspace) return
@@ -189,7 +201,7 @@ export function App() {
       }
     }
     loadSettings()
-  }, [setSettings, setApiConnected, openWorkspace])
+  }, [setSettings, openWorkspace])
 
   useEffect(() => {
     const unsubs = [
@@ -215,7 +227,8 @@ export function App() {
         if (!useAppStore.getState().workspaceRoot) return
         openSearchPanel({ replace: true })
       }),
-      window.compass.menu.onOpenHelp(() => openHelp())
+      window.compass.menu.onOpenHelp(() => openHelp()),
+      window.compass.menu.onOpenAiHelp(() => openHelpAsk())
     ]
     return () => unsubs.forEach((fn) => fn())
   }, [
@@ -225,7 +238,8 @@ export function App() {
     openSettingsTab,
     setShowTerminal,
     openSearchPanel,
-    openHelp
+    openHelp,
+    openHelpAsk
   ])
 
   useEffect(() => {
@@ -292,6 +306,7 @@ export function App() {
         onCloseFolder={() => void handleCloseFolder()}
         onSave={() => void handleSave()}
         onOpenHelp={() => openHelp()}
+        onOpenAiHelp={() => openHelpAsk()}
       />
 
       <ResizableLayout
@@ -319,8 +334,27 @@ export function App() {
 
       <HelpDialog
         open={helpOpen}
+        initialDocId={helpDocId}
+        showAiHelp={llmConnected}
         onClose={() => setHelpOpen(false)}
         onCommand={handleHelpCommand}
+        onOpenAsk={() => {
+          setHelpOpen(false)
+          openHelpAsk()
+        }}
+      />
+      <HelpAskDialog
+        open={helpAskOpen}
+        onClose={() => setHelpAskOpen(false)}
+        onCommand={handleHelpCommand}
+        onOpenHelp={() => {
+          setHelpAskOpen(false)
+          openHelp()
+        }}
+        onOpenArticle={(docId) => {
+          setHelpAskOpen(false)
+          openHelp(docId)
+        }}
       />
     </div>
   )

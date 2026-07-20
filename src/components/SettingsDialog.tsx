@@ -17,6 +17,7 @@ import {
   type LocaleId,
   type MessageKey
 } from '@/i18n'
+import { refreshLlmConnection } from '@/utils/llm-connection'
 
 type SettingsTabId = 'appearance' | 'chat' | 'llm' | 'terminal'
 
@@ -85,7 +86,8 @@ export function SettingsPanel() {
   const workspaceDefaultUseCasePreset = useAppStore((s) => s.workspaceDefaultUseCasePreset)
   const setWorkspaceDefaultUseCasePreset = useAppStore((s) => s.setWorkspaceDefaultUseCasePreset)
   const setSettings = useAppStore((s) => s.setSettings)
-  const setApiConnected = useAppStore((s) => s.setApiConnected)
+  const llmConnection = useAppStore((s) => s.llmConnection)
+  const [testingConnection, setTestingConnection] = useState(false)
 
   const initial = buildSettingsSnapshot(settings, workspaceDefaultUseCasePreset)
   const [form, setForm] = useState<AppSettings>(initial.form)
@@ -186,8 +188,7 @@ export function SettingsPanel() {
         )
       }
 
-      const provider = getLlmProvider(toSave.providerId)
-      setApiConnected(provider.requiresApiKey ? (toSave.apiKey ? true : null) : true)
+      void refreshLlmConnection()
       setMessage(t('settings.saved'))
     } catch {
       setMessage(t('settings.saveFailed'))
@@ -425,6 +426,33 @@ export function SettingsPanel() {
               )}
               <span className="field-hint">{t('settings.modelHint')}</span>
             </label>
+
+            <div className="settings-connection-row">
+              <button
+                type="button"
+                className="btn-secondary"
+                disabled={testingConnection || saving}
+                onClick={() => {
+                  setTestingConnection(true)
+                  void refreshLlmConnection().finally(() => setTestingConnection(false))
+                }}
+              >
+                {testingConnection || llmConnection.status === 'checking'
+                  ? t('settings.testingConnection')
+                  : t('settings.testConnection')}
+              </button>
+              <span
+                className={`settings-connection-status status-${llmConnection.status}`}
+                title={llmConnection.error ?? undefined}
+              >
+                {llmConnection.status === 'checking' && t('status.checking')}
+                {llmConnection.status === 'connected' && t('status.connected')}
+                {llmConnection.status === 'incomplete' &&
+                  (llmConnection.error || t('status.configuredHint'))}
+                {llmConnection.status === 'error' &&
+                  (llmConnection.error || t('status.connectionFailed'))}
+              </span>
+            </div>
 
             <div className="form-row">
               <label>

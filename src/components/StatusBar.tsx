@@ -4,6 +4,7 @@ import { getFileName, getLanguageFromPath } from '@/utils/language'
 import { FILE_ENCODINGS, getEncodingLabel } from '@/utils/file-encoding'
 import { buildWorkspaceIndex } from '@/utils/project-index'
 import { getLlmProvider } from '@/utils/llm-providers'
+import { refreshLlmConnection } from '@/utils/llm-connection'
 import type { FileEncoding } from '@/types'
 import { useI18n, type MessageKey } from '@/i18n'
 import { isMediaOpenFile } from '@/utils/media-context'
@@ -13,7 +14,7 @@ export function StatusBar() {
   const activeFilePath = useAppStore((s) => s.activeFilePath)
   const openFiles = useAppStore((s) => s.openFiles)
   const cursorPosition = useAppStore((s) => s.cursorPosition)
-  const apiConnected = useAppStore((s) => s.apiConnected)
+  const llmConnection = useAppStore((s) => s.llmConnection)
   const settings = useAppStore((s) => s.settings)
   const workspaceRoot = useAppStore((s) => s.workspaceRoot)
   const indexStatus = useAppStore((s) => s.indexStatus)
@@ -57,10 +58,46 @@ export function StatusBar() {
     return () => window.removeEventListener('mousedown', onPointerDown)
   }, [menuOpen])
 
-  const connectionStatus = () => {
-    if (provider.requiresApiKey && !settings.apiKey) return t('status.apiUnset')
-    if (apiConnected === true) return t('status.connected')
-    return t('status.idle')
+  const connectionStatus = (): { label: string; hint: string } => {
+    switch (llmConnection.status) {
+      case 'checking':
+        return { label: t('status.checking'), hint: t('status.checkingHint') }
+      case 'connected':
+        return { label: t('status.connected'), hint: t('status.connectedHint') }
+      case 'incomplete':
+        if (llmConnection.code === 'model') {
+          return { label: t('status.modelUnset'), hint: t('status.configuredHint') }
+        }
+        if (llmConnection.code === 'baseUrl') {
+          return { label: t('status.baseUrlUnset'), hint: t('status.configuredHint') }
+        }
+        if (llmConnection.code === 'apiKey') {
+          return { label: t('status.apiUnset'), hint: t('status.configuredHint') }
+        }
+        return {
+          label: llmConnection.error || t('status.apiUnset'),
+          hint: t('status.configuredHint')
+        }
+      case 'error':
+        if (llmConnection.code === 'modelMissing') {
+          return {
+            label: t('status.modelMissingShort'),
+            hint: llmConnection.error || t('status.modelMissing', { model: settings.model })
+          }
+        }
+        if (llmConnection.code === 'auth') {
+          return {
+            label: t('status.authFailed'),
+            hint: llmConnection.error || t('status.connectionFailed')
+          }
+        }
+        return {
+          label: t('status.connectionFailed'),
+          hint: llmConnection.error || t('status.connectionFailed')
+        }
+      default:
+        return { label: t('status.idle'), hint: t('status.configuredHint') }
+    }
   }
 
   const indexStatusLabel = () => {
@@ -96,6 +133,7 @@ export function StatusBar() {
   }
 
   const indexLabel = indexStatusLabel()
+  const llmStatus = connectionStatus()
 
   return (
     <div className="status-bar">
@@ -176,7 +214,14 @@ export function StatusBar() {
       >
         {providerLabel}: {settings.model}
       </span>
-      <span className="status-item status-right">{connectionStatus()}</span>
+      <button
+        type="button"
+        className={`status-item status-right status-connection status-${llmConnection.status}`}
+        title={llmStatus.hint}
+        onClick={() => void refreshLlmConnection()}
+      >
+        {llmStatus.label}
+      </button>
     </div>
   )
 }

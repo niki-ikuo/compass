@@ -35,6 +35,9 @@ import type {
   HelpDoc,
   HelpDocMeta,
   HelpSearchHit,
+  HelpAskRequest,
+  HelpAskResult,
+  LlmConnectionTestResult,
   LocaleId
 } from '../src/types'
 
@@ -95,6 +98,8 @@ const compassAPI = {
     complete: (request: InlineCompletionRequest): Promise<InlineCompletionResult> =>
       ipcRenderer.invoke('ai:complete', request),
     cancelComplete: (): Promise<boolean> => ipcRenderer.invoke('ai:cancelComplete'),
+    testConnection: (): Promise<LlmConnectionTestResult> =>
+      ipcRenderer.invoke('ai:testConnection'),
     onChunk: (callback: (chatId: string, chunk: string) => void): (() => void) => {
       const handler = (_event: Electron.IpcRendererEvent, chatId: string, chunk: string): void =>
         callback(chatId, chunk)
@@ -225,7 +230,9 @@ const compassAPI = {
     get: (id: string, locale: LocaleId): Promise<HelpDoc> =>
       ipcRenderer.invoke('help:get', id, locale),
     search: (query: string, locale: LocaleId): Promise<HelpSearchHit[]> =>
-      ipcRenderer.invoke('help:search', query, locale)
+      ipcRenderer.invoke('help:search', query, locale),
+    ask: (request: HelpAskRequest): Promise<HelpAskResult> => ipcRenderer.invoke('help:ask', request),
+    cancelAsk: (): Promise<boolean> => ipcRenderer.invoke('help:cancelAsk')
   },
   menu: {
     onOpenFolder: (callback: () => void): (() => void) => {
@@ -277,7 +284,14 @@ const compassAPI = {
       const handler = (): void => callback()
       ipcRenderer.on('menu:open-help', handler)
       return () => ipcRenderer.removeListener('menu:open-help', handler)
-    }
+    },
+    onOpenAiHelp: (callback: () => void): (() => void) => {
+      const handler = (): void => callback()
+      ipcRenderer.on('menu:open-ai-help', handler)
+      return () => ipcRenderer.removeListener('menu:open-ai-help', handler)
+    },
+    setAiHelpVisible: (visible: boolean): Promise<void> =>
+      ipcRenderer.invoke('menu:setAiHelpVisible', visible)
   },
   index: {
     build: (workspaceRoot: string): Promise<IndexBuildResult> =>

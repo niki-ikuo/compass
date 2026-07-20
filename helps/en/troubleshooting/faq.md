@@ -8,6 +8,10 @@ keywords:
   - History
   - Use case
   - Claude
+  - Language
+  - Locale
+  - English
+  - Japanese
 category: troubleshooting
 related:
   - common-errors.md
@@ -29,6 +33,10 @@ Different goals. Compass focuses on “open a folder and write with AI.” There
 ## Can I use Claude?
 
 There is no dedicated Claude provider. Use **OpenRouter** (or similar) and pick an Anthropic model. → [AI setup](../getting-started/ai-provider.md)
+
+## How do I switch between English and Japanese?
+
+Open **Settings → Language** and choose `English` or `日本語`. The UI, help articles, and AI Help answers follow that setting. If Help is already open, the articles switch when you change the language.
 
 ## Is there autosave?
 

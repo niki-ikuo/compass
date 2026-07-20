@@ -508,6 +508,49 @@ export interface HelpSearchHit {
   snippet: string
 }
 
+export interface HelpAskRequest {
+  question: string
+  locale: LocaleId
+  currentDocId?: string
+}
+
+export interface HelpAskResult {
+  answer: string
+  sources: Array<{ id: string; title: string }>
+  commands: string[]
+  error?: string
+  cancelled?: boolean
+}
+
+export interface LlmConnectionTestResult {
+  ok: boolean
+  status: 'incomplete' | 'connected' | 'error'
+  error?: string
+  code?:
+    | 'apiKey'
+    | 'baseUrl'
+    | 'model'
+    | 'auth'
+    | 'network'
+    | 'modelMissing'
+    | 'http'
+    | 'unknown'
+  method?: 'models' | 'chat'
+}
+
+export type LlmConnectionUiStatus =
+  | 'incomplete'
+  | 'checking'
+  | 'connected'
+  | 'error'
+
+export interface LlmConnectionState {
+  status: LlmConnectionUiStatus
+  error: string | null
+  code: LlmConnectionTestResult['code'] | null
+  method: 'models' | 'chat' | null
+}
+
 export interface EditorRevealRequest {
   id: number
   path: string
@@ -561,6 +604,7 @@ export interface CompassAPI {
     cancel: (chatId?: string) => Promise<boolean>
     complete: (request: InlineCompletionRequest) => Promise<InlineCompletionResult>
     cancelComplete: () => Promise<boolean>
+    testConnection: () => Promise<LlmConnectionTestResult>
     onChunk: (callback: (chatId: string, chunk: string) => void) => () => void
     onDone: (callback: (chatId: string) => void) => () => void
     onAborted: (callback: (chatId: string) => void) => () => void
@@ -606,6 +650,8 @@ export interface CompassAPI {
     list: (locale: LocaleId) => Promise<HelpDocMeta[]>
     get: (id: string, locale: LocaleId) => Promise<HelpDoc>
     search: (query: string, locale: LocaleId) => Promise<HelpSearchHit[]>
+    ask: (request: HelpAskRequest) => Promise<HelpAskResult>
+    cancelAsk: () => Promise<boolean>
   }
   menu: {
     onOpenFolder: (callback: () => void) => () => void
@@ -618,6 +664,8 @@ export interface CompassAPI {
     onFindInFiles: (callback: () => void) => () => void
     onReplaceInFiles: (callback: () => void) => () => void
     onOpenHelp: (callback: () => void) => () => void
+    onOpenAiHelp: (callback: () => void) => () => void
+    setAiHelpVisible: (visible: boolean) => Promise<void>
   }
   index: {
     build: (workspaceRoot: string) => Promise<IndexBuildResult>

@@ -18,6 +18,7 @@ interface MenuBarProps {
   onCloseFolder: () => void
   onSave: () => void
   onOpenHelp: () => void
+  onOpenAiHelp: () => void
 }
 
 type MenuId = 'file' | 'edit' | 'view' | 'help'
@@ -100,7 +101,8 @@ export function MenuBar({
   onOpenFolder,
   onCloseFolder,
   onSave,
-  onOpenHelp
+  onOpenHelp,
+  onOpenAiHelp
 }: MenuBarProps) {
   const { t } = useI18n()
   const [openMenu, setOpenMenu] = useState<MenuId | null>(null)
@@ -108,6 +110,8 @@ export function MenuBar({
   const workspaceRoot = useAppStore((s) => s.workspaceRoot)
   const openSearchPanel = useAppStore((s) => s.openSearchPanel)
   const openBrowserTab = useAppStore((s) => s.openBrowserTab)
+  const llmConnection = useAppStore((s) => s.llmConnection)
+  const aiHelpAvailable = llmConnection.status === 'connected'
 
   const closeMenu = useCallback(() => setOpenMenu(null), [])
 
@@ -206,6 +210,9 @@ export function MenuBar({
 
   const helpItems: MenuItem[] = [
     { label: t('menu.openHelp'), shortcut: 'F1', action: onOpenHelp },
+    ...(aiHelpAvailable
+      ? [{ label: t('menu.openAiHelp'), action: onOpenAiHelp }]
+      : []),
     { separator: true, label: '', action: () => {} },
     { label: t('menu.about'), action: () => void window.compass.shell.showAbout() }
   ]

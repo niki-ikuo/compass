@@ -56,6 +56,7 @@ import {
 } from './services/terminal'
 import { replaceInWorkspace, searchWorkspace } from './services/workspace-search'
 import { getHelpDoc, listHelpDocs, searchHelpDocs } from './services/help'
+import { askHelp, cancelHelpAsk } from './services/help-ask'
 import type {
   AppSettings,
   ChatContextRef,
@@ -67,8 +68,10 @@ import type {
   WorkspaceReplaceOptions,
   WorkspaceSearchOptions
 } from '../src/types'
+import { testLlmConnection } from './services/ai-connection'
 
 let mainWindow: BrowserWindow | null = null
+let aiHelpMenuVisible = false
 
 function applyViewZoom(
   webContents: Electron.WebContents,
@@ -233,6 +236,14 @@ function createMenu(): void {
           accelerator: 'F1',
           click: () => mainWindow?.webContents.send('menu:open-help')
         },
+        ...(aiHelpMenuVisible
+          ? [
+              {
+                label: t('menu.openAiHelp'),
+                click: () => mainWindow?.webContents.send('menu:open-ai-help')
+              } satisfies Electron.MenuItemConstructorOptions
+            ]
+          : []),
         { type: 'separator' },
         {
           label: t('menu.about'),
@@ -251,6 +262,12 @@ function createMenu(): void {
   ]
 
   Menu.setApplicationMenu(Menu.buildFromTemplate(template))
+}
+
+function setAiHelpMenuVisible(visible: boolean): void {
+  if (aiHelpMenuVisible === visible) return
+  aiHelpMenuVisible = visible
+  createMenu()
 }
 
 type EditAction = 'undo' | 'redo' | 'cut' | 'copy' | 'paste' | 'selectAll'
@@ -344,6 +361,12 @@ function registerIpcHandlers(): void {
     if (typeof query !== 'string') return []
     return searchHelpDocs(query, locale)
   })
+
+  ipcMain.handle('help:ask', async (_event, request: { question: string; locale: string; currentDocId?: string }) => {
+    return askHelp(request)
+  })
+
+  ipcMain.handle('help:cancelAsk', () => cancelHelpAsk())
 
   ipcMain.handle('fs:openFolder', async () => {
     const result = await dialog.showOpenDialog(mainWindow!, {
@@ -527,6 +550,14 @@ function registerIpcHandlers(): void {
 
   ipcMain.handle('ai:cancelComplete', () => {
     return cancelInlineCompletion()
+  })
+
+  ipcMain.handle('ai:testConnection', async () => {
+    return testLlmConnection()
+  })
+
+  ipcMain.handle('menu:setAiHelpVisible', (_event, visible: boolean) => {
+    setAiHelpMenuVisible(Boolean(visible))
   })
 
   ipcMain.handle('index:build', async (event, workspaceRoot: string) => {
