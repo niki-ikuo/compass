@@ -415,6 +415,16 @@ function registerIpcHandlers(): void {
     shell.showItemInFolder(targetPath)
   })
 
+  ipcMain.handle('shell:openPath', async (_event, targetPath: string) => {
+    if (typeof targetPath !== 'string' || targetPath.trim() === '') {
+      throw new Error('Invalid path')
+    }
+    const errorMessage = await shell.openPath(targetPath.trim())
+    if (errorMessage) {
+      throw new Error(errorMessage)
+    }
+  })
+
   ipcMain.handle('shell:openExternal', async (_event, url: string) => {
     if (typeof url !== 'string' || !/^https?:\/\//i.test(url.trim())) {
       throw new Error('Invalid URL')

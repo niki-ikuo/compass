@@ -644,6 +644,7 @@ export interface CompassAPI {
     ) => Promise<void>
     showAbout: () => Promise<void>
     showItemInFolder: (targetPath: string) => Promise<void>
+    openPath: (targetPath: string) => Promise<void>
     openExternal: (url: string) => Promise<void>
   }
   app: {

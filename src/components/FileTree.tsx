@@ -732,6 +732,20 @@ export function FileTree() {
     [t]
   )
 
+  const openWithDefaultApp = useCallback(
+    async (node: FileTreeNode) => {
+      setContextMenu(null)
+      if (node.isPreview || node.isDirectory) return
+      try {
+        await window.compass.shell.openPath(node.path)
+        setError(null)
+      } catch (err) {
+        setError(getErrorMessage(err, t('explorer.openWithDefaultAppFailed')))
+      }
+    },
+    [t]
+  )
+
   const cancelPendingDelete = useCallback(() => {
     setPendingDeleteTargets(null)
     restoreWorkbenchFocus()
@@ -1196,6 +1210,9 @@ export function FileTree() {
   const canDelete = deleteTargets.length > 0 && deleteTargets.every((n) => !n.isPreview)
   const canAddToChat = chatAttachTargets.length > 0
   const canShowInOsExplorer = Boolean(contextMenu?.node && !contextMenu.node.isPreview)
+  const canOpenWithDefaultApp = Boolean(
+    contextMenu?.node && !contextMenu.node.isPreview && !contextMenu.node.isDirectory
+  )
   const isRootDropTarget = dropTargetPath === normalizeNodePath(workspaceRoot)
   const workspaceName = basename(workspaceRoot)
 
@@ -1342,6 +1359,14 @@ export function FileTree() {
                   }}
                 >
                   {t('explorer.searchInFolder')}
+                </button>
+              )}
+              {canOpenWithDefaultApp && (
+                <button
+                  onMouseEnter={closeCreateSubmenu}
+                  onClick={() => void openWithDefaultApp(contextMenu.node!)}
+                >
+                  {t('explorer.openWithDefaultApp')}
                 </button>
               )}
               {canShowInOsExplorer && (

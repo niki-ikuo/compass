@@ -223,6 +223,8 @@ const compassAPI = {
     showAbout: (): Promise<void> => ipcRenderer.invoke('shell:showAbout'),
     showItemInFolder: (targetPath: string): Promise<void> =>
       ipcRenderer.invoke('shell:showItemInFolder', targetPath),
+    openPath: (targetPath: string): Promise<void> =>
+      ipcRenderer.invoke('shell:openPath', targetPath),
     openExternal: (url: string): Promise<void> => ipcRenderer.invoke('shell:openExternal', url)
   },
   app: {
