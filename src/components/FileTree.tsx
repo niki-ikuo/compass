@@ -23,7 +23,7 @@ import {
   listEffectiveDocTemplates,
   type DocTemplate
 } from '@/utils/doc-templates'
-import { buildUniqueFileName } from '@/utils/unique-file-name'
+import { buildUniqueFileName, getNameStemSelectionEnd } from '@/utils/unique-file-name'
 import { getErrorMessage } from '@/utils/error-message'
 import { ConfirmDialog } from './ConfirmDialog'
 import { TemplateManagerDialog } from './TemplateManagerDialog'
@@ -220,10 +220,12 @@ interface FileTreeItemProps {
 
 function InlineNameInput({
   defaultName,
+  isDirectory = false,
   onSubmit,
   onCancel
 }: {
   defaultName: string
+  isDirectory?: boolean
   onSubmit: (name: string) => void
   onCancel: () => void
 }) {
@@ -231,9 +233,12 @@ function InlineNameInput({
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    inputRef.current?.focus()
-    inputRef.current?.select()
-  }, [])
+    const input = inputRef.current
+    if (!input) return
+    input.focus()
+    const end = getNameStemSelectionEnd(defaultName, isDirectory)
+    input.setSelectionRange(0, end)
+  }, [defaultName, isDirectory])
 
   const handleSubmit = () => {
     const trimmed = value.trim()
@@ -331,6 +336,7 @@ function FileTreeItem({
           {isRenaming ? (
             <InlineNameInput
               defaultName={node.name}
+              isDirectory
               onSubmit={(name) => onRenameSubmit(node.path, name)}
               onCancel={onRenameCancel}
             />
@@ -1036,13 +1042,15 @@ export function FileTree() {
     }
   }
 
-  const startRename = (node: FileTreeNode) => {
+  const startRename = useCallback((node: FileTreeNode) => {
+    if (node.isPreview || isWorkspaceRootPath(node.path)) return
     setContextMenu(null)
     setCreateMenu(null)
     setTemplateMenu(null)
+    setInlineInput(null)
     setRenamingPath(node.path)
     setError(null)
-  }
+  }, [isWorkspaceRootPath])
 
   const handleCreateSubmit = async (name: string) => {
     if (!inlineInput) return
@@ -1134,17 +1142,38 @@ export function FileTree() {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key !== 'Delete' || selectedPaths.size === 0 || pendingDeleteTargets) return
       const target = e.target as HTMLElement
       if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
         return
       }
+      if (pendingDeleteTargets || inlineInput || renamingPath || isAnyMenuOpen) return
+
+      if (e.key === 'F2') {
+        if (selectedPaths.size !== 1) return
+        const selectedPath = [...selectedPaths][0]
+        const node = visibleNodes.find((n) => normalizeNodePath(n.path) === selectedPath)
+        if (!node) return
+        e.preventDefault()
+        startRename(node)
+        return
+      }
+
+      if (e.key !== 'Delete' || selectedPaths.size === 0) return
       e.preventDefault()
       requestDelete(null)
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [selectedPaths, requestDelete, pendingDeleteTargets])
+  }, [
+    selectedPaths,
+    requestDelete,
+    pendingDeleteTargets,
+    inlineInput,
+    renamingPath,
+    isAnyMenuOpen,
+    visibleNodes,
+    startRename
+  ])
 
   if (!workspaceRoot) {
     return (
@@ -1235,6 +1264,7 @@ export function FileTree() {
               </span>
               <InlineNameInput
                 defaultName={inlineInput.defaultName}
+                isDirectory={inlineInput.mode === 'create-folder'}
                 onSubmit={handleCreateSubmit}
                 onCancel={() => setInlineInput(null)}
               />

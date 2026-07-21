@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildUniqueFileName } from '@/utils/unique-file-name'
+import { buildUniqueFileName, getNameStemSelectionEnd } from '@/utils/unique-file-name'
 
 describe('buildUniqueFileName', () => {
   it('returns preferred name when unused', () => {
@@ -24,5 +24,23 @@ describe('buildUniqueFileName', () => {
 
   it('handles names without extension', () => {
     expect(buildUniqueFileName('README', ['README'])).toBe('README (2)')
+  })
+})
+
+describe('getNameStemSelectionEnd', () => {
+  it('selects stem before the last extension dot for files', () => {
+    expect(getNameStemSelectionEnd('report.txt')).toBe(6)
+    expect(getNameStemSelectionEnd('archive.tar.gz')).toBe(11)
+    expect(getNameStemSelectionEnd('新規 テキスト ドキュメント.txt')).toBe(
+      '新規 テキスト ドキュメント'.length
+    )
+  })
+
+  it('selects the full name for folders, dotfiles, and names without a stem', () => {
+    expect(getNameStemSelectionEnd('docs', true)).toBe(4)
+    expect(getNameStemSelectionEnd('my.folder', true)).toBe(9)
+    expect(getNameStemSelectionEnd('README')).toBe(6)
+    expect(getNameStemSelectionEnd('.gitignore')).toBe(10)
+    expect(getNameStemSelectionEnd('')).toBe(0)
   })
 })

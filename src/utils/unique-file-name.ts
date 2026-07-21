@@ -21,3 +21,14 @@ export function buildUniqueFileName(
   }
   return `${stem} (${Date.now()})${ext}`
 }
+
+/**
+ * インライン名入力の初期選択終了位置。
+ * ファイルは拡張子の直前まで、フォルダ／ドット無し／先頭ドットのみは全選択。
+ */
+export function getNameStemSelectionEnd(name: string, isDirectory = false): number {
+  if (isDirectory || name.length === 0) return name.length
+  const dot = name.lastIndexOf('.')
+  if (dot <= 0) return name.length
+  return dot
+}
