@@ -392,6 +392,9 @@ export const ja = {
   'editor.imageLabel': '画像',
   'editor.pdfLabel': 'PDF',
   'editor.openMediaFailed': 'メディアファイルを開けませんでした',
+  'editor.closeTab': '閉じる',
+  'editor.closeOtherTabs': '他を閉じる',
+  'editor.closeAllTabs': 'すべて閉じる',
 
   'browser.newTab': 'ブラウザ',
   'browser.back': '戻る',
@@ -987,6 +990,9 @@ export const en: Record<MessageKey, string> = {
   'editor.imageLabel': 'Image',
   'editor.pdfLabel': 'PDF',
   'editor.openMediaFailed': 'Failed to open media file',
+  'editor.closeTab': 'Close',
+  'editor.closeOtherTabs': 'Close Others',
+  'editor.closeAllTabs': 'Close All',
 
   'browser.newTab': 'Browser',
   'browser.back': 'Back',

@@ -77,6 +77,12 @@ function parseWorkspaceActions(raw: string) {
   return parseWorkspaceActionsFromContent(raw)
 }
 
+interface ChatTabContextMenuState {
+  x: number
+  y: number
+  id: string
+}
+
 const CHAT_MODE_OPTIONS: { id: ChatMode; label: string; titleKey: 'chat.askModeTitle' | 'chat.editModeTitle' | 'chat.agentModeTitle' }[] =
   [
     { id: 'ask', label: 'Ask', titleKey: 'chat.askModeTitle' },
@@ -110,9 +116,11 @@ export function ChatPanel() {
   )
   const [chatTabDragId, setChatTabDragId] = useState<string | null>(null)
   const [chatTabDropIndex, setChatTabDropIndex] = useState<number | null>(null)
+  const [tabContextMenu, setTabContextMenu] = useState<ChatTabContextMenuState | null>(null)
   const chatTabDragIdRef = useRef<string | null>(null)
   const messagesContainerRef = useRef<HTMLDivElement>(null)
   const chatTabsRef = useRef<HTMLDivElement>(null)
+  const tabContextMenuRef = useRef<HTMLDivElement>(null)
   const inputComposerRef = useRef<ChatInputComposerHandle>(null)
   const pasteMediaInFlightRef = useRef(false)
   const historyRef = useRef<HTMLDivElement>(null)
@@ -165,6 +173,22 @@ export function ChatPanel() {
   const historySessions = [...chatSessions]
     .filter((session) => session.messages.length > 0)
     .sort((a, b) => b.updatedAt - a.updatedAt)
+
+  const closeTabContextMenu = () => setTabContextMenu(null)
+
+  const runCloseChatIds = (ids: string[], activateId?: string) => {
+    if (ids.length === 0) return
+    closeTabContextMenu()
+    for (const id of ids) {
+      closeChatSession(id)
+    }
+    if (
+      activateId &&
+      useAppStore.getState().chatSessions.some((s) => s.id === activateId && s.isOpen)
+    ) {
+      setActiveChatSession(activateId)
+    }
+  }
 
   const chatMessages = activeChat?.messages ?? []
   const chatContextRefs = activeChat?.contextRefs ?? []
@@ -340,6 +364,29 @@ export function ChatPanel() {
     const activeTab = el.querySelector<HTMLElement>('.chat-tab.active')
     activeTab?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' })
   }, [activeChatId, openChatTabsKey])
+
+  useEffect(() => {
+    if (!tabContextMenu) return
+
+    const onPointerDown = (event: MouseEvent) => {
+      const target = event.target as Node | null
+      if (target && tabContextMenuRef.current?.contains(target)) return
+      closeTabContextMenu()
+    }
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') closeTabContextMenu()
+    }
+    const onScroll = () => closeTabContextMenu()
+
+    window.addEventListener('mousedown', onPointerDown)
+    window.addEventListener('keydown', onKeyDown)
+    window.addEventListener('scroll', onScroll, true)
+    return () => {
+      window.removeEventListener('mousedown', onPointerDown)
+      window.removeEventListener('keydown', onKeyDown)
+      window.removeEventListener('scroll', onScroll, true)
+    }
+  }, [tabContextMenu])
 
   useEffect(() => {
     if (!modeMenuOpen && !presetMenuOpen) return
@@ -1109,6 +1156,12 @@ export function ChatPanel() {
               }`}
               draggable
               onClick={() => setActiveChatSession(session.id)}
+              onContextMenu={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                setActiveChatSession(session.id)
+                setTabContextMenu({ x: e.clientX, y: e.clientY, id: session.id })
+              }}
               title={session.title}
               onDragStart={(e) => {
                 chatTabDragIdRef.current = session.id
@@ -1164,6 +1217,42 @@ export function ChatPanel() {
             <div className="tab-drop-end" aria-hidden />
           )}
         </div>
+        {tabContextMenu && (
+          <div
+            ref={tabContextMenuRef}
+            className="file-tree-context-menu"
+            style={{ left: tabContextMenu.x, top: tabContextMenu.y }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={() => runCloseChatIds([tabContextMenu.id])}
+            >
+              {t('editor.closeTab')}
+            </button>
+            <button
+              type="button"
+              disabled={openChatSessions.length <= 1}
+              onClick={() => {
+                if (openChatSessions.length <= 1) return
+                const others = openChatSessions
+                  .filter((s) => s.id !== tabContextMenu.id)
+                  .map((s) => s.id)
+                runCloseChatIds(others, tabContextMenu.id)
+              }}
+            >
+              {t('editor.closeOtherTabs')}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                runCloseChatIds(openChatSessions.map((s) => s.id))
+              }}
+            >
+              {t('editor.closeAllTabs')}
+            </button>
+          </div>
+        )}
         <div className="chat-header-actions">
           <div className="chat-history-menu" ref={historyRef}>
             <button

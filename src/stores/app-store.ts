@@ -504,6 +504,8 @@ interface AppState {
     patch: { browserUrl?: string; browserTitle?: string }
   ) => void
   closeFile: (path: string) => void
+  /** 複数タブを一度に閉じる（未保存確認は呼び出し側） */
+  closeFiles: (paths: string[]) => void
   setActiveFile: (path: string) => void
   /** エディタタブを dropIndex（移動前の挿入位置）へ並べ替え */
   reorderOpenFile: (fromPath: string, dropIndex: number) => void
@@ -870,10 +872,16 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   closeFile: (path) => {
+    get().closeFiles([path])
+  },
+
+  closeFiles: (paths) => {
+    if (paths.length === 0) return
+    const pathSet = new Set(paths)
     set((state) => {
-      const filtered = state.openFiles.filter((f) => f.path !== path)
+      const filtered = state.openFiles.filter((f) => !pathSet.has(f.path))
       let activeFilePath = state.activeFilePath
-      if (activeFilePath === path) {
+      if (activeFilePath && pathSet.has(activeFilePath)) {
         activeFilePath = filtered.length > 0 ? filtered[filtered.length - 1].path : null
       }
       return { openFiles: filtered, activeFilePath }

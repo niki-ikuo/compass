@@ -751,8 +751,13 @@ body.is-resizing-panels iframe {
   cursor: pointer;
 }
 
-.file-tree-context-menu button:hover {
+.file-tree-context-menu button:hover:not(:disabled) {
   background: var(--bg-hover);
+}
+
+.file-tree-context-menu button:disabled {
+  opacity: 0.45;
+  cursor: default;
 }
 
 .file-tree-context-menu button.danger {
