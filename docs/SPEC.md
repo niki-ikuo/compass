@@ -31,10 +31,12 @@
 - Use-case presets (`general` / `document` / `data` / `code`) — orthogonal to Ask / Edit / Agent; see [USE_CASE_PRESET.md](./USE_CASE_PRESET.md)
 - Inline completions (ghost text / Tab accept; toggle in Settings)
 - Doc templates (built-in Markdown presets; workspace `.compass/templates/`)
+- Left sidebar Explorer / Search tabs (workspace text search)
+- Offline help + AI Help (`helps/` + `help:*` IPC)
+- Agent UX when tools unsupported — hide Agent toggle per provider; guided Edit fallback — see [AGENT_PLAN.md](./AGENT_PLAN.md) §7
 
 ### Deferred (later)
 
-- **Agent polish** — auto Edit fallback for tools-less providers; hide Agent toggle per provider — see [AGENT_PLAN.md](./AGENT_PLAN.md) §7 Deferred
 - Vector search / RAG (`.compass` is a structure index, not embedding search) — SPEC v2.1
 - MCP
 - Git integration
@@ -47,13 +49,13 @@
 ┌──────────────────────────────────────────────────────────┐
 │  Menu bar  [File] [Edit] [View] [Settings]               │
 ├──────────┬───────────────────────────────┬───────────────┤
-│          │  Tabs: plan.md  notes.md      │               │
-│ File     │───────────────────────────────│   AI chat     │
-│ tree     │                               │               │
-│          │   Monaco Editor               │  ┌──────────┐ │
-│  📁 docs │   (syntax highlighting)       │  │ history  │ │
-│   📄 plan│                               │  └──────────┘ │
-│   📄 data│                               │  [input]      │
+│ Explorer │  Tabs: plan.md  notes.md      │               │
+│ / Search │───────────────────────────────│   AI chat     │
+│          │                               │               │
+│  📁 docs │   Monaco Editor               │  ┌──────────┐ │
+│   📄 plan│   (syntax highlighting)       │  │ history  │ │
+│   📄 data│                               │  └──────────┘ │
+│          │                               │  [input]      │
 │          │                               │  [send]       │
 ├──────────┴───────────────────────────────┴───────────────┤
 │  Status bar: line/col | language | connection            │
@@ -63,7 +65,8 @@
 | Item | Spec |
 |------|------|
 | Window size | Default 1280×800, resizable |
-| Layout | 3 panes (tree 20% / editor 50% / chat 30%), panels collapsible |
+| Layout | 3 panes (left sidebar 20% / editor 50% / chat 30%), panels collapsible |
+| Left sidebar | Explorer (file tree) and Search (workspace text search) tabs |
 
 ---
 
@@ -85,8 +88,10 @@
 |---------|------|
 | Open folder | Dialog picks workspace root |
 | Tree | Recursive listing; hide `node_modules` / `.git` |
-| File ops | Open, save, create (v1.1+) |
-| Doc templates | Built-in Markdown presets; workspace `.compass/templates/*.md` overrides same-name IDs and adds extras (optional YAML frontmatter: `label`, `fileName`, `order`). Manage via Explorer → New → Manage Templates… |
+| File ops | Open, save, create (v1.1+); rename (F2); reveal in OS file manager |
+| Office / OpenDocument | Open with the OS default app (not the Monaco editor); Explorer also offers “Open with Default App” |
+| Doc templates | Built-in Markdown presets (including blank Markdown); workspace `.compass/templates/*.md` overrides same-name IDs and adds extras (optional YAML frontmatter: `label`, `fileName`, `order`). Manage via Explorer → New → Manage Templates… |
+| Dirty close / quit | Prompt to save before closing dirty editor tabs or quitting the app |
 
 ### 4.3 AI chat
 
@@ -129,7 +134,7 @@ MVP: whole-file replace or insert at cursor only.
 | API key | Per-provider, encrypted locally |
 | Model | `gpt-4o-mini` (provider suggestions + free input) |
 | Temperature | 0.2 |
-| Max tokens | 4096 |
+| Max tokens | 32768 |
 | Inline completions | ON |
 | Default shell | `powershell` (PowerShell / cmd / Git Bash / WSL) |
 | Default use-case preset | `general` (`document` / `data` / `code` also available — see [USE_CASE_PRESET.md](./USE_CASE_PRESET.md)) |
@@ -264,7 +269,7 @@ v2.0 shipped (terminal / .compass index / Ask·Edit·Agent autonomy / multi-LLM 
      └─ v3.0: MCP, plugins, native non–OpenAI APIs
 ```
 
-v2.0 Agent phases 0–4 (shipped) + deferred polish: [AGENT_PLAN.md](./AGENT_PLAN.md).  
+v2.0 Agent phases 0–4 (shipped) + later roadmap: [AGENT_PLAN.md](./AGENT_PLAN.md).  
 Runtime details: [AGENT.md](./AGENT.md).  
 Use-case presets: [USE_CASE_PRESET.md](./USE_CASE_PRESET.md).
 

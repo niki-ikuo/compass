@@ -150,20 +150,20 @@ i18n キー例: `ai.preset.code.role` / `document` / `data` / `general`（ja / e
 | メッセージ | `ChatMessage.preset?`（user） | 履歴から復元（`mode` と同様） |
 | UI | `ChatPanel` の `sendPreset` | 今の会話で選んでいる用途 |
 | 設定 | `AppSettings.defaultUseCasePreset` | 新規チャット / 起動時の初期値 |
-| 後から（任意） | ワークスペース既定（例: `.compass`） | フォルダ既定。アプリ設定より優先 |
+| ワークスペース | `.compass/settings.json` → `defaultUseCasePreset` | フォルダ既定。アプリ設定より優先 |
 
 **送信時の解決順:**
 
 1. チャット UI の現在選択
-2. （将来）ワークスペース既定
+2. ワークスペース既定（`.compass/settings.json`）
 3. `defaultUseCasePreset`
-4. フォールバック `code`
+4. フォールバック `general`（`DEFAULT_USE_CASE_PRESET`）
 
 **セッション切替:** そのセッションの最後の user メッセージの `preset` を復元。なければ設定デフォルト。
 
 **途中変更:** 同じチャットで切替可。次の送信から効く（過去メッセージは書き換えない）。
 
-**モデル切替との違い:** モデルはヘッダー変更で設定を即保存してよい。用途の「今の選択」は会話ローカルが主で、デフォルト変更は設定画面のみ。
+**モデル切替との違い:** モデルはコンポーザ変更で設定を即保存してよい。用途の「今の選択」は会話ローカルが主で、デフォルト変更は設定画面（アプリ / ワークスペース）のみ。
 
 ### 型のイメージ
 
@@ -175,29 +175,33 @@ preset?: UseCasePreset
 
 // AppSettings に追加（必須、初期値 'general'）
 defaultUseCasePreset: UseCasePreset
+
+// WorkspaceSettings（.compass/settings.json）
+defaultUseCasePreset?: UseCasePreset
 ```
 
 ---
 
 ## 8. UI 配置
 
-### 主: チャットヘッダー（モデルの隣）
+### 主: チャット入力フッタ（モードの隣）
 
 ```
-[ モデル ▼ ]  [ 用途: 一般 ▼ ]  [履歴] [+] [🗑]
+[履歴] [+] …
 ────────────────────────────────
 会話…
 ────────────────────────────────
-[ Ask / Edit / Agent ▼ ]  [送信]
+[ Ask / Edit / Agent ▼ ] [ 用途: 一般 ▼ ] [ モデル ▼ ]  [送信]
 ```
 
 - Ask / Edit / Agent ピッカーには入れない
 - 選択肢は 4 つ＋短い説明
-- ヘッダー切替は会話ローカル。設定のデフォルトは変えない
+- コンポーザ切替は会話ローカル。設定のデフォルトは変えない
 
 ### 従: SettingsDialog
 
-- Appearance または LLM 付近に「デフォルトの用途プリセット」
+- Appearance または LLM 付近に「デフォルトの用途プリセット」（アプリ）
+- フォルダを開いているときは「ワークスペース既定の用途」（`.compass/settings.json`）
 - （任意）「最後に使った用途を覚える」トグル  
   - ON: 送信成功時に `defaultUseCasePreset` を更新  
   - OFF: 設定値のみ
@@ -225,25 +229,25 @@ defaultUseCasePreset: UseCasePreset
 
 ## 10. スコープ分割
 
-### v1（本仕様の本体）
+### v1（本仕様の本体）— 出荷済み
 
 - 型: `UseCasePreset`
 - `ChatRequest` / user `ChatMessage` / `AppSettings.defaultUseCasePreset`
-- ヘッダーセレクト＋設定デフォルト
+- コンポーザセレクト＋設定デフォルト
 - プロンプトの役割差し替え（ja / en）
 - 既存 `code` は現状と同等（回帰）
 
-### v1.5
+### v1.5 — 出荷済み
 
 - 用途別の短い user reminder
 - 「最後に使った用途を覚える」
+- ワークスペース既定用途（`.compass/settings.json`）
+- テンプレ（内蔵 Markdown ＋ ワークスペース `.compass/templates/`）
+- Agent の document / data 向け light verify（`agent-verify-light.ts`）
 
-### v2（別タスクと接続）
+### 後続（別タスクと接続）
 
-- 文書向け索引（見出し・要約）
-- 用途別 verify（文書: 見出し / 用語、データ: 列ずれ 等）
-- ワークスペース既定用途
-- テンプレ（議事録・手順書など）
+- 文書向け索引（light verify を超える見出し・要約）
 - Markdown 体験強化（プレビュー往復・見出しアウトライン・文書向け差分）
 - チャット参照拡張（複数ファイルセット、画像、PDF テキスト抽出）
 - MCP / プラグイン（本体はフォルダ＋承認付き AI、外部能力は拡張）
@@ -252,9 +256,9 @@ defaultUseCasePreset: UseCasePreset
 
 ## 11. 受け入れ条件（v1）
 
-1. ヘッダーで 4 用途を切り替えでき、次の送信の system に反映される
+1. コンポーザで 4 用途を切り替えでき、次の送信の system に反映される
 2. Ask / Edit / Agent と独立に選べる（同じドロップダウンに混ざらない）
-3. 新規チャットは `defaultUseCasePreset` で始まる
+3. 新規チャットは `defaultUseCasePreset`（ワークスペース既定があればそちら）で始まる
 4. セッション復元で、最後に送った用途が戻る
 5. `code` ＋既存モードで、現行と実質同等の振る舞い
 6. `document` で文書系の依頼をしたとき、コード前提の言い回しが減る（手動確認で可）
@@ -265,7 +269,7 @@ defaultUseCasePreset: UseCasePreset
 
 1. **用途 ≠ モード**（混ぜない）
 2. **v1 はプロンプト＋UI＋永続化のみ**（ツール / 索引は触らない）
-3. **会話中の用途はヘッダー、初期値は設定**
+3. **会話中の用途はコンポーザ、初期値は設定（アプリ / ワークスペース）**
 4. **未指定は `general`**（ワークスペース優先の既定。保存済み設定は維持）
 
 ---
@@ -274,10 +278,10 @@ defaultUseCasePreset: UseCasePreset
 
 用途プリセット本体のあとに効きやすい順:
 
-1. 用途プリセット（文書 / データ / 一般）← 本仕様 v1
+1. 用途プリセット（文書 / データ / 一般）← 本仕様 v1（出荷済み）
 2. Markdown 体験＋文書向け差分
 3. 見出し・要約ベースの索引
 4. 画像・PDF テキストの参照
-5. 用途別の軽い検証とテンプレ
+5. 用途別の軽い検証とテンプレ（light verify / テンプレは出荷済み）
 
 **追加開発なしでもすでに向いている使い方:** Markdown の企画・手順・議事の推敲（Edit / Agent）、JSON / YAML / CSV の整理、メモ置き場フォルダを開いて Ask で要約・整理。

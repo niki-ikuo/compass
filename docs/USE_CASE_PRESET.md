@@ -150,20 +150,20 @@ i18n keys (example): `ai.preset.code.role` / `document` / `data` / `general` (ja
 | Message | `ChatMessage.preset?` (user) | Restore from history (same pattern as `mode`) |
 | UI | `sendPreset` in `ChatPanel` | Current chat selection |
 | Settings | `AppSettings.defaultUseCasePreset` | Default for new chats / startup |
-| Later (optional) | Workspace default (e.g. `.compass`) | Folder default; overrides app settings |
+| Workspace | `.compass/settings.json` → `defaultUseCasePreset` | Folder default; overrides app settings |
 
 **Resolve order on send:**
 
 1. Current chat UI selection
-2. (Future) workspace default
+2. Workspace default (`.compass/settings.json`)
 3. `defaultUseCasePreset`
-4. Fallback `code`
+4. Fallback `general` (`DEFAULT_USE_CASE_PRESET`)
 
 **Session switch:** restore `preset` from the last user message in that session; otherwise settings default.
 
 **Mid-chat change:** allowed; applies from the next send (do not rewrite history).
 
-**vs model picker:** model may persist to settings immediately from the header. Use-case “current selection” stays chat-local; only Settings changes the default.
+**vs model picker:** model may persist to settings immediately from the composer. Use-case “current selection” stays chat-local; only Settings (app / workspace) changes the default.
 
 ### Types (sketch)
 
@@ -175,29 +175,33 @@ preset?: UseCasePreset
 
 // AppSettings (required, default 'general')
 defaultUseCasePreset: UseCasePreset
+
+// WorkspaceSettings (.compass/settings.json)
+defaultUseCasePreset?: UseCasePreset
 ```
 
 ---
 
 ## 8. UI placement
 
-### Primary: chat header (next to model)
+### Primary: chat composer footer (beside mode)
 
 ```
-[ Model ▼ ]  [ Use case: General ▼ ]  [history] [+] [🗑]
+[history] [+] …
 ────────────────────────────────
 messages…
 ────────────────────────────────
-[ Ask / Edit / Agent ▼ ]  [Send]
+[ Ask / Edit / Agent ▼ ] [ Use case: General ▼ ] [ Model ▼ ]  [Send]
 ```
 
 - Do not put presets in the Ask / Edit / Agent picker
 - Four options + short descriptions
-- Header change is chat-local; does not rewrite settings default
+- Composer change is chat-local; does not rewrite settings default
 
 ### Secondary: SettingsDialog
 
-- “Default use-case preset” near Appearance or LLM
+- “Default use-case preset” (app) near Appearance or LLM
+- “Workspace default use-case preset” when a folder is open (stored in `.compass/settings.json`)
 - Optional “Remember last use case” toggle  
   - ON: update `defaultUseCasePreset` after a successful send  
   - OFF: settings value only
@@ -225,25 +229,25 @@ Approval flows (Edit / Agent) stay the same. The preset only changes *what* is w
 
 ## 10. Scope split
 
-### v1 (this spec)
+### v1 (this spec) — shipped
 
 - Type: `UseCasePreset`
 - `ChatRequest` / user `ChatMessage` / `AppSettings.defaultUseCasePreset`
-- Header select + settings default
+- Composer select + settings default
 - Role swap in prompts (ja / en)
 - `code` behaves like today (regression)
 
-### v1.5
+### v1.5 — shipped
 
 - Short per-preset user reminders
 - “Remember last use case”
+- Workspace default preset (`.compass/settings.json`)
+- Templates (built-in Markdown + workspace `.compass/templates/`)
+- Agent light verify for document / data (`agent-verify-light.ts`)
 
-### v2 (related work)
+### Later (related work)
 
-- Document-oriented index (headings / summaries)
-- Per-preset verify (docs: headings / terms; data: column skew; etc.)
-- Workspace default preset
-- Templates (minutes, procedures, …)
+- Document-oriented index (headings / summaries beyond light verify)
 - Stronger Markdown UX (preview toggle, outline jump, readable doc diffs)
 - Broader chat references (multi-file sets, images, PDF text extraction)
 - MCP / plugins (core stays folder + approved AI; external skills via extensions)
@@ -252,9 +256,9 @@ Approval flows (Edit / Agent) stay the same. The preset only changes *what* is w
 
 ## 11. Acceptance (v1)
 
-1. Header can switch among four presets and the next send’s system prompt reflects it
+1. Composer can switch among four presets and the next send’s system prompt reflects it
 2. Preset is independent of Ask / Edit / Agent (not the same dropdown)
-3. New chats start from `defaultUseCasePreset`
+3. New chats start from `defaultUseCasePreset` (workspace default wins when set)
 4. Session restore brings back the last sent preset
 5. `code` + existing modes behave substantially like today
 6. `document` reduces code-centric phrasing on doc tasks (manual check OK)
@@ -265,7 +269,7 @@ Approval flows (Edit / Agent) stay the same. The preset only changes *what* is w
 
 1. **Use case ≠ mode**
 2. **v1 is prompt + UI + persistence only** (no tool / index changes)
-3. **Header for the active chat; Settings for the default**
+3. **Composer for the active chat; Settings (app / workspace) for the default**
 4. **Unset → `general`** (workspace-first default; existing saved settings keep their value)
 
 ---
@@ -274,10 +278,10 @@ Approval flows (Edit / Agent) stay the same. The preset only changes *what* is w
 
 After shipping presets:
 
-1. Use-case presets (document / data / general) ← this spec v1
+1. Use-case presets (document / data / general) ← this spec v1 (shipped)
 2. Markdown UX + document-friendly diffs
 3. Heading / summary-based index
 4. Image / PDF text as references
-5. Light per-preset checks and templates
+5. Light per-preset checks and templates (light verify / templates shipped)
 
 **Already useful without extra features:** polish Markdown plans / procedures / minutes (Edit / Agent); tidy JSON / YAML / CSV; open a notes folder and Ask for summary / organization.

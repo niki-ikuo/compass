@@ -11,6 +11,7 @@ related:
   - install.md
   - ai-provider.md
   - open-project.md
+  - search.md
   - ../ai/chat.md
 commands:
   - Open Folder
@@ -39,7 +40,7 @@ Compass is an **AI workspace** for local folders. It is not a code-only IDE — 
 
 | Area | Role |
 |------|------|
-| Left | File tree |
+| Left | Explorer (file tree) / Search tabs |
 | Center | Editor (tabs) |
 | Right | AI chat (Ask / Edit / Agent) |
 | Bottom | Terminal (when shown) |
@@ -49,5 +50,6 @@ Compass is an **AI workspace** for local folders. It is not a code-only IDE — 
 - [Install](install.md)
 - [AI provider setup](ai-provider.md)
 - [Open a project](open-project.md)
+- [Search in the workspace](search.md)
 - [AI chat](../ai/chat.md)
 - [Agent](../ai/agent.md)

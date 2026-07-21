@@ -40,7 +40,7 @@ Open **Settings → Language** and choose `English` or `日本語`. The UI, help
 
 ## Is there autosave?
 
-No. Save explicitly.
+No. Save explicitly. If you close a dirty editor tab or quit the app, Compass asks whether to save.
 
 ## Where is chat history?
 
@@ -52,6 +52,10 @@ In the open workspace: `.compass/chat-history.json`.
 - Use-case presets … **what role it speaks as**
 
 Both are available around chat. → [AI chat](../ai/chat.md)
+
+## How do I search across files?
+
+Open the **Search** tab on the left sidebar (folder must be open). → [Search](../getting-started/search.md)
 
 ## GitHub or MCP?
 

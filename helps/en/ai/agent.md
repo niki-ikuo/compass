@@ -42,7 +42,7 @@ Agent is not “a longer Edit.” The model calls tools, observes results, and t
 | Situation | Result |
 |-----------|--------|
 | Ollama | Agent hidden (Ask / Edit only) |
-| Model without tools | Error — switch to Edit or change provider |
+| Model / provider without tools | Agent hidden, or guided prompt to resend in **Edit** |
 | No folder open | “Open a folder” |
 
 ## How to use

@@ -2,9 +2,9 @@
 
 **English** | [日本語](ja/AGENT_PLAN.md)
 
-Phased build record for **v2.0 Agent** autonomy (tool loops, commands, multi-step runs). **Phases 0–4 are shipped** in the current product (`package.json` version 2.0.x). For how the runtime behaves today, see [AGENT.md](./AGENT.md). Related: [SPEC.md](./SPEC.md) §10, [ARCHITECTURE.md](./ARCHITECTURE.md).
+Phased build record for **v2.0 Agent** autonomy (tool loops, commands, multi-step runs). **Phases 0–4 are shipped** in the current product (`package.json` version 2.2.x). For how the runtime behaves today, see [AGENT.md](./AGENT.md). Related: [SPEC.md](./SPEC.md) §10, [ARCHITECTURE.md](./ARCHITECTURE.md).
 
-This document keeps the phase checklist, decided policies, and **remaining** deferred work. It is not a “not started” plan.
+This document keeps the phase checklist, decided policies, and later roadmap. It is not a “not started” plan.
 
 ---
 
@@ -33,7 +33,7 @@ Agent is **not** “Edit but larger.” Edit stays a single-turn propose → hum
 2. **Workspace sandbox** — paths must resolve inside the open folder (`resolveInsideWorkspace`); no escape via `..`.
 3. **Human approval for writes** — reuse Edit’s preview → apply path (`previewActions` / `applyActions`).
 4. **Single cancellable run** — one AbortController-style cancel per Agent run (same spirit as `ai:cancel`).
-5. **OpenAI-compatible `tools` API** — native tool calling (not the `compass-actions` text protocol). Providers without tools get a clear error (auto Edit fallback still deferred).
+5. **OpenAI-compatible `tools` API** — native tool calling (not the `compass-actions` text protocol). Providers without tools hide Agent in the picker; guided Edit fallback if Agent was still selected.
 6. **Terminal split** — keep user PTY (xterm) separate from Agent’s short-lived controlled `exec`.
 
 ### Reusable assets
@@ -140,7 +140,7 @@ End-to-end tool loop without mutating the workspace.
 - **Apply failure → re-propose:** On apply error the preview stays for Retry; **Ask Agent to fix** clears the preview and returns the failure observation
 - **Verify loop:** `verify` tool runs project test / lint / typecheck via package scripts (or safe fallbacks)
 - **Progress / cancel:** `ai:step` status labels; `waiting_approval` step status; abort clears approval + running/waiting steps
-- **Tools-less providers:** Clear error (`ai.agentToolsUnsupported`) directing the user to Edit or a tools-capable model
+- **Tools-less providers:** Hide Agent mode in the chat picker when tools are unsupported (`isAgentModeAvailable` / `ChatPanel`); if Agent was somehow selected, guided Edit fallback (`agentEditFallback`) offers resend in Edit
 - **History:** `waiting_approval` / `running` steps normalize safely on load
 - **Guardrails:** Turn limits, payload truncation, secret redaction (`src/utils/redact.ts`) and `exec` output
 - **Plan layer:** `updateTodo` + `checkpoint` (`electron/services/agent-plan.ts`)
@@ -148,12 +148,12 @@ End-to-end tool loop without mutating the workspace.
 
 **Exit criteria:** Met for daily use on primary OpenAI-compatible providers.
 
-### Deferred (still open)
+### Shipped polish (was deferred)
 
 | Item | Notes |
 |------|--------|
-| Auto Ask/Edit fallback when tools unsupported | Currently a clear error only |
-| Hide Agent toggle per provider | Optional UX polish |
+| Hide Agent toggle per provider | Shipped — Ollama and other tools-less providers hide Agent (Ask / Edit only) |
+| Guided Edit fallback when tools unsupported | Shipped — banner + resend in Edit (`ChatPanel` `agentEditFallback`) |
 
 ---
 
@@ -208,6 +208,6 @@ Avoid shipping “commands + auto-apply writes” in one slice — cancel, appro
 |-------|-----------------|----------|
 | Approval policy after reject | Stop run vs continue without write | **Continue with rejection observation** |
 | Batched vs per-file write tools | One `proposeActions` vs many tools | **`proposeActions` batch** |
-| Tools-less providers | Hide Agent / warn / fallback | **Warn with clear error** (Edit / switch model); hide-toggle & auto-fallback deferred |
+| Tools-less providers | Hide Agent / warn / fallback | **Hide Agent when unsupported**; guided **Edit fallback** if Agent was still selected; otherwise clear error (`ai.agentToolsUnsupported`) |
 | Step persistence shape | On message vs separate run record | **On `ChatMessage.agentSteps`** |
 | Exec allow list | Allow-list vs deny-list first | **Deny-list first** (`agent-exec.ts`) |

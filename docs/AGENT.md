@@ -139,7 +139,7 @@ Limits (constants in `agent-runner.ts`):
 | `MAX_AGENT_TURNS` | 16 |
 | `MAX_TOOL_CALLS` | 40 |
 | `CONTINUE_TURN_GRANT` / `CONTINUE_TOOL_GRANT` | +12 / +30 |
-| `MAX_TOOL_RESULT_CHARS` | 80 000 (to the model) |
+| `MAX_TOOL_RESULT_CHARS` | 24 000 (to the model) |
 | `MAX_PERSISTED_OBSERVATION_CHARS` | 4 000 (history / UI) |
 
 After a successful apply, the tool observation includes `VERIFY_AFTER_APPLY_NUDGE` so the model tends to call `verify`.
@@ -286,7 +286,7 @@ src/
 
 | Document | Use when |
 |----------|----------|
-| [AGENT_PLAN.md](./AGENT_PLAN.md) | Phases 0–4 shipped record + deferred polish |
+| [AGENT_PLAN.md](./AGENT_PLAN.md) | Phases 0–4 shipped record + later roadmap |
 | [ARCHITECTURE.md](./ARCHITECTURE.md) | Process / IPC layout |
 | [SPEC.md](./SPEC.md) | Product boundaries Ask / Edit / Agent |
 | [USE_CASE_PRESET.md](./USE_CASE_PRESET.md) | Use-case presets (orthogonal to mode) |

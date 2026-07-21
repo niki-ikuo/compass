@@ -18,6 +18,7 @@ category: index
 - [インストール](getting-started/install.md)
 - [AIプロバイダー設定](getting-started/ai-provider.md)
 - [プロジェクトを開く](getting-started/open-project.md)
+- [ワークスペースを検索](getting-started/search.md)
 
 ---
 
@@ -25,6 +26,7 @@ category: index
 
 - [AIチャットを使う](ai/chat.md)
 - [Agentを使う](ai/agent.md)
+- [ファイルを検索する](getting-started/search.md)
 - [GitHubを使う](integrations/github.md)（未対応）
 - [MCPを使う](integrations/mcp.md)（未対応）
 

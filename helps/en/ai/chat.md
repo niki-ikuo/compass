@@ -45,7 +45,10 @@ Separately from Ask / Edit / Agent, use-case presets (General / Document / Data 
 - **Enter** … send
 - **Shift+Enter** … new line
 - The open file (and selection, if any) are included as context
-- Drop **files** from Explorer onto chat to attach them as references (**folders are not allowed**; read-only context only)
+- Drop **files** onto chat to attach them as read-only references (**folders are not allowed**):
+  - From the **left Explorer** (workspace files)
+  - From the **OS file manager** (e.g. Windows Explorer) — external files outside the folder, when a workspace is open
+- You can also drag **editor tabs** into chat as references
 - Replies stream in
 - History is saved to `.compass/chat-history.json` in the workspace
 
@@ -56,6 +59,10 @@ Separately from Ask / Edit / Agent, use-case presets (General / Document / Data 
 3. **Apply** or reject
 
 Nothing is written automatically.
+
+### Tabs
+
+Right-click a chat tab for **Close** / **Close Others** / **Close All**. Closing the last chat tab hides the chat panel.
 
 ## FAQ
 

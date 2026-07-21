@@ -139,7 +139,7 @@ OpenAI function schema は `AGENT_TOOLS`（`agent-runner.ts`）。`executeTool` 
 | `MAX_AGENT_TURNS` | 16 |
 | `MAX_TOOL_CALLS` | 40 |
 | `CONTINUE_TURN_GRANT` / `CONTINUE_TOOL_GRANT` | +12 / +30 |
-| `MAX_TOOL_RESULT_CHARS` | 80 000（モデル向け） |
+| `MAX_TOOL_RESULT_CHARS` | 24 000（モデル向け） |
 | `MAX_PERSISTED_OBSERVATION_CHARS` | 4 000（履歴 / UI） |
 
 適用成功後の観測には `VERIFY_AFTER_APPLY_NUDGE` が付き、モデルに `verify` を促す。
@@ -286,7 +286,7 @@ src/
 
 | ドキュメント | 用途 |
 |--------------|------|
-| [AGENT_PLAN.md](./AGENT_PLAN.md) | Phase 0–4 出荷記録と後回し項目 |
+| [AGENT_PLAN.md](./AGENT_PLAN.md) | Phase 0–4 出荷記録と後続ロードマップ |
 | [ARCHITECTURE.md](./ARCHITECTURE.md) | プロセス / IPC 全体像 |
 | [SPEC.md](./SPEC.md) | Ask / Edit / Agent の製品境界 |
 | [USE_CASE_PRESET.md](./USE_CASE_PRESET.md) | 用途プリセット（モードとは別軸） |
