@@ -216,7 +216,8 @@ On Continue = yes: budgets increase and **plan + memory** are re-injected as a u
 |-----------|------|
 | `agentSteps` on assistant messages | Timeline + history persistence |
 | Prior tool context | Summarized observations re-injected on follow-up (`buildPriorAgentContext`) |
-| Plan (`updateTodo` / `checkpoint`) | Checklist + resume note; rebuilt from history; re-injected on Continue |
+| Plan (`updateTodo` / `checkpoint`) | Checklist + resume note; rebuilt from history; re-injected on Continue; chat Plan panel rebuilds from all assistant `agentSteps` through the current message |
+| Soft multi-part nudge | If the latest user ask looks multi-part and the plan is empty, inject a user-role nudge to call `updateTodo` first (not a hard gate) |
 | Memory (`remember` + auto observations) | Durable notes; rebuilt from history |
 | Read cache | Avoid re-sending full file bodies within one run |
 
@@ -233,7 +234,7 @@ electron/services/
   agent-propose-actions.ts  # JSON parse / coerce / incompleteness
   agent-exec.ts             # deny-list shell, risk classification
   agent-verify.ts           # test/lint/typecheck orchestration
-  agent-plan.ts             # todos + checkpoint
+  agent-plan.ts             # re-exports shared plan helpers
   agent-memory.ts           # remember + observation capture
   agent-read-cache.ts       # in-run readFile cache
   agent-paths.ts            # workspace-relative path normalize
@@ -242,6 +243,8 @@ electron/services/
   workspace-search.ts       # search backend
 
 src/
+  utils/agent-plan.ts       # todos + checkpoint + multi-part nudge heuristics (shared)
+  components/AgentPlanPanel.tsx  # chat Plan checklist UI
   components/ChatPanel.tsx
   components/AgentStepTimeline.tsx
   stores/app-store.ts       # preview apply/reject, approval resolve

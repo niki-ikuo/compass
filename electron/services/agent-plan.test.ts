@@ -7,7 +7,9 @@ import {
   formatAgentPlanForModel,
   formatOpenTodosNudge,
   getOpenTodos,
+  looksLikeMultiPartAgentTask,
   rebuildPlanFromSteps,
+  collectAgentStepsThrough,
   sanitizeCheckpointArgs,
   sanitizeUpdateTodoArgs
 } from './agent-plan'
@@ -104,6 +106,27 @@ describe('formatAgentPlanForModel', () => {
     expect(text).toContain('Halfway through.')
     expect(text).toContain('1 done / 1 remaining')
     expect(text).toContain('Next')
+    expect(text).toContain('Next: mark "2" in_progress')
+  })
+})
+
+describe('looksLikeMultiPartAgentTask', () => {
+  it('detects numbered or bulleted multi-item asks', () => {
+    expect(
+      looksLikeMultiPartAgentTask('1. Fix the bug\n2. Add a test\n3. Update docs')
+    ).toBe(true)
+    expect(looksLikeMultiPartAgentTask('- Read foo\n- Patch bar')).toBe(true)
+  })
+
+  it('detects many path mentions', () => {
+    expect(
+      looksLikeMultiPartAgentTask('Look at @[a.ts] @[b.ts] @[c.ts] and fix them')
+    ).toBe(true)
+  })
+
+  it('ignores short single asks', () => {
+    expect(looksLikeMultiPartAgentTask('What does this function do?')).toBe(false)
+    expect(looksLikeMultiPartAgentTask('Fix the typo in README.')).toBe(false)
   })
 })
 
@@ -181,6 +204,34 @@ describe('rebuildPlanFromSteps', () => {
 
     expect(state.checkpoint).toBe('Started A')
     expect(state.todos).toEqual([{ id: '1', content: 'A', status: 'done' }])
+  })
+})
+
+describe('collectAgentStepsThrough', () => {
+  it('includes assistant steps up to the given index only', () => {
+    const messages: Array<{
+      role: string
+      content?: string
+      agentSteps?: Array<{ name: string; status: string; args: Record<string, unknown> }>
+    }> = [
+      { role: 'user', content: 'a' },
+      {
+        role: 'assistant',
+        agentSteps: [{ name: 'updateTodo', status: 'done', args: { todos: [] } }]
+      },
+      { role: 'user', content: 'b' },
+      {
+        role: 'assistant',
+        agentSteps: [{ name: 'readFile', status: 'done', args: { path: 'x' } }]
+      }
+    ]
+
+    expect(collectAgentStepsThrough(messages, 1)).toHaveLength(1)
+    expect(collectAgentStepsThrough(messages, 3).map((s) => s.name)).toEqual([
+      'updateTodo',
+      'readFile'
+    ])
+    expect(collectAgentStepsThrough(messages, 0)).toEqual([])
   })
 })
 

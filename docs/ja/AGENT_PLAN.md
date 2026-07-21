@@ -143,7 +143,7 @@ idle → thinking → tool_call → (waiting_approval)? → applying? → thinki
 - **tools 非対応:** チャットのモード選択で Agent を非表示（`isAgentModeAvailable` / `ChatPanel`）。万一 Agent が選ばれていた場合は Edit への誘導フォールバック（`agentEditFallback`）で再送できる
 - **履歴:** 読込時に `waiting_approval` / `running` を安全に正規化
 - **ガードレール:** ターン上限、ペイロード切り詰め、秘密マスキング（`src/utils/redact.ts`）および `exec` 出力
-- **計画レイヤ:** `updateTodo` + `checkpoint`（`electron/services/agent-plan.ts`）
+- **計画レイヤ:** `updateTodo` + `checkpoint`（`src/utils/agent-plan.ts`、`electron/services/agent-plan.ts` から再エクスポート）
 - **コンテキスト保持（RAG 前段階）:** `remember` + 観測の自動要約（`agent-memory.ts`）；強化された `.compass` 要約；ラン内 `readFile` キャッシュ（`agent-read-cache.ts`）
 
 **完了条件:** 主要 OpenAI 互換プロバイダでの日常利用として達成済み。

@@ -216,7 +216,8 @@ Continue = yes: 予算加算し **plan + memory** を user メッセージとし
 |--------|------|
 | アシスタントの `agentSteps` | タイムライン + 履歴永続化 |
 | 過去ツール文脈 | フォローアップで観測要約を再注入（`buildPriorAgentContext`） |
-| Plan（`updateTodo` / `checkpoint`） | チェックリスト + 再開メモ。履歴から再構築、Continue 時に再注入 |
+| Plan（`updateTodo` / `checkpoint`） | チェックリスト + 再開メモ。履歴から再構築、Continue 時に再注入。チャットの計画パネルは当該メッセージまでの全 assistant `agentSteps` から再構築 |
+| 複数パート soft nudge | 最新ユーザー依頼が複数パートっぽく計画が空なら、先に `updateTodo` するよう user ロールで誘導（必須ゲートではない） |
 | Memory（`remember` + 自動観測） | 耐久メモ。履歴から再構築 |
 | Read キャッシュ | 同一ラン内のフル再読込を抑制 |
 
@@ -233,7 +234,7 @@ electron/services/
   agent-propose-actions.ts  # JSON パース / 修復 / 不完全検出
   agent-exec.ts             # deny-list シェル、リスク分類
   agent-verify.ts           # test/lint/typecheck
-  agent-plan.ts             # todos + checkpoint
+  agent-plan.ts             # 共有 plan ヘルパーの再エクスポート
   agent-memory.ts           # remember + 観測キャプチャ
   agent-read-cache.ts       # ラン内 readFile キャッシュ
   agent-paths.ts            # ワークスペース相対パス正規化
@@ -242,6 +243,8 @@ electron/services/
   workspace-search.ts       # search 実装
 
 src/
+  utils/agent-plan.ts       # todos + checkpoint + 複数パート nudge（共有）
+  components/AgentPlanPanel.tsx  # チャット計画パネル
   components/ChatPanel.tsx
   components/AgentStepTimeline.tsx
   stores/app-store.ts       # プレビュー適用/却下、承認 resolve

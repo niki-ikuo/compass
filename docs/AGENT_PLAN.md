@@ -143,7 +143,7 @@ End-to-end tool loop without mutating the workspace.
 - **Tools-less providers:** Hide Agent mode in the chat picker when tools are unsupported (`isAgentModeAvailable` / `ChatPanel`); if Agent was somehow selected, guided Edit fallback (`agentEditFallback`) offers resend in Edit
 - **History:** `waiting_approval` / `running` steps normalize safely on load
 - **Guardrails:** Turn limits, payload truncation, secret redaction (`src/utils/redact.ts`) and `exec` output
-- **Plan layer:** `updateTodo` + `checkpoint` (`electron/services/agent-plan.ts`)
+- **Plan layer:** `updateTodo` + `checkpoint` (`src/utils/agent-plan.ts`, re-exported from `electron/services/agent-plan.ts`)
 - **Context retention (pre-RAG):** `remember` + auto observations (`agent-memory.ts`); smarter `.compass` summary; in-run `readFile` cache (`agent-read-cache.ts`)
 
 **Exit criteria:** Met for daily use on primary OpenAI-compatible providers.

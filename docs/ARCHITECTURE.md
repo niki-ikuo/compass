@@ -57,6 +57,8 @@ electron/
 
 src/
 ├── App.tsx                 # Root UI / workspace bootstrap
+├── utils/agent-plan.ts     # Shared Agent plan (todos/checkpoint); main re-exports via agent-plan.ts
+├── components/AgentPlanPanel.tsx  # Chat plan checklist
 ├── components/             # UI components (incl. LeftSidebar, SearchPanel, Help*)
 ├── stores/app-store.ts     # Zustand store
 ├── utils/                  # Preview, index helpers, encoding, etc.

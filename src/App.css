@@ -2144,10 +2144,98 @@ body:has(.monaco-editor .find-widget.visible) .workbench-hover-container .action
   color: var(--text-secondary);
 }
 
+.agent-plan-panel {
+  margin: 0 0 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-secondary);
+}
+
+.agent-plan-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.agent-plan-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.agent-plan-progress {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.agent-plan-checkpoint {
+  margin-bottom: 6px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.agent-plan-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.agent-plan-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--text-primary);
+}
+
+.agent-plan-mark {
+  flex-shrink: 0;
+  width: 12px;
+  text-align: center;
+  color: var(--text-secondary);
+}
+
+.agent-plan-item.status-done {
+  color: var(--text-secondary);
+}
+
+.agent-plan-item.status-done .agent-plan-item-text {
+  text-decoration: line-through;
+}
+
+.agent-plan-item.status-cancelled {
+  color: var(--text-secondary);
+  opacity: 0.7;
+}
+
+.agent-plan-item.status-in_progress .agent-plan-mark {
+  color: var(--accent);
+}
+
+.agent-plan-item-text {
+  min-width: 0;
+  word-break: break-word;
+}
+
 .agent-step-timeline {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  margin: 0 0 8px;
 }
 
 .agent-step-quiet-list {

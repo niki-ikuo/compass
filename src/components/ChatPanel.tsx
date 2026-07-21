@@ -24,6 +24,8 @@ import {
   USE_CASE_PRESET_OPTIONS
 } from '@/utils/use-case-preset'
 import { AgentStepTimeline } from './AgentStepTimeline'
+import { AgentPlanPanel } from './AgentPlanPanel'
+import { collectAgentStepsThrough } from '@/utils/agent-plan'
 import { AnimatedStatus } from './AnimatedEllipsis'
 import { ChatHistoryIcon, PlusIcon, TrashIcon, CloseIcon } from './icons/ToolbarIcons'
 import {
@@ -1424,7 +1426,10 @@ export function ChatPanel() {
               </div>
               <div className="chat-content">
                 {msg.role === 'assistant' && msg.agentSteps && msg.agentSteps.length > 0 && (
-                  <AgentStepTimeline steps={msg.agentSteps} />
+                  <>
+                    <AgentPlanPanel steps={collectAgentStepsThrough(chatMessages, index)} />
+                    <AgentStepTimeline steps={msg.agentSteps} />
+                  </>
                 )}
                 <ChatMessageContent
                   content={msg.content}

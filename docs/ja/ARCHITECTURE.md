@@ -57,6 +57,8 @@ electron/
 
 src/
 ├── App.tsx                 # ルート UI・ワークスペース起動
+├── utils/agent-plan.ts     # Agent plan 共有（todos/checkpoint）。main は agent-plan.ts から再エクスポート
+├── components/AgentPlanPanel.tsx  # チャット計画チェックリスト
 ├── components/             # 画面コンポーネント（LeftSidebar、SearchPanel、Help* など）
 ├── stores/app-store.ts     # Zustand ストア
 ├── utils/                  # プレビュー・索引・エンコーディング等

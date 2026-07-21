@@ -45,6 +45,8 @@ import {
   rebuildPlanFromSteps,
   sanitizeCheckpointArgs,
   sanitizeUpdateTodoArgs,
+  looksLikeMultiPartAgentTask,
+  formatInitialTodoPlanNudge,
   type AgentPlanState
 } from './agent-plan'
 import {
@@ -1308,6 +1310,11 @@ export async function runAgent(webContents: WebContents, request: ChatRequest): 
     const memory = rebuildMemoryFromHistory(history)
     const readCache = createAgentReadCache()
     let lastAppliedPaths: string[] = []
+
+    const latestUserText = [...history].reverse().find((m) => m.role === 'user')?.content ?? ''
+    if (plan.todos.length === 0 && looksLikeMultiPartAgentTask(latestUserText)) {
+      apiMessages.push({ role: 'user', content: formatInitialTodoPlanNudge() })
+    }
 
     const url = `${settings.apiBaseUrl.replace(/\/$/, '')}/chat/completions`
     const headers = buildApiHeaders(settings)
