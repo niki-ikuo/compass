@@ -16,6 +16,12 @@ interface TerminalTab {
   shellId: string
 }
 
+interface TerminalTabContextMenuState {
+  x: number
+  y: number
+  id: string
+}
+
 interface TerminalInstanceProps {
   tabId: string
   shellId: string
@@ -547,8 +553,12 @@ export function TerminalPanel() {
   const [selectedShellId, setSelectedShellId] = useState<string>('')
   const [tabs, setTabs] = useState<TerminalTab[]>([])
   const [activeTabId, setActiveTabId] = useState<string | null>(null)
+  const [tabContextMenu, setTabContextMenu] = useState<TerminalTabContextMenuState | null>(null)
   const tabCounterRef = useRef(0)
   const autoCreateRequestedRef = useRef(false)
+  const tabContextMenuRef = useRef<HTMLDivElement>(null)
+
+  const closeTabContextMenu = () => setTabContextMenu(null)
 
   useEffect(() => {
     if (showTerminal) {
@@ -621,22 +631,66 @@ export function TerminalPanel() {
     createTab()
   }, [workspaceRoot, tabs.length, createTab, shells.length, selectedShellId])
 
-  const closeTab = useCallback(
-    (tabId: string, options?: { hidePanelWhenEmpty?: boolean }) => {
-      void window.compass.terminal.kill(tabId)
+  const closeTabs = useCallback(
+    (
+      tabIds: string[],
+      options?: { hidePanelWhenEmpty?: boolean; activateId?: string }
+    ) => {
+      if (tabIds.length === 0) return
+      closeTabContextMenu()
+      const idSet = new Set(tabIds)
+      for (const id of tabIds) {
+        void window.compass.terminal.kill(id)
+      }
       setTabs((prev) => {
-        const next = prev.filter((tab) => tab.id !== tabId)
-        if (activeTabId === tabId) {
-          setActiveTabId(next[next.length - 1]?.id ?? null)
-        }
+        const next = prev.filter((tab) => !idSet.has(tab.id))
+        setActiveTabId((current) => {
+          if (options?.activateId && next.some((tab) => tab.id === options.activateId)) {
+            return options.activateId
+          }
+          if (current && idSet.has(current)) {
+            return next[next.length - 1]?.id ?? null
+          }
+          return current
+        })
         if (next.length === 0 && options?.hidePanelWhenEmpty) {
           setShowTerminal(false)
         }
         return next
       })
     },
-    [activeTabId, setShowTerminal]
+    [setShowTerminal]
   )
+
+  const closeTab = useCallback(
+    (tabId: string, options?: { hidePanelWhenEmpty?: boolean }) => {
+      closeTabs([tabId], options)
+    },
+    [closeTabs]
+  )
+
+  useEffect(() => {
+    if (!tabContextMenu) return
+
+    const onPointerDown = (event: MouseEvent) => {
+      const target = event.target as Node | null
+      if (target && tabContextMenuRef.current?.contains(target)) return
+      closeTabContextMenu()
+    }
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') closeTabContextMenu()
+    }
+    const onScroll = () => closeTabContextMenu()
+
+    window.addEventListener('mousedown', onPointerDown)
+    window.addEventListener('keydown', onKeyDown)
+    window.addEventListener('scroll', onScroll, true)
+    return () => {
+      window.removeEventListener('mousedown', onPointerDown)
+      window.removeEventListener('keydown', onKeyDown)
+      window.removeEventListener('scroll', onScroll, true)
+    }
+  }, [tabContextMenu])
 
   const handleShellChange = (shellId: string) => {
     setSelectedShellId(shellId)
@@ -691,6 +745,13 @@ export function TerminalPanel() {
                 setActiveTabId(tab.id)
                 setFocusToken((token) => token + 1)
               }}
+              onContextMenu={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                setActiveTabId(tab.id)
+                setFocusToken((token) => token + 1)
+                setTabContextMenu({ x: e.clientX, y: e.clientY, id: tab.id })
+              }}
             >
               <span>{tab.title}</span>
               <span
@@ -708,6 +769,48 @@ export function TerminalPanel() {
             </button>
           ))}
         </div>
+
+        {tabContextMenu && (
+          <div
+            ref={tabContextMenuRef}
+            className="file-tree-context-menu"
+            style={{ left: tabContextMenu.x, top: tabContextMenu.y }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={() =>
+                closeTabs([tabContextMenu.id], { hidePanelWhenEmpty: true })
+              }
+            >
+              {t('editor.closeTab')}
+            </button>
+            <button
+              type="button"
+              disabled={tabs.length <= 1}
+              onClick={() => {
+                if (tabs.length <= 1) return
+                const others = tabs
+                  .filter((tab) => tab.id !== tabContextMenu.id)
+                  .map((tab) => tab.id)
+                closeTabs(others, { activateId: tabContextMenu.id })
+              }}
+            >
+              {t('editor.closeOtherTabs')}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                closeTabs(
+                  tabs.map((tab) => tab.id),
+                  { hidePanelWhenEmpty: true }
+                )
+              }}
+            >
+              {t('editor.closeAllTabs')}
+            </button>
+          </div>
+        )}
 
         <div className="terminal-panel-actions">
           {shells.length > 0 && (
