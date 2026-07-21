@@ -78,6 +78,25 @@ function getOpenSessions(sessions: ChatSession[]): ChatSession[] {
   return sessions.filter((session) => session.isOpen)
 }
 
+/** 開いているチャットが無いときに空セッションを1つ用意する（パネル再表示時） */
+function ensureOpenChatSession(sessions: ChatSession[]): {
+  sessions: ChatSession[]
+  activeChatId: string
+} {
+  const openSessions = getOpenSessions(sessions)
+  if (openSessions.length > 0) {
+    return {
+      sessions,
+      activeChatId: openSessions[openSessions.length - 1].id
+    }
+  }
+  const session = createEmptyChatSession()
+  return {
+    sessions: [...sessions, session],
+    activeChatId: session.id
+  }
+}
+
 let chatHistorySaveTimer: ReturnType<typeof setTimeout> | null = null
 
 function scheduleChatHistorySave(workspaceRoot: string | null): void {
@@ -987,7 +1006,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     const session = createEmptyChatSession()
     set({
       chatSessions: [...state.chatSessions, session],
-      activeChatId: session.id
+      activeChatId: session.id,
+      showChat: true
     })
     scheduleChatHistorySave(state.workspaceRoot)
   },
@@ -1000,7 +1020,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     ) {
       get().revertWorkspacePreview()
     }
-    set({ activeChatId: id })
+    set({ activeChatId: id, showChat: true })
     scheduleChatHistorySave(state.workspaceRoot)
   },
 
@@ -1032,17 +1052,18 @@ export const useAppStore = create<AppState>((set, get) => ({
       target.messages.length === 0 && target.contextRefs.length === 0
 
     // 空のチャットは履歴に残さず削除。内容があるものは非表示のみ。
-    let nextSessions = isEmptySession
+    const nextSessions = isEmptySession
       ? state.chatSessions.filter((s) => s.id !== id)
       : state.chatSessions.map((s) =>
           s.id === id ? { ...s, isOpen: false, updatedAt: Date.now() } : s
         )
 
-    let openSessions = getOpenSessions(nextSessions)
+    const openSessions = getOpenSessions(nextSessions)
+    // 最終タブを閉じたら空タブを作らず、チャットパネル自体を閉じる
     if (openSessions.length === 0) {
-      const session = createEmptyChatSession()
-      nextSessions = [...nextSessions, session]
-      openSessions = [session]
+      set({ chatSessions: nextSessions, activeChatId: null, showChat: false })
+      scheduleChatHistorySave(state.workspaceRoot)
+      return
     }
 
     let activeChatId = state.activeChatId
@@ -1070,7 +1091,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       chatSessions: state.chatSessions.map((s) =>
         s.id === id ? { ...s, isOpen: true } : s
       ),
-      activeChatId: id
+      activeChatId: id,
+      showChat: true
     })
     scheduleChatHistorySave(state.workspaceRoot)
   },
@@ -1087,13 +1109,18 @@ export const useAppStore = create<AppState>((set, get) => ({
       get().revertWorkspacePreview()
     }
 
-    let nextSessions = state.chatSessions.filter((s) => s.id !== id)
-    let openSessions = getOpenSessions(nextSessions)
+    const nextSessions = state.chatSessions.filter((s) => s.id !== id)
+    const openSessions = getOpenSessions(nextSessions)
 
+    // 開いているタブが無くなったら空タブを作らず、パネルを閉じる
     if (openSessions.length === 0) {
-      const session = createEmptyChatSession()
-      nextSessions = [...nextSessions, session]
-      openSessions = [session]
+      set({
+        chatSessions: nextSessions,
+        activeChatId: null,
+        showChat: false
+      })
+      scheduleChatHistorySave(state.workspaceRoot)
+      return
     }
 
     let activeChatId = state.activeChatId
@@ -1234,7 +1261,29 @@ export const useAppStore = create<AppState>((set, get) => ({
   setSettings: (settings) => set({ settings }),
   setSettingsOpen: (open) => set({ settingsOpen: open }),
   setShowFileTree: (show) => set({ showFileTree: show }),
-  setShowChat: (show) => set({ showChat: show }),
+  setShowChat: (show) => {
+    if (!show) {
+      set({ showChat: false })
+      return
+    }
+    const state = get()
+    const openSessions = getOpenSessions(state.chatSessions)
+    if (openSessions.length === 0) {
+      const ensured = ensureOpenChatSession(state.chatSessions)
+      set({
+        showChat: true,
+        chatSessions: ensured.sessions,
+        activeChatId: ensured.activeChatId
+      })
+      scheduleChatHistorySave(state.workspaceRoot)
+      return
+    }
+    const activeChatId =
+      state.activeChatId && openSessions.some((s) => s.id === state.activeChatId)
+        ? state.activeChatId
+        : openSessions[openSessions.length - 1].id
+    set({ showChat: true, activeChatId })
+  },
   setShowTerminal: (show) => set({ showTerminal: show }),
   setLeftSidebarView: (view) => set({ leftSidebarView: view }),
   openSearchPanel: (options) =>
@@ -1703,14 +1752,30 @@ export const useAppStore = create<AppState>((set, get) => ({
         ? [mentionOrMentions]
         : []
     if (mentions.length === 0 && !selection) return
-    set((state) => ({
-      showChat: true,
-      chatComposerInsertRequest: {
-        id: (state.chatComposerInsertRequest?.id ?? 0) + 1,
-        mentions,
-        selection
+    set((state) => {
+      const openSessions = getOpenSessions(state.chatSessions)
+      const ensured =
+        openSessions.length === 0
+          ? ensureOpenChatSession(state.chatSessions)
+          : {
+              sessions: state.chatSessions,
+              activeChatId:
+                state.activeChatId && openSessions.some((s) => s.id === state.activeChatId)
+                  ? state.activeChatId
+                  : openSessions[openSessions.length - 1].id
+            }
+      return {
+        showChat: true,
+        chatSessions: ensured.sessions,
+        activeChatId: ensured.activeChatId,
+        chatComposerInsertRequest: {
+          id: (state.chatComposerInsertRequest?.id ?? 0) + 1,
+          mentions,
+          selection
+        }
       }
-    }))
+    })
+    scheduleChatHistorySave(get().workspaceRoot)
   },
 
   clearChatComposerInsertRequest: () => set({ chatComposerInsertRequest: null }),
