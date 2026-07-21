@@ -7,7 +7,12 @@ import { buildUniqueFileName } from '@/utils/unique-file-name'
 /** ワークスペースのテンプレートフォルダ（Git 共有向け。`.compass` 配下） */
 export const WORKSPACE_TEMPLATES_DIR = '.compass/templates'
 
-export type BuiltinDocTemplateId = 'meeting-notes' | 'procedure' | 'plan-memo' | 'data-memo'
+export type BuiltinDocTemplateId =
+  | 'blank-markdown'
+  | 'meeting-notes'
+  | 'procedure'
+  | 'plan-memo'
+  | 'data-memo'
 
 /** 内蔵 ID、または `.compass/templates/*.md` のファイル名（拡張子なし） */
 export type DocTemplateId = BuiltinDocTemplateId | (string & {})
@@ -20,6 +25,7 @@ export interface DocTemplate {
   defaultFileName: string
   /** 内蔵テンプレ用 i18n キー。ワークスペース由来では未設定 */
   labelKey?:
+    | 'template.blankMarkdown'
     | 'template.meetingNotes'
     | 'template.procedure'
     | 'template.planMemo'
@@ -43,6 +49,10 @@ export interface WorkspaceTemplateDraft {
 }
 
 const TEMPLATES_JA: Record<BuiltinDocTemplateId, Omit<DocTemplate, 'id' | 'labelKey' | 'source'>> = {
+  'blank-markdown': {
+    defaultFileName: 'untitled.md',
+    body: ''
+  },
   'meeting-notes': {
     defaultFileName: 'meeting-notes.md',
     body: [
@@ -161,6 +171,10 @@ const TEMPLATES_JA: Record<BuiltinDocTemplateId, Omit<DocTemplate, 'id' | 'label
 }
 
 const TEMPLATES_EN: Record<BuiltinDocTemplateId, Omit<DocTemplate, 'id' | 'labelKey' | 'source'>> = {
+  'blank-markdown': {
+    defaultFileName: 'untitled.md',
+    body: ''
+  },
   'meeting-notes': {
     defaultFileName: 'meeting-notes.md',
     body: [
@@ -279,6 +293,7 @@ const TEMPLATES_EN: Record<BuiltinDocTemplateId, Omit<DocTemplate, 'id' | 'label
 }
 
 const LABEL_KEYS: Record<BuiltinDocTemplateId, NonNullable<DocTemplate['labelKey']>> = {
+  'blank-markdown': 'template.blankMarkdown',
   'meeting-notes': 'template.meetingNotes',
   procedure: 'template.procedure',
   'plan-memo': 'template.planMemo',
@@ -286,6 +301,7 @@ const LABEL_KEYS: Record<BuiltinDocTemplateId, NonNullable<DocTemplate['labelKey
 }
 
 export const DOC_TEMPLATE_IDS: BuiltinDocTemplateId[] = [
+  'blank-markdown',
   'meeting-notes',
   'procedure',
   'plan-memo',

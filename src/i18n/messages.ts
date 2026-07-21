@@ -199,6 +199,7 @@ export const ja = {
   'explorer.noFolder': 'フォルダが開かれていません',
   'explorer.openFolderHint': 'メニューから「フォルダを開く」を選択',
 
+  'template.blankMarkdown': '空の Markdown',
   'template.meetingNotes': '議事録',
   'template.procedure': '手順書',
   'template.planMemo': '企画メモ',
@@ -791,6 +792,7 @@ export const en: Record<MessageKey, string> = {
   'explorer.noFolder': 'No folder open',
   'explorer.openFolderHint': 'Choose "Open Folder" from the menu',
 
+  'template.blankMarkdown': 'Blank Markdown',
   'template.meetingNotes': 'Meeting notes',
   'template.procedure': 'Procedure',
   'template.planMemo': 'Plan memo',

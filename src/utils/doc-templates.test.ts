@@ -23,14 +23,21 @@ import {
 } from '@/utils/doc-templates'
 
 describe('doc-templates', () => {
-  it('lists four built-in templates for ja and en', () => {
-    expect(listDocTemplates('ja')).toHaveLength(4)
-    expect(listDocTemplates('en')).toHaveLength(4)
+  it('lists five built-in templates for ja and en', () => {
+    expect(listDocTemplates('ja')).toHaveLength(5)
+    expect(listDocTemplates('en')).toHaveLength(5)
+    expect(DOC_TEMPLATE_IDS).toContain('blank-markdown')
     expect(DOC_TEMPLATE_IDS).toContain('meeting-notes')
-    expect(listDocTemplates('ja')[0].source).toBe('builtin')
+    expect(listDocTemplates('ja')[0]).toMatchObject({
+      id: 'blank-markdown',
+      defaultFileName: 'untitled.md',
+      body: '',
+      source: 'builtin'
+    })
   })
 
   it('returns localized markdown bodies', () => {
+    expect(getDocTemplate('blank-markdown', 'ja').body).toBe('')
     expect(getDocTemplate('meeting-notes', 'ja').body).toContain('# 議事録')
     expect(getDocTemplate('meeting-notes', 'en').body).toContain('# Meeting notes')
     expect(getDocTemplate('procedure', 'ja').body).toContain('## 手順')
@@ -122,10 +129,11 @@ describe('doc-templates', () => {
     const merged = mergeDocTemplates(builtins, [extra, override])
 
     expect(merged.map((item) => item.id)).toEqual([
+      'blank-markdown',
       'weekly',
       'procedure',
-      'plan-memo',
       'meeting-notes',
+      'plan-memo',
       'data-memo'
     ])
     expect(merged.find((item) => item.id === 'meeting-notes')).toMatchObject({
@@ -171,7 +179,7 @@ describe('doc-templates', () => {
     })
 
     const effective = await listEffectiveDocTemplates('/ws', 'ja', fs)
-    expect(effective).toHaveLength(5)
+    expect(effective).toHaveLength(6)
     expect(effective.find((t) => t.id === 'meeting-notes')?.body).toContain('# 上書き議事録')
     expect(effective.find((t) => t.id === 'incident')?.label).toBe('インシデント')
   })
@@ -185,7 +193,7 @@ describe('doc-templates', () => {
     expect(fs.readDir).toHaveBeenCalledWith(`/ws/${WORKSPACE_TEMPLATES_DIR}`, {
       missingOk: true
     })
-    expect(list).toHaveLength(4)
+    expect(list).toHaveLength(5)
     expect(list.every((t) => t.source === 'builtin')).toBe(true)
   })
 
@@ -225,7 +233,7 @@ describe('doc-templates', () => {
     expect(ensureUniqueTemplateId('weekly', ['weekly', 'weekly-2'])).toBe('weekly-3')
     const drafts = draftsFromEffectiveTemplates(listDocTemplates('en'), (t) => t.id)
     expect(reindexDraftOrders(drafts.map((d) => ({ ...d, order: 999 }))).map((d) => d.order)).toEqual([
-      0, 100, 200, 300
+      0, 100, 200, 300, 400
     ])
   })
 })
