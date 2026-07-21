@@ -13,6 +13,7 @@ import {
   parseMarkdownHeadings,
   type MarkdownHeading
 } from '../../src/utils/markdown-outline'
+import { shouldSkipWorkspaceEntry } from './fs-ignore'
 
 const INDEX_VERSION = 4
 const COMPASS_DIR = '.compass'
@@ -215,6 +216,7 @@ async function listSourceFiles(dirPath: string): Promise<string[]> {
       const sub = await listSourceFiles(join(dirPath, entry.name))
       result.push(...sub)
     } else {
+      if (shouldSkipWorkspaceEntry(entry.name, false)) continue
       const ext = extname(entry.name).slice(1).toLowerCase()
       if (SOURCE_EXTENSIONS.has(ext)) {
         result.push(join(dirPath, entry.name))

@@ -19,6 +19,7 @@ import { ApplyPatchError, applyUnifiedDiff } from '../../src/utils/apply-patch'
 import { decodeFileBuffer, encodeContent } from './encoding'
 import { getImageMimeType, isImagePath, isPdfPath } from '../../src/utils/media-context'
 import { extractPdfText } from '../../src/utils/pdf-text'
+import { shouldSkipWorkspaceEntry } from './fs-ignore'
 
 const PATHED_ACTION_TYPES = new Set([
   'mkdir',
@@ -120,6 +121,7 @@ export async function readDirectory(
 
   for (const entry of sorted) {
     if (entry.isDirectory() && IGNORED_DIRS.has(entry.name)) continue
+    if (shouldSkipWorkspaceEntry(entry.name, entry.isDirectory())) continue
 
     const fullPath = join(dirPath, entry.name)
     if (entry.isDirectory()) {
@@ -551,6 +553,7 @@ async function listFilesRecursive(dirPath: string): Promise<string[]> {
       const subFiles = await listFilesRecursive(join(dirPath, entry.name))
       result.push(...subFiles)
     } else {
+      if (shouldSkipWorkspaceEntry(entry.name, false)) continue
       result.push(join(dirPath, entry.name))
     }
   }

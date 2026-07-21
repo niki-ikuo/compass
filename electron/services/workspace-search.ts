@@ -9,6 +9,7 @@ import type {
   WorkspaceSearchResult,
   WorkspaceSearchFileResult
 } from '../../src/types'
+import { shouldSkipWorkspaceEntry } from './fs-ignore'
 
 const IGNORED_DIRS = new Set([
   'node_modules',
@@ -131,6 +132,7 @@ async function collectFiles(dir: string, files: string[]): Promise<void> {
       continue
     }
     if (!entry.isFile()) continue
+    if (shouldSkipWorkspaceEntry(entry.name, false)) continue
     files.push(join(dir, entry.name))
   }
 }

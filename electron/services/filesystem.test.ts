@@ -11,6 +11,7 @@ import {
   materializeWorkspaceActions,
   movePath,
   previewWorkspaceActions,
+  readDirectory,
   renamePath,
   resolveChatContext,
   resolveInsideWorkspace
@@ -227,5 +228,37 @@ describe('resolveChatContext', () => {
     expect(resolved.folders).toHaveLength(1)
     expect(resolved.folders[0].structure).toEqual(['src/a.ts'])
     expect(resolved.folders[0].files.some((f) => f.relativePath === 'src/a.ts')).toBe(true)
+  })
+
+  it('hides Office lock files from folder context listing', async () => {
+    const root = makeTempRoot('office-lock-ctx')
+    tempRoots.push(root)
+    writeFileSync(join(root, 'report.xlsx'), 'xlsx', 'utf-8')
+    writeFileSync(join(root, '~$report.xlsx'), 'lock', 'utf-8')
+    writeFileSync(join(root, '~$notes.docx'), 'lock', 'utf-8')
+
+    const resolved = await resolveChatContext(root, [
+      { path: root, name: 'office-lock-ctx', isDirectory: true }
+    ])
+
+    expect(resolved.folders).toHaveLength(1)
+    expect(resolved.folders[0].structure).toEqual(['report.xlsx'])
+    expect(resolved.folders[0].structure.some((p) => p.includes('~$'))).toBe(false)
+  })
+})
+
+describe('readDirectory', () => {
+  it('omits Office lock files from the explorer tree', async () => {
+    const root = makeTempRoot('office-lock-tree')
+    tempRoots.push(root)
+    writeFileSync(join(root, 'notes.docx'), 'doc', 'utf-8')
+    writeFileSync(join(root, '~$notes.docx'), 'lock', 'utf-8')
+    writeFileSync(join(root, 'sheet.xlsx'), 'xls', 'utf-8')
+    writeFileSync(join(root, '~$sheet.xlsx'), 'lock', 'utf-8')
+
+    const tree = await readDirectory(root)
+    const names = tree.map((node) => node.name).sort()
+
+    expect(names).toEqual(['notes.docx', 'sheet.xlsx'])
   })
 })
