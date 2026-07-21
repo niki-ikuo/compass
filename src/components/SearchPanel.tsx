@@ -126,7 +126,6 @@ export function SearchPanel() {
   const setSearchSearching = useAppStore((s) => s.setSearchSearching)
   const setSearchError = useAppStore((s) => s.setSearchError)
   const setSearchReplaceOpen = useAppStore((s) => s.setSearchReplaceOpen)
-  const setLeftSidebarView = useAppStore((s) => s.setLeftSidebarView)
   const revealInEditor = useAppStore((s) => s.revealInEditor)
   const syncOpenFileContents = useAppStore((s) => s.syncOpenFileContents)
   const setFileTree = useAppStore((s) => s.setFileTree)
@@ -326,16 +325,6 @@ export function SearchPanel() {
   if (!workspaceRoot) {
     return (
       <div className="search-panel">
-        <div className="panel-header">
-          <span>{t('search.placeholder')}</span>
-          <button
-            type="button"
-            className="search-panel-back"
-            onClick={() => setLeftSidebarView('explorer')}
-          >
-            {t('search.explorer')}
-          </button>
-        </div>
         <div className="search-empty">{t('search.needFolder')}</div>
       </div>
     )
@@ -343,20 +332,6 @@ export function SearchPanel() {
 
   return (
     <div className="search-panel">
-      <div className="panel-header">
-        <span>{t('search.placeholder')}</span>
-        <div className="search-panel-header-actions">
-          <button
-            type="button"
-            className="search-panel-back"
-            onClick={() => setLeftSidebarView('explorer')}
-            title={t('search.backToExplorer')}
-          >
-            {t('search.explorer')}
-          </button>
-        </div>
-      </div>
-
       <div className="search-form">
         <div className="search-input-row">
           <button

@@ -29,8 +29,6 @@ export function App() {
   const setChatPanelWidthRatio = useAppStore((s) => s.setChatPanelWidthRatio)
   const openSettingsTab = useAppStore((s) => s.openSettingsTab)
   const openSearchPanel = useAppStore((s) => s.openSearchPanel)
-  const setLeftSidebarView = useAppStore((s) => s.setLeftSidebarView)
-  const leftSidebarView = useAppStore((s) => s.leftSidebarView)
   const workspaceRoot = useAppStore((s) => s.workspaceRoot)
   const setWorkspaceRoot = useAppStore((s) => s.setWorkspaceRoot)
   const restoreChatSessions = useAppStore((s) => s.restoreChatSessions)
@@ -321,18 +319,8 @@ export function App() {
   }, [])
 
   const handleToggleExplorer = useCallback(() => {
-    if (showFileTree && leftSidebarView === 'explorer') {
-      setShowFileTree(false)
-      return
-    }
-    setLeftSidebarView('explorer')
-    setShowFileTree(true)
-  }, [showFileTree, leftSidebarView, setShowFileTree, setLeftSidebarView])
-
-  const handleOpenSearch = useCallback(() => {
-    if (!workspaceRoot) return
-    openSearchPanel()
-  }, [workspaceRoot, openSearchPanel])
+    setShowFileTree(!showFileTree)
+  }, [showFileTree, setShowFileTree])
 
   return (
     <div className="app">
@@ -340,9 +328,7 @@ export function App() {
         showFileTree={showFileTree}
         showChat={showChat}
         showTerminal={showTerminal}
-        leftSidebarView={leftSidebarView}
         onToggleFileTree={handleToggleExplorer}
-        onOpenSearch={handleOpenSearch}
         onToggleChat={() => setShowChat(!showChat)}
         onToggleTerminal={() => setShowTerminal(!showTerminal)}
         onOpenSettings={() => openSettingsTab()}

@@ -122,9 +122,7 @@ export const ja = {
   'menu.openHelp': 'ヘルプを開く',
   'menu.openAiHelp': 'AIヘルプ',
   'menu.toggleExplorer': 'エクスプローラの開閉',
-  'menu.toggleSearch': '検索',
   'menu.searchDisabled': 'フォルダを開くと検索が利用できます',
-  'menu.searchShortcut': '検索 (Ctrl+Shift+F)',
   'menu.toggleTerminal': 'ターミナルの開閉',
   'menu.terminalDisabled': 'フォルダを開くとターミナルが利用できます',
   'menu.toggleChat': 'チャットの開閉',
@@ -166,6 +164,11 @@ export const ja = {
   'welcome.lead': 'フォルダを開いて、テキストの編集を始めましょう',
   'welcome.openFolder': '新しいフォルダを開く',
   'welcome.recent': '最近開いたフォルダ',
+
+  // sidebar
+  'sidebar.views': 'サイドバーの表示',
+  'sidebar.explorer': 'エクスプローラ',
+  'sidebar.search': '検索',
 
   // explorer
   'explorer.expandAll': 'すべて展開',
@@ -237,8 +240,6 @@ export const ja = {
     '未保存のファイルが {count} 件あります。ディスク上の内容で置換すると未保存の変更が失われる可能性があります。続行しますか？',
   'search.replacePartial':
     '{replacements} 件を置換しましたが、{errors} 件でエラーがありました',
-  'search.backToExplorer': 'エクスプローラに戻る',
-  'search.explorer': 'エクスプローラ',
   'search.hideReplace': '置換を隠す',
   'search.showReplace': '置換を表示',
   'search.placeholder': '検索',
@@ -727,9 +728,7 @@ export const en: Record<MessageKey, string> = {
   'menu.openHelp': 'Open Help',
   'menu.openAiHelp': 'AI Help',
   'menu.toggleExplorer': 'Toggle Explorer',
-  'menu.toggleSearch': 'Search',
   'menu.searchDisabled': 'Open a folder to use search',
-  'menu.searchShortcut': 'Search (Ctrl+Shift+F)',
   'menu.toggleTerminal': 'Toggle Terminal',
   'menu.terminalDisabled': 'Open a folder to use the terminal',
   'menu.toggleChat': 'Toggle Chat',
@@ -769,6 +768,10 @@ export const en: Record<MessageKey, string> = {
   'welcome.lead': 'Open a folder to start editing text',
   'welcome.openFolder': 'Open Folder',
   'welcome.recent': 'Recent folders',
+
+  'sidebar.views': 'Sidebar views',
+  'sidebar.explorer': 'Explorer',
+  'sidebar.search': 'Search',
 
   'explorer.expandAll': 'Expand All',
   'explorer.collapseAll': 'Collapse All',
@@ -838,8 +841,6 @@ export const en: Record<MessageKey, string> = {
     '{count} unsaved file(s) are in scope. Replacing on disk may discard unsaved changes. Continue?',
   'search.replacePartial':
     'Replaced {replacements} match(es), but {errors} error(s) occurred',
-  'search.backToExplorer': 'Back to Explorer',
-  'search.explorer': 'Explorer',
   'search.hideReplace': 'Hide Replace',
   'search.showReplace': 'Show Replace',
   'search.placeholder': 'Search',

@@ -1,16 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { SettingsIcon, ExplorerIcon, ChatIcon, TerminalIcon, SearchIcon } from './icons/ToolbarIcons'
+import { SettingsIcon, ExplorerIcon, ChatIcon, TerminalIcon } from './icons/ToolbarIcons'
 import { useAppStore } from '@/stores/app-store'
-import type { LeftSidebarView } from '@/types'
 import { useI18n } from '@/i18n'
 
 interface MenuBarProps {
   showFileTree: boolean
   showChat: boolean
   showTerminal: boolean
-  leftSidebarView: LeftSidebarView
   onToggleFileTree: () => void
-  onOpenSearch: () => void
   onToggleChat: () => void
   onToggleTerminal: () => void
   onOpenSettings: () => void
@@ -92,9 +89,7 @@ export function MenuBar({
   showFileTree,
   showChat,
   showTerminal,
-  leftSidebarView,
   onToggleFileTree,
-  onOpenSearch,
   onToggleChat,
   onToggleTerminal,
   onOpenSettings,
@@ -217,8 +212,7 @@ export function MenuBar({
     { label: t('menu.about'), action: () => void window.compass.shell.showAbout() }
   ]
 
-  const explorerActive = showFileTree && leftSidebarView === 'explorer'
-  const searchActive = showFileTree && leftSidebarView === 'search'
+  const explorerActive = showFileTree
 
   return (
     <div className="menu-bar" ref={barRef}>
@@ -273,18 +267,9 @@ export function MenuBar({
           onClick={onToggleFileTree}
           title={t('menu.toggleExplorer')}
           aria-label={t('menu.toggleExplorer')}
+          aria-pressed={explorerActive}
         >
           <ExplorerIcon />
-        </button>
-        <button
-          type="button"
-          className={`menu-bar-btn${searchActive ? ' active' : ''}`}
-          onClick={onOpenSearch}
-          disabled={!workspaceRoot}
-          title={workspaceRoot ? t('menu.searchShortcut') : t('menu.searchDisabled')}
-          aria-label={t('menu.toggleSearch')}
-        >
-          <SearchIcon />
         </button>
         <button
           type="button"
@@ -293,6 +278,7 @@ export function MenuBar({
           disabled={!workspaceRoot}
           title={workspaceRoot ? t('menu.toggleTerminal') : t('menu.terminalDisabled')}
           aria-label={t('menu.toggleTerminal')}
+          aria-pressed={showTerminal}
         >
           <TerminalIcon />
         </button>
@@ -302,6 +288,7 @@ export function MenuBar({
           onClick={onToggleChat}
           title={t('menu.toggleChat')}
           aria-label={t('menu.toggleChat')}
+          aria-pressed={showChat}
         >
           <ChatIcon />
         </button>
