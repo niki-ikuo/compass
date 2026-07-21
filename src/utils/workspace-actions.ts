@@ -1,5 +1,5 @@
 import type { WorkspaceAction } from '@/types'
-import { CODE_FENCE_REGEX, COMPASS_ACTIONS_REGEX, BARE_COMPASS_ACTIONS_REGEX } from './code-fence'
+import { CODE_FENCE_REGEX, findCompassActionsBlocks } from './code-fence'
 import type { CodeBlock } from '@/types'
 import { t } from '../i18n/runtime'
 
@@ -19,14 +19,23 @@ function extractCodeBlocksLocal(content: string): CodeBlock[] {
 }
 
 export function stripCompassActionsBlocks(content: string): string {
-  COMPASS_ACTIONS_REGEX.lastIndex = 0
-  return content.replace(COMPASS_ACTIONS_REGEX, '').trim()
+  const blocks = findCompassActionsBlocks(content)
+  if (blocks.length === 0) return content.trim()
+
+  let result = ''
+  let cursor = 0
+  for (const block of blocks) {
+    result += content.slice(cursor, block.start)
+    cursor = block.end
+  }
+  result += content.slice(cursor)
+  return result.trim()
 }
 
 export function stripAllCompassActionsContent(content: string): string {
   let result = stripCompassActionsBlocks(content)
-  result = result.replace(BARE_COMPASS_ACTIONS_REGEX, '').trim()
-  result = result.replace(/```\s*compass-actions\s*\n?[\s\S]*$/i, '').trim()
+  // Streaming / aborted replies may leave an unclosed fence without balanced JSON.
+  result = result.replace(/```\s*compass-actions\b[\s\S]*$/i, '').trim()
   return result
 }
 
@@ -75,17 +84,10 @@ function parseActionsJson(raw: string): WorkspaceAction[] {
 }
 
 export function parseWorkspaceActionsFromContent(content: string): WorkspaceAction[] {
-  COMPASS_ACTIONS_REGEX.lastIndex = 0
-  const fenced = COMPASS_ACTIONS_REGEX.exec(content)
-  if (fenced) {
-    return parseActionsJson(fenced[1])
+  for (const block of findCompassActionsBlocks(content)) {
+    const actions = parseActionsJson(block.json)
+    if (actions.length > 0) return actions
   }
-
-  const bare = content.match(BARE_COMPASS_ACTIONS_REGEX)
-  if (bare) {
-    return parseActionsJson(bare[1])
-  }
-
   return []
 }
 
