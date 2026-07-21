@@ -245,6 +245,25 @@ describe('resolveChatContext', () => {
     expect(resolved.folders[0].structure).toEqual(['report.xlsx'])
     expect(resolved.folders[0].structure.some((p) => p.includes('~$'))).toBe(false)
   })
+
+  it('skips deleted file and folder refs without throwing', async () => {
+    const root = makeTempRoot('deleted-refs-ctx')
+    tempRoots.push(root)
+    writeFileSync(join(root, 'still-here.md'), 'ok\n', 'utf-8')
+
+    const resolved = await resolveChatContext(root, [
+      { path: join(root, 'gone.md'), name: 'gone.md', isDirectory: false },
+      { path: join(root, 'was-here'), name: 'was-here', isDirectory: true },
+      { path: join(root, 'still-here.md'), name: 'still-here.md', isDirectory: false }
+    ])
+
+    expect(resolved.files).toHaveLength(1)
+    expect(resolved.files[0]).toMatchObject({
+      relativePath: 'still-here.md',
+      content: 'ok\n'
+    })
+    expect(resolved.folders).toHaveLength(0)
+  })
 })
 
 describe('readDirectory', () => {

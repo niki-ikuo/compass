@@ -1,4 +1,5 @@
 import { mkdir, readdir, readFile, rename, rm, stat, writeFile, copyFile } from 'fs/promises'
+import type { Dirent } from 'fs'
 import { resolve, relative, dirname, join, basename, isAbsolute } from 'path'
 import type {
   FileEncoding,
@@ -545,7 +546,13 @@ async function readContextFile(
 
 async function listFilesRecursive(dirPath: string): Promise<string[]> {
   const result: string[] = []
-  const entries = await readdir(dirPath, { withFileTypes: true })
+  let entries: Dirent[]
+  try {
+    entries = await readdir(dirPath, { withFileTypes: true })
+  } catch {
+    // Missing or unreadable directory (e.g. deleted after being attached to chat)
+    return result
+  }
 
   for (const entry of entries) {
     if (entry.isDirectory()) {
@@ -588,6 +595,14 @@ export async function resolveChatContext(
 
   for (const ref of references) {
     if (ref.isDirectory) {
+      try {
+        const info = await stat(ref.path)
+        if (!info.isDirectory()) continue
+      } catch {
+        // Deleted or inaccessible folder ref — skip like missing files
+        continue
+      }
+
       const allFiles = await listFilesRecursive(ref.path)
       const structure = allFiles.map((f) => toRelativePath(workspaceRoot, f))
       const truncated = allFiles.length > MAX_FOLDER_FILES
