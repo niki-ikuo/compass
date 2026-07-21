@@ -1,5 +1,5 @@
 import { useEffect, useCallback, useState } from 'react'
-import { useAppStore } from '@/stores/app-store'
+import { useAppStore, flushChatHistorySave, flushOpenEditorsSave } from '@/stores/app-store'
 import { LeftSidebar } from './components/LeftSidebar'
 import { ChatPanel } from './components/ChatPanel'
 import { StatusBar } from './components/StatusBar'
@@ -11,10 +11,11 @@ import { HelpDialog, type HelpCommandId } from './components/HelpDialog'
 import { HelpAskDialog } from './components/HelpAskDialog'
 import { buildWorkspaceIndex } from '@/utils/project-index'
 import { applyColorTheme } from '@/utils/color-theme'
-import { setLocale } from '@/i18n'
+import { setLocale, t } from '@/i18n'
 import { registerWheelZoomListener } from '@/utils/wheel-zoom'
 import { restoreOpenEditors } from '@/utils/restore-open-editors'
 import { refreshLlmConnection } from '@/utils/llm-connection'
+import { listDirtySavableFiles, saveDirtyFiles } from '@/utils/unsaved-files'
 
 export function App() {
   const showFileTree = useAppStore((s) => s.showFileTree)
@@ -147,6 +148,49 @@ export function App() {
     await window.compass.fs.writeFile(activeFile.path, activeFile.content, activeFile.encoding)
     markFileSaved(activeFile.path)
   }, [getActiveFile, markFileSaved])
+
+  const handleAppCloseRequested = useCallback(async () => {
+    const dirtyFiles = listDirtySavableFiles(useAppStore.getState().openFiles)
+
+    const finishClose = async (): Promise<void> => {
+      try {
+        await Promise.all([flushChatHistorySave(), flushOpenEditorsSave()])
+      } catch {
+        // 終了自体は続行（セッション復元の失敗でブロックしない）
+      }
+      await window.compass.app.allowClose()
+    }
+
+    if (dirtyFiles.length === 0) {
+      await finishClose()
+      return
+    }
+
+    const choice = await window.compass.app.confirmUnsavedQuit(dirtyFiles.length)
+    if (choice === 'cancel') {
+      await window.compass.app.cancelClose()
+      return
+    }
+
+    if (choice === 'save') {
+      try {
+        await saveDirtyFiles(dirtyFiles, (path) => useAppStore.getState().markFileSaved(path))
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err)
+        window.alert(t('app.quitSaveFailed', { message }))
+        await window.compass.app.cancelClose()
+        return
+      }
+    }
+
+    await finishClose()
+  }, [])
+
+  useEffect(() => {
+    return window.compass.app.onCloseRequested(() => {
+      void handleAppCloseRequested()
+    })
+  }, [handleAppCloseRequested])
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {

@@ -479,6 +479,15 @@ export const ja = {
   'workspace.closeDirtyConfirm':
     '未保存の変更があるファイルが {count} 件あります。フォルダを閉じてもよろしいですか？',
 
+  // app quit
+  'app.quitUnsavedTitle': '未保存の変更',
+  'app.quitUnsavedMessage':
+    '未保存の変更があるファイルが {count} 件あります。保存してから終了しますか？',
+  'app.quitSave': '保存して終了',
+  'app.quitDiscard': '保存しない',
+  'app.quitCancel': 'キャンセル',
+  'app.quitSaveFailed': '保存に失敗したため、終了をキャンセルしました。\n{message}',
+
   // fs errors (electron)
   'fs.nameRequired': '名前を入力してください',
   'fs.invalidChars': '名前に使えない文字が含まれています',
@@ -1051,6 +1060,14 @@ export const en: Record<MessageKey, string> = {
 
   'workspace.closeDirtyConfirm':
     '{count} file(s) have unsaved changes. Close the folder anyway?',
+
+  'app.quitUnsavedTitle': 'Unsaved changes',
+  'app.quitUnsavedMessage':
+    '{count} file(s) have unsaved changes. Save before quitting?',
+  'app.quitSave': 'Save',
+  'app.quitDiscard': "Don't Save",
+  'app.quitCancel': 'Cancel',
+  'app.quitSaveFailed': 'Save failed, so quit was cancelled.\n{message}',
 
   'fs.nameRequired': 'Enter a name',
   'fs.invalidChars': 'The name contains invalid characters',

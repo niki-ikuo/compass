@@ -225,6 +225,17 @@ const compassAPI = {
       ipcRenderer.invoke('shell:showItemInFolder', targetPath),
     openExternal: (url: string): Promise<void> => ipcRenderer.invoke('shell:openExternal', url)
   },
+  app: {
+    onCloseRequested: (callback: () => void): (() => void) => {
+      const handler = (): void => callback()
+      ipcRenderer.on('app:close-requested', handler)
+      return () => ipcRenderer.removeListener('app:close-requested', handler)
+    },
+    allowClose: (): Promise<void> => ipcRenderer.invoke('app:allow-close'),
+    cancelClose: (): Promise<void> => ipcRenderer.invoke('app:cancel-close'),
+    confirmUnsavedQuit: (count: number): Promise<'save' | 'discard' | 'cancel'> =>
+      ipcRenderer.invoke('dialog:unsavedQuit', count)
+  },
   help: {
     list: (locale: LocaleId): Promise<HelpDocMeta[]> => ipcRenderer.invoke('help:list', locale),
     get: (id: string, locale: LocaleId): Promise<HelpDoc> =>

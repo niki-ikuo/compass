@@ -73,6 +73,32 @@ import { testLlmConnection } from './services/ai-connection'
 
 let mainWindow: BrowserWindow | null = null
 let aiHelpMenuVisible = false
+/** 未保存確認を経たうえでウィンドウを閉じる許可 */
+let allowWindowClose = false
+/** クローズ確認ダイアログ／レンダラ応答の処理中（二重ダイアログ防止） */
+let closeRequestInFlight = false
+let closeRequestResetTimer: ReturnType<typeof setTimeout> | null = null
+
+function resetCloseRequestState(): void {
+  closeRequestInFlight = false
+  if (closeRequestResetTimer) {
+    clearTimeout(closeRequestResetTimer)
+    closeRequestResetTimer = null
+  }
+}
+
+function requestRendererCloseConfirm(): void {
+  if (!mainWindow || mainWindow.isDestroyed()) return
+  if (closeRequestInFlight) return
+  closeRequestInFlight = true
+  if (closeRequestResetTimer) clearTimeout(closeRequestResetTimer)
+  // レンダラ無応答時に再度閉じられるようにする
+  closeRequestResetTimer = setTimeout(() => {
+    closeRequestInFlight = false
+    closeRequestResetTimer = null
+  }, 60_000)
+  mainWindow.webContents.send('app:close-requested')
+}
 
 function applyViewZoom(
   webContents: Electron.WebContents,
@@ -116,8 +142,21 @@ function createWindow(): void {
     mainWindow.setMenuBarVisibility(false)
   }
 
+  mainWindow.on('close', (event) => {
+    if (allowWindowClose) return
+    event.preventDefault()
+    if (!mainWindow?.webContents || mainWindow.webContents.isLoadingMainFrame()) {
+      allowWindowClose = true
+      mainWindow?.close()
+      return
+    }
+    requestRendererCloseConfirm()
+  })
+
   mainWindow.on('closed', () => {
     mainWindow = null
+    allowWindowClose = false
+    resetCloseRequestState()
   })
 }
 
@@ -276,7 +315,41 @@ type ViewAction = 'reload' | 'toggleDevTools' | 'resetZoom' | 'zoomIn' | 'zoomOu
 
 function registerIpcHandlers(): void {
   ipcMain.handle('shell:quit', () => {
+    // app.quit() 直呼びではなく close フロー（未保存確認）を通す
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.close()
+      return
+    }
     app.quit()
+  })
+
+  ipcMain.handle('app:allow-close', () => {
+    resetCloseRequestState()
+    allowWindowClose = true
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.close()
+    }
+  })
+
+  ipcMain.handle('app:cancel-close', () => {
+    resetCloseRequestState()
+  })
+
+  ipcMain.handle('dialog:unsavedQuit', async (_event, count: number) => {
+    if (!mainWindow || mainWindow.isDestroyed()) return 'cancel' as const
+    const dirtyCount = typeof count === 'number' && count > 0 ? count : 1
+    const { response } = await dialog.showMessageBox(mainWindow, {
+      type: 'warning',
+      buttons: [t('app.quitSave'), t('app.quitDiscard'), t('app.quitCancel')],
+      defaultId: 0,
+      cancelId: 2,
+      noLink: true,
+      title: t('app.quitUnsavedTitle'),
+      message: t('app.quitUnsavedMessage', { count: dirtyCount })
+    })
+    if (response === 0) return 'save' as const
+    if (response === 1) return 'discard' as const
+    return 'cancel' as const
   })
 
   ipcMain.handle('shell:edit', (_event, action: EditAction) => {

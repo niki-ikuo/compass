@@ -646,6 +646,12 @@ export interface CompassAPI {
     showItemInFolder: (targetPath: string) => Promise<void>
     openExternal: (url: string) => Promise<void>
   }
+  app: {
+    onCloseRequested: (callback: () => void) => () => void
+    allowClose: () => Promise<void>
+    cancelClose: () => Promise<void>
+    confirmUnsavedQuit: (count: number) => Promise<'save' | 'discard' | 'cancel'>
+  }
   help: {
     list: (locale: LocaleId) => Promise<HelpDocMeta[]>
     get: (id: string, locale: LocaleId) => Promise<HelpDoc>
