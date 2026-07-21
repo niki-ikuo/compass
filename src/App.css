@@ -408,6 +408,23 @@ body {
   color: var(--menu-hover-fg);
 }
 
+.menu-bar-item-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.menu-bar-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 12px;
+  flex-shrink: 0;
+  font-size: 11px;
+  line-height: 1;
+}
+
 .menu-bar-shortcut {
   font-size: 11px;
   color: var(--text-secondary);
@@ -1089,6 +1106,11 @@ body.is-resizing-panels iframe {
   border-bottom: 1px solid var(--border);
 }
 
+.editor-view-toolbar-spacer {
+  flex: 1;
+  min-width: 8px;
+}
+
 .editor-view-toolbar button {
   padding: 4px 12px;
   border: none;
@@ -1099,7 +1121,12 @@ body.is-resizing-panels iframe {
   cursor: pointer;
 }
 
-.editor-view-toolbar button:hover {
+.editor-view-toolbar button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.editor-view-toolbar button:hover:not(:disabled) {
   background: var(--bg-hover);
   color: var(--text-primary);
 }

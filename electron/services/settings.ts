@@ -24,6 +24,8 @@ interface StoredSettings {
   colorTheme: ColorThemeId
   locale: LocaleId
   inlineCompletionsEnabled: boolean
+  editorMinimapEnabled: boolean
+  markdownOutlineEnabled: boolean
   autoOpenAgentPreview: boolean
   defaultShellId: string
   defaultUseCasePreset: UseCasePreset
@@ -42,6 +44,14 @@ function resolveLocale(value: unknown): LocaleId {
 
 function resolveInlineCompletionsEnabled(value: unknown): boolean {
   return typeof value === 'boolean' ? value : DEFAULT_SETTINGS.inlineCompletionsEnabled
+}
+
+function resolveEditorMinimapEnabled(value: unknown): boolean {
+  return typeof value === 'boolean' ? value : DEFAULT_SETTINGS.editorMinimapEnabled
+}
+
+function resolveMarkdownOutlineEnabled(value: unknown): boolean {
+  return typeof value === 'boolean' ? value : DEFAULT_SETTINGS.markdownOutlineEnabled
 }
 
 function resolveAutoOpenAgentPreview(value: unknown): boolean {
@@ -133,6 +143,8 @@ async function readStoredSettings(): Promise<StoredSettings> {
       colorTheme: resolveColorTheme(stored.colorTheme),
       locale: resolveLocale(stored.locale),
       inlineCompletionsEnabled: resolveInlineCompletionsEnabled(stored.inlineCompletionsEnabled),
+      editorMinimapEnabled: resolveEditorMinimapEnabled(stored.editorMinimapEnabled),
+      markdownOutlineEnabled: resolveMarkdownOutlineEnabled(stored.markdownOutlineEnabled),
       autoOpenAgentPreview: resolveAutoOpenAgentPreview(stored.autoOpenAgentPreview),
       defaultShellId: resolveDefaultShellId(stored.defaultShellId),
       defaultUseCasePreset: resolveUseCasePreset(stored.defaultUseCasePreset),
@@ -156,6 +168,8 @@ async function readStoredSettings(): Promise<StoredSettings> {
       colorTheme: DEFAULT_SETTINGS.colorTheme,
       locale: DEFAULT_SETTINGS.locale,
       inlineCompletionsEnabled: DEFAULT_SETTINGS.inlineCompletionsEnabled,
+      editorMinimapEnabled: DEFAULT_SETTINGS.editorMinimapEnabled,
+      markdownOutlineEnabled: DEFAULT_SETTINGS.markdownOutlineEnabled,
       autoOpenAgentPreview: DEFAULT_SETTINGS.autoOpenAgentPreview,
       defaultShellId: DEFAULT_SETTINGS.defaultShellId,
       defaultUseCasePreset: DEFAULT_SETTINGS.defaultUseCasePreset,
@@ -200,6 +214,8 @@ function toAppSettings(stored: StoredSettings): AppSettings {
     colorTheme: stored.colorTheme,
     locale: stored.locale,
     inlineCompletionsEnabled: stored.inlineCompletionsEnabled,
+    editorMinimapEnabled: stored.editorMinimapEnabled,
+    markdownOutlineEnabled: stored.markdownOutlineEnabled,
     autoOpenAgentPreview: stored.autoOpenAgentPreview,
     defaultShellId: stored.defaultShellId,
     defaultUseCasePreset: stored.defaultUseCasePreset,
@@ -246,6 +262,8 @@ export async function setSettings(settings: AppSettings): Promise<void> {
     colorTheme: resolveColorTheme(settings.colorTheme),
     locale,
     inlineCompletionsEnabled: resolveInlineCompletionsEnabled(settings.inlineCompletionsEnabled),
+    editorMinimapEnabled: resolveEditorMinimapEnabled(settings.editorMinimapEnabled),
+    markdownOutlineEnabled: resolveMarkdownOutlineEnabled(settings.markdownOutlineEnabled),
     autoOpenAgentPreview: resolveAutoOpenAgentPreview(settings.autoOpenAgentPreview),
     defaultShellId: resolveDefaultShellId(settings.defaultShellId),
     defaultUseCasePreset: resolveUseCasePreset(settings.defaultUseCasePreset),

@@ -295,6 +295,10 @@ export interface AppSettings {
   locale: LocaleId
   /** エディタのインライン補完（ゴーストテキスト） */
   inlineCompletionsEnabled: boolean
+  /** Monaco ミニマップ（エディタ右側の縮小表示） */
+  editorMinimapEnabled: boolean
+  /** Markdown 編集時の見出しアウトライン */
+  markdownOutlineEnabled: boolean
   /**
    * Agent のファイル変更プレビューをエディタで自動オープンするか。
    * false のときはエクスプローラ等で対象を開いたときに確認画面を出す。
@@ -746,6 +750,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   colorTheme: 'light',
   locale: DEFAULT_LOCALE,
   inlineCompletionsEnabled: true,
+  editorMinimapEnabled: true,
+  markdownOutlineEnabled: true,
   autoOpenAgentPreview: true,
   defaultShellId: 'powershell',
   defaultUseCasePreset: 'general',

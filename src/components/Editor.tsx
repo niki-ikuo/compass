@@ -26,6 +26,7 @@ import {
   writeSelectionClipboard
 } from '@/utils/chat-selection-drag'
 import { useI18n } from '@/i18n'
+import { patchAppSettings } from '@/utils/patch-app-settings'
 
 type MarkdownViewMode = 'edit' | 'preview' | 'split'
 
@@ -70,6 +71,8 @@ export function CodeEditor() {
   const pendingWorkspacePreview = useAppStore((s) => s.pendingWorkspacePreview)
   const monacoTheme = useAppStore((s) => getColorTheme(s.settings.colorTheme).monacoTheme)
   const inlineCompletionsEnabled = useAppStore((s) => s.settings.inlineCompletionsEnabled)
+  const editorMinimapEnabled = useAppStore((s) => s.settings.editorMinimapEnabled !== false)
+  const markdownOutlineEnabled = useAppStore((s) => s.settings.markdownOutlineEnabled !== false)
   const updateFileContent = useAppStore((s) => s.updateFileContent)
   const setEditorSelection = useAppStore((s) => s.setEditorSelection)
   const setCursorPosition = useAppStore((s) => s.setCursorPosition)
@@ -126,10 +129,13 @@ export function CodeEditor() {
         ...editorOptionsBase.inlineSuggest,
         enabled: inlineCompletionsEnabled !== false
       },
-      minimap: { enabled: !isMarkdown || markdownViewMode !== 'split' },
+      minimap: {
+        enabled:
+          editorMinimapEnabled && (!isMarkdown || markdownViewMode !== 'split')
+      },
       wordWrap
     }),
-    [inlineCompletionsEnabled, isMarkdown, markdownViewMode, wordWrap]
+    [inlineCompletionsEnabled, editorMinimapEnabled, isMarkdown, markdownViewMode, wordWrap]
   )
 
   useEffect(() => {
@@ -549,7 +555,7 @@ export function CodeEditor() {
               ...mergedEditorOptions,
               readOnly: true,
               renderSideBySide: true,
-              minimap: { enabled: true }
+              minimap: { enabled: editorMinimapEnabled }
             }}
           />
         </div>
@@ -560,7 +566,7 @@ export function CodeEditor() {
 
   const showEditor = !isMarkdown || markdownViewMode === 'edit' || markdownViewMode === 'split'
   const showPreviewPane = isMarkdown && (markdownViewMode === 'preview' || markdownViewMode === 'split')
-  const showOutline = isMarkdown && showEditor
+  const showOutline = isMarkdown && showEditor && markdownOutlineEnabled
 
   return (
     <>
@@ -585,6 +591,19 @@ export function CodeEditor() {
             onClick={() => setMarkdownViewMode('preview')}
           >
             {t('editor.previewTab')}
+          </button>
+          <span className="editor-view-toolbar-spacer" aria-hidden="true" />
+          <button
+            type="button"
+            className={markdownOutlineEnabled ? 'active' : ''}
+            aria-pressed={markdownOutlineEnabled}
+            disabled={!showEditor}
+            title={t('menu.toggleOutline')}
+            onClick={() =>
+              void patchAppSettings({ markdownOutlineEnabled: !markdownOutlineEnabled })
+            }
+          >
+            {t('editor.outline')}
           </button>
         </div>
       )}

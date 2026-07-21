@@ -65,6 +65,8 @@ function buildSettingsSnapshot(
     ...settings,
     providerKeys: { ...settings.providerKeys },
     inlineCompletionsEnabled: settings.inlineCompletionsEnabled !== false,
+    editorMinimapEnabled: settings.editorMinimapEnabled !== false,
+    markdownOutlineEnabled: settings.markdownOutlineEnabled !== false,
     autoOpenAgentPreview: settings.autoOpenAgentPreview === true,
     defaultShellId: settings.defaultShellId || DEFAULT_SETTINGS.defaultShellId,
     defaultUseCasePreset:

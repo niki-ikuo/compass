@@ -78,6 +78,8 @@ describe('getSettings / setSettings', () => {
       colorTheme: 'dark',
       locale: 'ja',
       inlineCompletionsEnabled: false,
+      editorMinimapEnabled: false,
+      markdownOutlineEnabled: false,
       autoOpenAgentPreview: false,
       defaultShellId: 'bash',
       defaultUseCasePreset: 'code',
@@ -90,6 +92,8 @@ describe('getSettings / setSettings', () => {
     expect(loaded.colorTheme).toBe('dark')
     expect(loaded.locale).toBe('ja')
     expect(loaded.inlineCompletionsEnabled).toBe(false)
+    expect(loaded.editorMinimapEnabled).toBe(false)
+    expect(loaded.markdownOutlineEnabled).toBe(false)
     expect(loaded.defaultUseCasePreset).toBe('code')
     expect(loaded.temperature).toBe(0.5)
   })

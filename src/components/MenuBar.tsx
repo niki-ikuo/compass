@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { SettingsIcon, ExplorerIcon, ChatIcon, TerminalIcon } from './icons/ToolbarIcons'
 import { useAppStore } from '@/stores/app-store'
+import { patchAppSettings } from '@/utils/patch-app-settings'
 import { useI18n } from '@/i18n'
 
 interface MenuBarProps {
@@ -25,6 +26,7 @@ interface MenuItem {
   shortcut?: string
   action: () => void
   separator?: boolean
+  checked?: boolean
 }
 
 function MenuDropdown({
@@ -67,14 +69,22 @@ function MenuDropdown({
               <button
                 key={item.label}
                 type="button"
-                role="menuitem"
+                role={item.checked !== undefined ? 'menuitemcheckbox' : 'menuitem'}
                 className="menu-bar-dropdown-item"
+                aria-checked={item.checked}
                 onClick={() => {
                   item.action()
                   onClose()
                 }}
               >
-                <span>{item.label}</span>
+                <span className="menu-bar-item-label">
+                  {item.checked !== undefined && (
+                    <span className="menu-bar-check" aria-hidden="true">
+                      {item.checked ? '✓' : ''}
+                    </span>
+                  )}
+                  <span>{item.label}</span>
+                </span>
                 {item.shortcut && <span className="menu-bar-shortcut">{item.shortcut}</span>}
               </button>
             )
@@ -106,6 +116,8 @@ export function MenuBar({
   const openSearchPanel = useAppStore((s) => s.openSearchPanel)
   const openBrowserTab = useAppStore((s) => s.openBrowserTab)
   const llmConnection = useAppStore((s) => s.llmConnection)
+  const editorMinimapEnabled = useAppStore((s) => s.settings.editorMinimapEnabled !== false)
+  const markdownOutlineEnabled = useAppStore((s) => s.settings.markdownOutlineEnabled !== false)
   const aiHelpAvailable = llmConnection.status === 'connected'
 
   const closeMenu = useCallback(() => setOpenMenu(null), [])
@@ -198,6 +210,17 @@ export function MenuBar({
     },
     { label: t('menu.zoomIn'), shortcut: 'Ctrl++', action: () => void window.compass.shell.view('zoomIn') },
     { label: t('menu.zoomOut'), shortcut: 'Ctrl+-', action: () => void window.compass.shell.view('zoomOut') },
+    { separator: true, label: '', action: () => {} },
+    {
+      label: t('menu.toggleMinimap'),
+      checked: editorMinimapEnabled,
+      action: () => void patchAppSettings({ editorMinimapEnabled: !editorMinimapEnabled })
+    },
+    {
+      label: t('menu.toggleOutline'),
+      checked: markdownOutlineEnabled,
+      action: () => void patchAppSettings({ markdownOutlineEnabled: !markdownOutlineEnabled })
+    },
     { separator: true, label: '', action: () => {} },
     { label: t('menu.newBrowserTab'), shortcut: 'Ctrl+Shift+B', action: () => openBrowserTab() },
     { label: t('menu.terminal'), shortcut: 'Ctrl+`', action: workspaceRoot ? onToggleTerminal : () => {} }
