@@ -490,6 +490,12 @@ export const ja = {
   'app.quitDiscard': '保存しない',
   'app.quitCancel': 'キャンセル',
   'app.quitSaveFailed': '保存に失敗したため、終了をキャンセルしました。\n{message}',
+  'app.closeUnsavedMessage':
+    '未保存の変更があるファイルが {count} 件あります。保存してから閉じますか？',
+  'app.closeUnsavedMessageNamed':
+    '「{name}」に未保存の変更があります。保存してから閉じますか？',
+  'app.closeSave': '保存',
+  'app.closeSaveFailed': '保存に失敗したため、閉じるのをキャンセルしました。\n{message}',
 
   // fs errors (electron)
   'fs.nameRequired': '名前を入力してください',
@@ -1074,6 +1080,11 @@ export const en: Record<MessageKey, string> = {
   'app.quitDiscard': "Don't Save",
   'app.quitCancel': 'Cancel',
   'app.quitSaveFailed': 'Save failed, so quit was cancelled.\n{message}',
+  'app.closeUnsavedMessage':
+    '{count} file(s) have unsaved changes. Save before closing?',
+  'app.closeUnsavedMessageNamed': '"{name}" has unsaved changes. Save before closing?',
+  'app.closeSave': 'Save',
+  'app.closeSaveFailed': 'Save failed, so close was cancelled.\n{message}',
 
   'fs.nameRequired': 'Enter a name',
   'fs.invalidChars': 'The name contains invalid characters',

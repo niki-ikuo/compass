@@ -652,6 +652,10 @@ export interface CompassAPI {
     allowClose: () => Promise<void>
     cancelClose: () => Promise<void>
     confirmUnsavedQuit: (count: number) => Promise<'save' | 'discard' | 'cancel'>
+    confirmUnsavedClose: (
+      count: number,
+      fileName?: string
+    ) => Promise<'save' | 'discard' | 'cancel'>
   }
   help: {
     list: (locale: LocaleId) => Promise<HelpDocMeta[]>

@@ -352,6 +352,30 @@ function registerIpcHandlers(): void {
     return 'cancel' as const
   })
 
+  ipcMain.handle(
+    'dialog:unsavedClose',
+    async (_event, count: number, fileName?: string) => {
+      if (!mainWindow || mainWindow.isDestroyed()) return 'cancel' as const
+      const dirtyCount = typeof count === 'number' && count > 0 ? count : 1
+      const named =
+        dirtyCount === 1 && typeof fileName === 'string' && fileName.trim().length > 0
+      const { response } = await dialog.showMessageBox(mainWindow, {
+        type: 'warning',
+        buttons: [t('app.closeSave'), t('app.quitDiscard'), t('app.quitCancel')],
+        defaultId: 0,
+        cancelId: 2,
+        noLink: true,
+        title: t('app.quitUnsavedTitle'),
+        message: named
+          ? t('app.closeUnsavedMessageNamed', { name: fileName.trim() })
+          : t('app.closeUnsavedMessage', { count: dirtyCount })
+      })
+      if (response === 0) return 'save' as const
+      if (response === 1) return 'discard' as const
+      return 'cancel' as const
+    }
+  )
+
   ipcMain.handle('shell:edit', (_event, action: EditAction) => {
     const webContents = mainWindow?.webContents
     if (!webContents) return

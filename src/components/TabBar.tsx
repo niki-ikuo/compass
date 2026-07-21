@@ -13,6 +13,7 @@ import {
   hasTabReorderDrag,
   resolveTabDropIndex
 } from '@/utils/tab-reorder'
+import { prepareCloseFiles, saveDirtyFiles } from '@/utils/unsaved-files'
 import { useI18n } from '@/i18n'
 import { CloseIcon } from './icons/ToolbarIcons'
 import type { OpenFile } from '@/types'
@@ -51,9 +52,34 @@ export function TabBar() {
   const reorderOpenFile = useAppStore((s) => s.reorderOpenFile)
   const tabBarRef = useRef<HTMLDivElement>(null)
   const dragPathRef = useRef<string | null>(null)
+  const closingRef = useRef(false)
   const [dragPath, setDragPath] = useState<string | null>(null)
   const [dropIndex, setDropIndex] = useState<number | null>(null)
   const openTabsKey = openFiles.map((file) => file.path).join('|')
+
+  const handleCloseTab = async (path: string) => {
+    if (closingRef.current) return
+    closingRef.current = true
+    try {
+      const state = useAppStore.getState()
+      const file = state.openFiles.find((f) => f.path === path)
+      if (!file) return
+
+      const result = await prepareCloseFiles([file], {
+        confirmUnsavedClose: (count, fileName) =>
+          window.compass.app.confirmUnsavedClose(count, fileName),
+        saveDirtyFiles: (files) =>
+          saveDirtyFiles(files, (savedPath) => useAppStore.getState().markFileSaved(savedPath))
+      })
+      if (result === 'abort') return
+      closeFile(path)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      window.alert(t('app.closeSaveFailed', { message }))
+    } finally {
+      closingRef.current = false
+    }
+  }
 
   useLayoutEffect(() => {
     const el = tabBarRef.current
@@ -168,7 +194,7 @@ export function TabBar() {
               className="tab-close"
               onClick={(e) => {
                 e.stopPropagation()
-                closeFile(file.path)
+                void handleCloseTab(file.path)
               }}
             >
               <CloseIcon />

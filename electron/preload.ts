@@ -236,7 +236,12 @@ const compassAPI = {
     allowClose: (): Promise<void> => ipcRenderer.invoke('app:allow-close'),
     cancelClose: (): Promise<void> => ipcRenderer.invoke('app:cancel-close'),
     confirmUnsavedQuit: (count: number): Promise<'save' | 'discard' | 'cancel'> =>
-      ipcRenderer.invoke('dialog:unsavedQuit', count)
+      ipcRenderer.invoke('dialog:unsavedQuit', count),
+    confirmUnsavedClose: (
+      count: number,
+      fileName?: string
+    ): Promise<'save' | 'discard' | 'cancel'> =>
+      ipcRenderer.invoke('dialog:unsavedClose', count, fileName)
   },
   help: {
     list: (locale: LocaleId): Promise<HelpDocMeta[]> => ipcRenderer.invoke('help:list', locale),
