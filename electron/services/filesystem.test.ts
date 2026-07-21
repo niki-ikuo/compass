@@ -264,6 +264,45 @@ describe('resolveChatContext', () => {
     })
     expect(resolved.folders).toHaveLength(0)
   })
+
+  it('loads external files as read-only context with absolute labels', async () => {
+    const root = makeTempRoot('ws-ctx')
+    const externalRoot = makeTempRoot('external-ctx')
+    tempRoots.push(root, externalRoot)
+    writeFileSync(join(root, 'inside.md'), 'in\n', 'utf-8')
+    const externalPath = join(externalRoot, 'outside.md')
+    writeFileSync(externalPath, 'out\n', 'utf-8')
+
+    const resolved = await resolveChatContext(root, [
+      { path: join(root, 'inside.md'), name: 'inside.md', isDirectory: false },
+      { path: externalPath, name: 'outside.md', isDirectory: false }
+    ])
+
+    expect(resolved.files).toHaveLength(2)
+    expect(resolved.files[0]).toMatchObject({
+      relativePath: 'inside.md',
+      content: 'in\n'
+    })
+    expect(resolved.files[1].content).toBe('out\n')
+    expect(resolved.files[1].relativePath.replace(/\\/g, '/')).toBe(
+      externalPath.replace(/\\/g, '/')
+    )
+    expect(resolved.files[1].relativePath.includes('..')).toBe(false)
+  })
+
+  it('ignores external folder refs', async () => {
+    const root = makeTempRoot('ws-folder-guard')
+    const externalRoot = makeTempRoot('external-folder')
+    tempRoots.push(root, externalRoot)
+    writeFileSync(join(externalRoot, 'secret.md'), 'nope\n', 'utf-8')
+
+    const resolved = await resolveChatContext(root, [
+      { path: externalRoot, name: 'external-folder', isDirectory: true }
+    ])
+
+    expect(resolved.folders).toHaveLength(0)
+    expect(resolved.files).toHaveLength(0)
+  })
 })
 
 describe('readDirectory', () => {

@@ -578,6 +578,8 @@ export interface CompassAPI {
     delete: (targetPath: string) => Promise<void>
     pickFiles: () => Promise<string[] | null>
     importFiles: (parentDir: string, sourcePaths: string[]) => Promise<string[]>
+    /** OS ドロップ等の File から絶対パスを得る（Electron webUtils） */
+    getPathForFile: (file: File) => string
     search: (
       workspaceRoot: string,
       options: WorkspaceSearchOptions

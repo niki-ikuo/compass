@@ -62,4 +62,11 @@ describe('formatContextMention + isStructuredMention', () => {
     expect(detectMentionKind(folder.slice(2, -1))).toBe('folder')
     expect(detectMentionKind(file.slice(2, -1))).toBe('file')
   })
+
+  it('mentions external files with absolute paths', () => {
+    const external = formatContextMention('C:/Users/niki/Desktop/spec.md', false, root)
+    expect(external).toBe('@[C:/Users/niki/Desktop/spec.md]')
+    expect(isStructuredMention(external.slice(2, -1))).toBe(true)
+    expect(detectMentionKind(external.slice(2, -1))).toBe('file')
+  })
 })

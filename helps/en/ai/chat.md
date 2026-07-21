@@ -45,6 +45,7 @@ Separately from Ask / Edit / Agent, use-case presets (General / Document / Data 
 - **Enter** … send
 - **Shift+Enter** … new line
 - The open file (and selection, if any) are included as context
+- Drop **files** from Explorer onto chat to attach them as references (**folders are not allowed**; read-only context only)
 - Replies stream in
 - History is saved to `.compass/chat-history.json` in the workspace
 

@@ -27,7 +27,7 @@ import {
 } from '../../src/utils/context-budget'
 import { getSettings } from './settings'
 import { ensureProjectIndex, getProjectIndexContext } from './project-indexer'
-import { resolveChatContext } from './filesystem'
+import { resolveChatContext, isInsideWorkspace } from './filesystem'
 import { getLlmProvider, getProviderLabel } from '../../src/utils/llm-providers'
 
 export type { ChatContentPart, ChatImageAttachment, UserMessagePayload }
@@ -226,7 +226,9 @@ export async function buildUserMessagePayload(request: ChatRequest): Promise<Use
 
     const indexContext = await getProjectIndexContext(request.workspaceRoot, {
       currentFile: request.context?.filePath,
-      referencePaths: request.context?.references?.map((r) => r.path),
+      referencePaths: request.context?.references
+        ?.map((r) => r.path)
+        .filter((p) => isInsideWorkspace(request.workspaceRoot!, p)),
       preset: request.preset
     })
     if (indexContext) {

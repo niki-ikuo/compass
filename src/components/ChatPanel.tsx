@@ -35,7 +35,9 @@ import {
 } from '@/utils/workspace-actions'
 import {
   hasChatContextDrag,
-  parseChatContextRefs
+  hasOsFileDrag,
+  parseChatContextRefs,
+  parseOsDroppedFileRefs
 } from '@/utils/chat-context-drag'
 import { formatContextMention } from '@/utils/chat-mentions'
 import {
@@ -881,7 +883,9 @@ export function ChatPanel() {
   }, [chatComposerInsertRequest?.id])
 
   const isChatDrop = (dataTransfer: DataTransfer) =>
-    hasChatContextDrag(dataTransfer) || hasChatSelectionDrag(dataTransfer)
+    hasChatContextDrag(dataTransfer) ||
+    hasChatSelectionDrag(dataTransfer) ||
+    hasOsFileDrag(dataTransfer)
 
   const handleDragOver = (e: React.DragEvent) => {
     if (!isChatDrop(e.dataTransfer)) return
@@ -917,6 +921,37 @@ export function ChatPanel() {
       } else {
         insertMentionAtCursor(selectionPayload.mention)
       }
+      return
+    }
+
+    if (!hasOsFileDrag(e.dataTransfer)) return
+
+    if (!workspaceRoot) {
+      window.alert(t('chat.dropFileNeedsWorkspace'))
+      return
+    }
+
+    const { files: osFileRefs, rejectedFolderNames } = parseOsDroppedFileRefs(
+      e.dataTransfer,
+      (file) => {
+        const path = window.compass.fs.getPathForFile(file)
+        return path.trim() ? path : null
+      }
+    )
+    if (rejectedFolderNames.length > 0) {
+      window.alert(t('chat.externalFolderNotAllowed'))
+    }
+    if (osFileRefs.length === 0) {
+      // Files はあるのにパスが取れない（稀）／フォルダのみで既にアラート済み
+      if (rejectedFolderNames.length === 0) {
+        window.alert(t('chat.dropFilePathFailed'))
+      }
+      return
+    }
+
+    addChatContextRefs(osFileRefs)
+    for (const fileRef of osFileRefs) {
+      insertContextMentionIntoInput(fileRef)
     }
   }
 

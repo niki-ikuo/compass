@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from 'electron'
+import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import type {
   AppSettings,
   ChatContextRef,
@@ -68,6 +68,14 @@ const compassAPI = {
     pickFiles: (): Promise<string[] | null> => ipcRenderer.invoke('fs:pickFiles'),
     importFiles: (parentDir: string, sourcePaths: string[]): Promise<string[]> =>
       ipcRenderer.invoke('fs:importFiles', parentDir, sourcePaths),
+    /** Electron 32+ では File.path が消えたため、OS ドロップの絶対パス取得に使う */
+    getPathForFile: (file: File): string => {
+      try {
+        return webUtils.getPathForFile(file) || ''
+      } catch {
+        return ''
+      }
+    },
     resolveChatContext: (
       workspaceRoot: string,
       references: ChatContextRef[]

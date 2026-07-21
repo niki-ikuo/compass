@@ -184,6 +184,14 @@ function validateName(name: string): void {
   if (/[<>:"/\\|?*]/.test(name)) throw new Error(t('fs.invalidChars'))
 }
 
+/** パスがワークスペース内（または直下）かどうか */
+export function isInsideWorkspace(workspaceRoot: string, targetPath: string): boolean {
+  const root = resolve(workspaceRoot)
+  const absolutePath = isAbsolute(targetPath) ? resolve(targetPath) : resolve(root, targetPath)
+  const rel = relative(root, absolutePath)
+  return rel === '' || (!rel.startsWith('..') && !isAbsolute(rel))
+}
+
 /** ワークスペース内パスへ解決。`allowRoot` でワークスペース直下自体を許可（listDir 用） */
 export function resolveInsideWorkspace(
   workspaceRoot: string,
@@ -440,8 +448,18 @@ export async function fileExists(filePath: string): Promise<boolean> {
   }
 }
 
-function toRelativePath(workspaceRoot: string, filePath: string): string {
-  return relative(workspaceRoot, filePath).replace(/\\/g, '/')
+/**
+ * チャット文脈用のパス表記。
+ * ワークスペース内は相対、外は絶対（`../..` 表記にしない）。
+ */
+function toContextPathLabel(workspaceRoot: string, filePath: string): string {
+  const root = resolve(workspaceRoot)
+  const absolute = resolve(filePath)
+  const rel = relative(root, absolute)
+  if (rel === '' || (!rel.startsWith('..') && !isAbsolute(rel))) {
+    return rel.replace(/\\/g, '/') || '.'
+  }
+  return absolute.replace(/\\/g, '/')
 }
 
 async function readTextFileSafe(
@@ -463,7 +481,7 @@ async function readTextFileSafe(
 
     const decoded = decodeFileBuffer(slice)
     return {
-      relativePath: toRelativePath(workspaceRoot, filePath),
+      relativePath: toContextPathLabel(workspaceRoot, filePath),
       content: decoded.content,
       truncated,
       kind: 'text'
@@ -482,7 +500,7 @@ async function readPdfFileSafe(
     if (!info.isFile()) return null
     const buffer = await readFile(filePath)
     const extracted = extractPdfText(buffer, MAX_PDF_TEXT_CHARS)
-    const relativePath = toRelativePath(workspaceRoot, filePath)
+    const relativePath = toContextPathLabel(workspaceRoot, filePath)
     if (!extracted.text.trim()) {
       return {
         relativePath,
@@ -513,7 +531,7 @@ async function readImageFileSafe(
     if (!info.isFile()) return null
     if (info.size > MAX_IMAGE_BYTES) {
       return {
-        relativePath: toRelativePath(workspaceRoot, filePath),
+        relativePath: toContextPathLabel(workspaceRoot, filePath),
         content: t('ai.imageTooLarge', {
           maxMb: Math.round(MAX_IMAGE_BYTES / (1024 * 1024))
         }),
@@ -523,7 +541,7 @@ async function readImageFileSafe(
     }
     const buffer = await readFile(filePath)
     return {
-      relativePath: toRelativePath(workspaceRoot, filePath),
+      relativePath: toContextPathLabel(workspaceRoot, filePath),
       content: '',
       truncated: false,
       kind: 'image',
@@ -595,6 +613,9 @@ export async function resolveChatContext(
 
   for (const ref of references) {
     if (ref.isDirectory) {
+      // フォルダ参照はワークスペース内のみ（外部フォルダはチャット文脈に載せない）
+      if (!isInsideWorkspace(workspaceRoot, ref.path)) continue
+
       try {
         const info = await stat(ref.path)
         if (!info.isDirectory()) continue
@@ -604,7 +625,7 @@ export async function resolveChatContext(
       }
 
       const allFiles = await listFilesRecursive(ref.path)
-      const structure = allFiles.map((f) => toRelativePath(workspaceRoot, f))
+      const structure = allFiles.map((f) => toContextPathLabel(workspaceRoot, f))
       const truncated = allFiles.length > MAX_FOLDER_FILES
       const selected = allFiles.slice(0, MAX_FOLDER_FILES)
       const folderFiles: ResolvedContextFile[] = []
@@ -628,12 +649,13 @@ export async function resolveChatContext(
       }
 
       folders.push({
-        relativePath: toRelativePath(workspaceRoot, ref.path) || '.',
+        relativePath: toContextPathLabel(workspaceRoot, ref.path) || '.',
         structure,
         files: folderFiles,
         truncated
       })
     } else {
+      // 外部ファイルも読み取り専用の文脈として許可
       const file = await readContextFile(ref.path, workspaceRoot)
       acceptFile(file)
     }

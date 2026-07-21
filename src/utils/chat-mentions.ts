@@ -13,17 +13,18 @@ export function formatFolderMention(label: string): string {
 }
 
 export function formatContextLabel(path: string, workspaceRoot: string | null): string {
-  if (!workspaceRoot) return path
-  const root = workspaceRoot.replace(/\\/g, '/')
   const normalized = path.replace(/\\/g, '/')
+  if (!workspaceRoot) return normalized
+  const root = workspaceRoot.replace(/\\/g, '/').replace(/\/$/, '')
   // ワークスペース直下そのものは相対 "."（フォルダ名だと Agent がサブパスと誤認する）
   if (normalized === root || normalized === `${root}/`) {
     return '.'
   }
-  if (normalized.startsWith(root)) {
-    return normalized.slice(root.length).replace(/^\//, '') || '.'
+  if (normalized.startsWith(`${root}/`)) {
+    return normalized.slice(root.length + 1) || '.'
   }
-  return path
+  // 外部ファイルは絶対パス（スラッシュ統一）でメンションする
+  return normalized
 }
 
 /** 指示文に埋め込むパス表記（フォルダは末尾 `/`） */

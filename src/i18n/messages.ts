@@ -275,10 +275,15 @@ export const ja = {
     '送信前に Ask / Edit / Agent を選べます。Ask は説明のみ、Edit はファイル変更を提案、Agent はツールで調査・変更提案（承認後に適用）します',
   'chat.emptyContext': '現在のファイルが自動的にコンテキストに含まれます',
   'chat.emptyPasteHint':
-    'エディタの選択行、スクリーンショット、PDF をチャットに貼ると参照できます',
+    'エディタの選択行、スクリーンショット、PDF をチャットに貼ると参照できます。エクスプローラーからファイルをドロップしても参照できます（フォルダは不可）',
   'chat.pasteMediaNeedsWorkspace':
     '画像や PDF を貼るには、先にフォルダを開いてください',
   'chat.pasteMediaFailed': '貼り付けたファイルの保存に失敗しました',
+  'chat.dropFileNeedsWorkspace':
+    '外部ファイルをドロップするには、先にフォルダを開いてください',
+  'chat.externalFolderNotAllowed':
+    '外部フォルダはチャットに追加できません。ファイルのみドロップしてください',
+  'chat.dropFilePathFailed': 'ドロップしたファイルのパスを取得できませんでした',
   'chat.you': 'あなた',
   'chat.ai': 'AI',
   'chat.modelOf': '{provider} のモデル',
@@ -875,9 +880,13 @@ export const en: Record<MessageKey, string> = {
     'Choose Ask / Edit / Agent before sending. Ask explains; Edit proposes file changes; Agent inspects with tools and proposes changes (apply after approval)',
   'chat.emptyContext': 'The current file is included as context automatically',
   'chat.emptyPasteHint':
-    'Paste editor selections, screenshots, or PDFs into chat to attach them as references',
+    'Paste editor selections, screenshots, or PDFs into chat to attach them as references. You can also drop files from Explorer (folders are not allowed)',
   'chat.pasteMediaNeedsWorkspace': 'Open a folder before pasting images or PDFs',
   'chat.pasteMediaFailed': 'Failed to save the pasted file',
+  'chat.dropFileNeedsWorkspace': 'Open a folder before dropping external files',
+  'chat.externalFolderNotAllowed':
+    'External folders cannot be added to chat. Drop files only',
+  'chat.dropFilePathFailed': 'Could not resolve the path of the dropped file',
   'chat.you': 'You',
   'chat.ai': 'AI',
   'chat.modelOf': '{provider} model',
