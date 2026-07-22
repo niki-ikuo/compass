@@ -43,6 +43,7 @@ electron/
     ├── agent-approval.ts   # 書き込み承認の一時停止 / 再開
     ├── agent-propose-actions.ts
     ├── agent-verify.ts / agent-verify-light.ts
+    ├── agent-data-sandbox.ts  # data 用途の profileData / queryData（sql.js）
     ├── agent-plan.ts / agent-memory.ts / agent-read-cache.ts / agent-paths.ts
     ├── settings.ts         # アプリ設定の読み書き
     ├── workspace-settings.ts  # `.compass/settings.json`（例: 既定用途）
@@ -93,7 +94,7 @@ Renderer からは `window.compass.*` を呼び出します。実装の正は `e
 6. 完了時に `ai:done`、失敗時に `ai:error`、キャンセル時に `ai:aborted`
 7. **Ask**: 説明のみ（ファイル変更アクションは出さない）
 8. **Edit**: `compass-actions` をパース → プレビュー → ユーザー承認で適用（自律ツールループではない）
-9. **Agent（Phase 1–4）**: 読取ツール、`proposeActions`（一時停止 → プレビュー → 承認、部分適用含む）、制限付き `exec`、ターン/ペイロード上限、秘密マスキング、tools 非対応時の扱い、`waiting_approval` UI — 詳細: [AGENT.md](./AGENT.md)
+9. **Agent（Phase 1–4）**: 読取ツール（Markdown は任意 `heading`）、`proposeActions`（一時停止 → プレビュー → 承認、部分適用含む）、制限付き `exec`、ターン/ペイロード上限、秘密マスキング、tools 非対応時の扱い、`waiting_approval` UI。document/data light verify。data 用途の `profileData` / `queryData` — 詳細: [AGENT.md](./AGENT.md)
 
 ## `.compass` フォルダ
 

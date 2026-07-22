@@ -138,7 +138,7 @@ End-to-end tool loop without mutating the workspace.
 
 - **Partial apply:** When the preview queue empties after per-file apply/reject, Agent approval resumes with an applied/rejected observation
 - **Apply failure → re-propose:** On apply error the preview stays for Retry; **Ask Agent to fix** clears the preview and returns the failure observation
-- **Verify loop:** `verify` tool runs project test / lint / typecheck via package scripts (or safe fallbacks)
+- **Verify loop:** `verify` tool runs project test / lint / typecheck via package scripts (or safe fallbacks); document/data use light checks (`agent-verify-light.ts`)
 - **Progress / cancel:** `ai:step` status labels; `waiting_approval` step status; abort clears approval + running/waiting steps
 - **Tools-less providers:** Hide Agent mode in the chat picker when tools are unsupported (`isAgentModeAvailable` / `ChatPanel`); if Agent was somehow selected, guided Edit fallback (`agentEditFallback`) offers resend in Edit
 - **History:** `waiting_approval` / `running` steps normalize safely on load
@@ -154,6 +154,9 @@ End-to-end tool loop without mutating the workspace.
 |------|--------|
 | Hide Agent toggle per provider | Shipped — Ollama and other tools-less providers hide Agent (Ask / Edit only) |
 | Guided Edit fallback when tools unsupported | Shipped — banner + resend in Edit (`ChatPanel` `agentEditFallback`) |
+| Document / data light verify | Shipped — headings / relative links; CSV/TSV/JSON/YAML schema checks |
+| Markdown section `readFile` | Shipped — optional `heading` argument |
+| Data Agent sandbox | Shipped — `profileData` / `queryData` when use-case is `data` (`agent-data-sandbox.ts`, sql.js) |
 
 ---
 

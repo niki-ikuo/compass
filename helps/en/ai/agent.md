@@ -8,6 +8,10 @@ keywords:
   - Approval
   - tools
   - Ollama
+  - Data
+  - profileData
+  - queryData
+  - Document
 category: ai
 related:
   - chat.md
@@ -26,10 +30,12 @@ Agent is not “a longer Edit.” The model calls tools, observes results, and t
 
 ## What can you do?
 
-- Read and inspect files in the workspace
+- Read and inspect files in the workspace (Markdown can be read by heading)
 - Propose batches of changes (you apply them)
 - Run limited commands (some require approval first)
 - Multi-turn work with plan / memory
+- With the **Document** use case: structure checks after edits (headings, relative links)
+- With the **Data** use case: profile CSV / TSV / JSON and run read-only SQL-style queries on imported tables
 
 ## Requirements
 
@@ -48,10 +54,11 @@ Agent is not “a longer Edit.” The model calls tools, observes results, and t
 ## How to use
 
 1. Select **Agent** in chat
-2. Describe the goal clearly (e.g. “Update this folder’s README to match the current project”)
-3. Watch the step timeline (thinking / tools / waiting for approval)
-4. Approve or reject change proposals and command runs
-5. Continue if prompted, or cancel
+2. Pick a use-case preset if needed (**Document** for docs, **Data** for tables)
+3. Describe the goal clearly (e.g. “Update this folder’s README to match the current project”)
+4. Watch the step timeline (thinking / tools / waiting for approval)
+5. Approve or reject change proposals and command runs
+6. Continue if prompted, or cancel
 
 ## Keep in mind
 
@@ -59,6 +66,7 @@ Agent is not “a longer Edit.” The model calls tools, observes results, and t
 - Paths stay inside the open workspace
 - Agent `exec` is a short-lived child process — not the integrated terminal
 - Turn / tool limits may ask you to continue
+- `profileData` / `queryData` appear only when the use case is **Data** (queries are read-only)
 
 ## FAQ
 
@@ -67,6 +75,9 @@ A. Not currently. Use Edit, or switch to a tools-capable provider such as OpenAI
 
 **Q. It stopped mid-run**  
 A. It may be waiting for approval or a continue confirmation. You can also cancel.
+
+**Q. How do I analyze a CSV with Agent?**  
+A. Set the use case to **Data**, then ask (e.g. “profile sales.csv and summarize null rates”). Agent can profile columns and run read-only queries without writing files until you approve a change.
 
 ## Related
 

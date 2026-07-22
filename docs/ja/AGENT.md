@@ -122,12 +122,14 @@ OpenAI function schema は `AGENT_TOOLS`（`agent-runner.ts`）。`executeTool` 
 
 | ツール | 主な実装 | 動き | ユーザー介入 |
 |--------|----------|------|--------------|
-| `readFile` | `agent-read-cache` | 最大約 200 KB、アウトライン、`force=true` 以外はキャッシュ | なし |
+| `readFile` | `agent-read-cache` | 最大約 200 KB、アウトライン、`force=true` 以外はキャッシュ。Markdown は任意の `heading` で該当セクションのみ | なし |
 | `listDir` | runner | 1 階層、最大 200 エントリ | なし |
 | `search` | `workspace-search` | 本文検索、最大 30 件 | なし |
 | `proposeActions` | `agent-propose-actions` + `filesystem` | 正規化 → プレビュー → **一時停止** | 適用 / 却下 / 部分適用 / Agent に修正させる |
 | `exec` | `agent-exec` | cwd は WS 内、deny-list、タイムアウト、出力上限 | 書込系は `ai:needExecApproval` |
-| `verify` | `agent-verify` | test / lint / typecheck（スクリプト or フォールバック） | なし（内部 exec） |
+| `verify` | `agent-verify` | test / lint / typecheck（スクリプト or フォールバック）；document/data 向け light チェック | なし（code は内部 exec） |
+| `profileData` | `agent-data-sandbox` | **data 用途のみ** — 列プロファイル（型 / null / ユニーク / サンプル）；ラン内 SQLite へ取込 | なし |
+| `queryData` | `agent-data-sandbox` | **data 用途のみ** — 取込済み CSV/TSV/JSON への読み取り専用 `SELECT` / `WITH…SELECT`（`t` = 先頭パスの別名） | なし |
 | `updateTodo` | `agent-plan` | チェックリスト | なし |
 | `checkpoint` | `agent-plan` | 再開用サマリ | なし |
 | `remember` | `agent-memory` | Continue / フォローアップ用の事実メモ | なし |
@@ -233,7 +235,9 @@ electron/services/
   agent-approval.ts         # 承認・続行の wait / resolve
   agent-propose-actions.ts  # JSON パース / 修復 / 不完全検出
   agent-exec.ts             # deny-list シェル、リスク分類
-  agent-verify.ts           # test/lint/typecheck
+  agent-verify.ts           # test/lint/typecheck（code）
+  agent-verify-light.ts     # document/data 向け light verify
+  agent-data-sandbox.ts     # profileData / queryData（data 用途・sql.js）
   agent-plan.ts             # 共有 plan ヘルパーの再エクスポート
   agent-memory.ts           # remember + 観測キャプチャ
   agent-read-cache.ts       # ラン内 readFile キャッシュ
@@ -244,6 +248,8 @@ electron/services/
 
 src/
   utils/agent-plan.ts       # todos + checkpoint + 複数パート nudge（共有）
+  utils/data-rows.ts / data-profile.ts / data-verify.ts / data-sql-guard.ts
+  utils/markdown-outline.ts # Markdown 見出しセクション・document verify
   components/AgentPlanPanel.tsx  # チャット計画パネル
   components/ChatPanel.tsx
   components/AgentStepTimeline.tsx

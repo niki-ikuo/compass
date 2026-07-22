@@ -51,7 +51,7 @@ In the open workspace: `.compass/chat-history.json`.
 - Ask / Edit / Agent … **how it behaves** (read-only / propose / tool loop)
 - Use-case presets … **what role it speaks as**
 
-Both are available around chat. → [AI chat](../ai/chat.md)
+Both are available around chat. With **Data** + Agent you also get table profiling and read-only queries; with **Document** + Agent, heading-aware reads and light structure checks. → [AI chat](../ai/chat.md) / [Agent](../ai/agent.md)
 
 ## How do I search across files?
 

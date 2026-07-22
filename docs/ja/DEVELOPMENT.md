@@ -44,7 +44,7 @@ npm run dev
 | IPC ハンドラ | `electron/main.ts` |
 | ファイル操作 | `electron/services/filesystem.ts` |
 | AI 通信 | `electron/services/ai-client.ts` |
-| Agent ツールループ | `electron/services/agent-runner.ts`、`agent-exec.ts`、[AGENT.md](./AGENT.md)、[AGENT_PLAN.md](./AGENT_PLAN.md) |
+| Agent ツールループ | `electron/services/agent-runner.ts`、`agent-exec.ts`、`agent-data-sandbox.ts`、[AGENT.md](./AGENT.md)、[AGENT_PLAN.md](./AGENT_PLAN.md) |
 | オフラインヘルプ / AI ヘルプ | `electron/services/help.ts`、`help-ask.ts`、`helps/`、`src/components/HelpDialog.tsx`、`HelpAskDialog.tsx` |
 | ワークスペース検索 | `electron/services/workspace-search.ts`、`src/components/SearchPanel.tsx`、`LeftSidebar.tsx` |
 | ワークスペース設定 | `electron/services/workspace-settings.ts`（`.compass/settings.json`） |

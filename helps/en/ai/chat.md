@@ -34,6 +34,12 @@ Use the right-hand chat to ask AI about the current file or selection.
 
 Separately from Ask / Edit / Agent, use-case presets (General / Document / Data / Code) control tone and approach.
 
+| Preset | Typical Agent extras |
+|--------|----------------------|
+| **Document** | Read Markdown by heading; light checks for headings / relative links |
+| **Data** | Column profiles and read-only queries on CSV / TSV / JSON |
+| **Code** / **General** | Standard tools (read / search / propose / exec / verify) |
+
 ## How to open
 
 1. [Configure AI](../getting-started/ai-provider.md)

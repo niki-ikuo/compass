@@ -20,7 +20,7 @@
 
 - Text editor
 - File tree
-- AI chat (side panel) — **Ask** (explain only) / **Edit** (propose file changes) / **Agent** (tool loop: read tools, `proposeActions` with preview approval, restricted `exec`, `verify`, plan/memory — see [AGENT.md](./AGENT.md))
+- AI chat (side panel) — **Ask** (explain only) / **Edit** (propose file changes) / **Agent** (tool loop: read tools, `proposeActions` with preview approval, restricted `exec`, `verify`, plan/memory; data use-case adds `profileData` / `queryData` — see [AGENT.md](./AGENT.md))
 - Current file sent as context
 - Diff preview & apply for AI suggestions (Edit: `compass-actions`; Agent: `proposeActions` → same preview → user approval)
 - OpenAI-compatible API (multi-LLM: provider presets, per-provider API keys, model selection)
@@ -279,7 +279,7 @@ Use-case presets: [USE_CASE_PRESET.md](./USE_CASE_PRESET.md).
 |------|---------|
 | Ask mode | Explain / review only; no workspace change proposals |
 | Edit mode | Propose create/change/delete as JSON; user previews and applies |
-| Agent | Shipped tool-call loop (Phases 0–4): read tools, `proposeActions` (preview approval), restricted `exec`, `verify`, plan/memory — see [AGENT.md](./AGENT.md) |
+| Agent | Shipped tool-call loop (Phases 0–4): read tools, `proposeActions` (preview approval), restricted `exec`, `verify`, plan/memory; data use-case `profileData` / `queryData` — see [AGENT.md](./AGENT.md) |
 | Use-case preset | *What kind of expert* (`general` / `document` / `data` / `code`). Orthogonal to Ask / Edit / Agent — see [USE_CASE_PRESET.md](./USE_CASE_PRESET.md) |
 
 ---

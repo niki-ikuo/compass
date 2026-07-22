@@ -122,7 +122,7 @@ Defined as OpenAI function schemas in `AGENT_TOOLS` (`agent-runner.ts`). Dispatc
 
 | Tool | Module / path | Behavior | User gate |
 |------|---------------|----------|-----------|
-| `readFile` | `agent-read-cache` | ≤ ~200 KB; outline; cache hit unless `force=true` | — |
+| `readFile` | `agent-read-cache` | ≤ ~200 KB; outline; cache hit unless `force=true`; Markdown optional `heading` for one section | — |
 | `listDir` | runner | One level, ≤ 200 entries | — |
 | `search` | `workspace-search` | Content search, ≤ 30 hits | — |
 | `proposeActions` | `agent-propose-actions` + `filesystem` | Normalize → preview → **pause** | Apply / Reject / partial / Ask Agent to fix |
@@ -235,7 +235,9 @@ electron/services/
   agent-approval.ts         # wait / resolve for approval & continue
   agent-propose-actions.ts  # JSON parse / coerce / incompleteness
   agent-exec.ts             # deny-list shell, risk classification
-  agent-verify.ts           # test/lint/typecheck orchestration
+  agent-verify.ts           # test/lint/typecheck orchestration (code)
+  agent-verify-light.ts     # document/data light verify
+  agent-data-sandbox.ts     # profileData / queryData (data use-case; sql.js)
   agent-plan.ts             # re-exports shared plan helpers
   agent-memory.ts           # remember + observation capture
   agent-read-cache.ts       # in-run readFile cache
@@ -246,6 +248,8 @@ electron/services/
 
 src/
   utils/agent-plan.ts       # todos + checkpoint + multi-part nudge heuristics (shared)
+  utils/data-rows.ts / data-profile.ts / data-verify.ts / data-sql-guard.ts
+  utils/markdown-outline.ts # Markdown heading sections + document verify
   components/AgentPlanPanel.tsx  # chat Plan checklist UI
   components/ChatPanel.tsx
   components/AgentStepTimeline.tsx

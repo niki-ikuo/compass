@@ -20,7 +20,7 @@
 
 - テキストエディタ
 - ファイルツリー
-- AIチャット（サイドパネル）— **Ask**（説明のみ）/ **Edit**（ファイル変更の提案）/ **Agent**（ツールループ: 読取、`proposeActions` によるプレビュー承認、制限付き `exec`、`verify`、plan/memory — [AGENT.md](./AGENT.md)）
+- AIチャット（サイドパネル）— **Ask**（説明のみ）/ **Edit**（ファイル変更の提案）/ **Agent**（ツールループ: 読取、`proposeActions` によるプレビュー承認、制限付き `exec`、`verify`、plan/memory。data 用途では `profileData` / `queryData` 追加 — [AGENT.md](./AGENT.md)）
 - 現在ファイルをコンテキスト送信
 - AI提案の差分プレビュー＆適用（Edit は `compass-actions`、Agent は `proposeActions` → 同じプレビュー → ユーザー承認）
 - OpenAI互換API接続（マルチ LLM 切替: プロバイダプリセット・プロバイダ別 API Key・モデル選択）
@@ -279,7 +279,7 @@ v2.0 Agent Phase 0–4（出荷済み）と後続ロードマップ: [AGENT_PLAN
 |------|------|
 | Ask モード | 説明・レビューのみ。ワークスペース変更は提案しない |
 | Edit モード | ファイル作成・変更・削除を JSON で提案し、ユーザーがプレビュー承認して適用 |
-| Agent | 出荷済みのツール呼び出しループ（Phase 0–4）: 読取、`proposeActions`（プレビュー承認）、制限付き `exec`、`verify`、plan/memory — [AGENT.md](./AGENT.md) |
+| Agent | 出荷済みのツール呼び出しループ（Phase 0–4）: 読取、`proposeActions`（プレビュー承認）、制限付き `exec`、`verify`、plan/memory。data 用途の `profileData` / `queryData` — [AGENT.md](./AGENT.md) |
 | 用途プリセット | 「何の専門家か」（`general` / `document` / `data` / `code`）。Ask / Edit / Agent とは別軸 — [USE_CASE_PRESET.md](./USE_CASE_PRESET.md) |
 
 ---

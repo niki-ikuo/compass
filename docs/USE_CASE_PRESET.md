@@ -6,7 +6,7 @@ Product spec for **use-case presets** (`general` / `document` / `data` / `code`)
 
 Related: [SPEC.md](./SPEC.md) (Ask / Edit / Agent), [ARCHITECTURE.md](./ARCHITECTURE.md)
 
-**Status:** Implemented (UI header + settings / workspace defaults + system-prompt roles + Agent light verify for document/data)
+**Status:** Implemented (UI header + settings / workspace defaults + system-prompt roles + Agent light verify for document/data + data-use-case `profileData` / `queryData`)
 
 ---
 
@@ -219,8 +219,8 @@ messages…
 | | Ask | Edit | Agent |
 |---|-----|------|-------|
 | **code** | Explain / review | Patch proposals | Inspect → propose → verify |
-| **document** | Summarize / outline | Edit `.md` etc. | Read multiple docs, append / reshape |
-| **data** | Schema / quality notes | Fix JSON / YAML / CSV | Cross-file reshape |
+| **document** | Summarize / outline | Edit `.md` etc. | Read by heading, reshape docs, light verify (headings / links) |
+| **data** | Schema / quality notes | Fix JSON / YAML / CSV / TSV | `profileData` / `queryData`, reshape, schema verify |
 | **general** | Organize / break down | Update note files | Folder overview + tidy proposals |
 
 Approval flows (Edit / Agent) stay the same. The preset only changes *what* is written.
@@ -245,10 +245,16 @@ Approval flows (Edit / Agent) stay the same. The preset only changes *what* is w
 - Templates (built-in Markdown + workspace `.compass/templates/`)
 - Agent light verify for document / data (`agent-verify-light.ts`)
 
+### Document Agent strengthen — shipped
+
+- Markdown `readFile` with optional `heading` for section reads
+- Document light verify: duplicate headings and broken relative `.md` links
+- Index context prioritizes Documents and follows sibling / doc links
+
 ### Data Agent tools — shipped
 
 - `profileData` / `queryData` (data use-case only): column profiles + read-only in-memory SQLite SELECT sandbox (`agent-data-sandbox.ts`)
-- Stronger data verify: duplicate first-column / id keys, mixed column types
+- Stronger data verify: duplicate first-column / id keys, mixed column types, TSV support
 
 ### Later (related work)
 

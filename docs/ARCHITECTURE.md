@@ -43,6 +43,7 @@ electron/
     ├── agent-approval.ts   # Write approval pause / resume
     ├── agent-propose-actions.ts
     ├── agent-verify.ts / agent-verify-light.ts
+    ├── agent-data-sandbox.ts  # data use-case profileData / queryData (sql.js)
     ├── agent-plan.ts / agent-memory.ts / agent-read-cache.ts / agent-paths.ts
     ├── settings.ts         # App settings read/write
     ├── workspace-settings.ts  # `.compass/settings.json` (e.g. default preset)
@@ -93,7 +94,7 @@ The renderer calls `window.compass.*`. The source of truth is `electron/preload.
 6. Completion: `ai:done`; failure: `ai:error`; cancel: `ai:aborted`
 7. **Ask**: explanation only (no file-change actions)
 8. **Edit**: parse `compass-actions` → preview → apply after user approval (not an autonomous tool loop)
-9. **Agent (Phase 1–4)**: read tools, `proposeActions` (pause → preview → approval, including partial resolve), restricted `exec`, turn/payload limits, secret redaction, tools-unsupported handling, `waiting_approval` UI — details: [AGENT.md](./AGENT.md)
+9. **Agent (Phase 1–4)**: read tools (Markdown optional `heading`), `proposeActions` (pause → preview → approval, including partial resolve), restricted `exec`, turn/payload limits, secret redaction, tools-unsupported handling, `waiting_approval` UI; document/data light verify; data use-case `profileData` / `queryData` — details: [AGENT.md](./AGENT.md)
 
 ## `.compass` folder
 

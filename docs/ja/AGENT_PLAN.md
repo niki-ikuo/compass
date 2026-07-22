@@ -138,7 +138,7 @@ idle → thinking → tool_call → (waiting_approval)? → applying? → thinki
 
 - **部分適用:** ファイル単位の適用/却下でプレビューキューが空になったら、適用/却下の観測を返して Agent 承認を再開
 - **適用失敗 → 再提案:** 適用エラー時はプレビューを残して再試行可能。**Agentに修正させる** でプレビューを閉じ、失敗観測を返してループが再提案できる
-- **検証ループ:** `verify` ツールでプロジェクトの test / lint / typecheck をスクリプト（または安全なフォールバック）経由で実行
+- **検証ループ:** `verify` ツールでプロジェクトの test / lint / typecheck をスクリプト（または安全なフォールバック）経由で実行。document/data は light チェック（`agent-verify-light.ts`）
 - **進捗 / キャンセル:** `ai:step` のステータス表示、`waiting_approval` ステップ、中断時に承認と running/waiting をクリア
 - **tools 非対応:** チャットのモード選択で Agent を非表示（`isAgentModeAvailable` / `ChatPanel`）。万一 Agent が選ばれていた場合は Edit への誘導フォールバック（`agentEditFallback`）で再送できる
 - **履歴:** 読込時に `waiting_approval` / `running` を安全に正規化
@@ -154,6 +154,9 @@ idle → thinking → tool_call → (waiting_approval)? → applying? → thinki
 |------|------|
 | プロバイダ別の Agent トグル非表示 | 出荷済み — Ollama など tools 非対応では Agent を隠す（Ask / Edit のみ） |
 | tools 非対応時の Edit 誘導フォールバック | 出荷済み — バナー＋ Edit で再送（`ChatPanel` の `agentEditFallback`） |
+| document / data light verify | 出荷済み — 見出し / 相対リンク；CSV/TSV/JSON/YAML スキーマ |
+| Markdown セクション `readFile` | 出荷済み — 任意の `heading` 引数 |
+| Data Agent サンドボックス | 出荷済み — 用途 `data` 時の `profileData` / `queryData`（`agent-data-sandbox.ts`、sql.js） |
 
 ---
 
