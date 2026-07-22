@@ -1,4 +1,5 @@
 import { getLlmProvider, getProviderLabel } from '../../src/utils/llm-providers'
+import { withOpenWebUiChatCompat } from '../../src/utils/open-webui-compat'
 import { t } from '../../src/i18n/runtime'
 import type { HelpAskRequest, HelpAskResult, HelpDoc } from '../../src/types'
 import { buildApiHeaders } from './ai-client'
@@ -218,7 +219,7 @@ export async function askHelp(request: HelpAskRequest): Promise<HelpAskResult> {
       fetch(url, {
         method: 'POST',
         headers: buildApiHeaders(settings),
-        body: JSON.stringify(payload),
+        body: JSON.stringify(withOpenWebUiChatCompat(payload, settings.apiBaseUrl)),
         signal
       })
 

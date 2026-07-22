@@ -1,5 +1,6 @@
 import type { AppSettings } from '../../src/types'
 import { getLlmProvider, getProviderLabel } from '../../src/utils/llm-providers'
+import { withOpenWebUiChatCompat } from '../../src/utils/open-webui-compat'
 import { t } from '../../src/i18n/runtime'
 import { buildApiHeaders } from './ai-client'
 import { getSettings } from './settings'
@@ -148,19 +149,24 @@ async function probeChat(
     let response = await fetch(url, {
       method: 'POST',
       headers: buildApiHeaders(settings),
-      body: JSON.stringify(payload),
+      body: JSON.stringify(withOpenWebUiChatCompat(payload, settings.apiBaseUrl)),
       signal
     })
     if (!response.ok && reasoning) {
       response = await fetch(url, {
         method: 'POST',
         headers: buildApiHeaders(settings),
-        body: JSON.stringify({
-          model: settings.model,
-          messages: payload.messages,
-          stream: false,
-          max_tokens: 1
-        }),
+        body: JSON.stringify(
+          withOpenWebUiChatCompat(
+            {
+              model: settings.model,
+              messages: payload.messages,
+              stream: false,
+              max_tokens: 1
+            },
+            settings.apiBaseUrl
+          )
+        ),
         signal
       })
     }

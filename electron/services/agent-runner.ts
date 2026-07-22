@@ -10,6 +10,7 @@ import type {
 } from '../../src/types'
 import { t } from '../../src/i18n/runtime'
 import { getLlmProvider, getProviderLabel } from '../../src/utils/llm-providers'
+import { withOpenWebUiChatCompat } from '../../src/utils/open-webui-compat'
 import { normalizeWorkspaceActions } from '../../src/utils/workspace-actions'
 import { getSettings } from './settings'
 import {
@@ -1354,15 +1355,18 @@ export async function runAgent(webContents: WebContents, request: ChatRequest): 
 
       pruneMessagesToTokenBudget(apiMessages, CONTEXT_BUDGET.totalInputTokens)
 
-      const body: Record<string, unknown> = {
-        model: settings.model,
-        messages: apiMessages,
-        temperature: settings.temperature,
-        max_tokens: Math.max(settings.maxTokens, AGENT_OUTPUT_TOKENS_FLOOR),
-        stream: true,
-        tools: AGENT_TOOLS,
-        tool_choice: 'auto'
-      }
+      const body = withOpenWebUiChatCompat(
+        {
+          model: settings.model,
+          messages: apiMessages,
+          temperature: settings.temperature,
+          max_tokens: Math.max(settings.maxTokens, AGENT_OUTPUT_TOKENS_FLOOR),
+          stream: true,
+          tools: AGENT_TOOLS,
+          tool_choice: 'auto'
+        },
+        settings.apiBaseUrl
+      )
 
       let turnResult: StreamTurnResult
       try {
