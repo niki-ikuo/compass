@@ -9,6 +9,7 @@ function normalizeSlashes(path: string): string {
  * ツール引数のパスをワークスペース相対に正規化する。
  * ワークスペース名そのもの（例: ルートが .../aaa なのに path="aaa"）は、
  * 同名サブフォルダが無い限りルート "." として扱う。
+ * 誤って付いた `ワークスペース名/` プレフィックスも、同名サブパスが無ければ除去する。
  *
  * existsCheck を渡すと fs をモック可能（テスト用）。省略時は existsSync。
  */
@@ -43,18 +44,35 @@ export function normalizeAgentRelativePath(
   }
 
   const rootName = basename(root)
+  const exists = options?.pathExists
+    ? options.pathExists
+    : (absolutePath: string) => existsSync(absolutePath)
+
   const sameName =
     raw === rootName ||
     (process.platform === 'win32' && raw.toLowerCase() === rootName.toLowerCase())
 
   if (sameName) {
     const candidate = join(root, raw)
-    const exists = options?.pathExists
-      ? options.pathExists(candidate)
-      : existsSync(candidate)
-    if (!exists) {
+    if (!exists(candidate)) {
       return '.'
     }
+    return raw
+  }
+
+  const hasPrefix =
+    raw.length > rootName.length &&
+    (raw.startsWith(`${rootName}/`) ||
+      (process.platform === 'win32' &&
+        raw.toLowerCase().startsWith(`${rootName.toLowerCase()}/`)))
+
+  if (hasPrefix) {
+    const stripped = raw.slice(rootName.length + 1)
+    const fullCandidate = join(root, raw)
+    if (exists(fullCandidate)) {
+      return raw
+    }
+    return stripped || '.'
   }
 
   return raw

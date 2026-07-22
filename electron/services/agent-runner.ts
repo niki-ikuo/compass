@@ -1,5 +1,6 @@
 import type { WebContents } from 'electron'
 import { randomUUID } from 'crypto'
+import { existsSync } from 'fs'
 import { readdir, readFile, stat } from 'fs/promises'
 import type {
   AgentToolStep,
@@ -894,7 +895,9 @@ async function executeProposeActions(
 
   let normalized: WorkspaceAction[]
   try {
-    normalized = normalizeWorkspaceActions(workspaceRoot, parsed.actions)
+    normalized = normalizeWorkspaceActions(workspaceRoot, parsed.actions, {
+      pathExists: (absolutePath) => existsSync(absolutePath)
+    })
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     return { ok: false, summary: message, content: `Error: ${message}` }

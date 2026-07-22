@@ -1,4 +1,5 @@
 import { mkdir, readdir, readFile, rename, rm, stat, writeFile, copyFile } from 'fs/promises'
+import { existsSync } from 'fs'
 import type { Dirent } from 'fs'
 import { resolve, relative, dirname, join, basename, isAbsolute } from 'path'
 import type {
@@ -21,6 +22,12 @@ import { decodeFileBuffer, encodeContent } from './encoding'
 import { getImageMimeType, isImagePath, isPdfPath } from '../../src/utils/media-context'
 import { extractPdfText } from '../../src/utils/pdf-text'
 import { shouldSkipWorkspaceEntry } from './fs-ignore'
+
+function normalizeActionPath(workspaceRoot: string, actionPath: string): string {
+  return normalizeWorkspaceActionPath(workspaceRoot, actionPath, {
+    pathExists: (absolutePath) => existsSync(absolutePath)
+  })
+}
 
 const PATHED_ACTION_TYPES = new Set([
   'mkdir',
@@ -52,7 +59,7 @@ export async function materializeWorkspaceActions(
       continue
     }
 
-    const relativePath = normalizeWorkspaceActionPath(workspaceRoot, action.path)
+    const relativePath = normalizeActionPath(workspaceRoot, action.path)
     if (!relativePath) {
       throw new ApplyPatchError(t('fs.patchEmptyPath'))
     }
@@ -332,7 +339,7 @@ export async function applyWorkspaceActions(
   const materialized = await materializeWorkspaceActions(workspaceRoot, actions)
   const normalizedActions = materialized.map((action) => {
     if (isPathedAction(action)) {
-      return { ...action, path: normalizeWorkspaceActionPath(workspaceRoot, action.path) }
+      return { ...action, path: normalizeActionPath(workspaceRoot, action.path) }
     }
     return action
   })
@@ -389,7 +396,7 @@ export async function previewWorkspaceActions(
   const materialized = await materializeWorkspaceActions(workspaceRoot, actions)
 
   for (const action of materialized) {
-    const relativeActionPath = normalizeWorkspaceActionPath(workspaceRoot, action.path)
+    const relativeActionPath = normalizeActionPath(workspaceRoot, action.path)
 
     if (action.type === 'mkdir') {
       const dirPath = resolveInsideWorkspace(workspaceRoot, relativeActionPath)

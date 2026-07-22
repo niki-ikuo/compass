@@ -16,11 +16,20 @@ export function formatContextLabel(path: string, workspaceRoot: string | null): 
   const normalized = path.replace(/\\/g, '/')
   if (!workspaceRoot) return normalized
   const root = workspaceRoot.replace(/\\/g, '/').replace(/\/$/, '')
+  const equalsRoot =
+    typeof process !== 'undefined' && process.platform === 'win32'
+      ? normalized.toLowerCase() === root.toLowerCase() ||
+        normalized.toLowerCase() === `${root.toLowerCase()}/`
+      : normalized === root || normalized === `${root}/`
   // ワークスペース直下そのものは相対 "."（フォルダ名だと Agent がサブパスと誤認する）
-  if (normalized === root || normalized === `${root}/`) {
+  if (equalsRoot) {
     return '.'
   }
-  if (normalized.startsWith(`${root}/`)) {
+  const underRoot =
+    typeof process !== 'undefined' && process.platform === 'win32'
+      ? normalized.toLowerCase().startsWith(`${root.toLowerCase()}/`)
+      : normalized.startsWith(`${root}/`)
+  if (underRoot) {
     return normalized.slice(root.length + 1) || '.'
   }
   // 外部ファイルは絶対パス（スラッシュ統一）でメンションする
@@ -56,15 +65,18 @@ export function detectMentionKind(inner: string): ChatMentionKind {
 /** `@[path]` 形式のメンションかどうか（中身はパスらしい文字列） */
 export function isStructuredMention(inner: string): boolean {
   const value = inner.trim()
-  if (!value || /\s/.test(value) || value.length > 260) return false
-  // 選択行: path:12 / path:12-34（パス部分は Unicode 可）
+  // Windows の長い絶対パス＋日本語を見越し、狭すぎる 260 は避ける
+  if (!value || value.length > 1024) return false
+  // 改行・制御文字は @[...] を壊す。半角/全角スペースはフォルダ名に現れうるので許可
+  if (/[\n\r\u0000-\u0008\u000B\u000C\u000E-\u001F]/.test(value)) return false
+  // 選択行: path:12 / path:12-34（パス部分は Unicode・スペース可）
   if (/^.+:\d+(-\d+)?$/.test(value)) return true
-  // フォルダ（ルート直下の漢字名も含む）
+  // フォルダ（ルート直下の漢字名・スペース付き名も含む）
   if (value.endsWith('/')) return true
-  // ネストした相対パス
+  // ネストした相対 / 絶対パス
   if (/[\\/]/.test(value)) return true
-  // ルート直下のファイル（拡張子あり）。\w だと漢字ファイル名が落ちるため basename は非空白・非区切りで許容
-  if (/^[^\s\\/]+\.\w{1,12}$/.test(value)) return true
+  // ルート直下のファイル（拡張子あり）。basename にスペース・漢字を許容
+  if (/^[^\\/]+\.\w{1,12}$/.test(value)) return true
   return false
 }
 

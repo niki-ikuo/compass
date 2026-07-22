@@ -29,10 +29,28 @@ describe('isStructuredMention', () => {
     expect(isStructuredMention('src/資料.ts:1-3')).toBe(true)
   })
 
+  it('accepts selection mentions with spaces in the path', () => {
+    expect(
+      isStructuredMention('西日本放送給与大臣ERP/西日本放送給与大臣ERP Class Library/a.ts:10-20')
+    ).toBe(true)
+  })
+
   it('rejects prose-like tokens without path shape', () => {
     expect(isStructuredMention('todo')).toBe(false)
     expect(isStructuredMention('hello world')).toBe(false)
     expect(isStructuredMention('')).toBe(false)
+  })
+
+  it('accepts paths with spaces (Windows folder names)', () => {
+    expect(isStructuredMention('西日本放送給与大臣ERP Class Library/')).toBe(true)
+    expect(
+      isStructuredMention('西日本放送給与大臣ERP/西日本放送給与大臣ERP Class Library')
+    ).toBe(true)
+    expect(
+      isStructuredMention('西日本放送給与大臣ERP/西日本放送給与大臣ERP Class Library/')
+    ).toBe(true)
+    expect(isStructuredMention('My Documents/report.md')).toBe(true)
+    expect(isStructuredMention('read me.md')).toBe(true)
   })
 })
 
@@ -63,10 +81,29 @@ describe('formatContextMention + isStructuredMention', () => {
     expect(detectMentionKind(file.slice(2, -1))).toBe('file')
   })
 
+  it('produces insertable capsules for nested folders with spaces', () => {
+    const folder = formatContextMention(
+      `${root}/西日本放送給与大臣ERP/西日本放送給与大臣ERP Class Library`,
+      true,
+      root
+    )
+    expect(folder).toBe('@[西日本放送給与大臣ERP/西日本放送給与大臣ERP Class Library/]')
+    expect(isStructuredMention(folder.slice(2, -1))).toBe(true)
+    expect(detectMentionKind(folder.slice(2, -1))).toBe('folder')
+  })
+
   it('mentions external files with absolute paths', () => {
     const external = formatContextMention('C:/Users/niki/Desktop/spec.md', false, root)
     expect(external).toBe('@[C:/Users/niki/Desktop/spec.md]')
     expect(isStructuredMention(external.slice(2, -1))).toBe(true)
     expect(detectMentionKind(external.slice(2, -1))).toBe('file')
+  })
+
+  it('handles Windows drive-letter case for Unicode workspace paths', () => {
+    if (process.platform !== 'win32') return
+    const jpRoot = 'C:/Users/niki/Desktop/研究'
+    const mention = formatContextMention('c:/Users/niki/Desktop/研究/資料.md', false, jpRoot)
+    expect(mention).toBe('@[資料.md]')
+    expect(isStructuredMention(mention.slice(2, -1))).toBe(true)
   })
 })

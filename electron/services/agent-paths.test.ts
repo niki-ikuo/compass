@@ -39,4 +39,20 @@ describe('normalizeAgentRelativePath', () => {
       })
     ).toBe('my-app')
   })
+
+  it('strips a mistaken workspace-name prefix when nested path is absent', () => {
+    expect(
+      normalizeAgentRelativePath('C:/Users/dev/資料', '資料/メモ.md', {
+        pathExists: () => false
+      })
+    ).toBe('メモ.md')
+  })
+
+  it('keeps workspace-name prefix when that nested folder exists', () => {
+    expect(
+      normalizeAgentRelativePath('C:/Users/dev/資料', '資料/メモ.md', {
+        pathExists: (abs) => abs.replace(/\\/g, '/').endsWith('/資料/資料/メモ.md')
+      })
+    ).toBe('資料/メモ.md')
+  })
 })

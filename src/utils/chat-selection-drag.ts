@@ -30,9 +30,21 @@ export function normalizeSelectionLines(sel: {
 
 export function toRelativeLabel(path: string, workspaceRoot: string | null): string {
   if (!workspaceRoot) return path.replace(/\\/g, '/')
-  const root = workspaceRoot.replace(/\\/g, '/')
+  const root = workspaceRoot.replace(/\\/g, '/').replace(/\/$/, '')
   const normalized = path.replace(/\\/g, '/')
-  if (normalized.startsWith(root)) {
+  const underRoot =
+    typeof process !== 'undefined' && process.platform === 'win32'
+      ? normalized.toLowerCase() === root.toLowerCase() ||
+        normalized.toLowerCase().startsWith(`${root.toLowerCase()}/`)
+      : normalized === root || normalized.startsWith(`${root}/`)
+  if (underRoot) {
+    if (
+      typeof process !== 'undefined' && process.platform === 'win32'
+        ? normalized.toLowerCase() === root.toLowerCase()
+        : normalized === root
+    ) {
+      return normalized
+    }
     return normalized.slice(root.length).replace(/^\//, '') || normalized
   }
   return normalized

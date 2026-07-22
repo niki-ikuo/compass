@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog, Menu, shell } from 'electron'
+import { app, BrowserWindow, ipcMain, dialog, Menu, shell, session } from 'electron'
 import { join } from 'path'
 import appIcon from '../resources/icon.ico?asset'
 import packageJson from '../package.json'
@@ -113,6 +113,40 @@ function zoomMenuClick(action: 'resetZoom' | 'zoomIn' | 'zoomOut'): void {
   const webContents = mainWindow?.webContents
   if (!webContents) return
   applyViewZoom(webContents, action)
+}
+
+/** パッケージ済みビルド向け CSP。開発中は Vite HMR が unsafe-eval を要するため未設定のまま（Electron も警告を許容）。 */
+function applyPackagedContentSecurityPolicy(): void {
+  if (!app.isPackaged) return
+
+  const csp = [
+    "default-src 'self'",
+    "script-src 'self'",
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: blob:",
+    "font-src 'self' data:",
+    "connect-src 'self' http: https:",
+    "media-src 'self' blob:",
+    "worker-src 'self' blob:",
+    "frame-src 'self' http: https:"
+  ].join('; ')
+
+  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+    const url = details.url
+    // アプリ本体のみ。BrowserViewer 等の外部ページには付けない
+    const isAppShell = url.startsWith('file:')
+    if (!isAppShell) {
+      callback({ responseHeaders: details.responseHeaders })
+      return
+    }
+
+    callback({
+      responseHeaders: {
+        ...details.responseHeaders,
+        'Content-Security-Policy': [csp]
+      }
+    })
+  })
 }
 
 function createWindow(): void {
@@ -783,6 +817,7 @@ function registerIpcHandlers(): void {
 
 app.whenReady().then(async () => {
   await getSettings()
+  applyPackagedContentSecurityPolicy()
   registerIpcHandlers()
   createWindow()
   createMenu()

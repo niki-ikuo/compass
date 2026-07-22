@@ -21,13 +21,14 @@ export type ChatSegment = ChatTextSegment | ChatCodeSegment
 
 function inferFilePath(language: string, code: string): string | null {
   const langPath = language.match(/^[\w+-]+[:/](.+)$/)
-  if (langPath) return langPath[1].replace(/\\/g, '/')
+  if (langPath) return langPath[1].replace(/\\/g, '/').trim()
 
   const firstLine = code.split('\n')[0]?.trim() ?? ''
+  // スペース・Unicode を含むパスを許可（旧 [\w./\\-]+ では落ちる）
   const fileComment = firstLine.match(
-    /^(?:\/\/|#|<!--)\s*(?:file:|filename:)?\s*([\w./\\-]+\.\w+)/i
+    /^(?:\/\/|#|<!--)\s*(?:file:|filename:)?\s*(.+?\.\w{1,12})\s*(?:-->)?$/i
   )
-  if (fileComment) return fileComment[1].replace(/\\/g, '/')
+  if (fileComment) return fileComment[1].replace(/\\/g, '/').trim()
 
   return null
 }

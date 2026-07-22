@@ -100,29 +100,127 @@ export function stripCodeBlocksByLanguage(content: string, languages: string[]):
   return result
 }
 
-export function toWorkspaceRelativePath(workspaceRoot: string, filePath: string): string {
-  const root = workspaceRoot.replace(/\\/g, '/').replace(/\/$/, '')
-  const normalized = filePath.replace(/\\/g, '/')
-  if (normalized.startsWith(`${root}/`)) {
-    return normalized.slice(root.length + 1)
-  }
-  return normalized.split('/').pop() ?? normalized
+function normalizeSlashes(path: string): string {
+  return path.replace(/\\/g, '/')
 }
 
-export function normalizeWorkspaceActionPath(workspaceRoot: string, actionPath: string): string {
-  let relative = actionPath.replace(/\\/g, '/').replace(/^\.\//, '')
-  const rootBase = workspaceRoot.replace(/\\/g, '/').split('/').filter(Boolean).pop()
+function trimTrailingSlashes(path: string): string {
+  let value = path
+  while (value.length > 1 && value.endsWith('/')) {
+    value = value.slice(0, -1)
+  }
+  return value
+}
 
-  if (rootBase && (relative === rootBase || relative.startsWith(`${rootBase}/`))) {
-    relative = relative === rootBase ? '' : relative.slice(rootBase.length + 1)
+function isAbsoluteFilesystemPath(path: string): boolean {
+  const normalized = normalizeSlashes(path)
+  return normalized.startsWith('/') || /^[a-zA-Z]:\//.test(normalized) || normalized.startsWith('//')
+}
+
+function pathSegmentsEqual(a: string, b: string): boolean {
+  if (typeof process !== 'undefined' && process.platform === 'win32') {
+    return a.toLowerCase() === b.toLowerCase()
+  }
+  return a === b
+}
+
+function pathStartsWithRoot(path: string, root: string): boolean {
+  if (typeof process !== 'undefined' && process.platform === 'win32') {
+    const lowerPath = path.toLowerCase()
+    const lowerRoot = root.toLowerCase()
+    return lowerPath === lowerRoot || lowerPath.startsWith(`${lowerRoot}/`)
+  }
+  return path === root || path.startsWith(`${root}/`)
+}
+
+function joinWorkspaceRoot(workspaceRoot: string, relativePath: string): string {
+  const root = trimTrailingSlashes(normalizeSlashes(workspaceRoot))
+  const rel = normalizeSlashes(relativePath).replace(/^\.\//, '')
+  if (!rel || rel === '.') return root
+  return `${root}/${rel}`
+}
+
+/**
+ * 絶対パスをワークスペース相対へ。すでに相対ならそのまま返す。
+ * プレフィックス不一致時に basename だけ残す旧挙動は、日本語ネストパスを壊すため廃止。
+ */
+export function toWorkspaceRelativePath(workspaceRoot: string, filePath: string): string {
+  const root = trimTrailingSlashes(normalizeSlashes(workspaceRoot))
+  const normalized = normalizeSlashes(filePath)
+
+  if (!isAbsoluteFilesystemPath(normalized)) {
+    return normalized.replace(/^\.\//, '')
   }
 
-  return relative
+  if (pathStartsWithRoot(normalized, root)) {
+    if (pathSegmentsEqual(normalized, root)) return '.'
+    return normalized.slice(root.length + 1)
+  }
+
+  return normalized
+}
+
+export type NormalizeWorkspacePathOptions = {
+  /** 同名サブパスの実在チェック。Main では existsSync を渡す。未指定時は危険なプレフィックス剥離をしない。 */
+  pathExists?: (absolutePath: string) => boolean
+}
+
+/**
+ * アクション path をワークスペース相対に正規化する。
+ * ワークスペース名プレフィックスの剥離は、pathExists があるときだけ
+ * （同名サブフォルダが実在すれば維持、無ければ誤付与とみなして除去）。
+ */
+export function normalizeWorkspaceActionPath(
+  workspaceRoot: string,
+  actionPath: string,
+  options?: NormalizeWorkspacePathOptions
+): string {
+  let relative = normalizeSlashes(actionPath).replace(/^\.\//, '')
+  relative = trimTrailingSlashes(relative)
+
+  if (!relative || relative === '.') return ''
+
+  if (isAbsoluteFilesystemPath(relative)) {
+    relative = toWorkspaceRelativePath(workspaceRoot, relative)
+    if (relative === '.') return ''
+  }
+
+  const root = trimTrailingSlashes(normalizeSlashes(workspaceRoot))
+  const rootBase = root.split('/').filter(Boolean).pop()
+  if (!rootBase) return relative
+
+  const isBareRootName = pathSegmentsEqual(relative, rootBase)
+  const hasRootPrefix =
+    relative.length > rootBase.length &&
+    pathSegmentsEqual(relative.slice(0, rootBase.length), rootBase) &&
+    relative.charAt(rootBase.length) === '/'
+
+  if (!isBareRootName && !hasRootPrefix) {
+    return relative
+  }
+
+  const pathExists = options?.pathExists
+  if (!pathExists) {
+    // Renderer など存在確認できない場合は剥離しない（日本語フォルダ名を落とさない）
+    return relative
+  }
+
+  if (isBareRootName) {
+    return pathExists(joinWorkspaceRoot(workspaceRoot, relative)) ? relative : ''
+  }
+
+  const stripped = relative.slice(rootBase.length + 1)
+  const fullAbs = joinWorkspaceRoot(workspaceRoot, relative)
+  if (pathExists(fullAbs)) {
+    return relative
+  }
+  return stripped
 }
 
 export function normalizeWorkspaceActions(
   workspaceRoot: string,
-  actions: WorkspaceAction[]
+  actions: WorkspaceAction[],
+  options?: NormalizeWorkspacePathOptions
 ): WorkspaceAction[] {
   return actions
     .map((action) => {
@@ -133,7 +231,10 @@ export function normalizeWorkspaceActions(
         action.type === 'deleteFile' ||
         action.type === 'deleteDir'
       ) {
-        return { ...action, path: normalizeWorkspaceActionPath(workspaceRoot, action.path) }
+        return {
+          ...action,
+          path: normalizeWorkspaceActionPath(workspaceRoot, action.path, options)
+        }
       }
       return action
     })
@@ -146,19 +247,25 @@ function inferTargetPath(
   activeFilePath: string | null
 ): string | null {
   if (activeFilePath) {
-    return normalizeWorkspaceActionPath(workspaceRoot, toWorkspaceRelativePath(workspaceRoot, activeFilePath))
+    return normalizeWorkspaceActionPath(
+      workspaceRoot,
+      toWorkspaceRelativePath(workspaceRoot, activeFilePath)
+    )
   }
 
-  const backtickMatch = content.match(/`([^`]+\.(?:css|html|js|ts|tsx|jsx|json|md))`/i)
+  const backtickMatch = content.match(
+    /`([^`\n]+\.(?:css|html|js|ts|tsx|jsx|json|md|csv|yml|yaml|txt))`/i
+  )
   if (backtickMatch) {
-    return normalizeWorkspaceActionPath(workspaceRoot, backtickMatch[1])
+    return normalizeWorkspaceActionPath(workspaceRoot, backtickMatch[1].trim())
   }
 
+  // スペース・日本語を含むパスを許可。終端は空白・句読点・括弧で区切る
   const pathMatch = content.match(
-    /(?:^|[\s(「『])([\w./-]+\.(?:css|html|js|ts|tsx|jsx|json|md))(?:$|[\s)」』。、])/im
+    /(?:^|[\s(「『])([^`"「」『』()\n]+?\.(?:css|html|js|ts|tsx|jsx|json|md|csv|yml|yaml|txt))(?=$|[\s)」』。、])/im
   )
   if (pathMatch) {
-    return normalizeWorkspaceActionPath(workspaceRoot, pathMatch[1])
+    return normalizeWorkspaceActionPath(workspaceRoot, pathMatch[1].trim())
   }
 
   return null
