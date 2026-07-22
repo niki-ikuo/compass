@@ -550,10 +550,10 @@ body {
 
 .panel-resize-handle {
   flex-shrink: 0;
-  width: 4px;
+  width: 2px;
   cursor: col-resize;
-  background: transparent;
-  transition: background 0.15s;
+  background: var(--border);
+  transition: background 0.15s, box-shadow 0.15s;
   position: relative;
   z-index: 2;
 }
@@ -563,13 +563,16 @@ body {
   position: absolute;
   top: 0;
   bottom: 0;
-  left: -2px;
-  right: -2px;
+  /* Widen hit target without leaving a gap beside the first tab */
+  left: -3px;
+  right: -3px;
 }
 
 .panel-resize-handle:hover,
 .panel-resize-handle.active {
   background: var(--accent);
+  /* 2px bar + 1px each side = 4px hover line without layout shift */
+  box-shadow: -1px 0 0 var(--accent), 1px 0 0 var(--accent);
 }
 
 body.is-resizing-panels {
@@ -907,28 +910,84 @@ body.is-resizing-panels iframe {
   margin-top: 8px;
 }
 
-/* Tabs */
-.tab-bar {
+/* Tabs — unified strip (AI chat style is the source of truth) */
+.tab-bar,
+.chat-tabs-bar,
+.terminal-panel-header {
   display: flex;
   background: var(--bg-tertiary);
   border-bottom: 1px solid var(--border);
-  overflow-x: auto;
 }
 
-.tab {
+.tab-bar {
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+}
+
+/* Chat / terminal: side actions sit beside the scroll row.
+   flex-start lets the horizontal scrollbar insert below the tabs
+   instead of shrinking tab hit targets. */
+.chat-tabs-bar,
+.terminal-panel-header {
+  align-items: flex-start;
+  flex-shrink: 0;
+}
+
+.chat-tabs,
+.terminal-tabs {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+}
+
+.chat-header-actions,
+.terminal-panel-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  position: relative;
+  flex-shrink: 0;
+  align-self: stretch;
+  padding: 0 8px;
+  background: var(--bg-secondary);
+  border-left: 1px solid var(--border);
+}
+
+.tab,
+.chat-tab,
+.terminal-tab {
   display: flex;
   align-items: center;
   gap: 6px;
+  box-sizing: border-box;
   padding: 6px 12px;
+  border: none;
   border-right: 1px solid var(--border);
-  cursor: pointer;
-  font-size: 12px;
-  white-space: nowrap;
+  border-radius: 0;
   background: var(--bg-secondary);
   color: var(--text-secondary);
+  font-family: inherit;
+  font-size: 12px;
+  line-height: 1.2;
+  white-space: nowrap;
+  cursor: pointer;
+  flex-shrink: 0;
 }
 
-.tab.active {
+.tab:hover,
+.chat-tab:hover,
+.terminal-tab:hover {
+  color: var(--text-primary);
+}
+
+.tab.active,
+.chat-tab.active,
+.terminal-tab.active {
   background: var(--bg-primary);
   color: var(--text-primary);
   border-bottom: 2px solid var(--accent);
@@ -973,24 +1032,37 @@ body.is-resizing-panels iframe {
   font-size: 10px;
 }
 
-.tab-close {
+.tab-close,
+.chat-tab-close,
+.terminal-tab-close {
+  flex-shrink: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  width: var(--icon-size);
+  height: var(--icon-size);
+  margin-right: -2px;
+  padding: 0;
   border: none;
+  border-radius: 3px;
   background: transparent;
   color: var(--icon-command);
   cursor: pointer;
-  padding: 0 1px;
   line-height: 1;
 }
 
-.tab-close svg {
+.tab-close svg,
+.chat-tab-close svg,
+.terminal-tab-close svg {
   width: 14px;
   height: 14px;
+  pointer-events: none;
 }
 
-.tab-close:hover {
+.tab-close:hover,
+.chat-tab-close:hover,
+.terminal-tab-close:hover {
+  background: var(--bg-tertiary);
   color: var(--icon-command-hover);
 }
 
@@ -1610,25 +1682,6 @@ body:has(.monaco-editor .find-widget.visible) .workbench-hover-container .action
   height: 100%;
 }
 
-.chat-tabs-bar {
-  display: flex;
-  align-items: stretch;
-  border-bottom: 1px solid var(--border);
-  background: var(--bg-tertiary);
-}
-
-.chat-header-actions {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 4px;
-  position: relative;
-  flex-shrink: 0;
-  padding: 0 8px;
-  background: var(--bg-secondary);
-  border-left: 1px solid var(--border);
-}
-
 .chat-model-select {
   display: flex;
   align-items: center;
@@ -1775,38 +1828,6 @@ body:has(.monaco-editor .find-widget.visible) .workbench-hover-container .action
   color: var(--icon-command-hover);
 }
 
-.chat-tabs {
-  display: flex;
-  flex: 1;
-  min-width: 0;
-  overflow-x: auto;
-  overflow-y: hidden;
-}
-
-.chat-tab {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  border-right: 1px solid var(--border);
-  background: var(--bg-secondary);
-  color: var(--text-secondary);
-  font-size: 12px;
-  white-space: nowrap;
-  cursor: pointer;
-  flex-shrink: 0;
-}
-
-.chat-tab:hover {
-  color: var(--text-primary);
-}
-
-.chat-tab.active {
-  background: var(--bg-primary);
-  color: var(--text-primary);
-  border-bottom: 2px solid var(--accent);
-}
-
 .chat-tab.loading .chat-tab-title::after {
   content: '';
   display: inline-block;
@@ -1852,28 +1873,6 @@ body:has(.monaco-editor .find-widget.visible) .workbench-hover-container .action
   white-space: nowrap;
   flex: 1;
   min-width: 0;
-}
-
-.chat-tab-close {
-  flex-shrink: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0 1px;
-  border: none;
-  background: transparent;
-  color: var(--icon-command);
-  cursor: pointer;
-  line-height: 1;
-}
-
-.chat-tab-close svg {
-  width: 14px;
-  height: 14px;
-}
-
-.chat-tab-close:hover {
-  color: var(--icon-command-hover);
 }
 
 .chat-header-left {
@@ -4455,7 +4454,7 @@ body.is-resizing-help * {
   flex-direction: column;
   flex-shrink: 0;
   background: var(--bg-primary);
-  border-top: 1px solid var(--border);
+  border-top: 2px solid var(--border);
   min-height: 0;
 }
 
@@ -4464,13 +4463,27 @@ body.is-resizing-help * {
   top: -2px;
   left: 0;
   right: 0;
-  height: 4px;
+  height: 2px;
   cursor: row-resize;
   z-index: 3;
+  background: transparent;
+  transition: background 0.15s, height 0.15s, top 0.15s;
+}
+
+.terminal-resize-handle::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  /* Widen hit target beyond the visible line */
+  top: -3px;
+  bottom: -3px;
 }
 
 .terminal-resize-handle:hover,
 .terminal-resize-handle.active {
+  top: -3px;
+  height: 4px;
   background: var(--accent);
 }
 
@@ -4488,79 +4501,12 @@ body.is-resizing-terminal iframe {
   pointer-events: none !important;
 }
 
-.terminal-panel-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  height: 32px;
-  padding: 0 8px;
-  background: var(--bg-secondary);
-  border-bottom: 1px solid var(--border);
-  flex-shrink: 0;
-}
-
 .terminal-panel-title {
   font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.5px;
   color: var(--text-secondary);
-}
-
-.terminal-tabs {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  min-width: 0;
-  flex: 1;
-  overflow-x: auto;
-}
-
-.terminal-tab {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  height: 26px;
-  padding: 0 8px;
-  border: none;
-  border-radius: 4px;
-  background: transparent;
-  color: var(--text-secondary);
-  font-size: 12px;
-  cursor: default;
-  white-space: nowrap;
-}
-
-.terminal-tab:hover {
-  background: var(--bg-hover);
-  color: var(--text-primary);
-}
-
-.terminal-tab.active {
-  background: var(--bg-tertiary);
-  color: var(--text-primary);
-}
-
-.terminal-tab-close {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: var(--icon-size);
-  height: var(--icon-size);
-  border-radius: 3px;
-  line-height: 1;
-  color: var(--icon-command);
-}
-
-.terminal-tab-close svg {
-  width: 14px;
-  height: 14px;
-}
-
-.terminal-tab-close:hover {
-  background: var(--bg-hover);
-  color: var(--icon-command-hover);
 }
 
 .terminal-tab-add {
@@ -4579,13 +4525,6 @@ body.is-resizing-terminal iframe {
 .terminal-tab-add:hover {
   background: var(--bg-hover);
   color: var(--icon-command-hover);
-}
-
-.terminal-panel-actions {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-shrink: 0;
 }
 
 .terminal-shell-select {
@@ -4626,13 +4565,15 @@ body.is-resizing-terminal iframe {
   position: relative;
   flex: 1;
   min-height: 0;
-  padding: 4px;
   overflow: hidden;
+  /* FitAddon の端数ピクセルと xterm viewport の隙間をテーマ色で埋める */
+  background: var(--terminal-bg, var(--bg-primary));
 }
 
 .terminal-instance {
   position: absolute;
-  inset: 4px;
+  inset: 0;
+  background: var(--terminal-bg, var(--bg-primary));
 }
 
 .terminal-instance.is-hidden {
@@ -4650,10 +4591,17 @@ body.is-resizing-terminal iframe {
 .terminal-instance .xterm {
   height: 100%;
   width: 100%;
+  background-color: var(--terminal-bg, var(--bg-primary));
 }
 
+/* xterm.css は viewport を #000 固定。テーマ色が効くよう上書きする */
 .terminal-instance .xterm-viewport {
   overflow-y: auto !important;
+  background-color: var(--terminal-bg, var(--bg-primary)) !important;
+}
+
+.terminal-instance .xterm-scrollable-element {
+  background-color: var(--terminal-bg, var(--bg-primary));
 }
 
 /*

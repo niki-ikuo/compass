@@ -185,6 +185,11 @@ export function TabBar() {
               setContextMenu({ x: e.clientX, y: e.clientY, path: file.path })
             }}
             onDragStart={(e) => {
+              // × 上での微小移動で DnD が始まると click が発火せず閉じられない
+              if ((e.target as HTMLElement).closest('.tab-close')) {
+                e.preventDefault()
+                return
+              }
               dragPathRef.current = file.path
               setDragPath(file.path)
               e.dataTransfer.setData(EDITOR_TAB_REORDER_MIME, file.path)
@@ -241,8 +246,18 @@ export function TabBar() {
               })}
             </span>
             <button
+              type="button"
               className="tab-close"
+              onPointerDown={(e) => {
+                // 親が draggable のため、mouseup 前に DnD が始まると click が消える。
+                // pointerdown で閉じてドラッグ開始を防ぐ。
+                if (e.button !== 0) return
+                e.preventDefault()
+                e.stopPropagation()
+                void runClosePaths([file.path])
+              }}
               onClick={(e) => {
+                // キーボード操作用（マウスは pointerdown で処理済み）
                 e.stopPropagation()
                 void runClosePaths([file.path])
               }}

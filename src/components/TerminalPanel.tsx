@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import '@xterm/xterm/css/xterm.css'
@@ -491,6 +491,7 @@ function TerminalInstance({
     <div
       className={`terminal-instance${active ? ' is-active' : ' is-hidden'}`}
       ref={containerRef}
+      style={{ ['--terminal-bg' as string]: terminalTheme.background }}
       onMouseDown={(event) => {
         if (!activeRef.current) return
         event.stopPropagation()
@@ -547,6 +548,8 @@ export function TerminalPanel() {
   const setTerminalHeight = useAppStore((s) => s.setTerminalHeight)
   const setShowTerminal = useAppStore((s) => s.setShowTerminal)
   const defaultShellId = useAppStore((s) => s.settings.defaultShellId)
+  const colorThemeId = useAppStore((s) => s.settings.colorTheme)
+  const terminalBg = getColorTheme(colorThemeId).terminal.background
 
   const [focusToken, setFocusToken] = useState(0)
   const [shells, setShells] = useState<TerminalShell[]>([])
@@ -557,8 +560,18 @@ export function TerminalPanel() {
   const tabCounterRef = useRef(0)
   const autoCreateRequestedRef = useRef(false)
   const tabContextMenuRef = useRef<HTMLDivElement>(null)
+  const terminalTabsRef = useRef<HTMLDivElement>(null)
 
   const closeTabContextMenu = () => setTabContextMenu(null)
+
+  const openTerminalTabsKey = tabs.map((tab) => `${tab.id}:${tab.title}`).join('|')
+
+  useLayoutEffect(() => {
+    const el = terminalTabsRef.current
+    if (!el || !activeTabId) return
+    const activeTab = el.querySelector<HTMLElement>('.terminal-tab.active')
+    activeTab?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' })
+  }, [activeTabId, openTerminalTabsKey])
 
   useEffect(() => {
     if (showTerminal) {
@@ -680,7 +693,12 @@ export function TerminalPanel() {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') closeTabContextMenu()
     }
-    const onScroll = () => closeTabContextMenu()
+    const onScroll = (event: Event) => {
+      // タブをアクティブ化したときの scrollIntoView でメニューが即閉じるのを防ぐ
+      const target = event.target
+      if (target instanceof Node && terminalTabsRef.current?.contains(target)) return
+      closeTabContextMenu()
+    }
 
     window.addEventListener('mousedown', onPointerDown)
     window.addEventListener('keydown', onKeyDown)
@@ -713,7 +731,10 @@ export function TerminalPanel() {
 
   if (!workspaceRoot) {
     return (
-      <div className="terminal-panel" style={{ height: terminalHeight }}>
+      <div
+        className="terminal-panel"
+        style={{ height: terminalHeight, ['--terminal-bg' as string]: terminalBg }}
+      >
         <div className="terminal-panel-header">
           <span className="terminal-panel-title">{t('terminal.defaultTitle')}</span>
           <button
@@ -732,14 +753,16 @@ export function TerminalPanel() {
   }
 
   return (
-    <div className="terminal-panel" style={{ height: terminalHeight }}>
+    <div
+      className="terminal-panel"
+      style={{ height: terminalHeight, ['--terminal-bg' as string]: terminalBg }}
+    >
       <VerticalResizeHandle onDrag={handleResize} />
       <div className="terminal-panel-header">
-        <div className="terminal-tabs">
+        <div className="terminal-tabs" ref={terminalTabsRef}>
           {tabs.map((tab) => (
-            <button
+            <div
               key={tab.id}
-              type="button"
               className={`terminal-tab${activeTabId === tab.id ? ' active' : ''}`}
               onClick={() => {
                 setActiveTabId(tab.id)
@@ -754,10 +777,15 @@ export function TerminalPanel() {
               }}
             >
               <span>{tab.title}</span>
-              <span
+              <button
+                type="button"
                 className="terminal-tab-close"
-                role="button"
-                tabIndex={-1}
+                onPointerDown={(e) => {
+                  if (e.button !== 0) return
+                  e.preventDefault()
+                  e.stopPropagation()
+                  closeTab(tab.id, { hidePanelWhenEmpty: true })
+                }}
                 onClick={(e) => {
                   e.stopPropagation()
                   closeTab(tab.id, { hidePanelWhenEmpty: true })
@@ -765,8 +793,8 @@ export function TerminalPanel() {
                 aria-label={t('terminal.closeTab')}
               >
                 <CloseIcon />
-              </span>
-            </button>
+              </button>
+            </div>
           ))}
         </div>
 
