@@ -27,7 +27,7 @@ import { AgentStepTimeline } from './AgentStepTimeline'
 import { AgentPlanPanel } from './AgentPlanPanel'
 import { collectAgentStepsThrough } from '@/utils/agent-plan'
 import { AnimatedStatus } from './AnimatedEllipsis'
-import { ChatHistoryIcon, PlusIcon, TrashIcon, CloseIcon } from './icons/ToolbarIcons'
+import { ChatHistoryIcon, PlusIcon, CloseIcon } from './icons/ToolbarIcons'
 import {
   buildDisplayContentForActions,
   inferWorkspaceActionsFromCodeBlocks,
@@ -380,7 +380,16 @@ export function ChatPanel() {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') closeTabContextMenu()
     }
-    const onScroll = () => closeTabContextMenu()
+    const onScroll = (event: Event) => {
+      // 右クリックでタブをアクティブ化したときの scrollIntoView / メッセージ自動スクロールで
+      // メニューが即閉じ、すべて閉じる等が押せなくなるのを防ぐ
+      const target = event.target
+      if (target instanceof Node) {
+        if (chatTabsRef.current?.contains(target)) return
+        if (messagesContainerRef.current?.contains(target)) return
+      }
+      closeTabContextMenu()
+    }
 
     window.addEventListener('mousedown', onPointerDown)
     window.addEventListener('keydown', onKeyDown)
@@ -1201,6 +1210,11 @@ export function ChatPanel() {
               }}
               title={session.title}
               onDragStart={(e) => {
+                // × 上での微小移動で DnD が始まると click が発火せず閉じられない
+                if ((e.target as HTMLElement).closest('.chat-tab-close')) {
+                  e.preventDefault()
+                  return
+                }
                 chatTabDragIdRef.current = session.id
                 setChatTabDragId(session.id)
                 e.dataTransfer.setData(CHAT_TAB_REORDER_MIME, session.id)
@@ -1240,7 +1254,16 @@ export function ChatPanel() {
               <button
                 type="button"
                 className="chat-tab-close"
+                onPointerDown={(e) => {
+                  // 親が draggable のため、mouseup 前に DnD が始まると click が消える。
+                  // pointerdown で閉じてドラッグ開始を防ぐ。
+                  if (e.button !== 0) return
+                  e.preventDefault()
+                  e.stopPropagation()
+                  closeChatSession(session.id)
+                }}
                 onClick={(e) => {
+                  // キーボード操作用（マウスは pointerdown で処理済み）
                   e.stopPropagation()
                   closeChatSession(session.id)
                 }}
@@ -1254,42 +1277,82 @@ export function ChatPanel() {
             <div className="tab-drop-end" aria-hidden />
           )}
         </div>
-        {tabContextMenu && (
-          <div
-            ref={tabContextMenuRef}
-            className="file-tree-context-menu"
-            style={{ left: tabContextMenu.x, top: tabContextMenu.y }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button
-              type="button"
-              onClick={() => runCloseChatIds([tabContextMenu.id])}
+        {tabContextMenu &&
+          createPortal(
+            <div
+              ref={tabContextMenuRef}
+              className="file-tree-context-menu"
+              style={{ left: tabContextMenu.x, top: tabContextMenu.y }}
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={(e) => e.stopPropagation()}
             >
-              {t('editor.closeTab')}
-            </button>
-            <button
-              type="button"
-              disabled={openChatSessions.length <= 1}
-              onClick={() => {
-                if (openChatSessions.length <= 1) return
-                const others = openChatSessions
-                  .filter((s) => s.id !== tabContextMenu.id)
-                  .map((s) => s.id)
-                runCloseChatIds(others, tabContextMenu.id)
-              }}
-            >
-              {t('editor.closeOtherTabs')}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                runCloseChatIds(openChatSessions.map((s) => s.id))
-              }}
-            >
-              {t('editor.closeAllTabs')}
-            </button>
-          </div>
-        )}
+              <button
+                type="button"
+                onPointerDown={(e) => {
+                  if (e.button !== 0) return
+                  e.preventDefault()
+                  e.stopPropagation()
+                  runCloseChatIds([tabContextMenu.id])
+                }}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  runCloseChatIds([tabContextMenu.id])
+                }}
+              >
+                {t('editor.closeTab')}
+              </button>
+              <button
+                type="button"
+                disabled={openChatSessions.length <= 1}
+                onPointerDown={(e) => {
+                  if (e.button !== 0) return
+                  if (openChatSessions.length <= 1) return
+                  e.preventDefault()
+                  e.stopPropagation()
+                  const others = useAppStore
+                    .getState()
+                    .chatSessions.filter((s) => s.isOpen && s.id !== tabContextMenu.id)
+                    .map((s) => s.id)
+                  runCloseChatIds(others, tabContextMenu.id)
+                }}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  if (openChatSessions.length <= 1) return
+                  const others = useAppStore
+                    .getState()
+                    .chatSessions.filter((s) => s.isOpen && s.id !== tabContextMenu.id)
+                    .map((s) => s.id)
+                  runCloseChatIds(others, tabContextMenu.id)
+                }}
+              >
+                {t('editor.closeOtherTabs')}
+              </button>
+              <button
+                type="button"
+                onPointerDown={(e) => {
+                  if (e.button !== 0) return
+                  e.preventDefault()
+                  e.stopPropagation()
+                  const ids = useAppStore
+                    .getState()
+                    .chatSessions.filter((s) => s.isOpen)
+                    .map((s) => s.id)
+                  runCloseChatIds(ids)
+                }}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  const ids = useAppStore
+                    .getState()
+                    .chatSessions.filter((s) => s.isOpen)
+                    .map((s) => s.id)
+                  runCloseChatIds(ids)
+                }}
+              >
+                {t('editor.closeAllTabs')}
+              </button>
+            </div>,
+            document.body
+          )}
         <div className="chat-header-actions">
           <div className="chat-history-menu" ref={historyRef}>
             <button
@@ -1365,14 +1428,6 @@ export function ChatPanel() {
             title={t('chat.newChat')}
           >
             <PlusIcon />
-          </button>
-          <button
-            className="btn-icon"
-            onClick={() => useAppStore.getState().clearChat()}
-            title={t('chat.clear')}
-            disabled={isChatLoading}
-          >
-            <TrashIcon />
           </button>
         </div>
       </div>
