@@ -29,7 +29,11 @@ import {
 } from '@/types'
 import { getLanguageFromPath } from '@/utils/language'
 import { generateId } from '@/utils/code-blocks'
-import { loadPanelLayout, savePanelLayout } from '@/utils/panel-layout'
+import {
+  loadPanelLayout,
+  savePanelLayout,
+  toPersistedPanelLayout
+} from '@/utils/panel-layout'
 import { createBrowserTabPath, normalizeBrowserUrl } from '@/utils/browser-tab'
 import { SETTINGS_TAB_PATH } from '@/utils/settings-tab'
 import { moveItemByDropIndex, reorderOpenSessionsById } from '@/utils/tab-reorder'
@@ -608,6 +612,7 @@ interface AppState {
 }
 
 const initialChatSession = createEmptyChatSession()
+const initialPanelLayout = loadPanelLayout()
 
 export const useAppStore = create<AppState>((set, get) => ({
   workspaceRoot: null,
@@ -620,9 +625,9 @@ export const useAppStore = create<AppState>((set, get) => ({
   loadingChatIds: [],
   settings: { ...DEFAULT_SETTINGS },
   settingsOpen: false,
-  showFileTree: true,
-  showChat: true,
-  showTerminal: false,
+  showFileTree: initialPanelLayout.showFileTree,
+  showChat: initialPanelLayout.showChat,
+  showTerminal: initialPanelLayout.showTerminal,
   leftSidebarView: 'explorer',
   searchQuery: '',
   searchReplace: '',
@@ -652,7 +657,11 @@ export const useAppStore = create<AppState>((set, get) => ({
   agentApprovalTrace: null,
   lastApplyError: null,
   chatComposerInsertRequest: null,
-  panelLayout: loadPanelLayout(),
+  panelLayout: {
+    fileTreeWidthRatio: initialPanelLayout.fileTreeWidthRatio,
+    chatWidthRatio: initialPanelLayout.chatWidthRatio,
+    terminalHeight: initialPanelLayout.terminalHeight
+  },
 
   setWorkspaceRoot: (root) =>
     set((state) => ({
@@ -1789,25 +1798,19 @@ export const useAppStore = create<AppState>((set, get) => ({
   clearChatComposerInsertRequest: () => set({ chatComposerInsertRequest: null }),
 
   setFileTreeWidthRatio: (ratio) =>
-    set((state) => {
-      const panelLayout = { ...state.panelLayout, fileTreeWidthRatio: ratio }
-      savePanelLayout(panelLayout)
-      return { panelLayout }
-    }),
+    set((state) => ({
+      panelLayout: { ...state.panelLayout, fileTreeWidthRatio: ratio }
+    })),
 
   setChatPanelWidthRatio: (ratio) =>
-    set((state) => {
-      const panelLayout = { ...state.panelLayout, chatWidthRatio: ratio }
-      savePanelLayout(panelLayout)
-      return { panelLayout }
-    }),
+    set((state) => ({
+      panelLayout: { ...state.panelLayout, chatWidthRatio: ratio }
+    })),
 
   setTerminalHeight: (height) =>
-    set((state) => {
-      const panelLayout = { ...state.panelLayout, terminalHeight: height }
-      savePanelLayout(panelLayout)
-      return { panelLayout }
-    }),
+    set((state) => ({
+      panelLayout: { ...state.panelLayout, terminalHeight: height }
+    })),
 
   getActiveChatSession: () => {
     const state = get()
@@ -1819,3 +1822,21 @@ export const useAppStore = create<AppState>((set, get) => ({
     return state.openFiles.find((f) => f.path === state.activeFilePath) ?? null
   }
 }))
+
+useAppStore.subscribe((state, prev) => {
+  if (
+    state.showFileTree === prev.showFileTree &&
+    state.showChat === prev.showChat &&
+    state.showTerminal === prev.showTerminal &&
+    state.panelLayout === prev.panelLayout
+  ) {
+    return
+  }
+  savePanelLayout(
+    toPersistedPanelLayout(state.panelLayout, {
+      showFileTree: state.showFileTree,
+      showChat: state.showChat,
+      showTerminal: state.showTerminal
+    })
+  )
+})
