@@ -67,12 +67,180 @@ export function extractMarkdownSummary(text: string, maxChars = 200): string {
   return `${summary.slice(0, Math.max(1, maxChars - 1))}…`
 }
 
-export type MarkdownHeadingIssueKind = 'broken_atx' | 'empty_heading' | 'level_jump'
+export type MarkdownHeadingIssueKind =
+  | 'broken_atx'
+  | 'empty_heading'
+  | 'level_jump'
+  | 'duplicate_heading'
+  | 'broken_link'
 
 export interface MarkdownHeadingIssue {
   kind: MarkdownHeadingIssueKind
   line: number
   message: string
+}
+
+const MD_LINK = /(!)?\[([^\]]*)\]\(([^)]+)\)/g
+const DOC_LINK_EXT = /\.(md|markdown|mdx)$/i
+
+/** `](href "title")` / `<href>` からリンク先パスだけ取り出す。 */
+export function stripMarkdownHref(raw: string): string {
+  let target = raw.trim()
+  if (target.startsWith('<') && target.endsWith('>')) {
+    target = target.slice(1, -1).trim()
+  }
+  const titled = target.match(/^(\S+)(?:\s+("|').*\2)?$/)
+  if (titled) target = titled[1]
+  const hashIdx = target.indexOf('#')
+  if (hashIdx === 0) return ''
+  if (hashIdx > 0) target = target.slice(0, hashIdx)
+  return target.trim()
+}
+
+/**
+ * fromFile（ワークスペース相対）から相対リンクを解決する。
+ * http(s) 等の絶対 URL・ワークスペース外は null。
+ */
+export function resolveMarkdownLink(fromFile: string, href: string): string | null {
+  const target = stripMarkdownHref(href)
+  if (!target) return null
+  if (/^[a-z][a-z0-9+.-]*:/i.test(target)) return null
+  if (target.startsWith('//')) return null
+
+  const from = fromFile.replace(/\\/g, '/').replace(/^\.\//, '')
+  const slash = from.lastIndexOf('/')
+  const fromDir = slash >= 0 ? from.slice(0, slash) : ''
+  const joined = fromDir ? `${fromDir}/${target}` : target
+  const parts: string[] = []
+  for (const part of joined.split('/')) {
+    if (!part || part === '.') continue
+    if (part === '..') {
+      if (parts.length === 0) return null
+      parts.pop()
+      continue
+    }
+    parts.push(part)
+  }
+  return parts.join('/')
+}
+
+/**
+ * Markdown 内の相対ドキュメントリンク（.md / .markdown / .mdx）を
+ * ワークスペース相対パスへ解決して返す（重複除去・出現順）。
+ */
+export function parseMarkdownDocLinks(text: string, fromFile: string): string[] {
+  const out: string[] = []
+  const seen = new Set<string>()
+  const lines = text.split('\n')
+  let inFence = false
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]
+    const fence = line.match(/^(`{3,}|~{3,})/)
+    if (fence) {
+      inFence = !inFence
+      continue
+    }
+    if (inFence) continue
+
+    MD_LINK.lastIndex = 0
+    let match: RegExpExecArray | null
+    while ((match = MD_LINK.exec(line)) !== null) {
+      if (match[1] === '!') continue
+      const resolved = resolveMarkdownLink(fromFile, match[3])
+      if (!resolved || !DOC_LINK_EXT.test(resolved)) continue
+      if (seen.has(resolved)) continue
+      seen.add(resolved)
+      out.push(resolved)
+    }
+  }
+  return out
+}
+
+/**
+ * 指定見出し（テキスト一致、大文字小文字無視可）から
+ * 同レベル以上の次見出し直前までのセクション本文を返す。
+ */
+export function extractMarkdownSection(text: string, headingText: string): string | null {
+  const needle = headingText.replace(/^#+\s*/, '').trim()
+  if (!needle) return null
+  const headings = parseMarkdownHeadings(text)
+  const idx = headings.findIndex(
+    (h) => h.text === needle || h.text.toLowerCase() === needle.toLowerCase()
+  )
+  if (idx < 0) return null
+
+  const start = headings[idx]
+  const lines = text.split('\n')
+  let endExclusive = lines.length
+  for (let i = idx + 1; i < headings.length; i++) {
+    if (headings[i].level <= start.level) {
+      endExclusive = headings[i].line - 1
+      break
+    }
+  }
+  return lines.slice(start.line - 1, endExclusive).join('\n')
+}
+
+/** 同一レベル・同一テキストの見出し重複。 */
+export function findDuplicateHeadings(headings: MarkdownHeading[]): MarkdownHeadingIssue[] {
+  const firstLine = new Map<string, number>()
+  const issues: MarkdownHeadingIssue[] = []
+  for (const h of headings) {
+    const key = `${h.level}\0${h.text}`
+    const prev = firstLine.get(key)
+    if (prev !== undefined) {
+      issues.push({
+        kind: 'duplicate_heading',
+        line: h.line,
+        message: `Duplicate h${h.level} heading "${h.text}" (also at L${prev})`
+      })
+    } else {
+      firstLine.set(key, h.line)
+    }
+  }
+  return issues
+}
+
+/**
+ * 相対 .md リンクのうち、exists が false のものを broken_link として返す。
+ * exists 未指定時はリンク検査をスキップ。
+ */
+export function findBrokenMarkdownDocLinks(
+  text: string,
+  fromFile: string,
+  exists?: (workspaceRelativePath: string) => boolean
+): MarkdownHeadingIssue[] {
+  if (!exists) return []
+  const issues: MarkdownHeadingIssue[] = []
+  const lines = text.split('\n')
+  let inFence = false
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]
+    const fence = line.match(/^(`{3,}|~{3,})/)
+    if (fence) {
+      inFence = !inFence
+      continue
+    }
+    if (inFence) continue
+
+    MD_LINK.lastIndex = 0
+    let match: RegExpExecArray | null
+    while ((match = MD_LINK.exec(line)) !== null) {
+      if (match[1] === '!') continue
+      const href = match[3]
+      const resolved = resolveMarkdownLink(fromFile, href)
+      if (!resolved || !DOC_LINK_EXT.test(resolved)) continue
+      if (exists(resolved)) continue
+      issues.push({
+        kind: 'broken_link',
+        line: i + 1,
+        message: `Broken doc link "${stripMarkdownHref(href)}" → ${resolved}`
+      })
+    }
+  }
+  return issues
 }
 
 /** 壊れた ATX（#直後に空白なし）や空見出しを検出。フェンス内は無視。 */
@@ -128,12 +296,30 @@ export function validateMarkdownHeadingStructure(
   return issues
 }
 
-/** 文書向け verify: 壊れた ATX + 階層ジャンプ。 */
-export function validateMarkdownDocument(text: string): MarkdownHeadingIssue[] {
-  return [
+export interface ValidateMarkdownDocumentOptions {
+  /** リンク解決の起点（ワークスペース相対）。未指定ならリンク検査なし */
+  relativePath?: string
+  /** ワークスペース相対パスの存在確認。未指定ならリンク検査なし */
+  fileExists?: (workspaceRelativePath: string) => boolean
+}
+
+/** 文書向け verify: 壊れた ATX・階層ジャンプ・重複見出し・（任意）壊れた相対 doc リンク。 */
+export function validateMarkdownDocument(
+  text: string,
+  options: ValidateMarkdownDocumentOptions = {}
+): MarkdownHeadingIssue[] {
+  const headings = parseMarkdownHeadings(text)
+  const issues: MarkdownHeadingIssue[] = [
     ...findBrokenAtxHeadings(text),
-    ...validateMarkdownHeadingStructure(parseMarkdownHeadings(text))
+    ...validateMarkdownHeadingStructure(headings),
+    ...findDuplicateHeadings(headings)
   ]
+  if (options.relativePath && options.fileExists) {
+    issues.push(
+      ...findBrokenMarkdownDocLinks(text, options.relativePath, options.fileExists)
+    )
+  }
+  return issues
 }
 
 export type MarkdownHeadingChangeKind = 'added' | 'removed'

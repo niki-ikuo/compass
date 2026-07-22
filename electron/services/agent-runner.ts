@@ -75,6 +75,7 @@ import {
 } from './agent-verify'
 import { redactSecrets, redactSecretsInArgs } from '../../src/utils/redact'
 import { formatAgentToolsUnsupportedError } from '../../src/utils/agent-tools'
+import { extractMarkdownSection } from '../../src/utils/markdown-outline'
 import {
   CONTEXT_BUDGET,
   fitHistoryMessages,
@@ -132,7 +133,7 @@ const AGENT_TOOLS = [
     function: {
       name: 'readFile',
       description:
-        'Read a text file under the workspace. Path is relative to the workspace root. Re-reads of an unchanged file return a cache hit (outline only); pass force=true to reload full contents from disk.',
+        'Read a text file under the workspace. Path is relative to the workspace root. Re-reads of an unchanged file return a cache hit (outline only); pass force=true to reload full contents from disk. For Markdown, optional heading returns only that section (from the heading through the next same-or-higher-level heading).',
       parameters: {
         type: 'object',
         properties: {
@@ -140,6 +141,11 @@ const AGENT_TOOLS = [
           force: {
             type: 'boolean',
             description: 'If true, bypass the in-run read cache and reload from disk'
+          },
+          heading: {
+            type: 'string',
+            description:
+              'Markdown only: heading text (with or without #) to read a single section instead of the whole file'
           }
         },
         required: ['path']
@@ -257,7 +263,7 @@ const AGENT_TOOLS = [
     function: {
       name: 'verify',
       description:
-        'Post-edit verification. In code use-case: run project test / lint / typecheck via package scripts or safe fallbacks. In document use-case: check markdown heading structure on edited files. In data use-case: check CSV column counts and JSON/YAML shape. Prefer after proposeActions is applied. Pass paths to limit which files are checked for document/data; otherwise the last applied paths are used. On failure, fix with proposeActions and verify again. If all checks are skipped because scripts/files are missing, do not narrate that skip in the final user-facing reply.',
+        'Post-edit verification. In code use-case: run project test / lint / typecheck via package scripts or safe fallbacks. In document use-case: check markdown heading structure, duplicate headings, and broken relative .md links on edited files. In data use-case: check CSV column counts and JSON/YAML shape. Prefer after proposeActions is applied. Pass paths to limit which files are checked for document/data; otherwise the last applied paths are used. On failure, fix with proposeActions and verify again. If all checks are skipped because scripts/files are missing, do not narrate that skip in the final user-facing reply.',
       parameters: {
         type: 'object',
         properties: {
@@ -689,6 +695,7 @@ async function executeReadFile(
     return { ok: false, summary: 'path is required', content: 'Error: path is required' }
   }
   const force = args.force === true
+  const headingArg = typeof args.heading === 'string' ? args.heading.trim() : ''
 
   try {
     const { relativePath, absolutePath } = await resolveAgentToolPath(workspaceRoot, pathArg)
@@ -708,7 +715,8 @@ async function executeReadFile(
       }
     }
 
-    if (!force) {
+    // Full-file cache hits only (heading slices need fresh section extract from disk text).
+    if (!force && !headingArg) {
       const cached = getCachedRead(readCache, relativePath)
       if (cached && cached.mtimeMs === info.mtimeMs && cached.size === info.size) {
         return formatCacheHit(cached)
@@ -726,26 +734,44 @@ async function executeReadFile(
     }
 
     const outline = buildFileOutline(relativePath, text)
-    const body = truncated
-      ? `# ${relativePath} (truncated)\nOutline: ${outline || '(none)'}\n${text}`
-      : `# ${relativePath}\nOutline: ${outline || '(none)'}\n${text}`
-    const content = truncateForModel(body)
-
     putCachedRead(readCache, {
       relativePath,
       mtimeMs: info.mtimeMs,
       size: info.size,
       charCount: text.length,
       outline,
-      content
+      content: truncated
+        ? `# ${relativePath} (truncated)\nOutline: ${outline || '(none)'}\n${text}`
+        : `# ${relativePath}\nOutline: ${outline || '(none)'}\n${text}`
     })
+
+    if (headingArg) {
+      const section = extractMarkdownSection(text, headingArg)
+      if (section === null) {
+        return {
+          ok: false,
+          summary: `heading not found: ${headingArg}`,
+          content: `Error: heading "${headingArg}" not found in ${relativePath}\nOutline: ${outline || '(none)'}`
+        }
+      }
+      const body = `# ${relativePath} § ${headingArg}\nOutline: ${outline || '(none)'}\n${section}`
+      return {
+        ok: true,
+        summary: `Read ${relativePath} section "${headingArg}" (${section.length} chars)`,
+        content: truncateForModel(body)
+      }
+    }
+
+    const body = truncated
+      ? `# ${relativePath} (truncated)\nOutline: ${outline || '(none)'}\n${text}`
+      : `# ${relativePath}\nOutline: ${outline || '(none)'}\n${text}`
 
     return {
       ok: true,
       summary: truncated
         ? `Read ${relativePath} (truncated to ${MAX_READ_BYTES} bytes)`
         : `Read ${relativePath} (${text.length} chars)`,
-      content
+      content: truncateForModel(body)
     }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)

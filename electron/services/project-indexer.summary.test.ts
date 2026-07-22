@@ -3,6 +3,7 @@ import type { DataSchema } from '../../src/utils/data-outline'
 import {
   buildSummary,
   compactSummaryForPreset,
+  expandRelatedPathsForPreset,
   extractSummarySection
 } from './project-indexer'
 
@@ -16,6 +17,7 @@ function file(
     symbols: Array<{ name: string; kind: string; line: number }>
     headings: Array<{ level: number; text: string; line: number }>
     summary: string
+    docLinks: string[]
     dataSchema: DataSchema
   }> = {}
 ) {
@@ -28,6 +30,7 @@ function file(
     symbols: overrides.symbols ?? [],
     ...(overrides.headings ? { headings: overrides.headings } : {}),
     ...(overrides.summary ? { summary: overrides.summary } : {}),
+    ...(overrides.docLinks ? { docLinks: overrides.docLinks } : {}),
     ...(overrides.dataSchema ? { dataSchema: overrides.dataSchema } : {})
   }
 }
@@ -145,6 +148,10 @@ describe('compactSummaryForPreset', () => {
     '## Entry points',
     '- src/main.ts',
     '',
+    '## Documents',
+    '- docs/guide.md | headings: # Guide',
+    '- docs/plan.md | headings: # Plan',
+    '',
     '## Data',
     '- data/a.csv | csv columns[2]: x, y; rows: 3',
     '- data/b.json | json array[2] keys: id',
@@ -163,8 +170,75 @@ describe('compactSummaryForPreset', () => {
     expect(compact).toContain('data/a.csv')
   })
 
+  it('puts Documents first for the document preset', () => {
+    const compact = compactSummaryForPreset(summary, 'document', 500)
+    expect(compact.indexOf('## Documents')).toBeLessThan(compact.indexOf('## Entry points'))
+    expect(compact).toContain('docs/guide.md')
+  })
+
   it('leaves order alone for other presets', () => {
     const compact = compactSummaryForPreset(summary, 'code', 500)
     expect(compact.indexOf('## Entry points')).toBeLessThan(compact.indexOf('## Data'))
+  })
+})
+
+describe('expandRelatedPathsForPreset', () => {
+  it('adds sibling markdown and doc link targets for document', () => {
+    const related = new Set<string>(['docs/a.md'])
+    expandRelatedPathsForPreset({
+      preset: 'document',
+      focusPaths: ['docs/a.md'],
+      files: [
+        file('docs/a.md', {
+          language: 'markdown',
+          docLinks: ['shared/note.md']
+        }),
+        file('docs/b.md', { language: 'markdown' }),
+        file('shared/note.md', { language: 'markdown' }),
+        file('other/c.md', { language: 'markdown' }),
+        file('src/app.ts')
+      ],
+      related
+    })
+    expect(related.has('docs/b.md')).toBe(true)
+    expect(related.has('shared/note.md')).toBe(true)
+    expect(related.has('other/c.md')).toBe(false)
+  })
+
+  it('adds sibling data files for data preset', () => {
+    const related = new Set<string>(['data/a.csv'])
+    expandRelatedPathsForPreset({
+      preset: 'data',
+      focusPaths: ['data/a.csv'],
+      files: [
+        file('data/a.csv', {
+          language: 'csv',
+          dataSchema: {
+            kind: 'csv',
+            fields: ['x'],
+            shape: 'csv'
+          }
+        }),
+        file('data/b.csv', {
+          language: 'csv',
+          dataSchema: {
+            kind: 'csv',
+            fields: ['y'],
+            shape: 'csv'
+          }
+        }),
+        file('other/c.csv', {
+          language: 'csv',
+          dataSchema: {
+            kind: 'csv',
+            fields: ['z'],
+            shape: 'csv'
+          }
+        })
+      ],
+      related
+    })
+    expect(related.has('data/b.csv')).toBe(true)
+    expect(related.has('other/c.csv')).toBe(false)
   })
 })

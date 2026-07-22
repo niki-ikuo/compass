@@ -10,12 +10,13 @@ import {
 } from '../../src/utils/data-outline'
 import {
   extractMarkdownSummary,
+  parseMarkdownDocLinks,
   parseMarkdownHeadings,
   type MarkdownHeading
 } from '../../src/utils/markdown-outline'
 import { shouldSkipWorkspaceEntry } from './fs-ignore'
 
-const INDEX_VERSION = 4
+const INDEX_VERSION = 5
 const COMPASS_DIR = '.compass'
 const IGNORED_DIRS = new Set([
   'node_modules',
@@ -69,6 +70,8 @@ interface IndexedFile {
   headings?: MarkdownHeading[]
   /** Markdown のみ — 先頭段落の短い要約 */
   summary?: string
+  /** Markdown のみ — 相対 .md リンク（ワークスペース相対パス） */
+  docLinks?: string[]
   /** CSV / JSON / YAML のデータスキーマ要約 */
   dataSchema?: DataSchema
 }
@@ -652,8 +655,10 @@ async function runBuildProjectIndex(
       if (language === 'markdown') {
         const headings = parseMarkdownHeadings(content).slice(0, 40)
         const summary = extractMarkdownSummary(content, 200)
+        const docLinks = parseMarkdownDocLinks(content, relPath).slice(0, 40)
         if (headings.length > 0) entry.headings = headings
         if (summary) entry.summary = summary
+        if (docLinks.length > 0) entry.docLinks = docLinks
       }
 
       const dataSchema = extractDataSchema(relPath, content)
@@ -754,29 +759,88 @@ export function extractSummarySection(summary: string, heading: string): string 
   return `${marker}\n${body}`.trim()
 }
 
-/** For the data use-case, put ## Data first and give it a larger share of the budget. */
+/** Prefer ## Data / ## Documents and give that section a larger share of the budget. */
 export function compactSummaryForPreset(
   summary: string,
   preset?: UseCasePreset | null,
   maxChars = 5000
 ): string {
-  if (preset !== 'data') {
+  const priorityHeading =
+    preset === 'data' ? '## Data' : preset === 'document' ? '## Documents' : null
+  if (!priorityHeading) {
     return summary.slice(0, maxChars)
   }
 
-  const dataSection = extractSummarySection(summary, '## Data')
-  if (!dataSection) {
+  const prioritySection = extractSummarySection(summary, priorityHeading)
+  if (!prioritySection) {
     return summary.slice(0, maxChars)
   }
 
-  const dataBudget = Math.min(4500, Math.floor(maxChars * 0.7))
-  const restBudget = Math.max(800, maxChars - Math.min(dataSection.length, dataBudget) - 2)
-  const trimmedData = dataSection.slice(0, dataBudget)
-  const withoutData = summary
-    .replace(dataSection, '')
+  const priorityBudget = Math.min(4500, Math.floor(maxChars * 0.7))
+  const restBudget = Math.max(800, maxChars - Math.min(prioritySection.length, priorityBudget) - 2)
+  const trimmedPriority = prioritySection.slice(0, priorityBudget)
+  const withoutPriority = summary
+    .replace(prioritySection, '')
     .replace(/\n{3,}/g, '\n\n')
     .trim()
-  return `${trimmedData}\n\n${withoutData.slice(0, restBudget)}`.slice(0, maxChars)
+  return `${trimmedPriority}\n\n${withoutPriority.slice(0, restBudget)}`.slice(0, maxChars)
+}
+
+function parentDir(path: string): string {
+  const slash = path.lastIndexOf('/')
+  return slash >= 0 ? path.slice(0, slash) : ''
+}
+
+/**
+ * Expand related paths for data/document presets (siblings + doc links).
+ * Mutates `related`. Exported for unit tests.
+ */
+export function expandRelatedPathsForPreset(options: {
+  preset?: UseCasePreset | null
+  focusPaths: Iterable<string>
+  files: Array<{
+    path: string
+    language?: string
+    dataSchema?: unknown
+    docLinks?: string[]
+  }>
+  related: Set<string>
+  isDataPath?: (path: string) => boolean
+}): void {
+  const preset = options.preset ?? null
+  const focusSet = new Set(options.focusPaths)
+  if (focusSet.size === 0) return
+
+  const focusDirs = new Set([...focusSet].map(parentDir))
+  const byPath = new Map(options.files.map((f) => [f.path, f]))
+  const isData = options.isDataPath ?? isDataIndexPath
+
+  if (preset === 'data') {
+    for (const file of options.files) {
+      if (!file.dataSchema || !isData(file.path)) continue
+      if (focusDirs.has(parentDir(file.path)) || focusSet.has(file.path)) {
+        options.related.add(file.path)
+      }
+    }
+    return
+  }
+
+  if (preset !== 'document') return
+
+  for (const file of options.files) {
+    if (file.language !== 'markdown') continue
+    if (focusDirs.has(parentDir(file.path)) || focusSet.has(file.path)) {
+      options.related.add(file.path)
+    }
+  }
+
+  for (const path of focusSet) {
+    const file = byPath.get(path)
+    if (!file?.docLinks) continue
+    for (const link of file.docLinks) {
+      if (byPath.has(link)) options.related.add(link)
+    }
+  }
 }
 
 export async function getProjectIndexContext(
@@ -820,23 +884,13 @@ export async function getProjectIndexContext(
       }
     }
 
-    // Data use-case: also attach sibling data files in the same folder (no import graph).
-    if (preset === 'data') {
-      const focusDirs = new Set(
-        [...focusPaths].map((path) => {
-          const slash = path.lastIndexOf('/')
-          return slash >= 0 ? path.slice(0, slash) : ''
-        })
-      )
-      for (const file of files) {
-        if (!file.dataSchema || !isDataIndexPath(file.path)) continue
-        const slash = file.path.lastIndexOf('/')
-        const dir = slash >= 0 ? file.path.slice(0, slash) : ''
-        if (focusDirs.has(dir) || focusPaths.has(file.path)) {
-          related.add(file.path)
-        }
-      }
-    }
+    // Data / document: attach siblings (+ markdown doc links for document).
+    expandRelatedPathsForPreset({
+      preset,
+      focusPaths,
+      files,
+      related
+    })
 
     const relatedFiles = files.filter((f) => related.has(f.path))
     const relatedSection =
@@ -855,9 +909,9 @@ export async function getProjectIndexContext(
           ].join('\n')
         : ''
 
-    const summaryBudget = preset === 'data' ? 6000 : 5000
+    const summaryBudget = preset === 'data' || preset === 'document' ? 6000 : 5000
     const compactSummary = compactSummaryForPreset(summary, preset, summaryBudget)
-    const contextBudget = preset === 'data' ? 10000 : 8000
+    const contextBudget = preset === 'data' || preset === 'document' ? 10000 : 8000
     const aiContext = [
       t('ai.indexHeader'),
       `indexedAt: ${meta.indexedAt}`,

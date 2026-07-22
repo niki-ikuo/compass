@@ -2,8 +2,11 @@ import { describe, expect, it } from 'vitest'
 import {
   compactDiffLines,
   diffMarkdownHeadings,
+  extractMarkdownSection,
   extractMarkdownSummary,
+  parseMarkdownDocLinks,
   parseMarkdownHeadings,
+  resolveMarkdownLink,
   validateMarkdownDocument
 } from '@/utils/markdown-outline'
 
@@ -38,12 +41,51 @@ describe('extractMarkdownSummary', () => {
   })
 })
 
+describe('extractMarkdownSection', () => {
+  it('returns from heading through next same-or-higher level', () => {
+    const text = ['# Title', '', '## Setup', 'one', '### Detail', 'two', '## Next', 'three'].join(
+      '\n'
+    )
+    expect(extractMarkdownSection(text, 'Setup')).toBe('## Setup\none\n### Detail\ntwo')
+    expect(extractMarkdownSection(text, '## Setup')).toBe('## Setup\none\n### Detail\ntwo')
+  })
+
+  it('returns null when heading is missing', () => {
+    expect(extractMarkdownSection('# A\n', 'Missing')).toBeNull()
+  })
+})
+
+describe('parseMarkdownDocLinks / resolveMarkdownLink', () => {
+  it('resolves relative doc links and skips urls / images', () => {
+    const text = [
+      'See [guide](./guide.md#install) and [abs](https://example.com/a.md).',
+      '![img](./pic.png)',
+      '[other](../shared/note.md)'
+    ].join('\n')
+    expect(parseMarkdownDocLinks(text, 'docs/index.md')).toEqual([
+      'docs/guide.md',
+      'shared/note.md'
+    ])
+    expect(resolveMarkdownLink('docs/a.md', '../../escape.md')).toBeNull()
+  })
+})
+
 describe('validateMarkdownDocument', () => {
   it('flags broken ATX and level jumps', () => {
     const text = ['#Ok', '# Title', '### Jump'].join('\n')
     const issues = validateMarkdownDocument(text)
     expect(issues.some((i) => i.kind === 'broken_atx')).toBe(true)
     expect(issues.some((i) => i.kind === 'level_jump')).toBe(true)
+  })
+
+  it('flags duplicate headings and broken relative doc links', () => {
+    const text = ['# Title', '## Dup', '## Dup', '[gone](./missing.md)'].join('\n')
+    const issues = validateMarkdownDocument(text, {
+      relativePath: 'docs/a.md',
+      fileExists: (p) => p === 'docs/a.md'
+    })
+    expect(issues.some((i) => i.kind === 'duplicate_heading')).toBe(true)
+    expect(issues.some((i) => i.kind === 'broken_link')).toBe(true)
   })
 })
 

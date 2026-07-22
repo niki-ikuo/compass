@@ -1,4 +1,5 @@
 import { readFile } from 'fs/promises'
+import { existsSync } from 'fs'
 import { join } from 'path'
 import type { UseCasePreset } from '../../src/types'
 import { normalizeUseCasePreset, DEFAULT_SETTINGS } from '../../src/types'
@@ -72,7 +73,11 @@ export async function runDocumentLightVerify(
       issueLines.push(`${rel}: file not readable`)
       continue
     }
-    const issues = validateMarkdownDocument(content)
+    const issues = validateMarkdownDocument(content, {
+      relativePath: rel,
+      fileExists: (workspaceRelativePath) =>
+        existsSync(join(workspaceRoot, workspaceRelativePath))
+    })
     for (const issue of issues) {
       issueLines.push(`${rel}:L${issue.line} ${issue.message}`)
     }
@@ -87,8 +92,8 @@ export async function runDocumentLightVerify(
       skipped: false,
       ok,
       summary: ok
-        ? `headings ok (${targets.length} file(s))`
-        : `headings failed (${issueLines.length} issue(s))`,
+        ? `document ok (${targets.length} file(s))`
+        : `document failed (${issueLines.length} issue(s))`,
       exitCode: ok ? 0 : 1,
       stdout: ok ? targets.map((p) => `ok ${p}`).join('\n') : issueLines.join('\n'),
       stderr: ''

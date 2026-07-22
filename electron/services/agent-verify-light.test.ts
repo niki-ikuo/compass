@@ -51,6 +51,23 @@ describe('runAgentVerify use-case light checks', () => {
     expect(result.ok).toBe(false)
   })
 
+  it('flags duplicate headings and broken links for document preset', async () => {
+    const root = makeRoot('doc-links')
+    writeFileSync(
+      join(root, 'notes.md'),
+      '# Title\n## Dup\n## Dup\nSee [x](./gone.md)\n'
+    )
+    const result = await runAgentVerify({
+      workspaceRoot: root,
+      preset: 'document',
+      paths: ['notes.md'],
+      signal: new AbortController().signal
+    })
+    expect(result.ok).toBe(false)
+    expect(result.content).toMatch(/Duplicate/)
+    expect(result.content).toMatch(/Broken doc link/)
+  })
+
   it('skips shell and light checks for general preset', async () => {
     const root = makeRoot('general')
     const result = await runAgentVerify({
