@@ -107,6 +107,8 @@ export type AgentToolName =
   | 'proposeActions'
   | 'exec'
   | 'verify'
+  | 'profileData'
+  | 'queryData'
   | 'updateTodo'
   | 'checkpoint'
   | 'remember'

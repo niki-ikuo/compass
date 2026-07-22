@@ -38,6 +38,10 @@ function toolIcon(name: string): string {
       return '⌨️'
     case 'verify':
       return '✅'
+    case 'profileData':
+      return '📊'
+    case 'queryData':
+      return '🧮'
     case 'proposeActions':
       return '✏️'
     case 'updateTodo':

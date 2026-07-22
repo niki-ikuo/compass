@@ -182,6 +182,25 @@ export function recordToolObservation(
     return
   }
 
+  if (toolName === 'profileData') {
+    const path =
+      typeof args.path === 'string' ? args.path.replace(/\\/g, '/') : ''
+    if (!path) return
+    upsertByPath(state, 'read', path, `profileData — ${result.summary}`)
+    return
+  }
+
+  if (toolName === 'queryData') {
+    const sql = typeof args.sql === 'string' ? args.sql.trim() : ''
+    const shortSql = sql.length > 100 ? `${sql.slice(0, 100)}…` : sql
+    pushEntry(
+      state,
+      'search',
+      shortSql ? `queryData \`${shortSql}\` — ${result.summary}` : `queryData — ${result.summary}`
+    )
+    return
+  }
+
   if (toolName === 'proposeActions') {
     pushEntry(state, 'write', result.summary)
   }
@@ -305,6 +324,18 @@ export function rebuildMemoryFromSteps(
       })
     } else if (step.name === 'proposeActions' && step.summary) {
       recordToolObservation(state, 'proposeActions', {}, {
+        ok: true,
+        summary: step.summary,
+        content: ''
+      })
+    } else if (step.name === 'profileData' && step.args && step.summary) {
+      recordToolObservation(state, 'profileData', step.args, {
+        ok: true,
+        summary: step.summary,
+        content: step.observation ?? ''
+      })
+    } else if (step.name === 'queryData' && step.args && step.summary) {
+      recordToolObservation(state, 'queryData', step.args, {
         ok: true,
         summary: step.summary,
         content: ''

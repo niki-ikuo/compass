@@ -68,6 +68,19 @@ describe('runAgentVerify use-case light checks', () => {
     expect(result.content).toMatch(/Broken doc link/)
   })
 
+  it('runs schema check for tsv paths', async () => {
+    const root = makeRoot('tsv')
+    writeFileSync(join(root, 'rows.tsv'), 'a\tb\n1\n')
+    const result = await runAgentVerify({
+      workspaceRoot: root,
+      preset: 'data',
+      paths: ['rows.tsv'],
+      signal: new AbortController().signal
+    })
+    expect(result.checks.some((c) => c.check === 'schema')).toBe(true)
+    expect(result.ok).toBe(false)
+  })
+
   it('skips shell and light checks for general preset', async () => {
     const root = makeRoot('general')
     const result = await runAgentVerify({

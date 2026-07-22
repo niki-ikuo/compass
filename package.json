@@ -25,12 +25,14 @@
     "node-pty": "^1.1.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "sql.js": "^1.14.1",
     "zustand": "^5.0.3"
   },
   "devDependencies": {
     "@types/node": "^26.1.1",
     "@types/react": "^19.0.10",
     "@types/react-dom": "^19.0.4",
+    "@types/sql.js": "^1.4.11",
     "@vitejs/plugin-react": "^4.3.4",
     "electron": "^34.5.8",
     "electron-builder": "^25.1.8",
@@ -46,6 +48,9 @@
     "productName": "Compass",
     "npmRebuild": false,
     "afterPack": "./scripts/after-pack.js",
+    "asarUnpack": [
+      "**/node_modules/sql.js/dist/sql-wasm.wasm"
+    ],
     "directories": {
       "output": "release",
       "buildResources": "build"

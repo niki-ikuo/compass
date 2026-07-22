@@ -11,6 +11,8 @@ export type AgentToolLabelKey =
   | 'chat.agentToolName.proposeActions'
   | 'chat.agentToolName.exec'
   | 'chat.agentToolName.verify'
+  | 'chat.agentToolName.profileData'
+  | 'chat.agentToolName.queryData'
   | 'chat.agentToolName.updateTodo'
   | 'chat.agentToolName.checkpoint'
   | 'chat.agentToolName.remember'
@@ -22,6 +24,8 @@ const AGENT_TOOL_LABEL_KEYS: Record<AgentToolName, AgentToolLabelKey> = {
   proposeActions: 'chat.agentToolName.proposeActions',
   exec: 'chat.agentToolName.exec',
   verify: 'chat.agentToolName.verify',
+  profileData: 'chat.agentToolName.profileData',
+  queryData: 'chat.agentToolName.queryData',
   updateTodo: 'chat.agentToolName.updateTodo',
   checkpoint: 'chat.agentToolName.checkpoint',
   remember: 'chat.agentToolName.remember'

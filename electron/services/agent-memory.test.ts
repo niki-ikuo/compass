@@ -110,4 +110,30 @@ describe('rebuildMemoryFromSteps', () => {
       true
     )
   })
+
+  it('replays profileData and queryData summaries', () => {
+    const state = rebuildMemoryFromSteps([
+      {
+        name: 'profileData',
+        args: { path: 'sales.csv' },
+        ok: true,
+        status: 'done',
+        summary: 'sales: 3 rows × 2 cols'
+      },
+      {
+        name: 'queryData',
+        args: { path: 'sales.csv', sql: 'SELECT COUNT(*) FROM t' },
+        ok: true,
+        status: 'done',
+        summary: '1 row(s)'
+      }
+    ])
+
+    expect(state.entries.some((e) => e.kind === 'read' && e.text.includes('profileData'))).toBe(
+      true
+    )
+    expect(state.entries.some((e) => e.kind === 'search' && e.text.includes('queryData'))).toBe(
+      true
+    )
+  })
 })

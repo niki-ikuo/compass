@@ -127,7 +127,9 @@ Defined as OpenAI function schemas in `AGENT_TOOLS` (`agent-runner.ts`). Dispatc
 | `search` | `workspace-search` | Content search, ≤ 30 hits | — |
 | `proposeActions` | `agent-propose-actions` + `filesystem` | Normalize → preview → **pause** | Apply / Reject / partial / Ask Agent to fix |
 | `exec` | `agent-exec` | Workspace cwd, deny-list, timeout, output cap | Write-risk cmds need `ai:needExecApproval` |
-| `verify` | `agent-verify` | test / lint / typecheck via scripts or fallbacks | — (uses internal exec) |
+| `verify` | `agent-verify` | test / lint / typecheck via scripts or fallbacks; document/data light checks | — (uses internal exec for code) |
+| `profileData` | `agent-data-sandbox` | **data use-case only** — column profile (types / nulls / uniques / samples); imports into in-run SQLite | — |
+| `queryData` | `agent-data-sandbox` | **data use-case only** — read-only `SELECT` / `WITH…SELECT` on imported CSV/TSV/JSON tables (`t` alias = first path) | — |
 | `updateTodo` | `agent-plan` | Checklist state for the run | — |
 | `checkpoint` | `agent-plan` | Short resume summary | — |
 | `remember` | `agent-memory` | Durable fact for Continue / follow-ups | — |

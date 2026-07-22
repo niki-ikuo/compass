@@ -16,6 +16,7 @@ function isDataPath(path: string): boolean {
   const lower = path.replace(/\\/g, '/').toLowerCase()
   return (
     lower.endsWith('.csv') ||
+    lower.endsWith('.tsv') ||
     lower.endsWith('.json') ||
     lower.endsWith('.yaml') ||
     lower.endsWith('.yml')

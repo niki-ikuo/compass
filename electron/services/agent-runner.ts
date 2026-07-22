@@ -73,9 +73,18 @@ import {
   normalizeVerifyChecks,
   runAgentVerify
 } from './agent-verify'
+import {
+  createAgentDataSandbox,
+  disposeAgentDataSandbox,
+  invalidateDataSandboxPaths,
+  profileDataFile,
+  queryDataFiles,
+  type AgentDataSandbox
+} from './agent-data-sandbox'
 import { redactSecrets, redactSecretsInArgs } from '../../src/utils/redact'
 import { formatAgentToolsUnsupportedError } from '../../src/utils/agent-tools'
 import { extractMarkdownSection } from '../../src/utils/markdown-outline'
+import { normalizeUseCasePreset } from '../../src/types'
 import {
   CONTEXT_BUDGET,
   fitHistoryMessages,
@@ -263,7 +272,7 @@ const AGENT_TOOLS = [
     function: {
       name: 'verify',
       description:
-        'Post-edit verification. In code use-case: run project test / lint / typecheck via package scripts or safe fallbacks. In document use-case: check markdown heading structure, duplicate headings, and broken relative .md links on edited files. In data use-case: check CSV column counts and JSON/YAML shape. Prefer after proposeActions is applied. Pass paths to limit which files are checked for document/data; otherwise the last applied paths are used. On failure, fix with proposeActions and verify again. If all checks are skipped because scripts/files are missing, do not narrate that skip in the final user-facing reply.',
+        'Post-edit verification. In code use-case: run project test / lint / typecheck via package scripts or safe fallbacks. In document use-case: check markdown heading structure, duplicate headings, and broken relative .md links on edited files. In data use-case: check CSV column counts, duplicate first-column keys, mixed column types, and JSON/YAML shape. Prefer after proposeActions is applied. Pass paths to limit which files are checked for document/data; otherwise the last applied paths are used. On failure, fix with proposeActions and verify again. If all checks are skipped because scripts/files are missing, do not narrate that skip in the final user-facing reply.',
       parameters: {
         type: 'object',
         properties: {
@@ -371,6 +380,63 @@ const AGENT_TOOLS = [
     }
   }
 ] as const
+
+/** Data use-case only: profile + read-only SQLite SELECT sandbox. */
+const DATA_AGENT_TOOLS = [
+  {
+    type: 'function',
+    function: {
+      name: 'profileData',
+      description:
+        'Profile a CSV / TSV / JSON (array of objects) file: columns, inferred types, null rates, unique counts, and sample values. Prefer this over readFile for large tables. Imports into the in-run SQLite sandbox and sets alias `t` for queryData.',
+      parameters: {
+        type: 'object',
+        properties: {
+          path: {
+            type: 'string',
+            description: 'Relative path to a data file from the workspace root'
+          }
+        },
+        required: ['path']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'queryData',
+      description:
+        'Run a read-only SELECT (or WITH … SELECT) against workspace data files loaded into an in-memory SQLite sandbox. Imports path/paths first. Table names come from file basenames; alias `t` always refers to the first path. Do not use DDL/DML. Prefer aggregates and LIMIT over dumping whole tables. File changes still go through proposeActions — never write back via SQL.',
+      parameters: {
+        type: 'object',
+        properties: {
+          path: {
+            type: 'string',
+            description: 'Primary data file to import (sets alias t)'
+          },
+          paths: {
+            type: 'array',
+            description: 'Additional data files to import (for JOINs)',
+            items: { type: 'string' }
+          },
+          sql: {
+            type: 'string',
+            description: 'Single read-only SELECT statement'
+          }
+        },
+        required: ['sql']
+      }
+    }
+  }
+] as const
+
+function getAgentTools(preset?: import('../../src/types').UseCasePreset | null) {
+  const resolved = normalizeUseCasePreset(preset)
+  if (resolved === 'data') {
+    return [...AGENT_TOOLS, ...DATA_AGENT_TOOLS]
+  }
+  return [...AGENT_TOOLS]
+}
 
 function truncatePersistedObservation(content: string): string {
   const redacted = redactSecrets(content)
@@ -665,16 +731,32 @@ function normalizeToolArgsForCall(
   name: string,
   args: Record<string, unknown>
 ): Record<string, unknown> {
-  if (name === 'readFile' || name === 'listDir') {
+  if (name === 'readFile' || name === 'listDir' || name === 'profileData') {
     const relativePath = normalizeAgentRelativePath(
       workspaceRoot,
       typeof args.path === 'string' ? args.path : undefined,
       { defaultToRoot: name === 'listDir' }
     )
-    if (name === 'readFile' && !relativePath) {
+    if ((name === 'readFile' || name === 'profileData') && !relativePath) {
       return { ...args, path: typeof args.path === 'string' ? args.path : '' }
     }
     return { ...args, path: relativePath || '.' }
+  }
+  if (name === 'queryData') {
+    const next: Record<string, unknown> = { ...args }
+    if (typeof args.path === 'string' && args.path.trim()) {
+      next.path = normalizeAgentRelativePath(workspaceRoot, args.path, {
+        defaultToRoot: false
+      })
+    }
+    if (Array.isArray(args.paths)) {
+      next.paths = args.paths
+        .filter((p): p is string => typeof p === 'string' && p.trim().length > 0)
+        .map((p) =>
+          normalizeAgentRelativePath(workspaceRoot, p, { defaultToRoot: false })
+        )
+    }
+    return next
   }
   if (name === 'search' && typeof args.path === 'string' && args.path.trim()) {
     const relativePath = normalizeAgentRelativePath(workspaceRoot, args.path, {
@@ -1106,7 +1188,8 @@ async function executeTool(
   memory: AgentMemoryState,
   readCache: AgentReadCache,
   preset?: import('../../src/types').UseCasePreset | null,
-  lastAppliedPaths?: string[]
+  lastAppliedPaths?: string[],
+  dataSandbox?: AgentDataSandbox | null
 ): Promise<{ ok: boolean; summary: string; content: string }> {
   switch (name) {
     case 'readFile':
@@ -1119,6 +1202,41 @@ async function executeTool(
       return executeExec(webContents, chatId, workspaceRoot, callId, args, signal)
     case 'verify':
       return executeVerify(workspaceRoot, args, signal, preset, lastAppliedPaths)
+    case 'profileData': {
+      if (normalizeUseCasePreset(preset) !== 'data') {
+        return {
+          ok: false,
+          summary: 'data use-case only',
+          content: 'Error: profileData is only available when use-case preset is data'
+        }
+      }
+      if (!dataSandbox) {
+        return {
+          ok: false,
+          summary: 'sandbox unavailable',
+          content: 'Error: data sandbox is not initialized'
+        }
+      }
+      const path = typeof args.path === 'string' ? args.path : ''
+      return profileDataFile(dataSandbox, workspaceRoot, path)
+    }
+    case 'queryData': {
+      if (normalizeUseCasePreset(preset) !== 'data') {
+        return {
+          ok: false,
+          summary: 'data use-case only',
+          content: 'Error: queryData is only available when use-case preset is data'
+        }
+      }
+      if (!dataSandbox) {
+        return {
+          ok: false,
+          summary: 'sandbox unavailable',
+          content: 'Error: data sandbox is not initialized'
+        }
+      }
+      return queryDataFiles(dataSandbox, workspaceRoot, args)
+    }
     case 'updateTodo':
       return applyUpdateTodo(plan, args)
     case 'checkpoint':
@@ -1340,7 +1458,12 @@ export async function runAgent(webContents: WebContents, request: ChatRequest): 
     const memory = rebuildMemoryFromHistory(history)
     const readCache = createAgentReadCache()
     let lastAppliedPaths: string[] = []
+    const dataSandbox =
+      normalizeUseCasePreset(request.preset) === 'data'
+        ? await createAgentDataSandbox()
+        : null
 
+    try {
     const latestUserText = [...history].reverse().find((m) => m.role === 'user')?.content ?? ''
     if (plan.todos.length === 0 && looksLikeMultiPartAgentTask(latestUserText)) {
       apiMessages.push({ role: 'user', content: formatInitialTodoPlanNudge() })
@@ -1388,7 +1511,7 @@ export async function runAgent(webContents: WebContents, request: ChatRequest): 
           temperature: settings.temperature,
           max_tokens: Math.max(settings.maxTokens, AGENT_OUTPUT_TOKENS_FLOOR),
           stream: true,
-          tools: AGENT_TOOLS,
+          tools: getAgentTools(request.preset),
           tool_choice: 'auto'
         },
         settings.apiBaseUrl
@@ -1501,6 +1624,7 @@ export async function runAgent(webContents: WebContents, request: ChatRequest): 
                     ? result.appliedPaths
                     : extractActionPaths(args)
                 invalidateCachedPaths(readCache, paths)
+                invalidateDataSandboxPaths(dataSandbox, paths)
                 if (paths.length > 0) lastAppliedPaths = paths
               }
             }
@@ -1517,7 +1641,8 @@ export async function runAgent(webContents: WebContents, request: ChatRequest): 
               memory,
               readCache,
               request.preset,
-              lastAppliedPaths
+              lastAppliedPaths,
+              dataSandbox
             )
           }
         } catch (err) {
@@ -1550,6 +1675,9 @@ export async function runAgent(webContents: WebContents, request: ChatRequest): 
       }
 
       turn++
+    }
+    } finally {
+      disposeAgentDataSandbox(dataSandbox)
     }
   } catch (err) {
     if (isAbortError(err) || signal.aborted) {

@@ -245,6 +245,11 @@ Approval flows (Edit / Agent) stay the same. The preset only changes *what* is w
 - Templates (built-in Markdown + workspace `.compass/templates/`)
 - Agent light verify for document / data (`agent-verify-light.ts`)
 
+### Data Agent tools — shipped
+
+- `profileData` / `queryData` (data use-case only): column profiles + read-only in-memory SQLite SELECT sandbox (`agent-data-sandbox.ts`)
+- Stronger data verify: duplicate first-column / id keys, mixed column types
+
 ### Later (related work)
 
 - Document-oriented index (headings / summaries beyond light verify)
