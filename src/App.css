@@ -825,19 +825,6 @@ body.is-resizing-panels iframe {
   font-family: var(--font-ui);
 }
 
-.file-tree-create-bar {
-  padding: 6px 8px 4px;
-  border-bottom: 1px solid var(--border);
-  background: var(--bg-tertiary);
-}
-
-.file-tree-create-label {
-  display: block;
-  margin-bottom: 4px;
-  font-size: 10px;
-  color: var(--text-secondary);
-}
-
 .file-tree-item.creating {
   background: var(--bg-hover);
 }

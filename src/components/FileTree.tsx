@@ -235,6 +235,28 @@ function filterTopLevelPaths(paths: string[]): string[] {
   return result
 }
 
+/** 作成行の仮パス（scrollIntoView / data-tree-path 用） */
+const CREATE_ROW_PATH = '__compass_creating__'
+
+/** readDir と同じ並び（フォルダ優先 → 名前順）での挿入位置 */
+function findCreateInsertIndex(
+  children: FileTreeNode[],
+  defaultName: string,
+  isDirectory: boolean
+): number {
+  for (let i = 0; i < children.length; i++) {
+    const child = children[i]
+    if (isDirectory) {
+      if (!child.isDirectory) return i
+      if (defaultName.localeCompare(child.name) <= 0) return i
+    } else {
+      if (child.isDirectory) continue
+      if (defaultName.localeCompare(child.name) <= 0) return i
+    }
+  }
+  return children.length
+}
+
 interface FileTreeItemProps {
   node: FileTreeNode
   depth: number
@@ -252,6 +274,9 @@ interface FileTreeItemProps {
   renamingPath: string | null
   onRenameSubmit: (targetPath: string, newName: string) => void
   onRenameCancel: () => void
+  createInput: InlineInputState | null
+  onCreateSubmit: (name: string) => void
+  onCreateCancel: () => void
 }
 
 const TYPEAHEAD_RESET_MS = 500
@@ -316,6 +341,40 @@ function InlineNameInput({
   )
 }
 
+function CreateInlineRow({
+  depth,
+  defaultName,
+  isDirectory,
+  onSubmit,
+  onCancel
+}: {
+  depth: number
+  defaultName: string
+  isDirectory: boolean
+  onSubmit: (name: string) => void
+  onCancel: () => void
+}) {
+  return (
+    <div
+      className="file-tree-item creating"
+      style={{ paddingLeft: depth * 12 + 8 }}
+      data-tree-path={CREATE_ROW_PATH}
+      onClick={(e) => e.stopPropagation()}
+    >
+      <span className="file-tree-expand file-tree-expand-spacer" />
+      <span className="file-tree-icon">
+        <FileTreeNodeIcon name={defaultName} isDirectory={isDirectory} />
+      </span>
+      <InlineNameInput
+        defaultName={defaultName}
+        isDirectory={isDirectory}
+        onSubmit={onSubmit}
+        onCancel={onCancel}
+      />
+    </div>
+  )
+}
+
 function FileTreeItem({
   node,
   depth,
@@ -332,7 +391,10 @@ function FileTreeItem({
   onDropOnTarget,
   renamingPath,
   onRenameSubmit,
-  onRenameCancel
+  onRenameCancel,
+  createInput,
+  onCreateSubmit,
+  onCreateCancel
 }: FileTreeItemProps) {
   const { t } = useI18n()
   const normalizedPath = normalizeNodePath(node.path)
@@ -352,6 +414,62 @@ function FileTreeItem({
   const handleExpandClick = (e: React.MouseEvent) => {
     e.stopPropagation()
     if (!isRenaming) onToggleExpand(node.path)
+  }
+
+  const renderChildRows = (children: FileTreeNode[]) => {
+    const childDepth = depth + 1
+    const showCreate =
+      createInput !== null &&
+      normalizeNodePath(createInput.parentDir) === normalizedPath
+    const insertAt = showCreate
+      ? findCreateInsertIndex(
+          children,
+          createInput.defaultName,
+          createInput.mode === 'create-folder'
+        )
+      : -1
+
+    const createRow = showCreate ? (
+      <CreateInlineRow
+        key={CREATE_ROW_PATH}
+        depth={childDepth}
+        defaultName={createInput.defaultName}
+        isDirectory={createInput.mode === 'create-folder'}
+        onSubmit={onCreateSubmit}
+        onCancel={onCreateCancel}
+      />
+    ) : null
+
+    const rows: React.ReactNode[] = []
+    children.forEach((child, index) => {
+      if (createRow && index === insertAt) rows.push(createRow)
+      rows.push(
+        <FileTreeItem
+          key={child.path}
+          node={child}
+          depth={childDepth}
+          expandedDirs={expandedDirs}
+          selectedPaths={selectedPaths}
+          dropTargetPath={dropTargetPath}
+          onToggleExpand={onToggleExpand}
+          onItemClick={onItemClick}
+          onContextMenu={onContextMenu}
+          onDragStart={onDragStart}
+          onDragEnd={onDragEnd}
+          onDragOverTarget={onDragOverTarget}
+          onDragLeaveTarget={onDragLeaveTarget}
+          onDropOnTarget={onDropOnTarget}
+          renamingPath={renamingPath}
+          onRenameSubmit={onRenameSubmit}
+          onRenameCancel={onRenameCancel}
+          createInput={createInput}
+          onCreateSubmit={onCreateSubmit}
+          onCreateCancel={onCreateCancel}
+        />
+      )
+    })
+    if (createRow && insertAt === children.length) rows.push(createRow)
+    return rows
   }
 
   if (node.isDirectory) {
@@ -405,28 +523,7 @@ function FileTreeItem({
             </span>
           )}
         </div>
-        {isExpanded &&
-          node.children?.map((child) => (
-            <FileTreeItem
-              key={child.path}
-              node={child}
-              depth={depth + 1}
-              expandedDirs={expandedDirs}
-              selectedPaths={selectedPaths}
-              dropTargetPath={dropTargetPath}
-              onToggleExpand={onToggleExpand}
-              onItemClick={onItemClick}
-              onContextMenu={onContextMenu}
-              onDragStart={onDragStart}
-              onDragEnd={onDragEnd}
-              onDragOverTarget={onDragOverTarget}
-              onDragLeaveTarget={onDragLeaveTarget}
-              onDropOnTarget={onDropOnTarget}
-              renamingPath={renamingPath}
-              onRenameSubmit={onRenameSubmit}
-              onRenameCancel={onRenameCancel}
-            />
-          ))}
+        {isExpanded && renderChildRows(node.children ?? [])}
       </div>
     )
   }
@@ -665,13 +762,24 @@ export function FileTree() {
 
   const handleToggleExpand = useCallback((path: string) => {
     const normalized = normalizeNodePath(path)
+    const wasExpanded = expandedDirs.has(normalized)
     setExpandedDirs((prev) => {
       const next = new Set(prev)
-      if (next.has(normalized)) next.delete(normalized)
+      if (wasExpanded) next.delete(normalized)
       else next.add(normalized)
       return next
     })
-  }, [])
+    if (wasExpanded) {
+      setInlineInput((current) => {
+        if (!current) return current
+        const parentNorm = normalizeNodePath(current.parentDir)
+        if (parentNorm === normalized || parentNorm.startsWith(`${normalized}/`)) {
+          return null
+        }
+        return current
+      })
+    }
+  }, [expandedDirs])
 
   const setDirExpanded = useCallback((path: string, expanded: boolean) => {
     const normalized = normalizeNodePath(path)
@@ -735,6 +843,7 @@ export function FileTree() {
 
   const handleCollapseAll = () => {
     setExpandedDirs(new Set())
+    setInlineInput(null)
   }
 
   const closeAllMenus = useCallback(() => {
@@ -1175,9 +1284,13 @@ export function FileTree() {
     setContextMenu(null)
     setCreateMenu(null)
     setTemplateMenu(null)
+    setRenamingPath(null)
     setExpandedDirs((prev) => {
-      const next = new Set(prev)
+      let next = new Set(prev)
       next.add(normalizeNodePath(parentDir))
+      if (workspaceRoot) {
+        next = ensureAncestorsExpanded(next, [parentDir], workspaceRoot)
+      }
       return next
     })
     const preferredName =
@@ -1350,10 +1463,26 @@ export function FileTree() {
       }
       setInlineInput(null)
       setError(null)
+      focusTreeContent()
     } catch (err) {
       setError(getErrorMessage(err, t('explorer.createFailed')))
+      requestAnimationFrame(() => {
+        treeContentRef.current
+          ?.querySelector<HTMLInputElement>('.file-tree-input')
+          ?.focus()
+      })
     }
   }
+
+  const handleCreateCancel = useCallback(() => {
+    setInlineInput(null)
+    focusTreeContent()
+  }, [focusTreeContent])
+
+  useEffect(() => {
+    if (!inlineInput) return
+    scrollTreePathIntoView(CREATE_ROW_PATH)
+  }, [inlineInput, scrollTreePathIntoView])
 
   const handleRenameSubmit = async (targetPath: string, newName: string) => {
     try {
@@ -1671,7 +1800,6 @@ export function FileTree() {
     contextMenu?.node && !contextMenu.node.isPreview && !contextMenu.node.isDirectory
   )
   const isRootDropTarget = dropTargetPath === normalizeNodePath(workspaceRoot)
-  const workspaceName = basename(workspaceRoot)
 
   return (
     <div className="file-tree">
@@ -1722,35 +1850,6 @@ export function FileTree() {
         onDragLeave={(e) => handleDragLeaveTarget(e, workspaceRoot)}
         onDrop={(e) => void handleDropOnTarget(e, workspaceRoot)}
       >
-        {inlineInput && (
-          <div className="file-tree-create-bar" onClick={(e) => e.stopPropagation()}>
-            <span className="file-tree-create-label">
-              {inlineInput.mode === 'create-file'
-                ? t('explorer.newEmptyFile')
-                : t('explorer.newFolder')}
-              {' · '}
-              {inlineInput.parentDir === workspaceRoot
-                ? workspaceName
-                : inlineInput.parentDir.replace(workspaceRoot, '').replace(/^[/\\]/, '')}
-            </span>
-            <div className="file-tree-item creating" style={{ paddingLeft: 8 }}>
-              <span className="file-tree-expand file-tree-expand-spacer" />
-              <span className="file-tree-icon">
-                <FileTreeNodeIcon
-                  name={inlineInput.defaultName}
-                  isDirectory={inlineInput.mode === 'create-folder'}
-                />
-              </span>
-              <InlineNameInput
-                defaultName={inlineInput.defaultName}
-                isDirectory={inlineInput.mode === 'create-folder'}
-                onSubmit={handleCreateSubmit}
-                onCancel={() => setInlineInput(null)}
-              />
-            </div>
-          </div>
-        )}
-
         {rootedTree.map((node) => (
           <div key={node.path} onClick={(e) => e.stopPropagation()}>
             <FileTreeItem
@@ -1770,6 +1869,9 @@ export function FileTree() {
               renamingPath={renamingPath}
               onRenameSubmit={handleRenameSubmit}
               onRenameCancel={handleRenameCancel}
+              createInput={inlineInput}
+              onCreateSubmit={(name) => void handleCreateSubmit(name)}
+              onCreateCancel={handleCreateCancel}
             />
           </div>
         ))}
