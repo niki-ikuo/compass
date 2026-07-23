@@ -454,38 +454,39 @@ body {
 .menu-bar-controls {
   display: flex;
   align-items: center;
-  gap: 0;
+  gap: 2px;
   margin-left: auto;
   flex-shrink: 0;
 }
 
 .menu-bar-btn {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 24px;
+  width: 22px;
+  height: 22px;
   padding: 0;
   border: none;
   border-radius: 4px;
   background: transparent;
   color: var(--icon-command);
   cursor: pointer;
+  line-height: 1;
 }
 
 .menu-bar-btn:hover:not(:disabled) {
-  background: var(--bg-hover);
+  background: color-mix(in srgb, var(--text-primary) 16%, transparent);
   color: var(--icon-command);
 }
 
 .menu-bar-btn.active {
-  background: var(--bg-hover);
-  color: var(--text-primary);
+  background: color-mix(in srgb, var(--text-primary) 10%, transparent);
+  color: var(--icon-command);
 }
 
 .menu-bar-btn.active:hover:not(:disabled) {
-  background: var(--bg-hover);
-  color: var(--text-primary);
+  background: color-mix(in srgb, var(--text-primary) 18%, transparent);
+  color: var(--icon-command);
 }
 
 .menu-bar-btn svg {
@@ -763,19 +764,30 @@ body.is-resizing-panels iframe {
   gap: 2px;
 }
 
-.file-tree-toolbar .btn-icon {
+/* Explorer-aligned toolbar icon buttons (size + hover) */
+.file-tree-toolbar .btn-icon,
+.chat-header-actions .btn-icon,
+.terminal-tab-add,
+.terminal-panel-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 22px;
   height: 22px;
   padding: 0;
+  border: none;
   border-radius: 4px;
+  background: transparent;
   color: var(--icon-command);
+  cursor: pointer;
+  line-height: 1;
 }
 
-.file-tree-toolbar .btn-icon:hover:not(:disabled) {
-  background: var(--bg-hover);
+.file-tree-toolbar .btn-icon:hover:not(:disabled),
+.chat-header-actions .btn-icon:hover:not(:disabled),
+.terminal-tab-add:hover:not(:disabled),
+.terminal-panel-btn:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--text-primary) 16%, transparent);
   color: var(--icon-command);
 }
 
@@ -949,7 +961,7 @@ body.is-resizing-panels iframe {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 4px;
+  gap: 2px;
   position: relative;
   flex-shrink: 0;
   align-self: stretch;
@@ -4509,56 +4521,33 @@ body.is-resizing-terminal iframe {
   color: var(--text-secondary);
 }
 
-.terminal-tab-add {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
+.terminal-shell-select {
+  height: 22px;
+  max-width: 120px;
+  padding: 0 4px 0 6px;
   border: none;
   border-radius: 4px;
   background: transparent;
   color: var(--icon-command);
-  cursor: default;
-}
-
-.terminal-tab-add:hover {
-  background: var(--bg-hover);
-  color: var(--icon-command-hover);
-}
-
-.terminal-shell-select {
-  height: 24px;
-  padding: 0 8px;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  background: var(--bg-tertiary);
-  color: var(--text-primary);
   font-family: var(--font-ui);
   font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
 }
 
-.terminal-panel-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  border: none;
-  border-radius: 4px;
-  background: transparent;
+.terminal-shell-select:hover {
+  background: color-mix(in srgb, var(--text-primary) 16%, transparent);
   color: var(--icon-command);
-  cursor: default;
+}
+
+.terminal-shell-select:focus {
+  outline: none;
+  background: color-mix(in srgb, var(--text-primary) 16%, transparent);
 }
 
 .terminal-panel-btn svg {
-  width: 16px;
-  height: 16px;
-}
-
-.terminal-panel-btn:hover {
-  background: var(--bg-hover);
-  color: var(--icon-command-hover);
+  display: block;
+  flex-shrink: 0;
 }
 
 .terminal-body {
