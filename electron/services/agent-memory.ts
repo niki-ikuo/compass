@@ -4,6 +4,8 @@
  * instead of relying only on truncated prior tool blobs.
  */
 
+import { t } from '../../src/i18n/runtime'
+
 export type AgentMemoryKind =
   | 'read'
   | 'search'
@@ -256,8 +258,7 @@ function extractSearchHitPaths(content: string): string[] {
 export function formatAgentMemoryForModel(state: AgentMemoryState): string | null {
   if (state.entries.length === 0) return null
 
-  const header =
-    '[Agent working memory — important findings kept as conversation state. Prefer these over re-reading; update with remember when you learn something durable.]'
+  const header = t('ai.agentMemoryHeader')
   const lines = state.entries.map((e) => {
     const prefix = e.path ? `${e.kind}:${e.path}` : e.kind
     return `- (${prefix}) ${e.text}`
@@ -273,7 +274,7 @@ export function formatAgentMemoryForModel(state: AgentMemoryState): string | nul
       kept.unshift(lines[i])
       used += lines[i].length + 1
     }
-    body = ['...(older memory omitted)', ...kept].join('\n')
+    body = [t('ai.agentMemoryOmitted'), ...kept].join('\n')
   }
 
   return `${header}\n${body}`

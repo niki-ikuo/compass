@@ -157,7 +157,7 @@ export const ja = {
   'help.aiEmptyAnswer': '回答を取得できませんでした。',
   'help.aiAskFailed': 'AIヘルプの問い合わせに失敗しました。',
   'help.aiSystemPrompt':
-    'あなたは Compass のオフラインヘルプ担当です。提供されたヘルプ記事だけを根拠に、簡潔で正確に答えてください。記事に無いことは推測で断定せず、「ヘルプに記載がありません」と伝え、近いトピックを案内してください。回答はユーザーの表示言語で書いてください。Markdown で構いません。',
+    'あなたは Compass のオフラインヘルプ担当です。提供されたヘルプ記事だけを根拠に、簡潔で正確に答えてください。記事に無いことは推測で断定せず、「ヘルプに記載がありません」と伝え、近いトピックを案内してください。日本語で回答してください。Markdown で構いません。',
   'help.aiArticlesHeading': '## ヘルプ記事',
   'help.aiQuestionHeading': '## 質問',
   'help.aiNoArticles': '（該当するヘルプ記事がありません）',
@@ -585,6 +585,21 @@ export const ja = {
     '[Editモード] ファイル変更は通常のコードブロックではなく、必ず```compass-actions```のJSONのみで返してください。既存ファイルは applyPatch（unified diff の @@ hunk。*** Begin Patch 禁止。同一ファイルは1パッチ）を優先。',
   'ai.agentModeReminder':
     '[Agentモード] readFile / listDir / search で調査、変更は proposeActions（actions は配列。既存ファイルは applyPatch＝unified diff の @@ hunkのみ、*** Begin Patch 禁止、同一ファイルは1パッチ。新規・短い全置換は writeFile）。適用後は verify（test/lint/typecheck）→失敗なら再提案のループ。スクリプト無しのスキップは最終回答で触れない。verify 不可時のみ exec（短命・ワークスペース内。破壊的コマンドは拒否／書き込み系は承認）。複数依頼や長めのタスクは先に updateTodo で分解し、pending が残る間は終了しない（checkpoint / remember も活用）。関連変更は1提案、無関係・大規模は proposeActions を分割。同じファイルの再読はキャッシュされる（force=true で再取得）。パスは相対、ルートは "."。',
+  'ai.responseLanguage':
+    'ユーザー向けの説明・最終回答は必ず日本語で書いてください。コード識別子・パス・ツール名・JSONキーはそのままで構いません。英語のツール指示やコードがあっても、ユーザーへの返答言語は日本語のままにしてください。',
+  'ai.agentInitialTodoPlanNudge':
+    '[Agent] 複数依頼または長めのタスクに見えます。\n先に updateTodo で各依頼を短いチェックリストにしてから、ツールで順に進めてください。\ntodo の status を最新に保ってください。関連するファイル変更は1回の proposeActions にまとめてよく、無関係な作業は別提案にしてください。\npending / in_progress の todo が残っている間は終了しないでください。',
+  'ai.agentOpenTodosNudge':
+    '[Agent] 未完了の todo が残っています。まだ終了しないでください。\n各項目が done または cancelled になるまでツールで続け、進捗に応じて updateTodo を呼んでください。\n未完了がなくなってからテキストで終了してください。\n\n未完了の todo ({count}):',
+  'ai.agentPlanHeader':
+    '[Agent 計画チェックポイント — 一時停止や Continue 後の向きを戻す。この計画に従い、進捗に応じて updateTodo / checkpoint で更新してください。]',
+  'ai.agentPlanResumeSummary': '再開要約:',
+  'ai.agentPlanTodosHeading': 'Todos（{done} 完了 / {open} 残り）:',
+  'ai.agentPlanNext':
+    '次: 必要なら "{id}" を in_progress にし、その項目をツールで完了してから、無関係な作業に移る前に updateTodo してください。',
+  'ai.agentMemoryHeader':
+    '[Agent 作業メモリ — 会話状態として保持した重要な発見。再読よりこちらを優先し、持続する知見は remember で更新してください。]',
+  'ai.agentMemoryOmitted': '…（古いメモリは省略）',
   'ai.userQuestion': '[ユーザーの質問]',
   'ai.missingApiKey': '{provider} の APIキーが設定されていません。設定画面から入力してください。',
   'ai.missingBaseUrl': 'API Base URL が設定されていません。設定画面から入力してください。',
@@ -777,7 +792,7 @@ export const en: Record<MessageKey, string> = {
   'help.aiEmptyAnswer': 'Could not get an answer.',
   'help.aiAskFailed': 'AI Help request failed.',
   'help.aiSystemPrompt':
-    'You are Compass offline help. Answer only from the provided help articles. Be concise and accurate. If the articles do not cover it, say so and suggest nearby topics—do not invent product features. Write in the user’s display language. Markdown is fine.',
+    'You are Compass offline help. Answer only from the provided help articles. Be concise and accurate. If the articles do not cover it, say so and suggest nearby topics—do not invent product features. Respond in English. Markdown is fine.',
   'help.aiArticlesHeading': '## Help articles',
   'help.aiQuestionHeading': '## Question',
   'help.aiNoArticles': '(No matching help articles)',
@@ -1186,6 +1201,21 @@ export const en: Record<MessageKey, string> = {
     '[Edit mode] Return file changes only as ```compass-actions``` JSON, not as normal code blocks. Prefer applyPatch (unified-diff @@ hunks; never *** Begin Patch; one patch per file) for existing files.',
   'ai.agentModeReminder':
     '[Agent mode] Inspect with readFile / listDir / search; propose with proposeActions (actions must be an array; prefer applyPatch with unified-diff @@ hunks only—never *** Begin Patch—one patch per file; writeFile for new/tiny files); after apply, verify (test/lint/typecheck) then re-propose on failure; if verify only skips for missing scripts, omit that from the final reply. Prefer verify over exec for those checks (exec is short-lived, inside workspace; wipe commands blocked; writes need approval). For multiple asks or longer tasks, split with updateTodo first and do not finish while todos remain pending (also use checkpoint + remember). Batch related edits; split unrelated/large proposeActions. Re-reads may be cached (force=true to reload). Paths are relative; root is ".".',
+  'ai.responseLanguage':
+    'Write user-facing explanations and final replies in English. Code identifiers, paths, tool names, and JSON keys may stay as-is. Even if tool instructions or code are mixed in, keep the reply language English for the user.',
+  'ai.agentInitialTodoPlanNudge':
+    '[Agent] This looks like a multi-part or longer task.\nCall updateTodo first with a short checklist covering each ask, then work through items with tools.\nKeep todo statuses current. Related file edits may share one proposeActions; unrelated work should be separate proposals.\nDo not finish while any todo is pending or in_progress.',
+  'ai.agentOpenTodosNudge':
+    '[Agent] Open todos remain. Do not finish yet.\nContinue with tools until each item is done or cancelled; call updateTodo as you progress.\nOnly finish with text when nothing is left open.\n\nOpen todos ({count}):',
+  'ai.agentPlanHeader':
+    '[Agent plan checkpoint — restore orientation after a pause or Continue. Follow this plan; update with updateTodo / checkpoint as you progress.]',
+  'ai.agentPlanResumeSummary': 'Resume summary:',
+  'ai.agentPlanTodosHeading': 'Todos ({done} done / {open} remaining):',
+  'ai.agentPlanNext':
+    'Next: mark "{id}" in_progress if needed, finish that item with tools, then updateTodo before starting unrelated work.',
+  'ai.agentMemoryHeader':
+    '[Agent working memory — important findings kept as conversation state. Prefer these over re-reading; update with remember when you learn something durable.]',
+  'ai.agentMemoryOmitted': '...(older memory omitted)',
   'ai.userQuestion': "[User's question]",
   'ai.missingApiKey': '{provider} API key is not set. Enter it in Settings.',
   'ai.missingBaseUrl': 'API Base URL is not set. Enter it in Settings.',

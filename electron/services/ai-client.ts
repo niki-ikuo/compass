@@ -101,7 +101,8 @@ export function getSystemPrompt(
       : mode === 'agent'
         ? t('ai.agentSystemPrompt')
         : t('ai.editSystemPrompt')
-  return composeSystemPrompt(rolePrompt, modePrompt)
+  // Reinforce reply language after the (often long) mode constraints.
+  return `${composeSystemPrompt(rolePrompt, modePrompt)}\n\n${t('ai.responseLanguage')}`
 }
 
 const INLINE_COMPLETION_MAX_TOKENS = 96
@@ -345,6 +346,10 @@ export async function buildUserMessagePayload(request: ChatRequest): Promise<Use
     parts.push(t('ai.agentModeReminder'))
     parts.push('')
   }
+
+  // Near the user question so reply language is not drowned out by long context/code.
+  parts.push(t('ai.responseLanguage'))
+  parts.push('')
 
   const lastUser = [...request.messages].reverse().find((m) => m.role === 'user')
   if (lastUser) {

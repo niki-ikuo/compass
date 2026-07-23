@@ -37,3 +37,10 @@ describe('getUseCasePresetReminderKey', () => {
     expect(en['ai.preset.data.reminder']).toContain('columns')
   })
 })
+
+describe('ai.responseLanguage', () => {
+  it('pins reply language for ja and en catalogs', () => {
+    expect(ja['ai.responseLanguage']).toContain('日本語')
+    expect(en['ai.responseLanguage']).toContain('English')
+  })
+})

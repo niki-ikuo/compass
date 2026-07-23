@@ -1,5 +1,7 @@
 /** Agent plan layer: checklist (updateTodo) + resume checkpoint. */
 
+import { t } from '../i18n/runtime'
+
 export type AgentTodoStatus = 'pending' | 'in_progress' | 'done' | 'cancelled'
 
 export interface AgentTodoItem {
@@ -177,12 +179,7 @@ export function looksLikeMultiPartAgentTask(text: string): boolean {
 
 /** Soft nudge before the first turn when the ask looks multi-part and no plan exists yet. */
 export function formatInitialTodoPlanNudge(): string {
-  return [
-    '[Agent] This looks like a multi-part or longer task.',
-    'Call updateTodo first with a short checklist covering each ask, then work through items with tools.',
-    'Keep todo statuses current. Related file edits may share one proposeActions; unrelated work should be separate proposals.',
-    'Do not finish while any todo is pending or in_progress.'
-  ].join('\n')
+  return t('ai.agentInitialTodoPlanNudge')
 }
 
 /**
@@ -192,14 +189,7 @@ export function formatInitialTodoPlanNudge(): string {
 export function formatOpenTodosNudge(state: AgentPlanState): string | null {
   const open = getOpenTodos(state)
   if (open.length === 0) return null
-  return [
-    '[Agent] Open todos remain. Do not finish yet.',
-    'Continue with tools until each item is done or cancelled; call updateTodo as you progress.',
-    'Only finish with text when nothing is left open.',
-    '',
-    `Open todos (${open.length}):`,
-    formatTodosList(open)
-  ].join('\n')
+  return [t('ai.agentOpenTodosNudge', { count: open.length }), formatTodosList(open)].join('\n')
 }
 
 /**
@@ -211,25 +201,21 @@ export function formatAgentPlanForModel(state: AgentPlanState): string | null {
   const hasCheckpoint = Boolean(state.checkpoint?.trim())
   if (!hasTodos && !hasCheckpoint) return null
 
-  const parts: string[] = [
-    '[Agent plan checkpoint — restore orientation after a pause or Continue. Follow this plan; update with updateTodo / checkpoint as you progress.]'
-  ]
+  const parts: string[] = [t('ai.agentPlanHeader')]
 
   if (hasCheckpoint) {
-    parts.push(`Resume summary:\n${state.checkpoint!.trim()}`)
+    parts.push(`${t('ai.agentPlanResumeSummary')}\n${state.checkpoint!.trim()}`)
   }
 
   if (hasTodos) {
     const open = getOpenTodos(state)
     const done = state.todos.filter((t) => t.status === 'done')
     parts.push(
-      `Todos (${done.length} done / ${open.length} remaining):\n${formatTodosList(state.todos)}`
+      `${t('ai.agentPlanTodosHeading', { done: done.length, open: open.length })}\n${formatTodosList(state.todos)}`
     )
     if (open.length > 0) {
-      const next = open.find((t) => t.status === 'in_progress') ?? open[0]
-      parts.push(
-        `Next: mark "${next.id}" in_progress if needed, finish that item with tools, then updateTodo before starting unrelated work.`
-      )
+      const next = open.find((item) => item.status === 'in_progress') ?? open[0]
+      parts.push(t('ai.agentPlanNext', { id: next.id }))
     }
   }
 
@@ -275,16 +261,16 @@ export function sanitizeUpdateTodoArgs(args: Record<string, unknown>): Record<st
   const raw = Array.isArray(args.todos) ? args.todos : []
   const todos = raw.slice(0, MAX_TODOS).map((item) => {
     if (!item || typeof item !== 'object') return { id: '?', content: '?', status: '?' }
-    const t = item as Partial<AgentTodoItem>
+    const todo = item as Partial<AgentTodoItem>
     return {
-      id: typeof t.id === 'string' ? t.id.slice(0, 40) : '?',
+      id: typeof todo.id === 'string' ? todo.id.slice(0, 40) : '?',
       content:
-        typeof t.content === 'string'
-          ? t.content.length > 80
-            ? `${t.content.slice(0, 80)}…`
-            : t.content
+        typeof todo.content === 'string'
+          ? todo.content.length > 80
+            ? `${todo.content.slice(0, 80)}…`
+            : todo.content
           : '?',
-      status: typeof t.status === 'string' ? t.status : '?'
+      status: typeof todo.status === 'string' ? todo.status : '?'
     }
   })
   return {

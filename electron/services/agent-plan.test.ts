@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { setLocale } from '../../src/i18n/runtime'
 import {
   applyCheckpoint,
   applyUpdateTodo,
@@ -108,6 +109,21 @@ describe('formatAgentPlanForModel', () => {
     expect(text).toContain('Next')
     expect(text).toContain('Next: mark "2" in_progress')
   })
+
+  it('uses Japanese plan copy when locale is ja', () => {
+    setLocale('ja')
+    const state = createAgentPlanState()
+    applyUpdateTodo(state, {
+      todos: [{ id: '1', content: '作業', status: 'pending' }]
+    })
+    applyCheckpoint(state, { summary: '途中まで完了' })
+
+    const text = formatAgentPlanForModel(state)
+    expect(text).toContain('再開要約:')
+    expect(text).toContain('途中まで完了')
+    expect(text).toContain('Todos（0 完了 / 1 残り）:')
+    setLocale('en')
+  })
 })
 
 describe('looksLikeMultiPartAgentTask', () => {
@@ -166,6 +182,18 @@ describe('open todo helpers', () => {
     expect(nudge).toContain('Open todos remain')
     expect(nudge).toContain('Still open')
     expect(nudge).not.toContain('Done')
+  })
+
+  it('formatOpenTodosNudge uses Japanese copy when locale is ja', () => {
+    setLocale('ja')
+    const state = createAgentPlanState()
+    applyUpdateTodo(state, {
+      todos: [{ id: '1', content: '残り作業', status: 'pending' }]
+    })
+    const nudge = formatOpenTodosNudge(state)
+    expect(nudge).toContain('未完了の todo が残っています')
+    expect(nudge).toContain('残り作業')
+    setLocale('en')
   })
 })
 
