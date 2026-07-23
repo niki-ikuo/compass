@@ -173,19 +173,51 @@ function collectVisibleNodes(nodes: FileTreeNode[], expandedDirs: Set<string>): 
   return result
 }
 
-function getDefaultExpandedDirs(nodes: FileTreeNode[], depth = 0): Set<string> {
-  const expanded = new Set<string>()
+/** 未保存時のデフォルト: ワークスペースルートだけ開く */
+function getDefaultExpandedDirs(workspaceRoot: string): Set<string> {
+  return new Set([normalizeNodePath(workspaceRoot)])
+}
+
+function collectAllNodePaths(nodes: FileTreeNode[]): string[] {
+  const paths: string[] = []
   for (const node of nodes) {
-    if (node.isDirectory && depth < 2) {
-      expanded.add(normalizeNodePath(node.path))
-      if (node.children) {
-        for (const path of getDefaultExpandedDirs(node.children, depth + 1)) {
-          expanded.add(path)
-        }
-      }
+    paths.push(normalizeNodePath(node.path))
+    if (node.children) paths.push(...collectAllNodePaths(node.children))
+  }
+  return paths
+}
+
+function filterExistingPaths(paths: string[], known: Set<string>): Set<string> {
+  const next = new Set<string>()
+  for (const path of paths) {
+    const normalized = normalizeNodePath(path)
+    if (known.has(normalized)) next.add(normalized)
+  }
+  return next
+}
+
+/** 選択が見えるよう、選択パスの祖先ディレクトリを展開に含める */
+function ensureAncestorsExpanded(
+  expanded: Set<string>,
+  selectedPaths: Iterable<string>,
+  workspaceRoot: string
+): Set<string> {
+  const rootNorm = normalizeNodePath(workspaceRoot)
+  const next = new Set(expanded)
+  next.add(rootNorm)
+  for (const selected of selectedPaths) {
+    const normalized = normalizeNodePath(selected)
+    let current = parentDirPath(normalized)
+    while (current && current.length > 0) {
+      const currentNorm = normalizeNodePath(current)
+      next.add(currentNorm)
+      if (currentNorm === rootNorm) break
+      const parent = parentDirPath(currentNorm)
+      if (!parent || parent === currentNorm) break
+      current = parent
     }
   }
-  return expanded
+  return next
 }
 
 function filterTopLevelPaths(paths: string[]): string[] {
@@ -437,6 +469,7 @@ export function FileTree() {
   const { t, locale } = useI18n()
   const fileTree = useAppStore((s) => s.fileTree)
   const workspaceRoot = useAppStore((s) => s.workspaceRoot)
+  const persistedExplorerState = useAppStore((s) => s.persistedExplorerState)
   const pendingWorkspacePreview = useAppStore((s) => s.pendingWorkspacePreview)
   const openPreviewFile = useAppStore((s) => s.openPreviewFile)
   const setActiveFile = useAppStore((s) => s.setActiveFile)
@@ -480,6 +513,7 @@ export function FileTree() {
   const [dropTargetPath, setDropTargetPath] = useState<string | null>(null)
   const lastSelectedPathRef = useRef<string | null>(null)
   const treeInitializedRef = useRef(false)
+  const persistExpandedReadyRef = useRef(false)
   const draggingPathsRef = useRef<string[] | null>(null)
   const createMenuRef = useRef<HTMLDivElement>(null)
   const templateMenuRef = useRef<HTMLDivElement>(null)
@@ -499,25 +533,60 @@ export function FileTree() {
 
   useEffect(() => {
     treeInitializedRef.current = false
+    persistExpandedReadyRef.current = false
     setSelectedPaths(new Set())
     lastSelectedPathRef.current = null
-    setExpandedDirs(new Set())
+    setExpandedDirs(workspaceRoot ? getDefaultExpandedDirs(workspaceRoot) : new Set())
     setDropTargetPath(null)
     draggingPathsRef.current = null
   }, [workspaceRoot])
 
   useEffect(() => {
-    if (!workspaceRoot || treeInitializedRef.current) return
-    if (displayTree.length === 0) {
-      // Loading or empty workspace: still show the root folder expanded.
-      setExpandedDirs(new Set([normalizeNodePath(workspaceRoot)]))
+    if (!workspaceRoot) return
+    if (persistedExplorerState === undefined) {
+      treeInitializedRef.current = false
+      persistExpandedReadyRef.current = false
       return
     }
-    const defaults = getDefaultExpandedDirs(displayTree)
-    defaults.add(normalizeNodePath(workspaceRoot))
-    setExpandedDirs(defaults)
+    if (treeInitializedRef.current) return
+
+    const knownDirs = new Set(collectDirectoryPaths(rootedTree))
+    knownDirs.add(normalizeNodePath(workspaceRoot))
+    const knownNodes = new Set(collectAllNodePaths(rootedTree))
+    knownNodes.add(normalizeNodePath(workspaceRoot))
+
+    if (persistedExplorerState === null) {
+      setExpandedDirs(getDefaultExpandedDirs(workspaceRoot))
+      setSelectedPaths(new Set())
+      lastSelectedPathRef.current = null
+    } else {
+      const selected = filterExistingPaths(persistedExplorerState.selectedPaths, knownNodes)
+      let expanded = filterExistingPaths(persistedExplorerState.expandedDirs, knownDirs)
+      expanded = ensureAncestorsExpanded(expanded, selected, workspaceRoot)
+      setExpandedDirs(expanded)
+      setSelectedPaths(selected)
+      const last = persistedExplorerState.lastSelectedPath
+        ? normalizeNodePath(persistedExplorerState.lastSelectedPath)
+        : null
+      lastSelectedPathRef.current =
+        last && selected.has(last) ? last : ([...selected][selected.size - 1] ?? null)
+    }
     treeInitializedRef.current = true
-  }, [workspaceRoot, displayTree])
+    persistExpandedReadyRef.current = true
+  }, [workspaceRoot, persistedExplorerState, rootedTree])
+
+  useEffect(() => {
+    if (!workspaceRoot || !persistExpandedReadyRef.current) return
+    const handle = window.setTimeout(() => {
+      void window.compass.explorerState.save(workspaceRoot, {
+        version: 1,
+        expandedDirs: [...expandedDirs],
+        selectedPaths: [...selectedPaths],
+        lastSelectedPath: lastSelectedPathRef.current
+      })
+    }, 300)
+    return () => window.clearTimeout(handle)
+  }, [workspaceRoot, expandedDirs, selectedPaths])
 
   const visibleNodes = useMemo(
     () => collectVisibleNodes(rootedTree, expandedDirs),

@@ -334,6 +334,14 @@ export interface WorkspaceOpenEditors {
   openTabs: PersistedOpenTab[]
 }
 
+/** エクスプローラーの展開・選択状態（`.compass/explorer-state.json`） */
+export interface WorkspaceExplorerState {
+  version: number
+  expandedDirs: string[]
+  selectedPaths: string[]
+  lastSelectedPath: string | null
+}
+
 /** ワークスペース固有設定（`.compass/settings.json`） */
 export interface WorkspaceSettings {
   /** フォルダ既定の用途。未設定時はアプリの defaultUseCasePreset に従う */
@@ -716,6 +724,10 @@ export interface CompassAPI {
   openEditors: {
     load: (workspaceRoot: string) => Promise<WorkspaceOpenEditors>
     save: (workspaceRoot: string, editors: WorkspaceOpenEditors) => Promise<void>
+  }
+  explorerState: {
+    load: (workspaceRoot: string) => Promise<WorkspaceExplorerState | null>
+    save: (workspaceRoot: string, state: WorkspaceExplorerState) => Promise<void>
   }
   terminal: {
     listShells: () => Promise<TerminalShell[]>

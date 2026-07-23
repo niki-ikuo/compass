@@ -43,7 +43,18 @@ export function LeftSidebar() {
           <span>{t('sidebar.search')}</span>
         </button>
       </div>
-      <div className="left-sidebar-body">{searchActive ? <SearchPanel /> : <FileTree />}</div>
+      <div className="left-sidebar-body">
+        <div
+          className="left-sidebar-panel"
+          hidden={!explorerActive}
+          aria-hidden={!explorerActive}
+        >
+          <FileTree />
+        </div>
+        <div className="left-sidebar-panel" hidden={!searchActive} aria-hidden={!searchActive}>
+          <SearchPanel />
+        </div>
+      </div>
     </div>
   )
 }

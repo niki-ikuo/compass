@@ -73,14 +73,17 @@ export function App() {
       }
 
       setWorkspaceRoot(folder)
+      useAppStore.getState().setPersistedExplorerState(undefined)
       try {
-        const [tree, chatHistory, workspaceSettings, openEditors] = await Promise.all([
+        const [tree, chatHistory, workspaceSettings, openEditors, explorerState] = await Promise.all([
           window.compass.fs.readDir(folder),
           window.compass.chat.loadHistory(folder),
           window.compass.workspace.getSettings(folder),
-          window.compass.openEditors.load(folder)
+          window.compass.openEditors.load(folder),
+          window.compass.explorerState.load(folder)
         ])
         setFileTree(tree)
+        useAppStore.getState().setPersistedExplorerState(explorerState)
         useAppStore
           .getState()
           .setWorkspaceDefaultUseCasePreset(workspaceSettings.defaultUseCasePreset ?? null)
@@ -96,6 +99,7 @@ export function App() {
         await window.compass.index.unwatch()
         setWorkspaceRoot(null)
         useAppStore.getState().setWorkspaceDefaultUseCasePreset(null)
+        useAppStore.getState().setPersistedExplorerState(undefined)
         setFileTree([])
         throw error
       }

@@ -19,6 +19,7 @@ import type {
   UseCasePreset,
   PersistedOpenTab,
   WorkspaceOpenEditors,
+  WorkspaceExplorerState,
   LlmConnectionState
 } from '@/types'
 import {
@@ -440,6 +441,11 @@ interface AppState {
   /** 開いているワークスペースの用途既定（`.compass/settings.json`）。未設定は null */
   workspaceDefaultUseCasePreset: UseCasePreset | null
   fileTree: FileTreeNode[]
+  /**
+   * 起動時に復元するエクスプローラー状態。
+   * `undefined` = 未読込 / `null` = 保存なし（デフォルト） / オブジェクト = 復元
+   */
+  persistedExplorerState: WorkspaceExplorerState | null | undefined
   openFiles: OpenFile[]
   activeFilePath: string | null
   chatSessions: ChatSession[]
@@ -491,6 +497,7 @@ interface AppState {
 
   setWorkspaceRoot: (root: string | null) => void
   setWorkspaceDefaultUseCasePreset: (preset: UseCasePreset | null) => void
+  setPersistedExplorerState: (state: WorkspaceExplorerState | null | undefined) => void
   restoreChatSessions: (sessions: ChatSession[], activeChatId: string | null) => void
   closeWorkspace: () => boolean
   setFileTree: (tree: FileTreeNode[]) => void
@@ -618,6 +625,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   workspaceRoot: null,
   workspaceDefaultUseCasePreset: null,
   fileTree: [],
+  persistedExplorerState: undefined,
   openFiles: [],
   activeFilePath: null,
   chatSessions: [initialChatSession],
@@ -667,11 +675,14 @@ export const useAppStore = create<AppState>((set, get) => ({
     set((state) => ({
       workspaceRoot: root,
       workspaceDefaultUseCasePreset: root ? state.workspaceDefaultUseCasePreset : null,
+      persistedExplorerState: root ? state.persistedExplorerState : undefined,
       chatSessions: state.chatSessions.map((session) => ({ ...session, contextRefs: [] }))
     })),
 
   setWorkspaceDefaultUseCasePreset: (preset) =>
     set({ workspaceDefaultUseCasePreset: normalizeUseCasePreset(preset) ?? null }),
+
+  setPersistedExplorerState: (state) => set({ persistedExplorerState: state }),
 
   restoreChatSessions: (sessions, activeChatId) => {
     const normalized = sessions.map(normalizeChatSession)
@@ -743,6 +754,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       workspaceRoot: null,
       workspaceDefaultUseCasePreset: null,
       fileTree: [],
+      persistedExplorerState: undefined,
       openFiles: [],
       activeFilePath: null,
       indexStatus: 'idle',

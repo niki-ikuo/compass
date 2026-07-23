@@ -45,6 +45,7 @@ import {
 import { startIndexWatcher, stopIndexWatcher } from './services/index-watcher'
 import { loadChatHistory, saveChatHistory } from './services/chat-history'
 import { loadOpenEditors, saveOpenEditors } from './services/open-editors'
+import { loadExplorerState, saveExplorerState } from './services/explorer-state'
 import {
   createTerminal,
   killAllTerminals,
@@ -66,6 +67,7 @@ import type {
   InlineCompletionRequest,
   WorkspaceAction,
   WorkspaceOpenEditors,
+  WorkspaceExplorerState,
   WorkspaceReplaceOptions,
   WorkspaceSearchOptions
 } from '../src/types'
@@ -780,6 +782,17 @@ function registerIpcHandlers(): void {
     'openEditors:save',
     async (_event, workspaceRoot: string, editors: WorkspaceOpenEditors) => {
       await saveOpenEditors(workspaceRoot, editors)
+    }
+  )
+
+  ipcMain.handle('explorerState:load', async (_event, workspaceRoot: string) => {
+    return loadExplorerState(workspaceRoot)
+  })
+
+  ipcMain.handle(
+    'explorerState:save',
+    async (_event, workspaceRoot: string, state: WorkspaceExplorerState) => {
+      await saveExplorerState(workspaceRoot, state)
     }
   )
 

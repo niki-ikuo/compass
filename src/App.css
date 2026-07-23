@@ -675,6 +675,17 @@ body.is-resizing-panels iframe {
   flex-direction: column;
 }
 
+.left-sidebar-panel {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.left-sidebar-panel[hidden] {
+  display: none;
+}
+
 /* File tree */
 .file-tree {
   display: flex;

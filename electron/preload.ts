@@ -32,6 +32,7 @@ import type {
   AgentNeedExecApprovalEvent,
   WorkspaceSettings,
   WorkspaceOpenEditors,
+  WorkspaceExplorerState,
   HelpDoc,
   HelpDocMeta,
   HelpSearchHit,
@@ -369,6 +370,12 @@ const compassAPI = {
       ipcRenderer.invoke('openEditors:load', workspaceRoot),
     save: (workspaceRoot: string, editors: WorkspaceOpenEditors): Promise<void> =>
       ipcRenderer.invoke('openEditors:save', workspaceRoot, editors)
+  },
+  explorerState: {
+    load: (workspaceRoot: string): Promise<WorkspaceExplorerState | null> =>
+      ipcRenderer.invoke('explorerState:load', workspaceRoot),
+    save: (workspaceRoot: string, state: WorkspaceExplorerState): Promise<void> =>
+      ipcRenderer.invoke('explorerState:save', workspaceRoot, state)
   },
   terminal: (() => {
     type DataCallback = (id: string, data: string) => void
