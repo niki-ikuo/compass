@@ -37,7 +37,6 @@ import {
   ChevronDownIcon
 } from './icons/ToolbarIcons'
 import { FileTreeNodeIcon } from './icons/FileTypeIcons'
-import { restoreWorkbenchFocus } from '@/utils/workbench-focus'
 import { openWorkspaceFile } from '@/utils/open-workspace-file'
 
 type InputMode = 'create-file' | 'create-folder' | 'rename'
@@ -250,6 +249,18 @@ interface FileTreeItemProps {
   onRenameCancel: () => void
 }
 
+const TYPEAHEAD_RESET_MS = 500
+
+function isEditableKeyboardTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false
+  return (
+    target.tagName === 'INPUT' ||
+    target.tagName === 'TEXTAREA' ||
+    target.tagName === 'SELECT' ||
+    target.isContentEditable
+  )
+}
+
 function InlineNameInput({
   defaultName,
   isDirectory = false,
@@ -326,6 +337,7 @@ function FileTreeItem({
   const isDraggable = !isRenaming && !node.isPreview
   const isDropTarget =
     node.isDirectory && !node.isPreview && dropTargetPath === normalizedPath
+  const ariaLevel = depth + 1
 
   const handleClick = (e: React.MouseEvent) => {
     if (isRenaming) return
@@ -342,10 +354,15 @@ function FileTreeItem({
       ? ` preview preview-${node.previewKind ?? 'new-folder'}`
       : ''
     return (
-      <div>
+      <div role="group">
         <div
           className={`file-tree-item directory${previewClass}${isDraggable ? ' draggable' : ''}${isSelected ? ' selected' : ''}${isDropTarget ? ' drop-target' : ''}`}
           style={{ paddingLeft: depth * 12 + 8 }}
+          role="treeitem"
+          aria-selected={isSelected}
+          aria-expanded={isExpanded}
+          aria-level={ariaLevel}
+          data-tree-path={normalizedPath}
           draggable={isDraggable}
           onDragStart={(e) => onDragStart(e, node)}
           onDragEnd={onDragEnd}
@@ -416,6 +433,10 @@ function FileTreeItem({
     <div
       className={`file-tree-item file${previewClass}${isDraggable ? ' draggable' : ''}${isSelected ? ' selected' : ''}`}
       style={{ paddingLeft: depth * 12 + 8 }}
+      role="treeitem"
+      aria-selected={isSelected}
+      aria-level={ariaLevel}
+      data-tree-path={normalizedPath}
       draggable={isDraggable}
       onDragStart={(e) => onDragStart(e, node)}
       onDragEnd={onDragEnd}
@@ -512,6 +533,12 @@ export function FileTree() {
   const [selectedPaths, setSelectedPaths] = useState<Set<string>>(() => new Set())
   const [dropTargetPath, setDropTargetPath] = useState<string | null>(null)
   const lastSelectedPathRef = useRef<string | null>(null)
+  const focusedPathRef = useRef<string | null>(null)
+  const treeContentRef = useRef<HTMLDivElement>(null)
+  const typeaheadRef = useRef<{ query: string; timeoutId: number | null }>({
+    query: '',
+    timeoutId: null
+  })
   const treeInitializedRef = useRef(false)
   const persistExpandedReadyRef = useRef(false)
   const draggingPathsRef = useRef<string[] | null>(null)
@@ -536,6 +563,7 @@ export function FileTree() {
     persistExpandedReadyRef.current = false
     setSelectedPaths(new Set())
     lastSelectedPathRef.current = null
+    focusedPathRef.current = null
     setExpandedDirs(workspaceRoot ? getDefaultExpandedDirs(workspaceRoot) : new Set())
     setDropTargetPath(null)
     draggingPathsRef.current = null
@@ -559,6 +587,7 @@ export function FileTree() {
       setExpandedDirs(getDefaultExpandedDirs(workspaceRoot))
       setSelectedPaths(new Set())
       lastSelectedPathRef.current = null
+      focusedPathRef.current = null
     } else {
       const selected = filterExistingPaths(persistedExplorerState.selectedPaths, knownNodes)
       let expanded = filterExistingPaths(persistedExplorerState.expandedDirs, knownDirs)
@@ -568,8 +597,10 @@ export function FileTree() {
       const last = persistedExplorerState.lastSelectedPath
         ? normalizeNodePath(persistedExplorerState.lastSelectedPath)
         : null
-      lastSelectedPathRef.current =
+      const focus =
         last && selected.has(last) ? last : ([...selected][selected.size - 1] ?? null)
+      lastSelectedPathRef.current = focus
+      focusedPathRef.current = focus
     }
     treeInitializedRef.current = true
     persistExpandedReadyRef.current = true
@@ -635,6 +666,62 @@ export function FileTree() {
     })
   }, [])
 
+  const setDirExpanded = useCallback((path: string, expanded: boolean) => {
+    const normalized = normalizeNodePath(path)
+    setExpandedDirs((prev) => {
+      const next = new Set(prev)
+      if (expanded) next.add(normalized)
+      else next.delete(normalized)
+      return next
+    })
+  }, [])
+
+  const scrollTreePathIntoView = useCallback((path: string) => {
+    const normalized = normalizeNodePath(path)
+    requestAnimationFrame(() => {
+      const root = treeContentRef.current
+      if (!root) return
+      const escaped =
+        typeof CSS !== 'undefined' && typeof CSS.escape === 'function'
+          ? CSS.escape(normalized)
+          : normalized.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
+      const el = root.querySelector(`[data-tree-path="${escaped}"]`)
+      el?.scrollIntoView({ block: 'nearest' })
+    })
+  }, [])
+
+  const focusTreeContent = useCallback(() => {
+    requestAnimationFrame(() => {
+      treeContentRef.current?.focus({ preventScroll: true })
+    })
+  }, [])
+
+  /** キーボード/マウスコモンの選択移動。range 時はアンカーを維持 */
+  const moveSelectionTo = useCallback(
+    (path: string, options?: { range?: boolean }) => {
+      const normalized = normalizeNodePath(path)
+      focusedPathRef.current = normalized
+
+      if (options?.range && lastSelectedPathRef.current) {
+        const visiblePaths = visibleNodes.map((n) => normalizeNodePath(n.path))
+        const anchorIdx = visiblePaths.indexOf(lastSelectedPathRef.current)
+        const focusIdx = visiblePaths.indexOf(normalized)
+        if (anchorIdx >= 0 && focusIdx >= 0) {
+          const start = Math.min(anchorIdx, focusIdx)
+          const end = Math.max(anchorIdx, focusIdx)
+          setSelectedPaths(new Set(visiblePaths.slice(start, end + 1)))
+          scrollTreePathIntoView(normalized)
+          return
+        }
+      }
+
+      setSelectedPaths(new Set([normalized]))
+      lastSelectedPathRef.current = normalized
+      scrollTreePathIntoView(normalized)
+    },
+    [visibleNodes, scrollTreePathIntoView]
+  )
+
   const handleExpandAll = () => {
     setExpandedDirs(new Set(collectDirectoryPaths(rootedTree)))
   }
@@ -654,6 +741,7 @@ export function FileTree() {
   const handleItemClick = useCallback(
     (node: FileTreeNode, e: React.MouseEvent) => {
       closeAllMenus()
+      focusTreeContent()
       const normalized = normalizeNodePath(node.path)
 
       if (e.ctrlKey || e.metaKey) {
@@ -664,6 +752,7 @@ export function FileTree() {
           return next
         })
         lastSelectedPathRef.current = normalized
+        focusedPathRef.current = normalized
         return
       }
 
@@ -676,12 +765,14 @@ export function FileTree() {
           const end = Math.max(anchorIdx, clickIdx)
           const range = visiblePaths.slice(start, end + 1)
           setSelectedPaths(new Set(range))
+          focusedPathRef.current = normalized
           return
         }
       }
 
       setSelectedPaths(new Set([normalized]))
       lastSelectedPathRef.current = normalized
+      focusedPathRef.current = normalized
 
       if (node.isDirectory) {
         handleToggleExpand(node.path)
@@ -689,7 +780,7 @@ export function FileTree() {
         void handleOpenFile(node.path)
       }
     },
-    [handleToggleExpand, visibleNodes, closeAllMenus]
+    [handleToggleExpand, visibleNodes, closeAllMenus, focusTreeContent]
   )
 
   const getDeleteTargets = useCallback(
@@ -817,14 +908,14 @@ export function FileTree() {
 
   const cancelPendingDelete = useCallback(() => {
     setPendingDeleteTargets(null)
-    restoreWorkbenchFocus()
-  }, [])
+    focusTreeContent()
+  }, [focusTreeContent])
 
   const confirmPendingDelete = useCallback(async () => {
     const targets = pendingDeleteTargets
     setPendingDeleteTargets(null)
     if (!targets || targets.length === 0) {
-      restoreWorkbenchFocus()
+      focusTreeContent()
       return
     }
 
@@ -835,6 +926,7 @@ export function FileTree() {
       }
       setSelectedPaths(new Set())
       lastSelectedPathRef.current = null
+      focusedPathRef.current = null
       setExpandedDirs((prev) => {
         const next = new Set(prev)
         for (const target of targets) {
@@ -853,9 +945,9 @@ export function FileTree() {
       setError(getErrorMessage(err, t('explorer.deleteFailed')))
       await refreshTree()
     } finally {
-      restoreWorkbenchFocus()
+      focusTreeContent()
     }
-  }, [pendingDeleteTargets, removePaths, refreshTree, t])
+  }, [pendingDeleteTargets, removePaths, refreshTree, t, focusTreeContent])
 
   const handleNodeDragStart = useCallback(
     (e: React.DragEvent, node: FileTreeNode) => {
@@ -945,7 +1037,9 @@ export function FileTree() {
         if (moves.length > 0) {
           const movedPaths = moves.map((m) => normalizeNodePath(m.to))
           setSelectedPaths(new Set(movedPaths))
-          lastSelectedPathRef.current = movedPaths[movedPaths.length - 1] ?? null
+          const focus = movedPaths[movedPaths.length - 1] ?? null
+          lastSelectedPathRef.current = focus
+          focusedPathRef.current = focus
           setExpandedDirs((prev) => {
             const next = new Set(prev)
             next.add(normalizeNodePath(destDir))
@@ -1067,8 +1161,11 @@ export function FileTree() {
     if (paths.length === 0) return
     const normalized = paths.map((path) => normalizeNodePath(path))
     setSelectedPaths(new Set(normalized))
-    lastSelectedPathRef.current = normalized[normalized.length - 1] ?? null
-  }, [])
+    const focus = normalized[normalized.length - 1] ?? null
+    lastSelectedPathRef.current = focus
+    focusedPathRef.current = focus
+    if (focus) scrollTreePathIntoView(focus)
+  }, [scrollTreePathIntoView])
 
   const importFromFile = async (parentDir: string) => {
     setCreateMenu(null)
@@ -1162,11 +1259,23 @@ export function FileTree() {
       renameOpenFile(targetPath, newPath)
       await refreshTree()
       setRenamingPath(null)
+      selectTreePaths([newPath])
       setError(null)
+      focusTreeContent()
     } catch (err) {
       setError(getErrorMessage(err, t('explorer.renameFailed')))
+      requestAnimationFrame(() => {
+        treeContentRef.current
+          ?.querySelector<HTMLInputElement>('.file-tree-input')
+          ?.focus()
+      })
     }
   }
+
+  const handleRenameCancel = useCallback(() => {
+    setRenamingPath(null)
+    focusTreeContent()
+  }, [focusTreeContent])
 
   const handleContextMenu = (e: React.MouseEvent, node: FileTreeNode) => {
     e.preventDefault()
@@ -1175,7 +1284,11 @@ export function FileTree() {
     if (!selectedPaths.has(normalized)) {
       setSelectedPaths(new Set([normalized]))
       lastSelectedPathRef.current = normalized
+      focusedPathRef.current = normalized
+    } else {
+      focusedPathRef.current = normalized
     }
+    focusTreeContent()
     setCreateMenu(null)
     setTemplateMenu(null)
     setContextMenu({ x: e.clientX, y: e.clientY, node })
@@ -1192,6 +1305,7 @@ export function FileTree() {
   const handleContentClick = () => {
     setSelectedPaths(new Set())
     lastSelectedPathRef.current = null
+    focusedPathRef.current = null
     closeAllMenus()
   }
 
@@ -1224,12 +1338,114 @@ export function FileTree() {
   }, [isAnyMenuOpen, closeAllMenus])
 
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement
-      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
+    return () => {
+      if (typeaheadRef.current.timeoutId != null) {
+        window.clearTimeout(typeaheadRef.current.timeoutId)
+      }
+    }
+  }, [])
+
+  const resetTypeahead = useCallback(() => {
+    if (typeaheadRef.current.timeoutId != null) {
+      window.clearTimeout(typeaheadRef.current.timeoutId)
+      typeaheadRef.current.timeoutId = null
+    }
+    typeaheadRef.current.query = ''
+  }, [])
+
+  const handleTreeKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLDivElement>) => {
+      if (isEditableKeyboardTarget(e.target)) return
+      if (pendingDeleteTargets || inlineInput || renamingPath || isAnyMenuOpen) return
+      if (visibleNodes.length === 0) return
+
+      const visiblePaths = visibleNodes.map((n) => normalizeNodePath(n.path))
+      const currentPath =
+        focusedPathRef.current && visiblePaths.includes(focusedPathRef.current)
+          ? focusedPathRef.current
+          : lastSelectedPathRef.current && visiblePaths.includes(lastSelectedPathRef.current)
+            ? lastSelectedPathRef.current
+            : (visiblePaths[0] ?? null)
+      const currentIndex = currentPath ? visiblePaths.indexOf(currentPath) : -1
+
+      const activateIndex = (index: number, range: boolean) => {
+        if (index < 0 || index >= visibleNodes.length) return
+        moveSelectionTo(visibleNodes[index].path, { range })
+      }
+
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault()
+        resetTypeahead()
+        if (currentIndex < 0) {
+          activateIndex(0, false)
+          return
+        }
+        const delta = e.key === 'ArrowDown' ? 1 : -1
+        const nextIndex = Math.max(0, Math.min(visibleNodes.length - 1, currentIndex + delta))
+        activateIndex(nextIndex, e.shiftKey)
         return
       }
-      if (pendingDeleteTargets || inlineInput || renamingPath || isAnyMenuOpen) return
+
+      if (e.key === 'Home' || e.key === 'End') {
+        e.preventDefault()
+        resetTypeahead()
+        activateIndex(e.key === 'Home' ? 0 : visibleNodes.length - 1, e.shiftKey)
+        return
+      }
+
+      if (e.key === 'ArrowRight') {
+        e.preventDefault()
+        resetTypeahead()
+        if (currentIndex < 0) {
+          activateIndex(0, false)
+          return
+        }
+        const node = visibleNodes[currentIndex]
+        if (!node.isDirectory) return
+        const normalized = normalizeNodePath(node.path)
+        if (!expandedDirs.has(normalized)) {
+          setDirExpanded(node.path, true)
+          return
+        }
+        if (node.children && node.children.length > 0) {
+          moveSelectionTo(node.children[0].path)
+        }
+        return
+      }
+
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault()
+        resetTypeahead()
+        if (currentIndex < 0) {
+          activateIndex(0, false)
+          return
+        }
+        const node = visibleNodes[currentIndex]
+        const normalized = normalizeNodePath(node.path)
+        if (node.isDirectory && expandedDirs.has(normalized)) {
+          setDirExpanded(node.path, false)
+          return
+        }
+        const parent = parentDirPath(normalized)
+        if (parent && visiblePaths.includes(normalizeNodePath(parent))) {
+          moveSelectionTo(parent)
+        }
+        return
+      }
+
+      if (e.key === 'Enter') {
+        e.preventDefault()
+        resetTypeahead()
+        if (currentIndex < 0) return
+        const node = visibleNodes[currentIndex]
+        moveSelectionTo(node.path)
+        if (node.isDirectory) {
+          handleToggleExpand(node.path)
+        } else {
+          void handleOpenFile(node.path)
+        }
+        return
+      }
 
       if (e.key === 'F2') {
         if (selectedPaths.size !== 1) return
@@ -1237,26 +1453,57 @@ export function FileTree() {
         const node = visibleNodes.find((n) => normalizeNodePath(n.path) === selectedPath)
         if (!node) return
         e.preventDefault()
+        resetTypeahead()
         startRename(node)
         return
       }
 
-      if (e.key !== 'Delete' || selectedPaths.size === 0) return
-      e.preventDefault()
-      requestDelete(null)
-    }
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [
-    selectedPaths,
-    requestDelete,
-    pendingDeleteTargets,
-    inlineInput,
-    renamingPath,
-    isAnyMenuOpen,
-    visibleNodes,
-    startRename
-  ])
+      if (e.key === 'Delete') {
+        if (selectedPaths.size === 0) return
+        e.preventDefault()
+        resetTypeahead()
+        requestDelete(null)
+        return
+      }
+
+      // タイプサーチ（印字可能文字）
+      if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        e.preventDefault()
+        const nextQuery = (typeaheadRef.current.query + e.key).toLowerCase()
+        typeaheadRef.current.query = nextQuery
+        if (typeaheadRef.current.timeoutId != null) {
+          window.clearTimeout(typeaheadRef.current.timeoutId)
+        }
+        typeaheadRef.current.timeoutId = window.setTimeout(() => {
+          typeaheadRef.current.query = ''
+          typeaheadRef.current.timeoutId = null
+        }, TYPEAHEAD_RESET_MS)
+
+        const startFrom = currentIndex >= 0 ? currentIndex + 1 : 0
+        const order = [
+          ...visibleNodes.slice(startFrom),
+          ...visibleNodes.slice(0, startFrom)
+        ]
+        const match = order.find((n) => n.name.toLowerCase().startsWith(nextQuery))
+        if (match) moveSelectionTo(match.path)
+      }
+    },
+    [
+      pendingDeleteTargets,
+      inlineInput,
+      renamingPath,
+      isAnyMenuOpen,
+      visibleNodes,
+      expandedDirs,
+      moveSelectionTo,
+      setDirExpanded,
+      handleToggleExpand,
+      selectedPaths,
+      startRename,
+      requestDelete,
+      resetTypeahead
+    ]
+  )
 
   if (!workspaceRoot) {
     return (
@@ -1322,7 +1569,12 @@ export function FileTree() {
       {error && <div className="file-tree-error">{error}</div>}
 
       <div
+        ref={treeContentRef}
         className={`file-tree-content${isRootDropTarget ? ' drop-target' : ''}`}
+        role="tree"
+        aria-label={t('sidebar.explorer')}
+        tabIndex={0}
+        onKeyDown={handleTreeKeyDown}
         onContextMenu={handleRootContextMenu}
         onClick={handleContentClick}
         onDragOver={(e) => handleDragOverTarget(e, workspaceRoot)}
@@ -1376,7 +1628,7 @@ export function FileTree() {
               onDropOnTarget={(e, destDir) => void handleDropOnTarget(e, destDir)}
               renamingPath={renamingPath}
               onRenameSubmit={handleRenameSubmit}
-              onRenameCancel={() => setRenamingPath(null)}
+              onRenameCancel={handleRenameCancel}
             />
           </div>
         ))}

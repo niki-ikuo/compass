@@ -698,6 +698,11 @@ body.is-resizing-panels iframe {
   flex: 1;
   overflow-y: auto;
   padding: 4px 0;
+  outline: none;
+}
+
+.file-tree-content:focus-visible {
+  box-shadow: inset 0 0 0 1px var(--accent, #3b82f6);
 }
 
 .file-tree-item {
