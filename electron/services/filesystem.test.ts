@@ -4,6 +4,7 @@ import { tmpdir } from 'os'
 import { afterEach, describe, expect, it } from 'vitest'
 import {
   applyWorkspaceActions,
+  copyPathsInto,
   createDirectory,
   createFile,
   deletePath,
@@ -181,6 +182,43 @@ describe('filesystem CRUD helpers', () => {
     expect(created[0]).toMatch(/photo \(2\)\.png$/)
     expect(readFileSync(created[0], 'utf-8')).toBe('img-a')
     expect(readFileSync(join(root, 'photo.png'), 'utf-8')).toBe('existing')
+  })
+
+  it('copies files and folders with unique names in the same directory', async () => {
+    const root = makeTempRoot('copy')
+    tempRoots.push(root)
+
+    writeFileSync(join(root, 'note.md'), '# hello\n', 'utf-8')
+    const dir = await createDirectory(root, 'docs')
+    writeFileSync(join(dir, 'inner.txt'), 'inner', 'utf-8')
+
+    const [copiedFile] = await copyPathsInto([join(root, 'note.md')], root)
+    expect(copiedFile).toMatch(/note \(2\)\.md$/)
+    expect(readFileSync(copiedFile, 'utf-8')).toBe('# hello\n')
+    expect(readFileSync(join(root, 'note.md'), 'utf-8')).toBe('# hello\n')
+
+    const [copiedDir] = await copyPathsInto([dir], root)
+    expect(copiedDir).toMatch(/docs \(2\)$/)
+    expect(readFileSync(join(copiedDir, 'inner.txt'), 'utf-8')).toBe('inner')
+  })
+
+  it('copies into another folder keeping the original name when free', async () => {
+    const root = makeTempRoot('copy-dest')
+    tempRoots.push(root)
+    const dest = await createDirectory(root, 'out')
+    writeFileSync(join(root, 'a.txt'), 'a', 'utf-8')
+
+    const [copied] = await copyPathsInto([join(root, 'a.txt')], dest)
+    expect(copied).toBe(join(dest, 'a.txt'))
+    expect(readFileSync(copied, 'utf-8')).toBe('a')
+  })
+
+  it('rejects copying a folder into itself', async () => {
+    const root = makeTempRoot('copy-self')
+    tempRoots.push(root)
+    const nested = await createDirectory(root, 'nested')
+
+    await expect(copyPathsInto([nested], nested)).rejects.toThrow(/into itself/i)
   })
 })
 

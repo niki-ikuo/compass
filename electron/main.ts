@@ -17,6 +17,7 @@ import {
   resolveChatContext,
   previewWorkspaceActions,
   importFilesToWorkspace,
+  copyPathsInto,
   writeBinaryFile,
   writeFileContent,
   readBinaryFile
@@ -564,6 +565,13 @@ function registerIpcHandlers(): void {
   ipcMain.handle('fs:move', async (_event, sourcePath: string, destDir: string) => {
     return movePath(sourcePath, destDir)
   })
+
+  ipcMain.handle(
+    'fs:copy',
+    async (_event, sourcePaths: string[], destDir: string) => {
+      return copyPathsInto(sourcePaths, destDir)
+    }
+  )
 
   ipcMain.handle('fs:delete', async (_event, targetPath: string) => {
     await deletePath(targetPath)

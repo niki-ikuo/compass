@@ -1,4 +1,4 @@
-import { mkdir, readdir, readFile, rename, rm, stat, writeFile, copyFile } from 'fs/promises'
+import { mkdir, readdir, readFile, rename, rm, stat, writeFile, copyFile, cp } from 'fs/promises'
 import { existsSync } from 'fs'
 import type { Dirent } from 'fs'
 import { resolve, relative, dirname, join, basename, isAbsolute } from 'path'
@@ -320,6 +320,56 @@ export async function movePath(sourcePath: string, destDir: string): Promise<str
 
   await rename(sourceResolved, newPath)
   return newPath
+}
+
+/**
+ * ワークスペース内のファイル／フォルダを destDir へコピーする。
+ * 同名があれば `stem (n).ext`（テンプレート新規作成・取り込みと同じ）で別名にする。
+ */
+export async function copyPathsInto(
+  sourcePaths: string[],
+  destDir: string
+): Promise<string[]> {
+  if (sourcePaths.length === 0) return []
+
+  const destResolved = resolve(destDir)
+  const destInfo = await stat(destResolved)
+  if (!destInfo.isDirectory()) {
+    throw new Error(t('fs.destMustBeFolder'))
+  }
+
+  let existingEntries: string[]
+  try {
+    existingEntries = await readdir(destResolved)
+  } catch {
+    throw new Error(t('fs.destMustBeFolder'))
+  }
+
+  const destNorm = normalizeComparePath(destResolved)
+  const reservedNames = [...existingEntries]
+  const created: string[] = []
+
+  for (const sourcePath of sourcePaths) {
+    const sourceResolved = resolve(sourcePath)
+    const sourceNorm = normalizeComparePath(sourceResolved)
+    if (destNorm === sourceNorm || destNorm.startsWith(`${sourceNorm}/`)) {
+      throw new Error(t('fs.cannotCopyIntoSelf'))
+    }
+
+    const sourceInfo = await stat(sourceResolved)
+    const fileName = buildUniqueFileName(basename(sourceResolved), reservedNames)
+    reservedNames.push(fileName)
+    const newPath = join(destResolved, fileName)
+
+    if (sourceInfo.isDirectory()) {
+      await cp(sourceResolved, newPath, { recursive: true })
+    } else {
+      await copyFile(sourceResolved, newPath)
+    }
+    created.push(newPath)
+  }
+
+  return created
 }
 
 export async function deletePath(targetPath: string): Promise<void> {

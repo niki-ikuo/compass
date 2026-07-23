@@ -65,6 +65,8 @@ const compassAPI = {
       ipcRenderer.invoke('fs:rename', targetPath, newName),
     move: (sourcePath: string, destDir: string): Promise<string> =>
       ipcRenderer.invoke('fs:move', sourcePath, destDir),
+    copy: (sourcePaths: string[], destDir: string): Promise<string[]> =>
+      ipcRenderer.invoke('fs:copy', sourcePaths, destDir),
     delete: (targetPath: string): Promise<void> => ipcRenderer.invoke('fs:delete', targetPath),
     pickFiles: (): Promise<string[] | null> => ipcRenderer.invoke('fs:pickFiles'),
     importFiles: (parentDir: string, sourcePaths: string[]): Promise<string[]> =>

@@ -589,6 +589,8 @@ export interface CompassAPI {
     createDirectory: (parentDir: string, name: string) => Promise<string>
     rename: (targetPath: string, newName: string) => Promise<string>
     move: (sourcePath: string, destDir: string) => Promise<string>
+    /** ワークスペース内コピー。同名時は `stem (n).ext` で別名 */
+    copy: (sourcePaths: string[], destDir: string) => Promise<string[]>
     delete: (targetPath: string) => Promise<void>
     pickFiles: () => Promise<string[] | null>
     importFiles: (parentDir: string, sourcePaths: string[]) => Promise<string[]>

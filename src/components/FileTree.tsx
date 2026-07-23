@@ -66,6 +66,11 @@ interface InlineInputState {
   defaultName: string
 }
 
+interface ExplorerClipboard {
+  mode: 'copy' | 'cut'
+  paths: string[]
+}
+
 function normalizeNodePath(path: string): string {
   return path.replace(/\\/g, '/')
 }
@@ -523,6 +528,7 @@ export function FileTree() {
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
   const [createMenu, setCreateMenu] = useState<CreateMenuState | null>(null)
   const [templateMenu, setTemplateMenu] = useState<TemplateMenuState | null>(null)
+  const [explorerClipboard, setExplorerClipboard] = useState<ExplorerClipboard | null>(null)
   const [docTemplates, setDocTemplates] = useState<DocTemplate[]>(() => listDocTemplates(locale))
   const [templateManagerOpen, setTemplateManagerOpen] = useState(false)
   const [inlineInput, setInlineInput] = useState<InlineInputState | null>(null)
@@ -566,6 +572,7 @@ export function FileTree() {
     focusedPathRef.current = null
     setExpandedDirs(workspaceRoot ? getDefaultExpandedDirs(workspaceRoot) : new Set())
     setDropTargetPath(null)
+    setExplorerClipboard(null)
     draggingPathsRef.current = null
   }, [workspaceRoot])
 
@@ -848,6 +855,101 @@ export function FileTree() {
       return [dragNode.path]
     },
     [selectedPaths, visibleNodes, isWorkspaceRootPath]
+  )
+
+  const copyTargetsToClipboard = useCallback(
+    (contextNode: FileTreeNode | null, mode: 'copy' | 'cut') => {
+      const targets = getDeleteTargets(contextNode)
+      if (targets.length === 0) return
+      setExplorerClipboard({
+        mode,
+        paths: targets.map((n) => n.path)
+      })
+      setContextMenu(null)
+      setError(null)
+    },
+    [getDeleteTargets]
+  )
+
+  const pasteClipboard = useCallback(
+    async (destDir: string) => {
+      if (!explorerClipboard || explorerClipboard.paths.length === 0) return
+      setContextMenu(null)
+      setCreateMenu(null)
+      setTemplateMenu(null)
+
+      const sources = filterTopLevelPaths(explorerClipboard.paths)
+      if (sources.length === 0) return
+
+      try {
+        if (explorerClipboard.mode === 'copy') {
+          const created = await window.compass.fs.copy(sources, destDir)
+          if (created.length === 0) return
+          const createdNorm = created.map(normalizeNodePath)
+          setSelectedPaths(new Set(createdNorm))
+          const focus = createdNorm[createdNorm.length - 1] ?? null
+          lastSelectedPathRef.current = focus
+          focusedPathRef.current = focus
+          setExpandedDirs((prev) => {
+            const next = new Set(prev)
+            next.add(normalizeNodePath(destDir))
+            return next
+          })
+          await refreshTree()
+        } else {
+          const moves: Array<{ from: string; to: string }> = []
+          for (const source of sources) {
+            if (!canMoveInto([source], destDir)) {
+              throw new Error(t('fs.cannotMoveIntoSelf'))
+            }
+            const newPath = await window.compass.fs.move(source, destDir)
+            if (newPath !== source) {
+              renameOpenFile(source, newPath)
+              moves.push({ from: source, to: newPath })
+            }
+          }
+          setExplorerClipboard(null)
+          if (moves.length > 0) {
+            const movedPaths = moves.map((m) => normalizeNodePath(m.to))
+            setSelectedPaths(new Set(movedPaths))
+            const focus = movedPaths[movedPaths.length - 1] ?? null
+            lastSelectedPathRef.current = focus
+            focusedPathRef.current = focus
+            setExpandedDirs((prev) => {
+              const next = new Set(prev)
+              next.add(normalizeNodePath(destDir))
+              for (const { from, to } of moves) {
+                const fromNorm = normalizeNodePath(from)
+                const toNorm = normalizeNodePath(to)
+                for (const path of [...next]) {
+                  if (path === fromNorm) {
+                    next.delete(path)
+                    next.add(toNorm)
+                  } else if (path.startsWith(`${fromNorm}/`)) {
+                    next.delete(path)
+                    next.add(toNorm + path.slice(fromNorm.length))
+                  }
+                }
+              }
+              return next
+            })
+            await refreshTree()
+          }
+        }
+        setError(null)
+      } catch (err) {
+        setError(
+          getErrorMessage(
+            err,
+            explorerClipboard.mode === 'copy' ? t('explorer.copyFailed') : t('explorer.pasteFailed')
+          )
+        )
+        await refreshTree()
+      } finally {
+        focusTreeContent()
+      }
+    },
+    [explorerClipboard, renameOpenFile, refreshTree, t, focusTreeContent]
   )
 
   const requestDelete = useCallback(
@@ -1466,6 +1568,37 @@ export function FileTree() {
         return
       }
 
+      if ((e.ctrlKey || e.metaKey) && !e.altKey) {
+        const key = e.key.toLowerCase()
+        if (key === 'c') {
+          if (getDeleteTargets(null).length === 0) return
+          e.preventDefault()
+          resetTypeahead()
+          copyTargetsToClipboard(null, 'copy')
+          return
+        }
+        if (key === 'x') {
+          if (getDeleteTargets(null).length === 0) return
+          e.preventDefault()
+          resetTypeahead()
+          copyTargetsToClipboard(null, 'cut')
+          return
+        }
+        if (key === 'v') {
+          if (!explorerClipboard || explorerClipboard.paths.length === 0 || !workspaceRoot) return
+          e.preventDefault()
+          resetTypeahead()
+          const destDir = resolveCreateParentFromSelection(
+            selectedPaths,
+            lastSelectedPathRef.current,
+            rootedTree,
+            workspaceRoot
+          )
+          void pasteClipboard(destDir)
+          return
+        }
+      }
+
       // タイプサーチ（印字可能文字）
       if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
         e.preventDefault()
@@ -1501,7 +1634,13 @@ export function FileTree() {
       selectedPaths,
       startRename,
       requestDelete,
-      resetTypeahead
+      resetTypeahead,
+      getDeleteTargets,
+      copyTargetsToClipboard,
+      explorerClipboard,
+      workspaceRoot,
+      rootedTree,
+      pasteClipboard
     ]
   )
 
@@ -1524,6 +1663,8 @@ export function FileTree() {
     !contextMenu.node.isPreview &&
     !isWorkspaceRootPath(contextMenu.node.path)
   const canDelete = deleteTargets.length > 0 && deleteTargets.every((n) => !n.isPreview)
+  const canCopyOrCut = canDelete
+  const canPaste = Boolean(explorerClipboard && explorerClipboard.paths.length > 0)
   const canAddToChat = chatAttachTargets.length > 0
   const canShowInOsExplorer = Boolean(contextMenu?.node && !contextMenu.node.isPreview)
   const canOpenWithDefaultApp = Boolean(
@@ -1657,6 +1798,35 @@ export function FileTree() {
           >
             {t('explorer.newFolder')}
           </button>
+          {(canCopyOrCut || canPaste) && (
+            <>
+              <div className="context-menu-separator" />
+              {canCopyOrCut && (
+                <button
+                  onMouseEnter={closeCreateSubmenu}
+                  onClick={() => copyTargetsToClipboard(contextMenu.node, 'cut')}
+                >
+                  {t('menu.cut')}
+                </button>
+              )}
+              {canCopyOrCut && (
+                <button
+                  onMouseEnter={closeCreateSubmenu}
+                  onClick={() => copyTargetsToClipboard(contextMenu.node, 'copy')}
+                >
+                  {t('menu.copy')}
+                </button>
+              )}
+              {canPaste && (
+                <button
+                  onMouseEnter={closeCreateSubmenu}
+                  onClick={() => void pasteClipboard(parentDir)}
+                >
+                  {t('menu.paste')}
+                </button>
+              )}
+            </>
+          )}
           {contextMenu.node && (
             <>
               <div className="context-menu-separator" />
