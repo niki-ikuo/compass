@@ -45,6 +45,8 @@ export function App() {
   const [helpOpen, setHelpOpen] = useState(false)
   const [helpAskOpen, setHelpAskOpen] = useState(false)
   const [helpDocId, setHelpDocId] = useState('index.md')
+  // 前回フォルダ復元が終わるまで Welcome（「新しいフォルダを開く」）を出さない
+  const [workspaceRestorePending, setWorkspaceRestorePending] = useState(true)
 
   const openHelp = useCallback((docId = 'index.md') => {
     setHelpDocId(docId)
@@ -226,23 +228,36 @@ export function App() {
   }, [locale])
 
   useEffect(() => {
+    let cancelled = false
     const loadSettings = async () => {
-      const settings = await window.compass.settings.get()
-      setSettings(settings)
-      applyColorTheme(settings.colorTheme)
-      setLocale(settings.locale)
-      void refreshLlmConnection()
-
-      const lastWorkspace = await window.compass.workspace.getLast()
-      if (!lastWorkspace) return
-
       try {
-        await openWorkspace(lastWorkspace)
-      } catch {
-        await window.compass.workspace.removeRecent(lastWorkspace)
+        const [settings, lastWorkspace] = await Promise.all([
+          window.compass.settings.get(),
+          window.compass.workspace.getLast()
+        ])
+        if (cancelled) return
+        setSettings(settings)
+        applyColorTheme(settings.colorTheme)
+        setLocale(settings.locale)
+        void refreshLlmConnection()
+
+        if (!lastWorkspace) return
+
+        try {
+          await openWorkspace(lastWorkspace)
+        } catch {
+          if (!cancelled) {
+            await window.compass.workspace.removeRecent(lastWorkspace)
+          }
+        }
+      } finally {
+        if (!cancelled) setWorkspaceRestorePending(false)
       }
     }
-    loadSettings()
+    void loadSettings()
+    return () => {
+      cancelled = true
+    }
   }, [setSettings, openWorkspace])
 
   useEffect(() => {
@@ -350,7 +365,7 @@ export function App() {
         center={
           workspaceRoot || openFiles.length > 0 ? (
             <EditorCenter />
-          ) : (
+          ) : workspaceRestorePending ? null : (
             <WorkspaceWelcome
               onOpenFolder={() => void handleOpenFolder()}
               onOpenRecent={openWorkspace}
