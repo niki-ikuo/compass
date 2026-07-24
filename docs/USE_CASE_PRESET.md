@@ -109,7 +109,8 @@ Keep mode constraints (Edit requires `compass-actions`, Ask forbids changes, etc
 - Treat CSV / JSON / YAML as structure
 - Prefer column names, types, missing values, duplicates, nesting
 - Avoid schema-breaking edits (no silent column/key renames, etc.)
-- For large tables: summary + examples; name rows/keys when needed
+- Agent: for tabular CSV/TSV/JSON of any size, prefer `profileData` then `queryData` (temp SQLite); avoid whole-table `readFile`
+- Summarize with examples; name rows/keys when needed
 
 ### `general`
 

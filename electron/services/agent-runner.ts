@@ -142,7 +142,7 @@ const AGENT_TOOLS = [
     function: {
       name: 'readFile',
       description:
-        'Read a text file under the workspace. Path is relative to the workspace root. Re-reads of an unchanged file return a cache hit (outline only); pass force=true to reload full contents from disk. For Markdown, optional heading returns only that section (from the heading through the next same-or-higher-level heading).',
+        'Read a text file under the workspace. Path is relative to the workspace root. Re-reads of an unchanged file return a cache hit (outline only); pass force=true to reload full contents from disk. For Markdown, optional heading returns only that section (from the heading through the next same-or-higher-level heading). When the use-case is data and the path is a tabular CSV/TSV/JSON array, prefer profileData / queryData instead of reading the whole file.',
       parameters: {
         type: 'object',
         properties: {
@@ -388,7 +388,7 @@ const DATA_AGENT_TOOLS = [
     function: {
       name: 'profileData',
       description:
-        'Profile a CSV / TSV / JSON (array of objects) file: columns, inferred types, null rates, unique counts, and sample values. Prefer this over readFile for large tables. Imports into the in-run SQLite sandbox and sets alias `t` for queryData.',
+        'Default entry point for CSV / TSV / JSON (array of objects): column profile (types, null rates, uniques, samples). Always prefer this over readFile for tabular files of any size. Imports into the in-run temporary SQLite sandbox and sets alias `t` for queryData. Call this before answering schema/quality questions about a table.',
       parameters: {
         type: 'object',
         properties: {
@@ -406,7 +406,7 @@ const DATA_AGENT_TOOLS = [
     function: {
       name: 'queryData',
       description:
-        'Run a read-only SELECT (or WITH … SELECT) against workspace data files loaded into an in-memory SQLite sandbox. Imports path/paths first. Table names come from file basenames; alias `t` always refers to the first path. Do not use DDL/DML. Prefer aggregates and LIMIT over dumping whole tables. File changes still go through proposeActions — never write back via SQL.',
+        'Run a read-only SELECT (or WITH … SELECT) on tabular files in the in-memory SQLite sandbox. Imports path/paths first (or reuses tables already imported by profileData). Table names come from file basenames; alias `t` always refers to the first path. Use this for counts, filters, aggregates, and JOINs instead of reading whole files into context. Do not use DDL/DML. Prefer aggregates and LIMIT over dumping whole tables. File changes still go through proposeActions — never write back via SQL.',
       parameters: {
         type: 'object',
         properties: {
