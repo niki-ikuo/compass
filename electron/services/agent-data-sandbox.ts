@@ -102,11 +102,41 @@ type CachedTable = {
   tableName: string
   mtimeMs: number
   size: number
+  rowCount: number
+  columnCount: number
+}
+
+export type ImportStatus = 'imported' | 'cached'
+
+export type EnsuredTable = {
+  tableName: string
+  relativePath: string
+  status: ImportStatus
+  rowCount: number
+  columnCount: number
 }
 
 export type AgentDataSandbox = {
   db: Database
   tables: Map<string, CachedTable>
+}
+
+function shortError(message: string, max = 80): string {
+  const oneLine = message.replace(/\s+/g, ' ').trim()
+  if (oneLine.length <= max) return oneLine
+  return `${oneLine.slice(0, max - 1)}…`
+}
+
+function formatTableImportLabel(entry: EnsuredTable): string {
+  const size = `${entry.rowCount}×${entry.columnCount}`
+  if (entry.status === 'imported') {
+    return `imported ${entry.tableName} ← ${entry.relativePath} (${size})`
+  }
+  return `cached ${entry.tableName} ← ${entry.relativePath} (${size})`
+}
+
+function formatEnsuredTablesLabel(entries: EnsuredTable[]): string {
+  return entries.map(formatTableImportLabel).join('; ')
 }
 
 export async function createAgentDataSandbox(): Promise<AgentDataSandbox> {
@@ -202,7 +232,7 @@ async function ensureImported(
   sandbox: AgentDataSandbox,
   workspaceRoot: string,
   relativePath: string
-): Promise<{ tableName: string } | { error: string }> {
+): Promise<EnsuredTable | { error: string }> {
   const normalized = relativePath.replace(/\\/g, '/')
   const existing = sandbox.tables.get(normalized)
   const file = await readWorkspaceDataFile(workspaceRoot, normalized)
@@ -213,7 +243,13 @@ async function ensureImported(
     existing.mtimeMs === file.mtimeMs &&
     existing.size === file.size
   ) {
-    return { tableName: existing.tableName }
+    return {
+      tableName: existing.tableName,
+      relativePath: existing.relativePath,
+      status: 'cached',
+      rowCount: existing.rowCount,
+      columnCount: existing.columnCount
+    }
   }
 
   const parsed = parseDataTableRows(normalized, file.content)
@@ -229,13 +265,22 @@ async function ensureImported(
   }
   const table = { ...parsed, tableName }
   importTable(sandbox.db, table)
+  const ensured: EnsuredTable = {
+    tableName,
+    relativePath: normalized,
+    status: 'imported',
+    rowCount: table.rows.length,
+    columnCount: table.columns.length
+  }
   sandbox.tables.set(normalized, {
     relativePath: normalized,
     tableName,
     mtimeMs: file.mtimeMs,
-    size: file.size
+    size: file.size,
+    rowCount: ensured.rowCount,
+    columnCount: ensured.columnCount
   })
-  return { tableName }
+  return ensured
 }
 
 function formatQueryResult(
@@ -285,7 +330,11 @@ export async function profileDataFile(
   // Keep sandbox in sync so follow-up queryData hits cache
   const ensured = await ensureImported(sandbox, workspaceRoot, relativePath)
   if ('error' in ensured) {
-    return { ok: false, summary: 'import failed', content: `Error: ${ensured.error}` }
+    return {
+      ok: false,
+      summary: `import failed: ${shortError(ensured.error)}`,
+      content: `Error: ${ensured.error}`
+    }
   }
   ensureAliasT(sandbox.db, ensured.tableName)
 
@@ -293,7 +342,7 @@ export async function profileDataFile(
   const content = formatDataProfile(profile)
   return {
     ok: true,
-    summary: `${profile.tableName}: ${profile.rowCount} rows × ${profile.columnCount} cols`,
+    summary: formatTableImportLabel(ensured),
     content
   }
 }
@@ -326,7 +375,7 @@ export async function queryDataFiles(
     }
   }
 
-  const tableNames: string[] = []
+  const ensuredTables: EnsuredTable[] = []
   for (const raw of pathList) {
     const relativePath = normalizeAgentRelativePath(workspaceRoot, raw, {
       defaultToRoot: false
@@ -336,12 +385,18 @@ export async function queryDataFiles(
     }
     const ensured = await ensureImported(sandbox, workspaceRoot, relativePath)
     if ('error' in ensured) {
-      return { ok: false, summary: 'import failed', content: `Error: ${relativePath}: ${ensured.error}` }
+      return {
+        ok: false,
+        summary: `import failed: ${shortError(`${relativePath}: ${ensured.error}`)}`,
+        content: `Error: ${relativePath}: ${ensured.error}`
+      }
     }
-    tableNames.push(ensured.tableName)
+    ensuredTables.push(ensured)
   }
 
-  ensureAliasT(sandbox.db, tableNames[0])
+  const primaryTable = ensuredTables[0].tableName
+  ensureAliasT(sandbox.db, primaryTable)
+  const importLabel = formatEnsuredTablesLabel(ensuredTables)
 
   // Also expose basename aliases already stored; document available tables
   const available = [...sandbox.tables.values()]
@@ -354,8 +409,8 @@ export async function queryDataFiles(
     if (raw.length === 0) {
       return {
         ok: true,
-        summary: '0 rows',
-        content: `tables: ${available}\nalias t → ${tableNames[0]}\ncolumns: (none)\nrows: 0`
+        summary: `${importLabel} · 0 rows`,
+        content: `tables: ${available}\nalias t → ${primaryTable}\ncolumns: (none)\nrows: 0`
       }
     }
     result = { columns: raw[0].columns, values: raw[0].values }
@@ -363,8 +418,8 @@ export async function queryDataFiles(
     const message = err instanceof Error ? err.message : String(err)
     return {
       ok: false,
-      summary: 'query failed',
-      content: `Error: ${message}\nAvailable tables: ${available}\nAlias: t → ${tableNames[0]}`
+      summary: `query failed: ${shortError(message)}`,
+      content: `Error: ${message}\nAvailable tables: ${available}\nAlias: t → ${primaryTable}`
     }
   }
 
@@ -373,8 +428,8 @@ export async function queryDataFiles(
   const body = formatQueryResult(result.columns, values, truncated)
   return {
     ok: true,
-    summary: `${values.length}${truncated ? '+' : ''} row(s)`,
-    content: `tables: ${available}\nalias t → ${tableNames[0]}\n${body}`
+    summary: `${importLabel} · ${values.length}${truncated ? '+' : ''} row(s)`,
+    content: `tables: ${available}\nalias t → ${primaryTable}\n${body}`
   }
 }
 

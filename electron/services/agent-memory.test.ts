@@ -118,14 +118,14 @@ describe('rebuildMemoryFromSteps', () => {
         args: { path: 'sales.csv' },
         ok: true,
         status: 'done',
-        summary: 'sales: 3 rows × 2 cols'
+        summary: 'imported sales ← sales.csv (3×2)'
       },
       {
         name: 'queryData',
         args: { path: 'sales.csv', sql: 'SELECT COUNT(*) FROM t' },
         ok: true,
         status: 'done',
-        summary: '1 row(s)'
+        summary: 'cached sales ← sales.csv (3×2) · 1 row(s)'
       }
     ])
 

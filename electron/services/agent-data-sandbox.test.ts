@@ -54,15 +54,20 @@ describe('agent-data-sandbox', () => {
       const profile = await profileDataFile(sandbox, root, 'sales.csv')
       expect(profile.ok).toBe(true)
       expect(profile.content).toContain('category:')
-      expect(profile.summary).toMatch(/3 rows/)
+      expect(profile.summary).toMatch(/^imported sales ← sales\.csv \(3×2\)$/)
 
       const query = await queryDataFiles(sandbox, root, {
         path: 'sales.csv',
         sql: 'SELECT category, SUM(amount) AS total FROM t GROUP BY category ORDER BY total DESC'
       })
       expect(query.ok).toBe(true)
+      expect(query.summary).toMatch(/^cached sales ← sales\.csv \(3×2\) · \d+ row\(s\)$/)
       expect(query.content).toContain('food')
       expect(query.content).toMatch(/15|20/)
+
+      const profileAgain = await profileDataFile(sandbox, root, 'sales.csv')
+      expect(profileAgain.ok).toBe(true)
+      expect(profileAgain.summary).toMatch(/^cached sales ← sales\.csv \(3×2\)$/)
     } finally {
       disposeAgentDataSandbox(sandbox)
     }
@@ -104,6 +109,8 @@ describe('agent-data-sandbox', () => {
         sql: 'SELECT u.name, SUM(o.total) AS spent FROM users u JOIN orders o ON u.id = o.user_id GROUP BY u.name ORDER BY spent DESC'
       })
       expect(result.ok).toBe(true)
+      expect(result.summary).toMatch(/imported users ← users\.json \(2×2\)/)
+      expect(result.summary).toMatch(/imported orders ← orders\.csv \(3×2\)/)
       expect(result.content).toContain('Ada')
       expect(result.content).toMatch(/140/)
     } finally {
