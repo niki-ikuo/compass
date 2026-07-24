@@ -272,10 +272,10 @@ interface FileTreeItemProps {
   onDragLeaveTarget: (e: React.DragEvent, destDir: string) => void
   onDropOnTarget: (e: React.DragEvent, destDir: string) => void
   renamingPath: string | null
-  onRenameSubmit: (targetPath: string, newName: string) => void
+  onRenameSubmit: (targetPath: string, newName: string) => void | Promise<void>
   onRenameCancel: () => void
   createInput: InlineInputState | null
-  onCreateSubmit: (name: string) => void
+  onCreateSubmit: (name: string) => void | Promise<void>
   onCreateCancel: () => void
 }
 
@@ -299,7 +299,7 @@ function InlineNameInput({
 }: {
   defaultName: string
   isDirectory?: boolean
-  onSubmit: (name: string) => void
+  onSubmit: (name: string) => void | Promise<void>
   onCancel: () => void
 }) {
   const [value, setValue] = useState(defaultName)
@@ -323,8 +323,19 @@ function InlineNameInput({
       return
     }
     const trimmed = value.trim()
-    if (trimmed) onSubmit(trimmed)
-    else onCancel()
+    if (!trimmed) {
+      onCancel()
+      return
+    }
+    void Promise.resolve(onSubmit(trimmed)).then(
+      () => {
+        // 成功時は入力行がアンマウントされる想定
+      },
+      () => {
+        // 失敗時は名前を直して再試行できるようにする
+        settledRef.current = false
+      }
+    )
   }
 
   return (
@@ -359,7 +370,7 @@ function CreateInlineRow({
   depth: number
   defaultName: string
   isDirectory: boolean
-  onSubmit: (name: string) => void
+  onSubmit: (name: string) => void | Promise<void>
   onCancel: () => void
 }) {
   return (
@@ -1456,7 +1467,9 @@ export function FileTree() {
   }, [isWorkspaceRootPath])
 
   const handleCreateSubmit = async (name: string) => {
-    if (!inlineInput) return
+    if (!inlineInput) {
+      throw new Error(t('explorer.createFailed'))
+    }
     try {
       let createdPath: string
       if (inlineInput.mode === 'create-file') {
@@ -1479,6 +1492,7 @@ export function FileTree() {
           ?.querySelector<HTMLInputElement>('.file-tree-input')
           ?.focus()
       })
+      throw err
     }
   }
 
@@ -1508,6 +1522,7 @@ export function FileTree() {
           ?.querySelector<HTMLInputElement>('.file-tree-input')
           ?.focus()
       })
+      throw err
     }
   }
 
@@ -1878,7 +1893,7 @@ export function FileTree() {
               onRenameSubmit={handleRenameSubmit}
               onRenameCancel={handleRenameCancel}
               createInput={inlineInput}
-              onCreateSubmit={(name) => void handleCreateSubmit(name)}
+              onCreateSubmit={handleCreateSubmit}
               onCreateCancel={handleCreateCancel}
             />
           </div>
