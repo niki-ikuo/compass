@@ -7,7 +7,9 @@ import type {
   WorkspaceActionResult,
   WorkspaceChangeEntry,
   WorkspaceChangeSet,
-  UndoAiApplyResult
+  WorkspaceChangeSetSummary,
+  UndoAiApplyResult,
+  UndoChatAppliesResult
 } from '../../src/types'
 import { t } from '../../src/i18n/runtime'
 import { normalizeWorkspaceActionPath } from '../../src/utils/workspace-actions'
@@ -459,6 +461,72 @@ export async function undoLastChangeSet(workspaceRoot: string): Promise<UndoAiAp
   await removeBackupDir(workspaceRoot, changeSet.id)
 
   return { changeSet: updated }
+}
+
+function toChangeSetSummary(changeSet: WorkspaceChangeSet): WorkspaceChangeSetSummary {
+  return {
+    id: changeSet.id,
+    chatId: changeSet.chatId,
+    createdAt: changeSet.createdAt,
+    source: changeSet.source,
+    entryCount: changeSet.entries.length,
+    status: changeSet.status,
+    paths: changeSet.entries.slice(0, 8).map((entry) => entry.relativePath)
+  }
+}
+
+/** Newest first. */
+export async function listChangeSets(
+  workspaceRoot: string
+): Promise<WorkspaceChangeSetSummary[]> {
+  const index = await loadIndex(workspaceRoot)
+  return [...index.changeSets].reverse().map(toChangeSetSummary)
+}
+
+/**
+ * Undo a specific Change Set only when it is the newest applied (LIFO).
+ */
+export async function undoChangeSet(
+  workspaceRoot: string,
+  changeSetId: string
+): Promise<UndoAiApplyResult> {
+  const tip = await peekLastAppliedChangeSet(workspaceRoot)
+  if (!tip) {
+    throw new Error(t('fs.undoNothing'))
+  }
+  if (tip.id !== changeSetId) {
+    throw new Error(t('fs.undoNotLatest'))
+  }
+  return undoLastChangeSet(workspaceRoot)
+}
+
+/**
+ * Undo consecutive tip applies that belong to `chatId` (newest-first).
+ * Stops when the tip belongs to another chat or nothing remains.
+ */
+export async function undoChatApplies(
+  workspaceRoot: string,
+  chatId: string
+): Promise<UndoChatAppliesResult> {
+  const undone: WorkspaceChangeSet[] = []
+
+  while (true) {
+    const tip = await peekLastAppliedChangeSet(workspaceRoot)
+    if (!tip) {
+      return {
+        undone,
+        stoppedReason: undone.length > 0 ? 'done' : 'none'
+      }
+    }
+    if (tip.chatId !== chatId) {
+      return {
+        undone,
+        stoppedReason: undone.length > 0 ? 'done' : 'blocked_other_chat'
+      }
+    }
+    const result = await undoLastChangeSet(workspaceRoot)
+    undone.push(result.changeSet)
+  }
 }
 
 /** Test helper: peek newest applied change set without mutating. */

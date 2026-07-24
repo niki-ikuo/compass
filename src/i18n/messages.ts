@@ -103,6 +103,8 @@ export const ja = {
   'menu.undo': '元に戻す',
   'menu.redo': 'やり直し',
   'menu.undoAiApply': 'AIの適用を取り消す',
+  'menu.undoAiApplyChat': 'このチャットの適用を取り消す',
+  'menu.aiApplyHistory': 'AI適用の履歴',
   'menu.cut': '切り取り',
   'menu.copy': 'コピー',
   'menu.paste': '貼り付け',
@@ -366,6 +368,10 @@ export const ja = {
   'chat.errorPrefix': 'エラー: {error}',
   'chat.applied': '✅ {count} 件の変更を適用しました。',
   'chat.undidApply': '↩️ 直前の適用（{count} 件）を取り消しました。',
+  'chat.undidApplyDetail':
+    '↩️ 適用を取り消しました（{count} 件）: {summary}',
+  'chat.undidApplyAgentWarning':
+    '⚠️ ユーザーがワークスペース適用を取り消しました。続行する前に該当ファイルを再読み込みしてください。',
   'chat.applyFailed': '適用に失敗しました',
   'chat.applyRetryHint': 'プレビューは残っています。修正するか、再試行してください。',
   'chat.retryApply': '再試行して適用',
@@ -502,6 +508,19 @@ export const ja = {
   'undo.confirmMessage':
     '直近の適用（{count} 件）を元に戻しますか？適用後に手動で編集したファイルがある場合は取り消せません。',
   'undo.failed': '取り消しに失敗しました: {message}',
+  'undo.history': '履歴',
+  'undo.historyTitle': 'AI適用の履歴',
+  'undo.historyEmpty': 'まだ適用履歴がありません',
+  'undo.historyEntry': '{count} 件 — {paths}',
+  'undo.statusApplied': '適用済み',
+  'undo.statusUndone': '取消済み',
+  'undo.statusStale': '無効',
+  'undo.notLatestHint': 'より新しい適用があるため、先にそちらを取り消してください',
+  'undo.messageApplied': '適用済み（{count} 件）',
+  'undo.messageUndone': '取消済み（{count} 件）',
+  'undo.undoThisChat': 'このチャットの適用を取り消す',
+  'undo.confirmChatMessage':
+    'このチャットの適用を、新しいものから順に取り消します。他チャットのより新しい適用があるとそこで止まります。続行しますか？',
   'markdown.previewFailed': '<p>プレビューの生成に失敗しました</p>',
 
   // workspace
@@ -543,6 +562,10 @@ export const ja = {
   'fs.patchFailed': 'パッチの適用に失敗しました ({path}): {reason}',
   'fs.importTooLarge': '「{name}」が大きすぎます（上限: 約 {maxMb}MB）',
   'fs.undoNothing': '取り消せる AI の適用がありません',
+  'fs.undoNotLatest':
+    'より新しい適用があるため取り消せません。直近の適用から取り消してください',
+  'fs.undoChatBlocked':
+    '他のチャットの適用が新しいため、このチャットの適用を取り消せません',
   'fs.undoStale':
     '「{path}」は適用後に変更されているため取り消せません',
   'fs.undoBackupFailed': '削除のバックアップに失敗しました ({path}): {reason}',
@@ -755,6 +778,8 @@ export const en: Record<MessageKey, string> = {
   'menu.undo': 'Undo',
   'menu.redo': 'Redo',
   'menu.undoAiApply': 'Undo AI Apply',
+  'menu.undoAiApplyChat': 'Undo Applies from This Chat',
+  'menu.aiApplyHistory': 'AI Apply History',
   'menu.cut': 'Cut',
   'menu.copy': 'Copy',
   'menu.paste': 'Paste',
@@ -1010,6 +1035,9 @@ export const en: Record<MessageKey, string> = {
   'chat.errorPrefix': 'Error: {error}',
   'chat.applied': '✅ Applied {count} change(s).',
   'chat.undidApply': '↩️ Undid the last apply ({count} change(s)).',
+  'chat.undidApplyDetail': '↩️ Undid apply ({count} change(s)): {summary}',
+  'chat.undidApplyAgentWarning':
+    '⚠️ The user undid a workspace apply. Re-read affected files before continuing.',
   'chat.applyFailed': 'Failed to apply',
   'chat.applyRetryHint': 'Preview is still open. Fix the issue or retry.',
   'chat.retryApply': 'Retry apply',
@@ -1142,6 +1170,19 @@ export const en: Record<MessageKey, string> = {
   'undo.confirmMessage':
     'Undo the last apply ({count} change(s))? If you edited those files after apply, undo will be blocked.',
   'undo.failed': 'Undo failed: {message}',
+  'undo.history': 'History',
+  'undo.historyTitle': 'AI apply history',
+  'undo.historyEmpty': 'No applies recorded yet',
+  'undo.historyEntry': '{count} change(s) — {paths}',
+  'undo.statusApplied': 'Applied',
+  'undo.statusUndone': 'Undone',
+  'undo.statusStale': 'Stale',
+  'undo.notLatestHint': 'A newer apply exists — undo that one first',
+  'undo.messageApplied': 'Applied ({count})',
+  'undo.messageUndone': 'Undone ({count})',
+  'undo.undoThisChat': 'Undo applies from this chat',
+  'undo.confirmChatMessage':
+    'Undo this chat’s applies newest-first? If another chat has a newer apply, undo stops there. Continue?',
   'markdown.previewFailed': '<p>Failed to generate preview</p>',
 
   'workspace.closeDirtyConfirm':
@@ -1177,6 +1218,9 @@ export const en: Record<MessageKey, string> = {
   'fs.patchFailed': 'Failed to apply patch ({path}): {reason}',
   'fs.importTooLarge': '"{name}" is too large (limit: ~{maxMb} MB)',
   'fs.undoNothing': 'No AI apply available to undo',
+  'fs.undoNotLatest': 'A newer apply exists. Undo the latest apply first.',
+  'fs.undoChatBlocked':
+    'Cannot undo this chat’s applies because another chat has a newer apply',
   'fs.undoStale': 'Cannot undo because "{path}" changed after apply',
   'fs.undoBackupFailed': 'Failed to back up deletion ({path}): {reason}',
   'fs.undoBackupMissing': 'Deletion backup missing: {path}',

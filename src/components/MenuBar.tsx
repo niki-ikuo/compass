@@ -161,6 +161,14 @@ export function MenuBar({
       shortcut: 'Ctrl+Shift+Z',
       action: () => window.dispatchEvent(new CustomEvent('compass:undo-ai-apply'))
     },
+    {
+      label: t('menu.undoAiApplyChat'),
+      action: () => window.dispatchEvent(new CustomEvent('compass:undo-ai-apply-chat'))
+    },
+    {
+      label: t('menu.aiApplyHistory'),
+      action: () => window.dispatchEvent(new CustomEvent('compass:ai-apply-history'))
+    },
     { separator: true, label: '', action: () => {} },
     { label: t('menu.cut'), shortcut: 'Ctrl+X', action: () => void window.compass.shell.edit('cut') },
     { label: t('menu.copy'), shortcut: 'Ctrl+C', action: () => void window.compass.shell.edit('copy') },

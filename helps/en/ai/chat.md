@@ -63,9 +63,9 @@ Separately from Ask / Edit / Agent, use-case presets (General / Document / Data 
 1. AI proposes a change
 2. Review the diff (additions green, deletions red)
 3. **Apply** or reject
-4. After apply, use **Undo this apply** (Edit → Undo AI Apply / `Ctrl+Shift+Z`) to revert the last apply
+4. After apply, use **Undo this apply** on the message, the success bar, Edit → Undo AI Apply / `Ctrl+Shift+Z`, or **AI Apply History**. You can also undo applies from the current chat (newest-first).
 
-Nothing is written automatically. If you edit those files after apply, undo is blocked.
+Nothing is written automatically. If you edit those files after apply, undo is blocked. Newer applies must be undone before older ones.
 
 ### Tabs
 

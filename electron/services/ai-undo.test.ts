@@ -4,7 +4,10 @@ import { tmpdir } from 'os'
 import { afterEach, describe, expect, it } from 'vitest'
 import {
   applyWorkspaceActionsRecordingUndo,
+  listChangeSets,
   peekLastAppliedChangeSet,
+  undoChangeSet,
+  undoChatApplies,
   undoLastChangeSet
 } from './ai-undo'
 
@@ -129,5 +132,89 @@ describe('ai apply undo', () => {
 
     await undoLastChangeSet(root)
     expect(readFileSync(join(root, 'keep.txt'), 'utf-8')).toBe('live')
+  })
+
+  it('undoChangeSet rejects when not the latest applied', async () => {
+    const root = makeTempRoot('not-latest')
+    tempRoots.push(root)
+    writeFileSync(join(root, 'a.txt'), 'A0', 'utf-8')
+    writeFileSync(join(root, 'b.txt'), 'B0', 'utf-8')
+
+    const first = await applyWorkspaceActionsRecordingUndo(
+      root,
+      [{ type: 'writeFile', path: 'a.txt', content: 'A1' }],
+      { undo: { chatId: 'chat-a', source: 'preview-file' } }
+    )
+    await applyWorkspaceActionsRecordingUndo(
+      root,
+      [{ type: 'writeFile', path: 'b.txt', content: 'B1' }],
+      { undo: { chatId: 'chat-b', source: 'preview-file' } }
+    )
+
+    await expect(undoChangeSet(root, first.changeSet!.id)).rejects.toThrow(
+      /newer apply|より新しい適用/i
+    )
+    expect(readFileSync(join(root, 'a.txt'), 'utf-8')).toBe('A1')
+    expect(readFileSync(join(root, 'b.txt'), 'utf-8')).toBe('B1')
+  })
+
+  it('undoChatApplies undoes tip applies for one chat and stops on another chat', async () => {
+    const root = makeTempRoot('chat-undo')
+    tempRoots.push(root)
+    writeFileSync(join(root, 'a.txt'), 'A0', 'utf-8')
+    writeFileSync(join(root, 'b.txt'), 'B0', 'utf-8')
+    writeFileSync(join(root, 'c.txt'), 'C0', 'utf-8')
+
+    await applyWorkspaceActionsRecordingUndo(
+      root,
+      [{ type: 'writeFile', path: 'a.txt', content: 'A1' }],
+      { undo: { chatId: 'chat-a', source: 'preview-file' } }
+    )
+    await applyWorkspaceActionsRecordingUndo(
+      root,
+      [{ type: 'writeFile', path: 'b.txt', content: 'B1' }],
+      { undo: { chatId: 'chat-a', source: 'preview-file' } }
+    )
+    await applyWorkspaceActionsRecordingUndo(
+      root,
+      [{ type: 'writeFile', path: 'c.txt', content: 'C1' }],
+      { undo: { chatId: 'chat-b', source: 'preview-file' } }
+    )
+
+    const blocked = await undoChatApplies(root, 'chat-a')
+    expect(blocked.undone).toHaveLength(0)
+    expect(blocked.stoppedReason).toBe('blocked_other_chat')
+
+    const undidB = await undoChatApplies(root, 'chat-b')
+    expect(undidB.undone).toHaveLength(1)
+    expect(readFileSync(join(root, 'c.txt'), 'utf-8')).toBe('C0')
+
+    const undidA = await undoChatApplies(root, 'chat-a')
+    expect(undidA.undone).toHaveLength(2)
+    expect(readFileSync(join(root, 'a.txt'), 'utf-8')).toBe('A0')
+    expect(readFileSync(join(root, 'b.txt'), 'utf-8')).toBe('B0')
+  })
+
+  it('lists change sets newest first', async () => {
+    const root = makeTempRoot('list')
+    tempRoots.push(root)
+    writeFileSync(join(root, 'a.txt'), 'A0', 'utf-8')
+
+    await applyWorkspaceActionsRecordingUndo(
+      root,
+      [{ type: 'writeFile', path: 'a.txt', content: 'A1' }],
+      { undo: { chatId: 'c1', source: 'preview-all' } }
+    )
+    await applyWorkspaceActionsRecordingUndo(
+      root,
+      [{ type: 'writeFile', path: 'a.txt', content: 'A2' }],
+      { undo: { chatId: 'c2', source: 'preview-all' } }
+    )
+
+    const listed = await listChangeSets(root)
+    expect(listed).toHaveLength(2)
+    expect(listed[0].chatId).toBe('c2')
+    expect(listed[0].status).toBe('applied')
+    expect(listed[1].chatId).toBe('c1')
   })
 })

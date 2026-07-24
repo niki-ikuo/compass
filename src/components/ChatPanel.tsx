@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { useAppStore } from '@/stores/app-store'
 import { DiffPreview } from './DiffPreview'
 import { ChatMessageContent } from './ChatMessageContent'
+import { ChatAppliedChangeSets } from './ChatAppliedChangeSets'
 import { WorkspaceActionPreview } from './WorkspaceActionPreview'
 import {
   ChatInputComposer,
@@ -163,6 +164,7 @@ export function ChatPanel() {
   const setFileTree = useAppStore((s) => s.setFileTree)
   const addChatContextRefs = useAppStore((s) => s.addChatContextRefs)
   const createChatSession = useAppStore((s) => s.createChatSession)
+  const undoAiAppliesForChat = useAppStore((s) => s.undoAiAppliesForChat)
   const setActiveChatSession = useAppStore((s) => s.setActiveChatSession)
   const reorderChatSession = useAppStore((s) => s.reorderChatSession)
   const closeChatSession = useAppStore((s) => s.closeChatSession)
@@ -1423,6 +1425,39 @@ export function ChatPanel() {
               )}
           </div>
           <button
+            type="button"
+            className="btn-icon"
+            onClick={() => window.dispatchEvent(new CustomEvent('compass:ai-apply-history'))}
+            title={t('undo.history')}
+          >
+            ↺
+          </button>
+          <button
+            type="button"
+            className="btn-icon"
+            disabled={!activeChatId || !workspaceRoot}
+            onClick={() => {
+              if (!activeChatId || !workspaceRoot) return
+              const confirmed = window.confirm(t('undo.confirmChatMessage'))
+              if (!confirmed) return
+              void (async () => {
+                try {
+                  await undoAiAppliesForChat(activeChatId)
+                  const tree = await window.compass.fs.readDir(workspaceRoot)
+                  setFileTree(tree)
+                  void buildWorkspaceIndex(workspaceRoot)
+                } catch (error) {
+                  const message =
+                    error instanceof Error ? error.message : t('chat.applyFailed')
+                  window.alert(t('undo.failed', { message }))
+                }
+              })()
+            }}
+            title={t('undo.undoThisChat')}
+          >
+            ↩
+          </button>
+          <button
             className="btn-icon"
             onClick={() => createChatSession()}
             title={t('chat.newChat')}
@@ -1491,6 +1526,11 @@ export function ChatPanel() {
                   isStreaming={isStreaming}
                   hideStreamingPlaceholder={Boolean(agentStreamStatus)}
                 />
+                {msg.role === 'assistant' &&
+                msg.appliedChangeSets &&
+                msg.appliedChangeSets.length > 0 ? (
+                  <ChatAppliedChangeSets items={msg.appliedChangeSets} />
+                ) : null}
                 {isStreaming && agentStreamStatus ? (
                   <div className="chat-agent-stream-status">
                     <AnimatedStatus label={agentStreamStatus} />

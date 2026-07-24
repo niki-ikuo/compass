@@ -23,6 +23,9 @@ import {
 } from './services/filesystem'
 import {
   applyWorkspaceActionsRecordingUndo,
+  listChangeSets,
+  undoChangeSet,
+  undoChatApplies,
   undoLastChangeSet
 } from './services/ai-undo'
 import { cancelChat, cancelInlineCompletion, completeInline, streamChat } from './services/ai-client'
@@ -624,6 +627,24 @@ function registerIpcHandlers(): void {
 
   ipcMain.handle('fs:undoLastAiApply', async (_event, workspaceRoot: string) => {
     return undoLastChangeSet(workspaceRoot)
+  })
+
+  ipcMain.handle(
+    'fs:undoAiApply',
+    async (_event, workspaceRoot: string, changeSetId: string) => {
+      return undoChangeSet(workspaceRoot, changeSetId)
+    }
+  )
+
+  ipcMain.handle(
+    'fs:undoChatAiApplies',
+    async (_event, workspaceRoot: string, chatId: string) => {
+      return undoChatApplies(workspaceRoot, chatId)
+    }
+  )
+
+  ipcMain.handle('fs:listAiApplies', async (_event, workspaceRoot: string) => {
+    return listChangeSets(workspaceRoot)
   })
 
   ipcMain.handle(

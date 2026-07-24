@@ -245,6 +245,8 @@ export interface ChatMessage {
   model?: string
   /** Agent モード時のツールステップ（永続化） */
   agentSteps?: AgentToolStep[]
+  /** AI Apply で記録した Change Set（メッセージ横 Undo 用） */
+  appliedChangeSets?: ChatAppliedChangeSet[]
 }
 
 export interface ChatSession {
@@ -451,6 +453,31 @@ export interface WorkspaceActionResult {
 
 export interface UndoAiApplyResult {
   changeSet: WorkspaceChangeSet
+}
+
+export interface UndoChatAppliesResult {
+  undone: WorkspaceChangeSet[]
+  /** none = nothing to undo; blocked_other_chat = a newer apply from another chat is on top */
+  stoppedReason: 'done' | 'none' | 'blocked_other_chat'
+}
+
+export interface WorkspaceChangeSetSummary {
+  id: string
+  chatId: string
+  createdAt: number
+  source: 'preview-all' | 'preview-file'
+  entryCount: number
+  status: WorkspaceChangeSetStatus
+  /** Short path list for UI (capped). */
+  paths: string[]
+}
+
+/** Recorded on assistant messages when an Apply succeeds (Phase 2). */
+export interface ChatAppliedChangeSet {
+  id: string
+  entryCount: number
+  status: 'applied' | 'undone'
+  summary: string
 }
 
 export type ActionPreviewItem =
@@ -670,6 +697,12 @@ export interface CompassAPI {
       options?: ApplyWorkspaceOptions
     ) => Promise<WorkspaceActionResult>
     undoLastAiApply: (workspaceRoot: string) => Promise<UndoAiApplyResult>
+    undoAiApply: (workspaceRoot: string, changeSetId: string) => Promise<UndoAiApplyResult>
+    undoChatAiApplies: (
+      workspaceRoot: string,
+      chatId: string
+    ) => Promise<UndoChatAppliesResult>
+    listAiApplies: (workspaceRoot: string) => Promise<WorkspaceChangeSetSummary[]>
   }
   ai: {
     chat: (request: ChatRequest) => Promise<void>

@@ -15,6 +15,8 @@ import type {
   WorkspaceAction,
   WorkspaceActionResult,
   UndoAiApplyResult,
+  UndoChatAppliesResult,
+  WorkspaceChangeSetSummary,
   WorkspaceSearchOptions,
   WorkspaceSearchResult,
   WorkspaceReplaceOptions,
@@ -99,6 +101,15 @@ const compassAPI = {
       ipcRenderer.invoke('fs:applyActions', workspaceRoot, actions, options),
     undoLastAiApply: (workspaceRoot: string): Promise<UndoAiApplyResult> =>
       ipcRenderer.invoke('fs:undoLastAiApply', workspaceRoot),
+    undoAiApply: (workspaceRoot: string, changeSetId: string): Promise<UndoAiApplyResult> =>
+      ipcRenderer.invoke('fs:undoAiApply', workspaceRoot, changeSetId),
+    undoChatAiApplies: (
+      workspaceRoot: string,
+      chatId: string
+    ): Promise<UndoChatAppliesResult> =>
+      ipcRenderer.invoke('fs:undoChatAiApplies', workspaceRoot, chatId),
+    listAiApplies: (workspaceRoot: string): Promise<WorkspaceChangeSetSummary[]> =>
+      ipcRenderer.invoke('fs:listAiApplies', workspaceRoot),
     search: (
       workspaceRoot: string,
       options: WorkspaceSearchOptions

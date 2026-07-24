@@ -2,9 +2,9 @@
 
 [English](../AI_APPLY_UNDO.md) | **日本語**
 
-状態: **Phase 1 実装済み**（Apply 時 Change Set、Undo Last、削除バックアップ、stale 判定、最小 UI）。関連: [AGENT.md](./AGENT.md)（プレビュー／適用ゲート）、[ARCHITECTURE.md](./ARCHITECTURE.md)、[SPEC.md](./SPEC.md)。
+状態: **Phase 2 実装済み**（メッセージ横 Undo、適用履歴一覧、Agent 向け Undo 通知強化、このチャットの適用取り消し）。Phase 3 はバックログ。関連: [AGENT.md](./AGENT.md)（プレビュー／適用ゲート）、[ARCHITECTURE.md](./ARCHITECTURE.md)、[SPEC.md](./SPEC.md)。
 
-AI によるワークスペース Apply 後の穴、作るべき機能、**いまどこまでやるべきか**を忖度なしで記録する。英語版が正本。Phase 2 以降はバックログ。
+Apply 後 Undo の設計記録。Phase 1 で Change Set 基盤、Phase 2 で発見性・チャット単位操作を追加。
 
 ---
 
@@ -220,12 +220,12 @@ Agent:
 - 最小 UI（成功時の導線 + コマンド／メニュー）
 - 複数タブはワークスペーススタック + `chatId` フィールドで安全側に（チャット別 UI は後回しでよい）
 
-### Phase 2 — 後で
+### Phase 2 — **実装済み**
 
 - 適用を記録したチャットメッセージ横からの Undo
-- 直近 Change Set の簡易一覧
-- Undo 後の Agent 向け通知の強化
-- 任意で「このチャットの適用を戻す」（新しい順、衝突で停止）
+- 直近 Change Set の簡易一覧（AI適用の履歴）
+- Undo 後の Agent 向け通知強化（パス要約 + Agent 実行中は再読込警告）
+- 「このチャットの適用を戻す」（新しい順、他チャットのより新しい適用で停止）
 
 ### Phase 3 — 任意／やらなくてよいものも含む
 

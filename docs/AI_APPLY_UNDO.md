@@ -2,9 +2,9 @@
 
 **English** | [日本語](ja/AI_APPLY_UNDO.md)
 
-Status: **Phase 1 implemented** (Change Set on Apply, Undo Last, delete backups, stale checks, minimal UI). Related: [AGENT.md](./AGENT.md) (preview / apply gate), [ARCHITECTURE.md](./ARCHITECTURE.md), [SPEC.md](./SPEC.md).
+Status: **Phase 2 implemented** (message-level Undo, apply history list, stronger Agent undo notes, undo-applies-from-this-chat). Phase 3 remains backlog. Related: [AGENT.md](./AGENT.md) (preview / apply gate), [ARCHITECTURE.md](./ARCHITECTURE.md), [SPEC.md](./SPEC.md).
 
-This document records a blunt assessment of the gap after AI workspace Apply, the feature to build, and **how far to go right now**. Phase 2+ remains backlog.
+This document records the post-Apply undo design. Phase 1 shipped the Change Set core; Phase 2 adds discovery and chat-scoped controls.
 
 ---
 
@@ -220,12 +220,12 @@ Agent:
 - Minimal UI: apply success affordance + command/menu
 - Multi-tab safe via workspace stack + `chatId` field (even if chat-filtered undo UI waits)
 
-### Phase 2 — later
+### Phase 2 — **Shipped**
 
 - Undo control on the chat message that recorded the apply
-- Simple list of recent change sets
-- Stronger Agent notification after undo
-- Optional “undo applies from this chat” (newest-first, stop on conflict)
+- Simple list of recent change sets (`AI Apply History`)
+- Stronger Agent notification after undo (path summary + re-read warning when Agent is running)
+- “Undo applies from this chat” (newest-first, stop when another chat’s apply is on top)
 
 ### Phase 3 — optional / maybe never
 
