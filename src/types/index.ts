@@ -397,8 +397,60 @@ export type WorkspaceAction =
   | { type: 'deleteFile'; path: string }
   | { type: 'deleteDir'; path: string }
 
+/** One successful AI Apply (all or per-file). Used for post-apply undo. */
+export type WorkspaceChangeSetStatus = 'applied' | 'undone' | 'stale'
+
+export type WorkspaceChangeEntry =
+  | {
+      type: 'writeFile'
+      relativePath: string
+      /** Content before apply; null when the file was created. */
+      before: string | null
+      after: string
+      wasNew: boolean
+    }
+  | {
+      type: 'mkdir'
+      relativePath: string
+      alreadyExisted: boolean
+    }
+  | {
+      type: 'deleteFile'
+      relativePath: string
+      before: string
+      backupRef?: string
+    }
+  | {
+      type: 'deleteDir'
+      relativePath: string
+      backupRef: string
+    }
+
+export interface WorkspaceChangeSet {
+  id: string
+  chatId: string
+  createdAt: number
+  source: 'preview-all' | 'preview-file'
+  workspaceRoot: string
+  entries: WorkspaceChangeEntry[]
+  status: WorkspaceChangeSetStatus
+}
+
+export interface ApplyWorkspaceOptions {
+  /** When set, record a Change Set so the apply can be undone. */
+  undo?: {
+    chatId: string
+    source: 'preview-all' | 'preview-file'
+  }
+}
+
 export interface WorkspaceActionResult {
   applied: WorkspaceAction[]
+  changeSet?: WorkspaceChangeSet
+}
+
+export interface UndoAiApplyResult {
+  changeSet: WorkspaceChangeSet
 }
 
 export type ActionPreviewItem =
@@ -614,8 +666,10 @@ export interface CompassAPI {
     ) => Promise<ActionPreviewItem[]>
     applyActions: (
       workspaceRoot: string,
-      actions: WorkspaceAction[]
+      actions: WorkspaceAction[],
+      options?: ApplyWorkspaceOptions
     ) => Promise<WorkspaceActionResult>
+    undoLastAiApply: (workspaceRoot: string) => Promise<UndoAiApplyResult>
   }
   ai: {
     chat: (request: ChatRequest) => Promise<void>

@@ -8,6 +8,7 @@ import type {
   EditorSelection,
   ActionPreviewItem,
   WorkspaceAction,
+  WorkspaceChangeSet,
   ChatContextRef,
   ChatMode,
   ChatSelectionRef,
@@ -391,6 +392,98 @@ function appliedWriteContentByPath(
   return byPath
 }
 
+function bannerFromChangeSet(changeSet: WorkspaceChangeSet): {
+  changeSetId: string
+  chatId: string
+  entryCount: number
+  createdAt: number
+} {
+  return {
+    changeSetId: changeSet.id,
+    chatId: changeSet.chatId,
+    entryCount: changeSet.entries.length,
+    createdAt: changeSet.createdAt
+  }
+}
+
+function syncOpenFilesAfterUndo(
+  openFiles: OpenFile[],
+  activeFilePath: string | null,
+  workspaceRoot: string,
+  changeSet: WorkspaceChangeSet
+): { openFiles: OpenFile[]; activeFilePath: string | null } {
+  let nextOpenFiles = [...openFiles]
+  let nextActive = activeFilePath
+
+  const toAbsolute = (relativePath: string): string => {
+    const root = workspaceRoot.replace(/\\/g, '/').replace(/\/+$/, '')
+    const rel = relativePath.replace(/\\/g, '/').replace(/^\/+/, '')
+    return `${root}/${rel}`
+  }
+
+  for (const entry of changeSet.entries) {
+    const absolute = normalizePath(toAbsolute(entry.relativePath))
+
+    if (entry.type === 'writeFile') {
+      if (entry.wasNew) {
+        nextOpenFiles = nextOpenFiles.filter((f) => normalizePath(f.path) !== absolute)
+        if (nextActive && normalizePath(nextActive) === absolute) {
+          nextActive = null
+        }
+      } else {
+        nextOpenFiles = nextOpenFiles.map((f) =>
+          normalizePath(f.path) === absolute
+            ? {
+                ...f,
+                content: entry.before ?? '',
+                isDirty: false,
+                isPreview: false,
+                previewOriginal: undefined,
+                isNewPreview: false
+              }
+            : f
+        )
+      }
+      continue
+    }
+
+    if (entry.type === 'deleteFile') {
+      const existingIdx = nextOpenFiles.findIndex((f) => normalizePath(f.path) === absolute)
+      const restored: OpenFile = {
+        path: absolute,
+        content: entry.before,
+        language: getLanguageFromPath(absolute),
+        encoding: 'utf8',
+        isDirty: false
+      }
+      if (existingIdx >= 0) nextOpenFiles[existingIdx] = restored
+      else nextOpenFiles.push(restored)
+      continue
+    }
+
+    if (entry.type === 'deleteDir') {
+      const prefix = `${absolute}/`
+      nextOpenFiles = nextOpenFiles.filter((f) => {
+        const path = normalizePath(f.path)
+        return path !== absolute && !path.startsWith(prefix)
+      })
+      if (nextActive) {
+        const active = normalizePath(nextActive)
+        if (active === absolute || active.startsWith(prefix)) nextActive = null
+      }
+    }
+  }
+
+  if (
+    nextActive &&
+    !nextOpenFiles.some((f) => normalizePath(f.path) === normalizePath(nextActive!))
+  ) {
+    nextActive = nextOpenFiles[nextOpenFiles.length - 1]?.path ?? null
+  }
+
+  return { openFiles: nextOpenFiles, activeFilePath: nextActive }
+}
+
 function revertPreviewFileInOpenFiles(
   openFiles: OpenFile[],
   activeFilePath: string | null,
@@ -487,6 +580,15 @@ interface AppState {
   agentApprovalTrace: { applied: string[]; rejected: string[] } | null
   /** 直近の適用失敗（プレビューを残してリトライ可能にする） */
   lastApplyError: string | null
+  /** Apply 成功後の Undo 案内（直近の Change Set） */
+  lastAiApplyUndo: {
+    changeSetId: string
+    chatId: string
+    entryCount: number
+    createdAt: number
+  } | null
+  /** 直近の AI Apply Undo 失敗 */
+  lastAiUndoError: string | null
   /** エディタなどからチャット入力へメンション挿入するリクエスト */
   chatComposerInsertRequest: {
     id: number
@@ -602,6 +704,8 @@ interface AppState {
   applyWorkspacePreview: () => Promise<void>
   applyPreviewFile: (filePath: string) => Promise<void>
   rejectPreviewFile: (filePath: string) => void
+  dismissAiApplyUndoBanner: () => void
+  undoLastAiApply: () => Promise<WorkspaceChangeSet>
   addChatContextRef: (ref: ChatContextRef) => void
   addChatContextRefs: (refs: ChatContextRef[]) => void
   removeChatContextRef: (path: string) => void
@@ -664,6 +768,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   pendingAgentApprovalId: null,
   agentApprovalTrace: null,
   lastApplyError: null,
+  lastAiApplyUndo: null,
+  lastAiUndoError: null,
   chatComposerInsertRequest: null,
   panelLayout: {
     fileTreeWidthRatio: initialPanelLayout.fileTreeWidthRatio,
@@ -768,6 +874,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       searchError: null,
       editorRevealRequest: null,
       loadingChatIds: [],
+      lastAiApplyUndo: null,
+      lastAiUndoError: null,
       chatSessions: state.chatSessions.map((session) => ({ ...session, contextRefs: [] }))
     })
     return true
@@ -1545,6 +1653,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (!state.pendingWorkspacePreview || !state.workspaceRoot) return
 
     const approvalId = state.pendingAgentApprovalId
+    const chatId = state.pendingWorkspacePreview.chatId
     const actionCount = state.pendingWorkspacePreview.actions.length
     const actionSummary = state.pendingWorkspacePreview.actions
       .map((a) => `- ${a.type}: ${a.path}`)
@@ -1556,11 +1665,14 @@ export const useAppStore = create<AppState>((set, get) => ({
     )
     const writeContents = appliedWriteContentByPath(state.pendingWorkspacePreview.items)
 
+    let changeSet: WorkspaceChangeSet | undefined
     try {
-      await window.compass.fs.applyActions(
+      const result = await window.compass.fs.applyActions(
         state.workspaceRoot,
-        state.pendingWorkspacePreview.actions
+        state.pendingWorkspacePreview.actions,
+        { undo: { chatId, source: 'preview-all' } }
       )
+      changeSet = result.changeSet
     } catch (error) {
       // Keep preview + Agent approval pending so the user can retry apply.
       const message = error instanceof Error ? error.message : 'apply failed'
@@ -1612,7 +1724,9 @@ export const useAppStore = create<AppState>((set, get) => ({
         pendingWorkspacePreview: null,
         pendingAgentApprovalId: null,
         agentApprovalTrace: null,
-        lastApplyError: null
+        lastApplyError: null,
+        lastAiUndoError: null,
+        lastAiApplyUndo: changeSet ? bannerFromChangeSet(changeSet) : s.lastAiApplyUndo
       }
     })
 
@@ -1642,8 +1756,15 @@ export const useAppStore = create<AppState>((set, get) => ({
     )
     if (actionsToApply.length === 0) return
 
+    const chatId = state.pendingWorkspacePreview.chatId
+    let changeSet: WorkspaceChangeSet | undefined
     try {
-      await window.compass.fs.applyActions(state.workspaceRoot, actionsToApply)
+      const result = await window.compass.fs.applyActions(
+        state.workspaceRoot,
+        actionsToApply,
+        { undo: { chatId, source: 'preview-file' } }
+      )
+      changeSet = result.changeSet
     } catch (error) {
       const message = error instanceof Error ? error.message : 'apply failed'
       set({ lastApplyError: message })
@@ -1674,10 +1795,42 @@ export const useAppStore = create<AppState>((set, get) => ({
         openFiles,
         pendingWorkspacePreview,
         agentApprovalTrace: trace,
-        lastApplyError: null
+        lastApplyError: null,
+        lastAiUndoError: null,
+        lastAiApplyUndo: changeSet ? bannerFromChangeSet(changeSet) : s.lastAiApplyUndo
       }
     })
     resolveAgentApprovalIfPreviewCleared(get, set)
+  },
+
+  dismissAiApplyUndoBanner: () => set({ lastAiApplyUndo: null, lastAiUndoError: null }),
+
+  undoLastAiApply: async () => {
+    const state = get()
+    if (!state.workspaceRoot) {
+      throw new Error('No workspace open')
+    }
+
+    try {
+      const result = await window.compass.fs.undoLastAiApply(state.workspaceRoot)
+      const synced = syncOpenFilesAfterUndo(
+        state.openFiles,
+        state.activeFilePath,
+        state.workspaceRoot,
+        result.changeSet
+      )
+      set({
+        openFiles: synced.openFiles,
+        activeFilePath: synced.activeFilePath,
+        lastAiApplyUndo: null,
+        lastAiUndoError: null
+      })
+      return result.changeSet
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'undo failed'
+      set({ lastAiUndoError: message })
+      throw error
+    }
   },
 
   rejectPreviewFile: (filePath) => {

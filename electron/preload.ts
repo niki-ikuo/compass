@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import type {
   AppSettings,
+  ApplyWorkspaceOptions,
   ChatContextRef,
   ChatRequest,
   DecodedFileContent,
@@ -13,6 +14,7 @@ import type {
   ActionPreviewItem,
   WorkspaceAction,
   WorkspaceActionResult,
+  UndoAiApplyResult,
   WorkspaceSearchOptions,
   WorkspaceSearchResult,
   WorkspaceReplaceOptions,
@@ -91,9 +93,12 @@ const compassAPI = {
       ipcRenderer.invoke('fs:previewActions', workspaceRoot, actions),
     applyActions: (
       workspaceRoot: string,
-      actions: WorkspaceAction[]
+      actions: WorkspaceAction[],
+      options?: ApplyWorkspaceOptions
     ): Promise<WorkspaceActionResult> =>
-      ipcRenderer.invoke('fs:applyActions', workspaceRoot, actions),
+      ipcRenderer.invoke('fs:applyActions', workspaceRoot, actions, options),
+    undoLastAiApply: (workspaceRoot: string): Promise<UndoAiApplyResult> =>
+      ipcRenderer.invoke('fs:undoLastAiApply', workspaceRoot),
     search: (
       workspaceRoot: string,
       options: WorkspaceSearchOptions

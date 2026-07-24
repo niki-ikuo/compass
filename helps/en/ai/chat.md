@@ -63,8 +63,9 @@ Separately from Ask / Edit / Agent, use-case presets (General / Document / Data 
 1. AI proposes a change
 2. Review the diff (additions green, deletions red)
 3. **Apply** or reject
+4. After apply, use **Undo this apply** (Edit → Undo AI Apply / `Ctrl+Shift+Z`) to revert the last apply
 
-Nothing is written automatically.
+Nothing is written automatically. If you edit those files after apply, undo is blocked.
 
 ### Tabs
 

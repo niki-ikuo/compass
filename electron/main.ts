@@ -6,7 +6,6 @@ import { t } from '../src/i18n/runtime'
 import type { FileEncoding, UseCasePreset } from '../src/types'
 import { nextZoomLevel } from './view-zoom'
 import {
-  applyWorkspaceActions,
   createDirectory,
   createFile,
   deletePath,
@@ -22,6 +21,10 @@ import {
   writeFileContent,
   readBinaryFile
 } from './services/filesystem'
+import {
+  applyWorkspaceActionsRecordingUndo,
+  undoLastChangeSet
+} from './services/ai-undo'
 import { cancelChat, cancelInlineCompletion, completeInline, streamChat } from './services/ai-client'
 import { runAgent, resolveAgentApproval, resolveAgentContinue } from './services/agent-runner'
 import {
@@ -61,6 +64,7 @@ import { getHelpDoc, listHelpDocs, searchHelpDocs } from './services/help'
 import { askHelp, cancelHelpAsk } from './services/help-ask'
 import type {
   AppSettings,
+  ApplyWorkspaceOptions,
   ChatContextRef,
   ChatRequest,
   ChatSession,
@@ -608,10 +612,19 @@ function registerIpcHandlers(): void {
 
   ipcMain.handle(
     'fs:applyActions',
-    async (_event, workspaceRoot: string, actions: WorkspaceAction[]) => {
-      return applyWorkspaceActions(workspaceRoot, actions)
+    async (
+      _event,
+      workspaceRoot: string,
+      actions: WorkspaceAction[],
+      options?: ApplyWorkspaceOptions
+    ) => {
+      return applyWorkspaceActionsRecordingUndo(workspaceRoot, actions, options)
     }
   )
+
+  ipcMain.handle('fs:undoLastAiApply', async (_event, workspaceRoot: string) => {
+    return undoLastChangeSet(workspaceRoot)
+  })
 
   ipcMain.handle(
     'fs:search',

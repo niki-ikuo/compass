@@ -63,6 +63,7 @@ Agent is not “a longer Edit.” The model calls tools, observes results, and t
 ## Keep in mind
 
 - Writes are never auto-applied (same preview as Edit)
+- After apply, you can undo the last apply (same as Edit)
 - Paths stay inside the open workspace
 - Agent `exec` is a short-lived child process — not the integrated terminal
 - Turn / tool limits may ask you to continue

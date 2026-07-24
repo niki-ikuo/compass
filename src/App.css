@@ -3171,6 +3171,15 @@ body:has(.monaco-editor .find-widget.visible) .workbench-hover-container .action
   border-top-color: var(--warning, #d29922);
 }
 
+.ai-undo-bar {
+  background: color-mix(in srgb, var(--success, #3fb950) 12%, transparent);
+  border-top-color: var(--success, #3fb950);
+}
+
+.ai-undo-bar .preview-bar-badge {
+  background: var(--success, #3fb950);
+}
+
 .action-preview-error {
   padding: 0 12px 8px;
   font-size: 11px;

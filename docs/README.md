@@ -12,6 +12,7 @@ Developer docs for Compass (AI workspace for local folders). For product overvie
 | [DEVELOPMENT.md](./DEVELOPMENT.md) | Dev environment, commands, implementation notes |
 | [AGENT.md](./AGENT.md) | Agent runtime — tool loop, approvals, IPC, modules |
 | [AGENT_PLAN.md](./AGENT_PLAN.md) | v2.0 Agent phases 0–4 (shipped) + later roadmap |
+| [AI_APPLY_UNDO.md](./AI_APPLY_UNDO.md) | Post-Apply undo — Phase 1 shipped; Phase 2+ backlog |
 | [Contributing](../CONTRIBUTING.md) | How to contribute ([日本語](../CONTRIBUTING.ja.md)) |
 
 English is the source of truth for these docs. Japanese translations live under [ja/](ja/README.md).

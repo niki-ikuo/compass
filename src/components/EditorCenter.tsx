@@ -2,6 +2,7 @@ import { useRef } from 'react'
 import { useAppStore } from '@/stores/app-store'
 import { TabBar } from './TabBar'
 import { PreviewBar } from './PreviewBar'
+import { AiApplyUndoBar } from './AiApplyUndoBar'
 import { CodeEditor } from './Editor'
 import { TerminalPanel } from './TerminalPanel'
 
@@ -19,6 +20,7 @@ export function EditorCenter() {
         <TabBar />
         <CodeEditor />
         <PreviewBar />
+        <AiApplyUndoBar />
       </div>
       {wasShownRef.current && (
         <div className={showTerminal ? '' : 'terminal-panel-hidden'}>

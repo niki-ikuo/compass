@@ -102,6 +102,7 @@ export const ja = {
   'menu.quit': '終了',
   'menu.undo': '元に戻す',
   'menu.redo': 'やり直し',
+  'menu.undoAiApply': 'AIの適用を取り消す',
   'menu.cut': '切り取り',
   'menu.copy': 'コピー',
   'menu.paste': '貼り付け',
@@ -364,6 +365,7 @@ export const ja = {
   'chat.previewFailed': 'プレビューの生成に失敗しました',
   'chat.errorPrefix': 'エラー: {error}',
   'chat.applied': '✅ {count} 件の変更を適用しました。',
+  'chat.undidApply': '↩️ 直前の適用（{count} 件）を取り消しました。',
   'chat.applyFailed': '適用に失敗しました',
   'chat.applyRetryHint': 'プレビューは残っています。修正するか、再試行してください。',
   'chat.retryApply': '再試行して適用',
@@ -493,6 +495,13 @@ export const ja = {
     'AIの変更提案 ({summary}) — エディタで差分を確認し、採用/拒否してください',
   'preview.openDiffHint': 'クリックでエディタの差分表示を開きます',
   'preview.applyAll': 'すべて適用',
+  'undo.badge': '取り消し可',
+  'undo.barHint': '{count} 件の変更を適用しました。この適用を取り消せます。',
+  'undo.undoApply': 'この適用を取り消す',
+  'undo.confirmTitle': 'AIの適用を取り消す',
+  'undo.confirmMessage':
+    '直近の適用（{count} 件）を元に戻しますか？適用後に手動で編集したファイルがある場合は取り消せません。',
+  'undo.failed': '取り消しに失敗しました: {message}',
   'markdown.previewFailed': '<p>プレビューの生成に失敗しました</p>',
 
   // workspace
@@ -533,6 +542,13 @@ export const ja = {
   'fs.patchEmpty': 'パッチが空です: {path}',
   'fs.patchFailed': 'パッチの適用に失敗しました ({path}): {reason}',
   'fs.importTooLarge': '「{name}」が大きすぎます（上限: 約 {maxMb}MB）',
+  'fs.undoNothing': '取り消せる AI の適用がありません',
+  'fs.undoStale':
+    '「{path}」は適用後に変更されているため取り消せません',
+  'fs.undoBackupFailed': '削除のバックアップに失敗しました ({path}): {reason}',
+  'fs.undoBackupMissing': '削除のバックアップが見つかりません: {path}',
+  'fs.undoDeleteDirTooLarge':
+    '「{path}」のフォルダ削除は Undo 用バックアップ上限（約 {maxMb}MB）を超えるため適用できません',
   'encoding.unsupported': '未対応の文字コードです: {encoding}',
 
   // search errors (electron)
@@ -738,6 +754,7 @@ export const en: Record<MessageKey, string> = {
   'menu.quit': 'Quit',
   'menu.undo': 'Undo',
   'menu.redo': 'Redo',
+  'menu.undoAiApply': 'Undo AI Apply',
   'menu.cut': 'Cut',
   'menu.copy': 'Copy',
   'menu.paste': 'Paste',
@@ -992,6 +1009,7 @@ export const en: Record<MessageKey, string> = {
   'chat.previewFailed': 'Failed to generate preview',
   'chat.errorPrefix': 'Error: {error}',
   'chat.applied': '✅ Applied {count} change(s).',
+  'chat.undidApply': '↩️ Undid the last apply ({count} change(s)).',
   'chat.applyFailed': 'Failed to apply',
   'chat.applyRetryHint': 'Preview is still open. Fix the issue or retry.',
   'chat.retryApply': 'Retry apply',
@@ -1117,6 +1135,13 @@ export const en: Record<MessageKey, string> = {
     'AI proposed changes ({summary}) — review the diff in the editor, then accept or reject',
   'preview.openDiffHint': 'Click to open the diff in the editor',
   'preview.applyAll': 'Apply All',
+  'undo.badge': 'Undo available',
+  'undo.barHint': 'Applied {count} change(s). You can undo this apply.',
+  'undo.undoApply': 'Undo this apply',
+  'undo.confirmTitle': 'Undo AI apply',
+  'undo.confirmMessage':
+    'Undo the last apply ({count} change(s))? If you edited those files after apply, undo will be blocked.',
+  'undo.failed': 'Undo failed: {message}',
   'markdown.previewFailed': '<p>Failed to generate preview</p>',
 
   'workspace.closeDirtyConfirm':
@@ -1151,6 +1176,12 @@ export const en: Record<MessageKey, string> = {
   'fs.patchEmpty': 'Empty patch: {path}',
   'fs.patchFailed': 'Failed to apply patch ({path}): {reason}',
   'fs.importTooLarge': '"{name}" is too large (limit: ~{maxMb} MB)',
+  'fs.undoNothing': 'No AI apply available to undo',
+  'fs.undoStale': 'Cannot undo because "{path}" changed after apply',
+  'fs.undoBackupFailed': 'Failed to back up deletion ({path}): {reason}',
+  'fs.undoBackupMissing': 'Deletion backup missing: {path}',
+  'fs.undoDeleteDirTooLarge':
+    'Cannot apply folder delete for "{path}" — exceeds undo backup limit (~{maxMb} MB)',
   'encoding.unsupported': 'Unsupported encoding: {encoding}',
 
   'search.scopeOutside': 'Search scope must be inside the workspace',
