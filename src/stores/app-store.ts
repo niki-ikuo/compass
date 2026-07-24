@@ -147,7 +147,7 @@ function toPersistedOpenEditors(state: {
 }): WorkspaceOpenEditors {
   const openTabs: PersistedOpenTab[] = []
   for (const file of state.openFiles) {
-    if (file.isPreview || file.viewKind === 'settings') continue
+    if (file.isPreview || file.isTransient || file.viewKind === 'settings') continue
     if (file.viewKind === 'browser') {
       openTabs.push({
         path: file.path,
@@ -731,12 +731,18 @@ interface AppState {
   restoreChatSessions: (sessions: ChatSession[], activeChatId: string | null) => void
   closeWorkspace: () => boolean
   setFileTree: (tree: FileTreeNode[]) => void
-  openFile: (path: string, content: string, encoding?: FileEncoding) => void
+  openFile: (
+    path: string,
+    content: string,
+    encoding?: FileEncoding,
+    options?: { transient?: boolean }
+  ) => void
   openMediaFile: (
     path: string,
     viewKind: 'image' | 'pdf',
     mimeType: string,
-    base64: string
+    base64: string,
+    options?: { transient?: boolean }
   ) => void
   openBrowserTab: (url?: string) => void
   openSettingsTab: () => void
@@ -747,6 +753,8 @@ interface AppState {
   closeFile: (path: string) => void
   /** 複数タブを一度に閉じる（未保存確認は呼び出し側） */
   closeFiles: (paths: string[]) => void
+  /** 一時プレビュータブを通常タブに固定する */
+  pinTransientFile: (path: string) => void
   setActiveFile: (path: string) => void
   /** エディタタブを dropIndex（移動前の挿入位置）へ並べ替え */
   reorderOpenFile: (fromPath: string, dropIndex: number) => void
@@ -1016,13 +1024,21 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   setFileTree: (tree) => set({ fileTree: tree }),
 
-  openFile: (path, content, encoding = 'utf8') => {
+  openFile: (path, content, encoding = 'utf8', options) => {
+    const transient = options?.transient === true
     set((state) => {
-      const existing = state.openFiles.find(
-        (f) => normalizePath(f.path) === normalizePath(path)
-      )
+      const normalized = normalizePath(path)
+      const existing = state.openFiles.find((f) => normalizePath(f.path) === normalized)
       // 既存タブは内容を上書きしない（未保存編集の消失を防ぐ）。再読込は reopenFileWithEncoding 等を使う
       if (existing) {
+        if (!transient && existing.isTransient) {
+          return {
+            openFiles: state.openFiles.map((f) =>
+              normalizePath(f.path) === normalized ? { ...f, isTransient: false } : f
+            ),
+            activeFilePath: existing.path
+          }
+        }
         return { activeFilePath: existing.path }
       }
       const newFile: OpenFile = {
@@ -1031,7 +1047,16 @@ export const useAppStore = create<AppState>((set, get) => ({
         language: getLanguageFromPath(path),
         encoding,
         isDirty: false,
-        viewKind: 'text'
+        viewKind: 'text',
+        ...(transient ? { isTransient: true } : {})
+      }
+      if (transient) {
+        const transientIdx = state.openFiles.findIndex((f) => f.isTransient)
+        if (transientIdx >= 0) {
+          const openFiles = [...state.openFiles]
+          openFiles[transientIdx] = newFile
+          return { openFiles, activeFilePath: path }
+        }
       }
       return {
         openFiles: [...state.openFiles, newFile],
@@ -1041,12 +1066,20 @@ export const useAppStore = create<AppState>((set, get) => ({
     scheduleOpenEditorsSave(get().workspaceRoot)
   },
 
-  openMediaFile: (path, viewKind, mimeType, base64) => {
+  openMediaFile: (path, viewKind, mimeType, base64, options) => {
+    const transient = options?.transient === true
     set((state) => {
-      const existing = state.openFiles.find(
-        (f) => normalizePath(f.path) === normalizePath(path)
-      )
+      const normalized = normalizePath(path)
+      const existing = state.openFiles.find((f) => normalizePath(f.path) === normalized)
       if (existing) {
+        if (!transient && existing.isTransient) {
+          return {
+            openFiles: state.openFiles.map((f) =>
+              normalizePath(f.path) === normalized ? { ...f, isTransient: false } : f
+            ),
+            activeFilePath: existing.path
+          }
+        }
         return { activeFilePath: existing.path }
       }
       const mediaFile: OpenFile = {
@@ -1057,7 +1090,16 @@ export const useAppStore = create<AppState>((set, get) => ({
         isDirty: false,
         viewKind,
         mediaMimeType: mimeType,
-        mediaBase64: base64
+        mediaBase64: base64,
+        ...(transient ? { isTransient: true } : {})
+      }
+      if (transient) {
+        const transientIdx = state.openFiles.findIndex((f) => f.isTransient)
+        if (transientIdx >= 0) {
+          const openFiles = [...state.openFiles]
+          openFiles[transientIdx] = mediaFile
+          return { openFiles, activeFilePath: path }
+        }
       }
       return {
         openFiles: [...state.openFiles, mediaFile],
@@ -1138,6 +1180,19 @@ export const useAppStore = create<AppState>((set, get) => ({
     scheduleOpenEditorsSave(get().workspaceRoot)
   },
 
+  pinTransientFile: (path) => {
+    const normalized = normalizePath(path)
+    const state = get()
+    const target = state.openFiles.find((f) => normalizePath(f.path) === normalized)
+    if (!target?.isTransient) return
+    set({
+      openFiles: state.openFiles.map((f) =>
+        normalizePath(f.path) === normalized ? { ...f, isTransient: false } : f
+      )
+    })
+    scheduleOpenEditorsSave(get().workspaceRoot)
+  },
+
   setActiveFile: (path) => {
     set({ activeFilePath: path })
     scheduleOpenEditorsSave(get().workspaceRoot)
@@ -1156,14 +1211,18 @@ export const useAppStore = create<AppState>((set, get) => ({
   updateFileContent: (path, content) =>
     set((state) => ({
       openFiles: state.openFiles.map((f) =>
-        f.path === path ? { ...f, content, isDirty: true } : f
+        f.path === path
+          ? { ...f, content, isDirty: true, isTransient: false }
+          : f
       )
     })),
 
   setFileEncoding: (path, encoding) =>
     set((state) => ({
       openFiles: state.openFiles.map((f) =>
-        f.path === path ? { ...f, encoding, isDirty: true } : f
+        f.path === path
+          ? { ...f, encoding, isDirty: true, isTransient: false }
+          : f
       )
     })),
 

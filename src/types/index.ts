@@ -24,6 +24,12 @@ export interface OpenFile {
   isPreview?: boolean
   previewOriginal?: string
   isNewPreview?: boolean
+  /**
+   * エクスプローラー単クリックの一時プレビュータブ。
+   * 選択が変わると閉じる。ダブルクリックや編集で通常タブ（false）になる。
+   * AI 変更プレビューの isPreview とは別概念。
+   */
+  isTransient?: boolean
   /** テキスト以外のタブ表示（画像 / PDF / ブラウザ / 設定） */
   viewKind?: 'text' | 'image' | 'pdf' | 'browser' | 'settings'
   mediaMimeType?: string

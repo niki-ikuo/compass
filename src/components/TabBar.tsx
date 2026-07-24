@@ -56,6 +56,7 @@ export function TabBar() {
   const setActiveFile = useAppStore((s) => s.setActiveFile)
   const closeFiles = useAppStore((s) => s.closeFiles)
   const reorderOpenFile = useAppStore((s) => s.reorderOpenFile)
+  const pinTransientFile = useAppStore((s) => s.pinTransientFile)
   const tabBarRef = useRef<HTMLDivElement>(null)
   const contextMenuRef = useRef<HTMLDivElement>(null)
   const dragPathRef = useRef<string | null>(null)
@@ -175,9 +176,14 @@ export function TabBar() {
         return (
           <div
             key={file.path}
-            className={`tab${file.path === activeFilePath ? ' active' : ''}${file.isPreview ? ' preview-tab' : ''}${isBrowserOpenFile(file) ? ' browser-tab' : ''}${isSettingsOpenFile(file) ? ' settings-tab-item' : ''} draggable${dragPath === file.path ? ' tab-dragging' : ''}${showDropBefore ? ' tab-drop-before' : ''}`}
+            className={`tab${file.path === activeFilePath ? ' active' : ''}${file.isPreview ? ' preview-tab' : ''}${file.isTransient ? ' transient-tab' : ''}${isBrowserOpenFile(file) ? ' browser-tab' : ''}${isSettingsOpenFile(file) ? ' settings-tab-item' : ''} draggable${dragPath === file.path ? ' tab-dragging' : ''}${showDropBefore ? ' tab-drop-before' : ''}`}
             draggable
             onClick={() => setActiveFile(file.path)}
+            onDoubleClick={() => {
+              if (file.isTransient) {
+                pinTransientFile(file.path)
+              }
+            }}
             onContextMenu={(e) => {
               e.preventDefault()
               e.stopPropagation()

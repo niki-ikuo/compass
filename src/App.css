@@ -3521,10 +3521,15 @@ body:has(.monaco-editor .find-widget.visible) .workbench-hover-container .action
   font-weight: 600;
 }
 
-/* Tab preview */
+/* Tab preview (AI proposeActions) */
 .tab.preview-tab {
   background: rgba(0, 120, 212, 0.15);
   border-top: 2px solid var(--accent);
+}
+
+/* Explorer single-click transient preview tab */
+.tab.transient-tab .tab-name {
+  font-style: italic;
 }
 
 .tab-preview-badge {

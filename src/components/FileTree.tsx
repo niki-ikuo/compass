@@ -265,6 +265,7 @@ interface FileTreeItemProps {
   dropTargetPath: string | null
   onToggleExpand: (path: string) => void
   onItemClick: (node: FileTreeNode, e: React.MouseEvent) => void
+  onItemDoubleClick: (node: FileTreeNode, e: React.MouseEvent) => void
   onContextMenu: (e: React.MouseEvent, node: FileTreeNode) => void
   onDragStart: (e: React.DragEvent, node: FileTreeNode) => void
   onDragEnd: () => void
@@ -402,6 +403,7 @@ function FileTreeItem({
   dropTargetPath,
   onToggleExpand,
   onItemClick,
+  onItemDoubleClick,
   onContextMenu,
   onDragStart,
   onDragEnd,
@@ -428,6 +430,11 @@ function FileTreeItem({
   const handleClick = (e: React.MouseEvent) => {
     if (isRenaming) return
     onItemClick(node, e)
+  }
+
+  const handleDoubleClick = (e: React.MouseEvent) => {
+    if (isRenaming) return
+    onItemDoubleClick(node, e)
   }
 
   const handleExpandClick = (e: React.MouseEvent) => {
@@ -472,6 +479,7 @@ function FileTreeItem({
           dropTargetPath={dropTargetPath}
           onToggleExpand={onToggleExpand}
           onItemClick={onItemClick}
+          onItemDoubleClick={onItemDoubleClick}
           onContextMenu={onContextMenu}
           onDragStart={onDragStart}
           onDragEnd={onDragEnd}
@@ -516,6 +524,7 @@ function FileTreeItem({
           }
           onDrop={node.isPreview ? undefined : (e) => onDropOnTarget(e, node.path)}
           onClick={handleClick}
+          onDoubleClick={handleDoubleClick}
           onContextMenu={(e) => onContextMenu(e, node)}
         >
           <span className="file-tree-expand" onClick={handleExpandClick}>
@@ -577,6 +586,7 @@ function FileTreeItem({
           : (e) => onDropOnTarget(e, fileParentDir)
       }
       onClick={handleClick}
+      onDoubleClick={handleDoubleClick}
       onContextMenu={(e) => onContextMenu(e, node)}
     >
       <span className="file-tree-expand file-tree-expand-spacer" />
@@ -670,6 +680,19 @@ export function FileTree() {
   const docTemplatesRef = useRef(docTemplates)
   docTemplatesRef.current = docTemplates
 
+  // 一時プレビュータブ: エクスプローラー選択がそのファイル単独でなくなったら閉じる
+  useEffect(() => {
+    const { openFiles, closeFiles } = useAppStore.getState()
+    const toClose = openFiles
+      .filter((f) => f.isTransient)
+      .filter((f) => {
+        const norm = normalizeNodePath(f.path)
+        return !(selectedPaths.size === 1 && selectedPaths.has(norm))
+      })
+      .map((f) => f.path)
+    if (toClose.length > 0) closeFiles(toClose)
+  }, [selectedPaths])
+
   useEffect(() => {
     let cancelled = false
     void listEffectiveDocTemplates(workspaceRoot, locale).then((list) => {
@@ -756,7 +779,7 @@ export function FileTree() {
     void buildWorkspaceIndex(root)
   }, [])
 
-  const handleOpenFile = async (path: string) => {
+  const handleOpenFile = async (path: string, options?: { preview?: boolean }) => {
     const previewItem = pendingWorkspacePreview?.items.find(
       (item): item is Extract<typeof item, { type: 'writeFile' }> =>
         item.type === 'writeFile' && item.path.replace(/\\/g, '/') === path.replace(/\\/g, '/')
@@ -776,7 +799,7 @@ export function FileTree() {
       return
     }
 
-    await openWorkspaceFile(path)
+    await openWorkspaceFile(path, { preview: options?.preview === true })
   }
 
   const handleToggleExpand = useCallback((path: string) => {
@@ -912,10 +935,25 @@ export function FileTree() {
       if (node.isDirectory) {
         handleToggleExpand(node.path)
       } else {
-        void handleOpenFile(node.path)
+        void handleOpenFile(node.path, { preview: true })
       }
     },
     [handleToggleExpand, visibleNodes, closeAllMenus, focusTreeContent]
+  )
+
+  const handleItemDoubleClick = useCallback(
+    (node: FileTreeNode, e: React.MouseEvent) => {
+      if (node.isDirectory) return
+      if (e.ctrlKey || e.metaKey || e.shiftKey) return
+      closeAllMenus()
+      focusTreeContent()
+      const normalized = normalizeNodePath(node.path)
+      setSelectedPaths(new Set([normalized]))
+      lastSelectedPathRef.current = normalized
+      focusedPathRef.current = normalized
+      void handleOpenFile(node.path, { preview: false })
+    },
+    [closeAllMenus, focusTreeContent]
   )
 
   const getDeleteTargets = useCallback(
@@ -1883,6 +1921,7 @@ export function FileTree() {
               dropTargetPath={dropTargetPath}
               onToggleExpand={handleToggleExpand}
               onItemClick={handleItemClick}
+              onItemDoubleClick={handleItemDoubleClick}
               onContextMenu={handleContextMenu}
               onDragStart={handleNodeDragStart}
               onDragEnd={handleNodeDragEnd}
