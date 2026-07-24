@@ -38,6 +38,7 @@ import {
 } from './icons/ToolbarIcons'
 import { FileTreeNodeIcon } from './icons/FileTypeIcons'
 import { openWorkspaceFile } from '@/utils/open-workspace-file'
+import { isHtmlFilePath, pathToFileUrl } from '@/utils/browser-tab'
 
 type InputMode = 'create-file' | 'create-folder' | 'rename'
 
@@ -1174,6 +1175,12 @@ export function FileTree() {
     [t]
   )
 
+  const openInTabBrowser = useCallback((node: FileTreeNode) => {
+    setContextMenu(null)
+    if (node.isPreview || node.isDirectory || !isHtmlFilePath(node.path)) return
+    useAppStore.getState().openBrowserTab(pathToFileUrl(node.path))
+  }, [])
+
   const cancelPendingDelete = useCallback(() => {
     setPendingDeleteTargets(null)
     focusTreeContent()
@@ -1860,6 +1867,18 @@ export function FileTree() {
   const canOpenWithDefaultApp = Boolean(
     contextMenu?.node && !contextMenu.node.isPreview && !contextMenu.node.isDirectory
   )
+  const canOpenInTabBrowser = Boolean(
+    contextMenu?.node &&
+      !contextMenu.node.isPreview &&
+      !contextMenu.node.isDirectory &&
+      isHtmlFilePath(contextMenu.node.path)
+  )
+  const canSearchInFolder = Boolean(
+    contextMenu?.node && contextMenu.node.isDirectory && !contextMenu.node.isPreview
+  )
+  const hasContextActions = canAddToChat || canSearchInFolder
+  const hasOpenActions = canOpenInTabBrowser || canOpenWithDefaultApp || canShowInOsExplorer
+  const hasMutateActions = canRename || canDelete
   const isRootDropTarget = dropTargetPath === normalizeNodePath(workspaceRoot)
 
   return (
@@ -2004,7 +2023,7 @@ export function FileTree() {
                     : t('explorer.addToChat')}
                 </button>
               )}
-              {contextMenu.node.isDirectory && !contextMenu.node.isPreview && (
+              {canSearchInFolder && (
                 <button
                   onMouseEnter={closeCreateSubmenu}
                   onClick={() => {
@@ -2014,6 +2033,15 @@ export function FileTree() {
                   }}
                 >
                   {t('explorer.searchInFolder')}
+                </button>
+              )}
+              {hasOpenActions && hasContextActions && <div className="context-menu-separator" />}
+              {canOpenInTabBrowser && (
+                <button
+                  onMouseEnter={closeCreateSubmenu}
+                  onClick={() => openInTabBrowser(contextMenu.node!)}
+                >
+                  {t('explorer.openInTabBrowser')}
                 </button>
               )}
               {canOpenWithDefaultApp && (
@@ -2032,6 +2060,7 @@ export function FileTree() {
                   {t('explorer.showInOsExplorer')}
                 </button>
               )}
+              {hasMutateActions && hasOpenActions && <div className="context-menu-separator" />}
               {canRename && (
                 <button
                   onMouseEnter={closeCreateSubmenu}
