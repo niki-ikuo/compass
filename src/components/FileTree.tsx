@@ -304,6 +304,8 @@ function InlineNameInput({
 }) {
   const [value, setValue] = useState(defaultName)
   const inputRef = useRef<HTMLInputElement>(null)
+  /** Enter / Escape 後の blur で二重確定しないようにする */
+  const settledRef = useRef(false)
 
   useEffect(() => {
     const input = inputRef.current
@@ -313,7 +315,13 @@ function InlineNameInput({
     input.setSelectionRange(0, end)
   }, [defaultName, isDirectory])
 
-  const handleSubmit = () => {
+  const finish = (action: 'submit' | 'cancel') => {
+    if (settledRef.current) return
+    settledRef.current = true
+    if (action === 'cancel') {
+      onCancel()
+      return
+    }
     const trimmed = value.trim()
     if (trimmed) onSubmit(trimmed)
     else onCancel()
@@ -328,14 +336,14 @@ function InlineNameInput({
       onKeyDown={(e) => {
         if (e.key === 'Enter') {
           e.preventDefault()
-          handleSubmit()
+          finish('submit')
         }
         if (e.key === 'Escape') {
           e.preventDefault()
-          onCancel()
+          finish('cancel')
         }
       }}
-      onBlur={handleSubmit}
+      onBlur={() => finish('submit')}
       onClick={(e) => e.stopPropagation()}
     />
   )
