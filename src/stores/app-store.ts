@@ -1018,24 +1018,12 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   openFile: (path, content, encoding = 'utf8') => {
     set((state) => {
-      const existing = state.openFiles.find((f) => f.path === path)
+      const existing = state.openFiles.find(
+        (f) => normalizePath(f.path) === normalizePath(path)
+      )
+      // 既存タブは内容を上書きしない（未保存編集の消失を防ぐ）。再読込は reopenFileWithEncoding 等を使う
       if (existing) {
-        return {
-          activeFilePath: path,
-          openFiles: state.openFiles.map((f) =>
-            f.path === path
-              ? {
-                  ...f,
-                  content,
-                  encoding,
-                  isDirty: false,
-                  viewKind: 'text',
-                  mediaMimeType: undefined,
-                  mediaBase64: undefined
-                }
-              : f
-          )
-        }
+        return { activeFilePath: existing.path }
       }
       const newFile: OpenFile = {
         path,
@@ -1055,7 +1043,12 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   openMediaFile: (path, viewKind, mimeType, base64) => {
     set((state) => {
-      const existing = state.openFiles.find((f) => f.path === path)
+      const existing = state.openFiles.find(
+        (f) => normalizePath(f.path) === normalizePath(path)
+      )
+      if (existing) {
+        return { activeFilePath: existing.path }
+      }
       const mediaFile: OpenFile = {
         path,
         content: '',
@@ -1065,12 +1058,6 @@ export const useAppStore = create<AppState>((set, get) => ({
         viewKind,
         mediaMimeType: mimeType,
         mediaBase64: base64
-      }
-      if (existing) {
-        return {
-          activeFilePath: path,
-          openFiles: state.openFiles.map((f) => (f.path === path ? mediaFile : f))
-        }
       }
       return {
         openFiles: [...state.openFiles, mediaFile],
