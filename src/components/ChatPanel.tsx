@@ -843,6 +843,16 @@ export function ChatPanel() {
     inputComposerRef.current?.insertMention(mention)
   }
 
+  /** drop / dragend 後にエクスプローラへフォーカスが戻ると入力不能になるため、遅延で奪い返す */
+  const focusChatComposerAfterDrop = () => {
+    const focus = () => inputComposerRef.current?.focus()
+    requestAnimationFrame(() => {
+      focus()
+      window.setTimeout(focus, 0)
+      window.setTimeout(focus, 50)
+    })
+  }
+
   const insertContextMentionIntoInput = (ref: {
     path: string
     isDirectory: boolean
@@ -923,6 +933,7 @@ export function ChatPanel() {
       for (const fileRef of fileRefs) {
         insertContextMentionIntoInput(fileRef)
       }
+      focusChatComposerAfterDrop()
       return
     }
 
@@ -934,6 +945,7 @@ export function ChatPanel() {
       } else {
         insertMentionAtCursor(selectionPayload.mention)
       }
+      focusChatComposerAfterDrop()
       return
     }
 
@@ -966,6 +978,7 @@ export function ChatPanel() {
     for (const fileRef of osFileRefs) {
       insertContextMentionIntoInput(fileRef)
     }
+    focusChatComposerAfterDrop()
   }
 
   const handlePasteSelection = (dataTransfer: DataTransfer): boolean => {

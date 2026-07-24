@@ -414,7 +414,21 @@ export const ChatInputComposer = forwardRef<ChatInputComposerHandle, ChatInputCo
 
     useImperativeHandle(ref, () => ({
       focus: () => {
-        editorRef.current?.focus()
+        const editor = editorRef.current
+        if (!editor || disabled) return
+        editor.focus()
+
+        // DnD 直後などは activeElement だけ composer で Selection が外れたまま、
+        // 見た目はフォーカス済みでも文字が入らないことがある。
+        const selection = window.getSelection()
+        if (!selection) return
+        if (selection.rangeCount === 0 || !editor.contains(selection.anchorNode)) {
+          const range = document.createRange()
+          range.selectNodeContents(editor)
+          range.collapse(false)
+          selection.removeAllRanges()
+          selection.addRange(range)
+        }
       },
       getValue: () => valueRef.current,
       clear: () => {
@@ -507,6 +521,15 @@ export const ChatInputComposer = forwardRef<ChatInputComposerHandle, ChatInputCo
           syncValue(readEditorValue())
         }}
         onKeyDown={handleKeyDown}
+        onDragOver={(event) => {
+          // contentEditable のネイティブ drop を避け、親の chat-input-area に処理を寄せる
+          if (event.dataTransfer.types.length > 0) {
+            event.preventDefault()
+          }
+        }}
+        onDrop={(event) => {
+          event.preventDefault()
+        }}
         onPaste={(event) => {
           const clipboard = event.clipboardData
           // Always take over paste so we can strip HTML / handle media & mentions.
