@@ -12,6 +12,7 @@ import {
 } from '../../src/utils/data-rows'
 import { buildDataProfile, formatDataProfile } from '../../src/utils/data-profile'
 import { normalizeAgentRelativePath } from './agent-paths'
+import { decodeFileBuffer } from './encoding'
 import { resolveInsideWorkspace } from './filesystem'
 
 const require = createRequire(__filename)
@@ -176,7 +177,8 @@ async function readWorkspaceDataFile(
         error: `File too large for data sandbox (${info.size} bytes; max ${MAX_IMPORT_BYTES})`
       }
     }
-    const content = await readFile(absolutePath, 'utf-8')
+    const buffer = await readFile(absolutePath)
+    const { content } = decodeFileBuffer(buffer)
     return { content, mtimeMs: info.mtimeMs, size: info.size }
   } catch (err) {
     return { error: err instanceof Error ? err.message : String(err) }

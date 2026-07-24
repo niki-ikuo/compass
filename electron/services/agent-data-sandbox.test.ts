@@ -118,6 +118,33 @@ describe('agent-data-sandbox', () => {
     }
   })
 
+  it('decodes Shift_JIS CSV the same way as the editor', async () => {
+    const root = makeRoot('sjis')
+    const iconv = (await import('iconv-lite')).default
+    const csv = '名前,金額\n田中,100\n佐藤,200\n'
+    writeFileSync(join(root, 'sales.csv'), iconv.encode(csv, 'CP932'))
+
+    const sandbox = await createAgentDataSandbox()
+    try {
+      const profile = await profileDataFile(sandbox, root, 'sales.csv')
+      expect(profile.ok).toBe(true)
+      expect(profile.content).toContain('田中')
+      expect(profile.content).not.toContain('\uFFFD')
+
+      const query = await queryDataFiles(sandbox, root, {
+        path: 'sales.csv',
+        sql: 'SELECT * FROM t'
+      })
+      // Japanese headers become underscores via uniqueColumns; values must stay readable
+      expect(query.ok).toBe(true)
+      expect(query.content).toContain('田中')
+      expect(query.content).toContain('佐藤')
+      expect(query.content).not.toContain('\uFFFD')
+    } finally {
+      disposeAgentDataSandbox(sandbox)
+    }
+  })
+
   it('initializes SQLite via wasmBinary (packaging-safe path)', async () => {
     const sandbox = await createAgentDataSandbox()
     try {

@@ -10,6 +10,7 @@ import type {
   WorkspaceSearchFileResult
 } from '../../src/types'
 import { shouldSkipWorkspaceEntry } from './fs-ignore'
+import { decodeFileBuffer, encodeContent } from './encoding'
 
 const IGNORED_DIRS = new Set([
   'node_modules',
@@ -241,7 +242,7 @@ export async function searchWorkspace(
     if (isProbablyBinary(buffer)) continue
 
     filesSearched++
-    const content = buffer.toString('utf8')
+    const content = decodeFileBuffer(buffer).content
     const { matches, truncated: fileTruncated } = searchInContent(
       content,
       matcher,
@@ -312,13 +313,14 @@ export async function replaceInWorkspace(
 
     if (isProbablyBinary(buffer)) continue
 
-    const original = buffer.toString('utf8')
+    const decoded = decodeFileBuffer(buffer)
+    const original = decoded.content
     matcher.lastIndex = 0
     const { content, count } = replaceInContent(original, matcher, replace)
     if (count === 0 || content === original) continue
 
     try {
-      await writeFile(filePath, content, 'utf8')
+      await writeFile(filePath, encodeContent(content, decoded.encoding))
       changedFiles.push({ path: filePath, content })
       replacements += count
     } catch (error) {

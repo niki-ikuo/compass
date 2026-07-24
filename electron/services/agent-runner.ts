@@ -24,6 +24,7 @@ import {
   toApiUserContent
 } from './ai-client'
 import type { ChatContentPart } from '../../src/utils/chat-content-parts'
+import { decodeFileBuffer } from './encoding'
 import { previewWorkspaceActions, resolveInsideWorkspace } from './filesystem'
 import { searchWorkspace } from './workspace-search'
 import { runAgentExec, classifyAgentExecCommand } from './agent-exec'
@@ -807,12 +808,12 @@ async function executeReadFile(
 
     let text: string
     let truncated = false
+    const buffer = await readFile(absolutePath)
     if (info.size > MAX_READ_BYTES) {
-      const buffer = await readFile(absolutePath)
-      text = buffer.subarray(0, MAX_READ_BYTES).toString('utf8')
+      text = decodeFileBuffer(buffer.subarray(0, MAX_READ_BYTES)).content
       truncated = true
     } else {
-      text = (await readFile(absolutePath)).toString('utf8')
+      text = decodeFileBuffer(buffer).content
     }
 
     const outline = buildFileOutline(relativePath, text)

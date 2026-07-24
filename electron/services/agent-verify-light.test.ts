@@ -81,6 +81,24 @@ describe('runAgentVerify use-case light checks', () => {
     expect(result.ok).toBe(false)
   })
 
+  it('verifies Shift_JIS CSV without mojibake false positives', async () => {
+    const iconv = (await import('iconv-lite')).default
+    const root = makeRoot('sjis')
+    writeFileSync(
+      join(root, 'sales.csv'),
+      iconv.encode('名前,金額\n田中,100\n佐藤,200\n', 'CP932')
+    )
+    const result = await runAgentVerify({
+      workspaceRoot: root,
+      preset: 'data',
+      paths: ['sales.csv'],
+      signal: new AbortController().signal
+    })
+    expect(result.checks.some((c) => c.check === 'schema')).toBe(true)
+    expect(result.ok).toBe(true)
+    expect(result.content).not.toContain('\uFFFD')
+  })
+
   it('skips shell and light checks for general preset', async () => {
     const root = makeRoot('general')
     const result = await runAgentVerify({

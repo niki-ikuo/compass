@@ -6,6 +6,7 @@ import { normalizeUseCasePreset, DEFAULT_SETTINGS } from '../../src/types'
 import { validateMarkdownDocument } from '../../src/utils/markdown-outline'
 import { verifyDataFile } from '../../src/utils/data-verify'
 import type { AgentVerifyCheckResult } from './agent-verify'
+import { decodeFileBuffer } from './encoding'
 
 function isMarkdownPath(path: string): boolean {
   const lower = path.replace(/\\/g, '/').toLowerCase()
@@ -40,7 +41,8 @@ async function readWorkspaceFile(
   relativePath: string
 ): Promise<string | null> {
   try {
-    return await readFile(join(workspaceRoot, relativePath), 'utf-8')
+    const buffer = await readFile(join(workspaceRoot, relativePath))
+    return decodeFileBuffer(buffer).content
   } catch {
     return null
   }

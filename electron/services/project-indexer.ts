@@ -15,6 +15,7 @@ import {
   type MarkdownHeading
 } from '../../src/utils/markdown-outline'
 import { shouldSkipWorkspaceEntry } from './fs-ignore'
+import { decodeFileBuffer } from './encoding'
 
 const INDEX_VERSION = 5
 const COMPASS_DIR = '.compass'
@@ -636,8 +637,9 @@ async function runBuildProjectIndex(
       const info = await stat(absPath)
       if (info.size > 256 * 1024) continue
 
-      const content = await readFile(absPath, 'utf-8')
-      if (content.includes('\0')) continue
+      const buffer = await readFile(absPath)
+      if (buffer.includes(0)) continue
+      const content = decodeFileBuffer(buffer).content
 
       const ext = extname(absPath).slice(1).toLowerCase()
       const language = getLanguage(ext)
