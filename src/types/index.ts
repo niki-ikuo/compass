@@ -659,6 +659,8 @@ export interface EditorRevealRequest {
 }
 
 export interface CompassAPI {
+  /** 起動時に main から渡されたテーマ（同期・初回ペイント前用） */
+  getInitialColorTheme: () => ColorThemeId
   fs: {
     openFolder: () => Promise<string | null>
     readDir: (

@@ -4,6 +4,7 @@ import type {
   ApplyWorkspaceOptions,
   ChatContextRef,
   ChatRequest,
+  ColorThemeId,
   DecodedFileContent,
   FileEncoding,
   FileTreeNode,
@@ -45,8 +46,21 @@ import type {
   LlmConnectionTestResult,
   LocaleId
 } from '../src/types'
+import { DEFAULT_SETTINGS } from '../src/types'
+import { applyColorTheme, parseColorThemeArg } from '../src/utils/color-theme'
+
+/** main が渡した起動テーマ。初回ペイント前に DOM へ適用してフラッシュを防ぐ */
+const initialColorTheme: ColorThemeId =
+  parseColorThemeArg(process.argv) ?? DEFAULT_SETTINGS.colorTheme
+
+try {
+  applyColorTheme(initialColorTheme)
+} catch {
+  // document 未準備の環境では無視（テスト等）
+}
 
 const compassAPI = {
+  getInitialColorTheme: (): ColorThemeId => initialColorTheme,
   fs: {
     openFolder: (): Promise<string | null> => ipcRenderer.invoke('fs:openFolder'),
     readDir: (

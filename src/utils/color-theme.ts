@@ -199,8 +199,24 @@ export function getColorTheme(id: ColorThemeId | undefined | null): ColorThemeDe
   return THEME_BY_ID.dark
 }
 
+/** BrowserWindow / 起動フラッシュ防止用。CSS の --bg-primary と揃える */
+export function getThemeBackgroundColor(id: ColorThemeId | undefined | null): string {
+  return getColorTheme(id).terminal.background
+}
+
+/** main → renderer へ起動テーマを渡す additionalArguments の接頭辞 */
+export const COLOR_THEME_ARG_PREFIX = '--compass-color-theme='
+
+export function parseColorThemeArg(argv: readonly string[]): ColorThemeId | null {
+  const arg = argv.find((entry) => entry.startsWith(COLOR_THEME_ARG_PREFIX))
+  if (!arg) return null
+  const id = arg.slice(COLOR_THEME_ARG_PREFIX.length)
+  return isColorThemeId(id) ? id : null
+}
+
 export function applyColorTheme(id: ColorThemeId): void {
   const theme = getColorTheme(id)
   document.documentElement.dataset.theme = theme.id
   document.documentElement.style.colorScheme = theme.colorScheme
+  document.documentElement.style.backgroundColor = theme.terminal.background
 }

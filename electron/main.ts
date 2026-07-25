@@ -4,6 +4,10 @@ import appIcon from '../resources/icon.ico?asset'
 import packageJson from '../package.json'
 import { t } from '../src/i18n/runtime'
 import type { FileEncoding, UseCasePreset } from '../src/types'
+import {
+  COLOR_THEME_ARG_PREFIX,
+  getThemeBackgroundColor
+} from '../src/utils/color-theme'
 import { nextZoomLevel } from './view-zoom'
 import {
   createDirectory,
@@ -159,7 +163,10 @@ function applyPackagedContentSecurityPolicy(): void {
   })
 }
 
-function createWindow(): void {
+async function createWindow(): Promise<void> {
+  const settings = await getSettings()
+  const backgroundColor = getThemeBackgroundColor(settings.colorTheme)
+
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 800,
@@ -167,13 +174,20 @@ function createWindow(): void {
     minHeight: 600,
     title: 'Compass',
     icon: appIcon,
-      webPreferences: {
+    backgroundColor,
+    show: false,
+    webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: false,
-      webviewTag: true
+      webviewTag: true,
+      additionalArguments: [`${COLOR_THEME_ARG_PREFIX}${settings.colorTheme}`]
     }
+  })
+
+  mainWindow.once('ready-to-show', () => {
+    mainWindow?.show()
   })
 
   if (process.env.ELECTRON_RENDERER_URL) {
@@ -874,11 +888,11 @@ app.whenReady().then(async () => {
   await getSettings()
   applyPackagedContentSecurityPolicy()
   registerIpcHandlers()
-  createWindow()
+  await createWindow()
   createMenu()
 
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow()
+    if (BrowserWindow.getAllWindows().length === 0) void createWindow()
   })
 })
 

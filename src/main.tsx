@@ -8,6 +8,7 @@ import cssWorker from 'monaco-editor/esm/vs/language/css/css.worker?worker'
 import htmlWorker from 'monaco-editor/esm/vs/language/html/html.worker?worker'
 import tsWorker from 'monaco-editor/esm/vs/language/typescript/ts.worker?worker'
 import { App } from './App'
+import { applyColorTheme } from './utils/color-theme'
 import './App.css'
 
 // CDN (0.55) ではなくローカル monaco-editor (0.52) を使う。
@@ -23,6 +24,13 @@ window.MonacoEnvironment = {
 }
 
 loader.config({ monaco })
+
+// preload でも適用済みだが、CSS 読込後・React 描画前に再適用して一貫させる
+try {
+  applyColorTheme(window.compass.getInitialColorTheme())
+} catch {
+  // ブラウザ単体プレビュー等
+}
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

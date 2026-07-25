@@ -864,6 +864,18 @@ interface AppState {
 const initialChatSession = createEmptyChatSession()
 const initialPanelLayout = loadPanelLayout()
 
+/** 起動時テーマをストア初期値に載せ、既定 light → 保存テーマのチラつきを防ぐ */
+function createInitialSettings(): AppSettings {
+  const settings: AppSettings = { ...DEFAULT_SETTINGS }
+  try {
+    const theme = window.compass?.getInitialColorTheme?.()
+    if (theme) settings.colorTheme = theme
+  } catch {
+    // テスト / 非 Electron
+  }
+  return settings
+}
+
 export const useAppStore = create<AppState>((set, get) => ({
   workspaceRoot: null,
   workspaceDefaultUseCasePreset: null,
@@ -874,7 +886,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   chatSessions: [initialChatSession],
   activeChatId: initialChatSession.id,
   loadingChatIds: [],
-  settings: { ...DEFAULT_SETTINGS },
+  settings: createInitialSettings(),
   settingsOpen: false,
   showFileTree: initialPanelLayout.showFileTree,
   showChat: initialPanelLayout.showChat,
