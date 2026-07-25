@@ -1,47 +1,51 @@
 import type { ActionPreviewItem, FileTreeNode } from '@/types'
+
 function insertNode(tree: FileTreeNode[], node: FileTreeNode, workspaceRoot: string): FileTreeNode[] {
-  const rel = node.path.replace(/\\/g, '/').replace(workspaceRoot.replace(/\\/g, '/'), '').replace(/^\//, '')
+  const root = workspaceRoot.replace(/\\/g, '/')
+  const rel = node.path.replace(/\\/g, '/').replace(root, '').replace(/^\//, '')
   const parts = rel.split('/').filter(Boolean)
   if (parts.length === 0) return tree
 
-  const result = [...tree]
-  let current = result
-  let currentPath = workspaceRoot.replace(/\\/g, '/')
+  const insertAt = (nodes: FileTreeNode[], depth: number, parentPath: string): FileTreeNode[] => {
+    const part = parts[depth]
+    const isLast = depth === parts.length - 1
+    const currentPath = `${parentPath}/${part}`.replace(/\\/g, '/')
+    const index = nodes.findIndex((n) => n.name === part)
 
-  for (let i = 0; i < parts.length; i++) {
-    const part = parts[i]
-    const isLast = i === parts.length - 1
-    currentPath = `${currentPath}/${part}`.replace(/\\/g, '/')
-    const existing = current.find((n) => n.name === part)
-
-    if (existing) {
+    if (index >= 0) {
+      const existing = nodes[index]
+      let next: FileTreeNode
       if (isLast && !node.isDirectory) {
-        existing.isPreview = node.isPreview
-        existing.previewKind = node.previewKind
+        next = {
+          ...existing,
+          isPreview: node.isPreview,
+          previewKind: node.previewKind
+        }
       } else if (existing.isDirectory && !isLast) {
-        existing.children = existing.children ?? []
-        current = existing.children
+        next = {
+          ...existing,
+          children: insertAt(existing.children ?? [], depth + 1, currentPath)
+        }
+      } else {
+        return nodes
       }
-    } else {
-      const newNode: FileTreeNode = isLast
-        ? { ...node, path: node.path.replace(/\\/g, '/') }
-        : {
-            name: part,
-            path: currentPath,
-            isDirectory: true,
-            children: [],
-            isPreview: node.isPreview,
-            previewKind: 'new-folder' as const
-          }
-      current.push(newNode)
-      if (!isLast) {
-        newNode.children = newNode.children ?? []
-        current = newNode.children
-      }
+      return [...nodes.slice(0, index), next, ...nodes.slice(index + 1)]
     }
+
+    const newNode: FileTreeNode = isLast
+      ? { ...node, path: node.path.replace(/\\/g, '/') }
+      : {
+          name: part,
+          path: currentPath,
+          isDirectory: true,
+          children: insertAt([], depth + 1, currentPath),
+          isPreview: node.isPreview,
+          previewKind: 'new-folder' as const
+        }
+    return [...nodes, newNode]
   }
 
-  return result
+  return insertAt(tree, 0, root)
 }
 
 function markModified(tree: FileTreeNode[], filePath: string): FileTreeNode[] {
@@ -81,7 +85,7 @@ export function mergePreviewIntoTree(
   items: ActionPreviewItem[],
   workspaceRoot: string
 ): FileTreeNode[] {
-  let merged = tree.map((n) => ({ ...n }))
+  let merged = tree
 
   for (const item of items) {
     if (item.type === 'mkdir' && !item.alreadyExists) {
