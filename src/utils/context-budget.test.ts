@@ -26,6 +26,13 @@ describe('truncateToTokenBudget', () => {
     expect(estimateTokens(out)).toBeLessThanOrEqual(10)
     expect(out.endsWith('…cut')).toBe(true)
   })
+
+  it('does not emit lone surrogates when cutting through an emoji', () => {
+    const long = `${'x'.repeat(20)}😀${'y'.repeat(20)}`
+    const out = truncateToTokenBudget(long, 8, '…')
+    // Lone surrogates round-trip to U+FFFD via UTF-8; valid text stays identical.
+    expect(Buffer.from(out, 'utf8').toString('utf8')).toBe(out)
+  })
 })
 
 describe('truncateKeepingEnd', () => {

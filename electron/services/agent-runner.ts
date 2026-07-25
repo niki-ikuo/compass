@@ -11,6 +11,7 @@ import type {
 import { t } from '../../src/i18n/runtime'
 import { getLlmProvider, getProviderLabel } from '../../src/utils/llm-providers'
 import { withOpenWebUiChatCompat } from '../../src/utils/open-webui-compat'
+import { jsonStringifyUtf8Safe } from '../../src/utils/utf8-text'
 import { normalizeWorkspaceActions } from '../../src/utils/workspace-actions'
 import { getSettings } from './settings'
 import {
@@ -1292,7 +1293,7 @@ async function streamAgentTurn(
   const response = await fetch(url, {
     method: 'POST',
     headers,
-    body: JSON.stringify(body),
+    body: jsonStringifyUtf8Safe(body),
     signal
   })
 

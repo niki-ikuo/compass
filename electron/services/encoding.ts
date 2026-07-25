@@ -1,5 +1,6 @@
 import iconv from 'iconv-lite'
 import { t } from '../../src/i18n/runtime'
+import { sanitizeUtf8Text } from '../../src/utils/utf8-text'
 
 export type FileEncoding =
   | 'utf8'
@@ -204,7 +205,7 @@ export function detectEncoding(buffer: Buffer): FileEncoding {
 export function decodeFileBuffer(buffer: Buffer, encoding?: FileEncoding): DecodedFile {
   const resolved = encoding ?? detectEncoding(buffer)
   return {
-    content: decodeBuffer(buffer, resolved),
+    content: sanitizeUtf8Text(decodeBuffer(buffer, resolved)),
     encoding: resolved
   }
 }

@@ -30,6 +30,7 @@ import { ensureProjectIndex, getProjectIndexContext } from './project-indexer'
 import { resolveChatContext, isInsideWorkspace } from './filesystem'
 import { getLlmProvider, getProviderLabel } from '../../src/utils/llm-providers'
 import { withOpenWebUiChatCompat } from '../../src/utils/open-webui-compat'
+import { jsonStringifyUtf8Safe } from '../../src/utils/utf8-text'
 
 export type { ChatContentPart, ChatImageAttachment, UserMessagePayload }
 export { toApiUserContent }
@@ -486,7 +487,7 @@ export async function completeInline(
       fetch(url, {
         method: 'POST',
         headers: buildApiHeaders(settings),
-        body: JSON.stringify(withOpenWebUiChatCompat(payload, settings.apiBaseUrl)),
+        body: jsonStringifyUtf8Safe(withOpenWebUiChatCompat(payload, settings.apiBaseUrl)),
         signal
       })
 
@@ -624,7 +625,7 @@ export async function streamChat(
     const response = await fetch(url, {
       method: 'POST',
       headers: buildApiHeaders(settings),
-      body: JSON.stringify(
+      body: jsonStringifyUtf8Safe(
         withOpenWebUiChatCompat(
           {
             model: settings.model,

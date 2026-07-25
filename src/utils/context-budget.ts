@@ -1,3 +1,5 @@
+import { sanitizeUtf8Text, sliceUtf16Safe } from './utf8-text'
+
 /**
  * Soft context-window management for chat / Agent API requests.
  * Uses a conservative chars÷3 estimate so CJK + code rarely under-count.
@@ -34,10 +36,10 @@ export function truncateToTokenBudget(
   notice = '\n…(truncated to fit context budget)'
 ): string {
   if (maxTokens <= 0) return notice.trim()
-  if (estimateTokens(text) <= maxTokens) return text
+  if (estimateTokens(text) <= maxTokens) return sanitizeUtf8Text(text)
   const maxChars = tokensToChars(maxTokens)
-  if (notice.length >= maxChars) return notice.slice(0, maxChars)
-  return `${text.slice(0, maxChars - notice.length)}${notice}`
+  if (notice.length >= maxChars) return sanitizeUtf8Text(sliceUtf16Safe(notice, 0, maxChars))
+  return sanitizeUtf8Text(`${sliceUtf16Safe(text, 0, maxChars - notice.length)}${notice}`)
 }
 
 /** Prefer keeping the end (user question / latest content). */
@@ -47,11 +49,12 @@ export function truncateKeepingEnd(
   notice = '…(earlier context omitted to fit budget)\n'
 ): string {
   if (maxTokens <= 0) return notice.trim()
-  if (estimateTokens(text) <= maxTokens) return text
+  if (estimateTokens(text) <= maxTokens) return sanitizeUtf8Text(text)
   const maxChars = tokensToChars(maxTokens)
-  if (notice.length >= maxChars) return notice.slice(0, maxChars)
+  if (notice.length >= maxChars) return sanitizeUtf8Text(sliceUtf16Safe(notice, 0, maxChars))
   const bodyChars = maxChars - notice.length
-  return `${notice}${text.slice(Math.max(0, text.length - bodyChars))}`
+  const start = Math.max(0, text.length - bodyChars)
+  return sanitizeUtf8Text(`${notice}${sliceUtf16Safe(text, start)}`)
 }
 
 export interface HistoryMessageLike {

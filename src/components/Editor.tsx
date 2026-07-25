@@ -16,7 +16,7 @@ import { MediaViewer } from './MediaViewer'
 import { BrowserViewer } from './BrowserViewer'
 import { SettingsPanel } from './SettingsDialog'
 import { isMediaOpenFile } from '@/utils/media-context'
-import { isBrowserOpenFile } from '@/utils/browser-tab'
+import { isBrowserOpenFile, pathToFileUrl } from '@/utils/browser-tab'
 import { isSettingsOpenFile } from '@/utils/settings-tab'
 import { buildWorkspaceIndex } from '@/utils/project-index'
 import {
@@ -38,6 +38,8 @@ const editorOptionsBase: editor.IStandaloneEditorConstructionOptions = {
   tabSize: 2,
   renderWhitespace: 'selection',
   bracketPairColorization: { enabled: true },
+  // Electron の window.confirm 後に contentEditable（チャット入力）が死ぬため、確認ダイアログは出さない
+  unusualLineTerminators: 'auto',
   // Ctrl+wheel はアプリ全体ズームへ（App の capture listener）。Monaco フォントズームは使わない。
   mouseWheelZoom: false,
   scrollbar: {
@@ -550,6 +552,8 @@ export function CodeEditor() {
             language={activeFile.language}
             original={activeFile.previewOriginal ?? ''}
             modified={activeFile.content}
+            originalModelPath={`${pathToFileUrl(activeFile.path)}.original`}
+            modifiedModelPath={pathToFileUrl(activeFile.path)}
             theme={monacoTheme}
             options={{
               ...mergedEditorOptions,
@@ -617,6 +621,7 @@ export function CodeEditor() {
           <div className={`editor-pane ${markdownViewMode === 'split' ? 'half' : 'full'}`}>
             <Editor
               height="100%"
+              path={pathToFileUrl(activeFile.path)}
               language={activeFile.language}
               value={activeFile.content}
               theme={monacoTheme}
