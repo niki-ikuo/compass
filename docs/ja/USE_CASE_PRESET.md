@@ -81,7 +81,7 @@ UI でも同じドロップダウンに同居させない。
 - Ask / Edit / Agent のルーティング
 - `compass-actions` / `proposeActions` の形式
 - Agent ツール一覧
-- `verify` の中身（test / lint / typecheck のまま）※後段で用途別化
+- **code** の `verify` 中身（test / lint / typecheck）。document/data の light verify（見出し / リンク / 用語 / スキーマ）は出荷済み
 - 索引生成ロジック本体（見出し索引は別タスク）
 - `temperature` / `maxTokens`（グローバルのまま）
 

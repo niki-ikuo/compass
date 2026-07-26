@@ -230,9 +230,10 @@ Agent:
 ### Phase 3 — 任意／やらなくてよいものも含む
 
 - ~~フルの履歴タイムライン UI~~（実装済み: メッセージ紐づけ・連鎖 Undo・要約保存）
+- ~~Template Manager への同基盤適用~~（実装済み: `source: 'template-manager'`）
 - git 自動 stash 連携
-- Template Manager への同基盤適用
 - 設定画面での保持件数・サイズ
+- Agent `exec` の副作用（対象外 — シェル書き込みは Change Set にならない）
 
 ---
 

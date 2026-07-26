@@ -115,7 +115,7 @@ Renderer からは `window.compass.*` を呼び出します。実装の正は `e
 | `rules.md` | 人が編集するワークスペースルール（Ask / Edit / Agent に自動添付） |
 | `glossary.md` | 任意の用語集（文書 verify + AI コンテキスト） |
 
-チャット時に構造索引の関連部分と、ハイブリッド検索の Related workspace excerpts、および `.compass/rules.md`（と任意の glossary）をコンテキストへ載せる。埋め込みはローカル（モデルダウンロードなしのハッシュ埋め込み）で、Ask/Agent の回答自体はオンライン LLM を使う。
+チャット時に構造索引の関連部分と、ハイブリッド検索の Related workspace excerpts、および `.compass/rules.md`（と任意の glossary）をコンテキストへ載せる。埋め込みは既定でローカルハッシュ（モデルダウンロードなし）。Settings で OpenAI 互換 `/embeddings` に切替可能（失敗時はハッシュへフォールバック）。Ask/Agent の回答自体はオンライン LLM を使う。
 
 ## マルチ LLM
 

@@ -7,15 +7,17 @@ import {
 } from './extractable-document'
 
 describe('extractable-document', () => {
-  it('detects pdf and docx only', () => {
+  it('detects pdf, docx, and xlsx', () => {
     expect(isExtractableDocumentPath('a/report.PDF')).toBe(true)
     expect(isDocxPath('notes.DOCX')).toBe(true)
     expect(isExtractableDocumentPath('notes.docx')).toBe(true)
+    expect(isExtractableDocumentPath('sheet.xlsx')).toBe(true)
     expect(isExtractableDocumentPath('legacy.doc')).toBe(false)
-    expect(isExtractableDocumentPath('sheet.xlsx')).toBe(false)
+    expect(isExtractableDocumentPath('deck.pptx')).toBe(false)
     expect(isExtractableDocumentPath('photo.png')).toBe(false)
     expect(getExtractableDocumentKind('x.pdf')).toBe('pdf')
     expect(getExtractableDocumentKind('x.docx')).toBe('docx')
+    expect(getExtractableDocumentKind('x.xlsx')).toBe('xlsx')
     expect(getExtractableDocumentKind('x.txt')).toBeNull()
   })
 

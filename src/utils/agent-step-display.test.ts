@@ -24,6 +24,9 @@ describe('getAgentToolLabelKey / formatAgentToolLabel', () => {
     expect(getAgentToolLabelKey('proposeActions')).toBe('chat.agentToolName.proposeActions')
     expect(getAgentToolLabelKey('mysteryTool')).toBeNull()
     expect(formatAgentToolLabel('search', (key) => key)).toBe('chat.agentToolName.search')
+    expect(formatAgentToolLabel('searchMeaning', (key) => key)).toBe(
+      'chat.agentToolName.searchMeaning'
+    )
     expect(formatAgentToolLabel('mysteryTool', (key) => key)).toBe('mysteryTool')
   })
 })

@@ -8,6 +8,7 @@ export type AgentToolLabelKey =
   | 'chat.agentToolName.readFile'
   | 'chat.agentToolName.listDir'
   | 'chat.agentToolName.search'
+  | 'chat.agentToolName.searchMeaning'
   | 'chat.agentToolName.proposeActions'
   | 'chat.agentToolName.exec'
   | 'chat.agentToolName.verify'
@@ -21,6 +22,7 @@ const AGENT_TOOL_LABEL_KEYS: Record<AgentToolName, AgentToolLabelKey> = {
   readFile: 'chat.agentToolName.readFile',
   listDir: 'chat.agentToolName.listDir',
   search: 'chat.agentToolName.search',
+  searchMeaning: 'chat.agentToolName.searchMeaning',
   proposeActions: 'chat.agentToolName.proposeActions',
   exec: 'chat.agentToolName.exec',
   verify: 'chat.agentToolName.verify',

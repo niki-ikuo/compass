@@ -99,6 +99,7 @@ function getLanguage(ext: string): string {
     txt: 'text',
     pdf: 'pdf',
     docx: 'docx',
+    xlsx: 'xlsx',
     vb: 'vb',
     vbs: 'vb',
     bas: 'vb',
@@ -425,7 +426,8 @@ export function buildSummary(files: IndexedFile[], edges: GraphEdge[]): string {
       (f) =>
         (f.language === 'markdown' &&
           ((f.headings && f.headings.length > 0) || Boolean(f.summary))) ||
-        ((f.language === 'pdf' || f.language === 'docx') && Boolean(f.summary))
+        ((f.language === 'pdf' || f.language === 'docx' || f.language === 'xlsx') &&
+          Boolean(f.summary))
     )
     .sort((a, b) => documentScore(b) - documentScore(a) || a.path.localeCompare(b.path))
 
@@ -434,7 +436,9 @@ export function buildSummary(files: IndexedFile[], edges: GraphEdge[]): string {
     for (const file of documents.slice(0, 40)) {
       const brief = formatDocumentBrief(file, 10)
       const kindLabel =
-        file.language === 'pdf' || file.language === 'docx' ? `, ${file.language}` : ''
+        file.language === 'pdf' || file.language === 'docx' || file.language === 'xlsx'
+          ? `, ${file.language}`
+          : ''
       lines.push(
         `- ${file.path} (${t('ai.indexLines', { count: file.lines })}${kindLabel})` +
           (brief ? ` | ${brief}` : '')
@@ -772,7 +776,7 @@ async function runBuildProjectIndex(
         if (headings.length > 0) entry.headings = headings
         if (summary) entry.summary = summary
         if (docLinks.length > 0) entry.docLinks = docLinks
-      } else if (language === 'pdf' || language === 'docx') {
+      } else if (language === 'pdf' || language === 'docx' || language === 'xlsx') {
         const summary = extractMarkdownSummary(content, 200)
         if (summary) entry.summary = summary
       }

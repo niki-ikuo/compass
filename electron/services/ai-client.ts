@@ -83,10 +83,12 @@ function appendResolvedFile(
       ? t('ai.pdfHeading', { path: file.relativePath })
       : file.kind === 'docx'
         ? t('ai.docxHeading', { path: file.relativePath })
-        : t('ai.fileHeading', { path: file.relativePath })
+        : file.kind === 'xlsx'
+          ? t('ai.xlsxHeading', { path: file.relativePath })
+          : t('ai.fileHeading', { path: file.relativePath })
   parts.push(`${heading}${file.truncated ? ' (truncated)' : ''}`)
   const fence =
-    file.kind === 'pdf' || file.kind === 'docx'
+    file.kind === 'pdf' || file.kind === 'docx' || file.kind === 'xlsx'
       ? 'text'
       : (file.relativePath.split('.').pop() ?? '')
   parts.push('```' + fence)

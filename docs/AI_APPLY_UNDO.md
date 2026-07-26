@@ -230,9 +230,10 @@ Agent:
 ### Phase 3 — optional / maybe never
 
 - ~~Full project timeline UI~~ (shipped: message linking, cascade undo, summary save)
+- ~~Same machinery for Template Manager~~ (shipped: `source: 'template-manager'`)
 - git auto-stash integration
-- Same machinery for Template Manager
 - Retention / size settings in Preferences
+- Agent `exec` side effects (out of scope — shell writes are not Change Sets)
 
 ---
 

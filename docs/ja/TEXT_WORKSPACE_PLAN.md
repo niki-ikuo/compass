@@ -57,14 +57,14 @@ v2.0 以降の実装順。対象は **ローカルのあらゆるテキスト**�
 バイナリはアプリ内編集しない。テキストとして使えるようにする。
 
 - [x] PDF テキストを (1) の索引へ入れる
-- [x] 抽出が安定する Office（まず `.docx`。無理な形式はスキップ）
+- [x] 抽出が安定する Office（`.docx` + `.xlsx`。無理な形式はスキップ）
 - [x] 抽出テキストの検索 / @メンション
 - [x] 「Markdown に要約」→ プレビュー → 適用（サイドカーまたは新規ファイル）
 - [x] 本物の編集は「既定アプリで開く」のまま
 
-**完了:** PDF + Markdown フォルダをコピペなしで質問・要約できる。
+**完了:** PDF + Markdown（+ 表計算テキスト）フォルダをコピペなしで質問・要約できる。
 
-**主な変更箇所:** `extractable-document.ts` / `docx-text.ts`、`project-indexer`、chat 文脈・Agent `readFile`・keyword 検索、Explorer / PDF ビューアの「Markdown に要約」。
+**主な変更箇所:** `extractable-document.ts` / `docx-text.ts` / `xlsx-text.ts`、`project-indexer`、chat 文脈・Agent `readFile`・keyword 検索、Explorer / PDF ビューアの「Markdown に要約」。
 
 **依存:** (1)。
 
@@ -118,6 +118,8 @@ v2.0 以降の実装順。対象は **ローカルのあらゆるテキスト**�
 | 最小の Git diff/commit UI | 4 だけでは足りないと分かったときだけ |
 | Anthropic ネイティブ API | OpenAI 互換が実ユーザーを止めるとき |
 | macOS / Linux | Windows のテキストループが固まってから |
+| `.pptx` / 古い `.doc` 抽出 | PDF/docx/xlsx のあと需要があれば |
+| オフライン神経埋め込みモデル | API + ハッシュでも足りないとき |
 
 ---
 

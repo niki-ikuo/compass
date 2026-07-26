@@ -1,7 +1,22 @@
 import { mkdtemp, mkdir, readFile, writeFile } from 'fs/promises'
 import { tmpdir } from 'os'
 import { join } from 'path'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+import { DEFAULT_SETTINGS } from '../../src/types'
+
+vi.mock('electron', () => ({
+  app: { getPath: () => tmpdir() },
+  safeStorage: {
+    isEncryptionAvailable: () => false,
+    encryptString: (value: string) => Buffer.from(value, 'utf-8'),
+    decryptString: (buffer: Buffer) => buffer.toString('utf-8')
+  }
+}))
+
+vi.mock('./settings', () => ({
+  getSettings: async () => ({ ...DEFAULT_SETTINGS, embeddingsMode: 'hash' as const })
+}))
+
 import { formatMeaningExcerptsForAi, searchSemanticWorkspace, writeSemanticIndex } from './semantic-index'
 
 async function makeWorkspace(): Promise<string> {

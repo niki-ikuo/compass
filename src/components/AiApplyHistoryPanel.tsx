@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import type { WorkspaceChangeSetSummary } from '@/types'
+import { TEMPLATE_MANAGER_UNDO_CHAT_ID, type WorkspaceChangeSetSummary } from '@/types'
 import { useAppStore } from '@/stores/app-store'
 import { buildWorkspaceIndex } from '@/utils/project-index'
 import { openWorkspaceFile } from '@/utils/open-workspace-file'
@@ -47,8 +47,13 @@ export function AiApplyHistoryPanel({ open, onClose }: AiApplyHistoryPanelProps)
   }, [open, refreshAiApplyHistory])
 
   const chatTitle = useCallback(
-    (chatId: string) => chatSessions.find((session) => session.id === chatId)?.title ?? chatId,
-    [chatSessions]
+    (chatId: string, source?: WorkspaceChangeSetSummary['source']) => {
+      if (source === 'template-manager' || chatId === TEMPLATE_MANAGER_UNDO_CHAT_ID) {
+        return t('undo.sourceTemplateManager')
+      }
+      return chatSessions.find((session) => session.id === chatId)?.title ?? chatId
+    },
+    [chatSessions, t]
   )
 
   const confirmItem = useMemo(
@@ -87,7 +92,7 @@ export function AiApplyHistoryPanel({ open, onClose }: AiApplyHistoryPanelProps)
       setSavingId(item.id)
       try {
         const markdown = buildApplySummaryMarkdown(item, {
-          chatTitle: chatTitle(item.chatId),
+          chatTitle: chatTitle(item.chatId, item.source),
           messagePreview: messagePreviewFor(chatSessions, item.chatId, item.messageId)
         })
         const relative = `.compass/apply-summaries/${buildApplySummaryFileName(item.id, item.createdAt)}`
@@ -148,8 +153,11 @@ export function AiApplyHistoryPanel({ open, onClose }: AiApplyHistoryPanelProps)
                                 ? t('undo.statusUndone')
                                 : t('undo.statusStale')}
                           </span>
-                          <span className="ai-apply-history-chat" title={chatTitle(item.chatId)}>
-                            {chatTitle(item.chatId)}
+                          <span
+                            className="ai-apply-history-chat"
+                            title={chatTitle(item.chatId, item.source)}
+                          >
+                            {chatTitle(item.chatId, item.source)}
                           </span>
                           <span className="ai-apply-history-time">
                             {new Date(item.createdAt).toLocaleString()}

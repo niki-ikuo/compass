@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { TEMPLATE_MANAGER_UNDO_CHAT_ID } from '@/types'
 import { useI18n } from '@/i18n'
 import {
   buildSaveTemplateActions,
@@ -182,7 +183,12 @@ export function TemplateManagerDialog({
         }))
       )
       const actions = buildSaveTemplateActions(normalized, previousWorkspaceIds)
-      await window.compass.fs.applyActions(workspaceRoot, actions)
+      await window.compass.fs.applyActions(workspaceRoot, actions, {
+        undo: {
+          chatId: TEMPLATE_MANAGER_UNDO_CHAT_ID,
+          source: 'template-manager'
+        }
+      })
       setDrafts(normalized)
       setPreviousWorkspaceIds(normalized.map((draft) => draft.id))
       setDirty(false)

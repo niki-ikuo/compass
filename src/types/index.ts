@@ -70,8 +70,8 @@ export interface ChatSelectionRef {
   text: string
 }
 
-/** チャット参照の解決結果種別（テキスト / PDF・docx 抽出 / 画像） */
-export type ResolvedContextKind = 'text' | 'pdf' | 'docx' | 'image'
+/** チャット参照の解決結果種別（テキスト / PDF・docx・xlsx 抽出 / 画像） */
+export type ResolvedContextKind = 'text' | 'pdf' | 'docx' | 'xlsx' | 'image'
 
 export interface ResolvedContextFile {
   relativePath: string
@@ -117,6 +117,7 @@ export type AgentToolName =
   | 'readFile'
   | 'listDir'
   | 'search'
+  | 'searchMeaning'
   | 'proposeActions'
   | 'exec'
   | 'verify'
@@ -125,6 +126,15 @@ export type AgentToolName =
   | 'updateTodo'
   | 'checkpoint'
   | 'remember'
+
+/** How workspace meaning search embeds text. */
+export type EmbeddingsMode = 'hash' | 'api'
+
+/** Undo / apply history origin. */
+export type WorkspaceChangeSource = 'preview-all' | 'preview-file' | 'template-manager'
+
+/** Synthetic chatId for Template Manager undo history entries. */
+export const TEMPLATE_MANAGER_UNDO_CHAT_ID = 'templates'
 
 export type AgentToolStepStatus =
   | 'running'
@@ -330,6 +340,13 @@ export interface AppSettings {
    * false のときは設定画面の値のみ。
    */
   rememberLastUseCasePreset: boolean
+  /**
+   * Workspace meaning search embeddings.
+   * `hash` = offline feature-hash (default). `api` = OpenAI-compatible `/embeddings`.
+   */
+  embeddingsMode: EmbeddingsMode
+  /** Embeddings model id when embeddingsMode is `api` (provider-specific). */
+  embeddingsModel: string
 }
 
 /** 永続化するエディタタブの種別（設定・プレビューは対象外） */
@@ -452,7 +469,7 @@ export interface WorkspaceChangeSet {
   /** Assistant message that produced the apply (timeline jump). */
   messageId?: string
   createdAt: number
-  source: 'preview-all' | 'preview-file'
+  source: WorkspaceChangeSource
   workspaceRoot: string
   entries: WorkspaceChangeEntry[]
   status: WorkspaceChangeSetStatus
@@ -462,7 +479,7 @@ export interface ApplyWorkspaceOptions {
   /** When set, record a Change Set so the apply can be undone. */
   undo?: {
     chatId: string
-    source: 'preview-all' | 'preview-file'
+    source: WorkspaceChangeSource
     /** Assistant message id to link in Apply history. */
     messageId?: string
   }
@@ -493,7 +510,7 @@ export interface WorkspaceChangeSetSummary {
   chatId: string
   messageId?: string
   createdAt: number
-  source: 'preview-all' | 'preview-file'
+  source: WorkspaceChangeSource
   entryCount: number
   status: WorkspaceChangeSetStatus
   /** Short path list for UI (capped). */
@@ -935,5 +952,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   autoOpenAgentPreview: true,
   defaultShellId: 'powershell',
   defaultUseCasePreset: 'general',
-  rememberLastUseCasePreset: true
+  rememberLastUseCasePreset: true,
+  embeddingsMode: 'hash',
+  embeddingsModel: ''
 }

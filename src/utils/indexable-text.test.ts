@@ -31,6 +31,11 @@ describe('isExcludedFromTextIndex / isTextIndexCandidatePath', () => {
     expect(isTextIndexCandidatePath('notes.DOCX')).toBe(true)
   })
 
+  it('includes extractable xlsx in the text index', () => {
+    expect(isExcludedFromTextIndex('sheet.xlsx')).toBe(false)
+    expect(isTextIndexCandidatePath('sheet.xlsx')).toBe(true)
+  })
+
   it('excludes binary, images, and non-extractable Office paths', () => {
     for (const path of [
       'app.exe',
@@ -38,7 +43,6 @@ describe('isExcludedFromTextIndex / isTextIndexCandidatePath', () => {
       'archive.zip',
       'font.woff2',
       'photo.png',
-      'sheet.xlsx',
       'legacy.doc',
       'deck.pptx'
     ]) {

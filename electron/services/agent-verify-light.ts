@@ -1,11 +1,12 @@
 import { readFile } from 'fs/promises'
-import { existsSync } from 'fs'
+import { existsSync, readFileSync } from 'fs'
 import { join } from 'path'
 import type { UseCasePreset } from '../../src/types'
 import { normalizeUseCasePreset, DEFAULT_SETTINGS } from '../../src/types'
 import {
   parseGlossaryMarkdown,
-  validateMarkdownDocument
+  validateMarkdownDocument,
+  type MarkdownHeadingIssue
 } from '../../src/utils/markdown-outline'
 import { verifyDataFile } from '../../src/utils/data-verify'
 import type { AgentVerifyCheckResult } from './agent-verify'
@@ -59,6 +60,58 @@ async function loadGlossaryTerms(workspaceRoot: string) {
   return parseGlossaryMarkdown(content)
 }
 
+function isHeadingIssue(issue: MarkdownHeadingIssue): boolean {
+  return (
+    issue.kind === 'broken_atx' ||
+    issue.kind === 'empty_heading' ||
+    issue.kind === 'level_jump' ||
+    issue.kind === 'duplicate_heading'
+  )
+}
+
+function isLinkIssue(issue: MarkdownHeadingIssue): boolean {
+  return (
+    issue.kind === 'broken_link' ||
+    issue.kind === 'broken_anchor' ||
+    issue.kind === 'broken_media'
+  )
+}
+
+function checkResult(
+  check: AgentVerifyCheckResult['check'],
+  issueLines: string[],
+  targetCount: number,
+  emptySummary: string,
+  okSummary: string,
+  failSummary: (n: number) => string
+): AgentVerifyCheckResult {
+  if (targetCount === 0) {
+    return {
+      check,
+      command: null,
+      source: 'missing',
+      skipped: true,
+      ok: true,
+      summary: emptySummary,
+      exitCode: null,
+      stdout: '',
+      stderr: ''
+    }
+  }
+  const ok = issueLines.length === 0
+  return {
+    check,
+    command: null,
+    source: 'fallback',
+    skipped: false,
+    ok,
+    summary: ok ? okSummary : failSummary(issueLines.length),
+    exitCode: ok ? 0 : 1,
+    stdout: ok ? `ok (${targetCount} file(s))` : issueLines.join('\n'),
+    stderr: ''
+  }
+}
+
 export async function runDocumentLightVerify(
   workspaceRoot: string,
   paths: string[] | undefined
@@ -66,54 +119,72 @@ export async function runDocumentLightVerify(
   const targets = normalizeRelativePaths(paths).filter(isMarkdownPath)
   if (targets.length === 0) {
     return [
-      {
-        check: 'headings',
-        command: null,
-        source: 'missing',
-        skipped: true,
-        ok: true,
-        summary: 'no markdown paths to check',
-        exitCode: null,
-        stdout: '',
-        stderr: ''
-      }
+      checkResult('headings', [], 0, 'no markdown paths to check', '', () => ''),
+      checkResult('links', [], 0, 'no markdown paths to check', '', () => ''),
+      checkResult('glossary', [], 0, 'no markdown paths to check', '', () => '')
     ]
   }
 
   const glossaryTerms = await loadGlossaryTerms(workspaceRoot)
-  const issueLines: string[] = []
+  const headingLines: string[] = []
+  const linkLines: string[] = []
+  const glossaryLines: string[] = []
+
   for (const rel of targets) {
     const content = await readWorkspaceFile(workspaceRoot, rel)
     if (content === null) {
-      issueLines.push(`${rel}: file not readable`)
+      headingLines.push(`${rel}: file not readable`)
       continue
     }
     const issues = validateMarkdownDocument(content, {
       relativePath: rel,
       fileExists: (workspaceRelativePath) =>
         existsSync(join(workspaceRoot, workspaceRelativePath)),
+      readFile: (workspaceRelativePath) => {
+        // Sync bridge for anchor checks across files (small docs only).
+        try {
+          const buffer = readFileSync(join(workspaceRoot, workspaceRelativePath))
+          return decodeFileBuffer(buffer).content
+        } catch {
+          return null
+        }
+      },
       glossaryTerms
     })
     for (const issue of issues) {
-      issueLines.push(`${rel}:L${issue.line} ${issue.message}`)
+      const line = `${rel}:L${issue.line} ${issue.message}`
+      if (isHeadingIssue(issue)) headingLines.push(line)
+      else if (isLinkIssue(issue)) linkLines.push(line)
+      else if (issue.kind === 'term_mismatch') glossaryLines.push(line)
+      else headingLines.push(line)
     }
   }
 
-  const ok = issueLines.length === 0
   return [
-    {
-      check: 'headings',
-      command: null,
-      source: 'fallback',
-      skipped: false,
-      ok,
-      summary: ok
-        ? `document ok (${targets.length} file(s))`
-        : `document failed (${issueLines.length} issue(s))`,
-      exitCode: ok ? 0 : 1,
-      stdout: ok ? targets.map((p) => `ok ${p}`).join('\n') : issueLines.join('\n'),
-      stderr: ''
-    }
+    checkResult(
+      'headings',
+      headingLines,
+      targets.length,
+      'no markdown paths to check',
+      `headings ok (${targets.length} file(s))`,
+      (n) => `headings failed (${n} issue(s))`
+    ),
+    checkResult(
+      'links',
+      linkLines,
+      targets.length,
+      'no markdown paths to check',
+      `links ok (${targets.length} file(s))`,
+      (n) => `links failed (${n} issue(s))`
+    ),
+    checkResult(
+      'glossary',
+      glossaryLines,
+      glossaryTerms.length === 0 ? 0 : targets.length,
+      glossaryTerms.length === 0 ? 'no glossary.md; skipped' : 'no markdown paths to check',
+      `glossary ok (${targets.length} file(s))`,
+      (n) => `glossary failed (${n} issue(s))`
+    )
   ]
 }
 

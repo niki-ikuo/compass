@@ -15,9 +15,10 @@ describe('isSourcePath (text-index policy)', () => {
     expect(isSourcePath('rows.csv')).toBe(true)
   })
 
-  it('includes extractable PDF / docx', () => {
+  it('includes extractable PDF / docx / xlsx', () => {
     expect(isSourcePath('docs/spec.pdf')).toBe(true)
     expect(isSourcePath('notes/memo.docx')).toBe(true)
+    expect(isSourcePath('sheets/data.xlsx')).toBe(true)
   })
 
   it('excludes binary / images / non-extractable Office and ignored trees', () => {
@@ -25,7 +26,7 @@ describe('isSourcePath (text-index policy)', () => {
     expect(isSourcePath('node_modules/x/index.js')).toBe(false)
     expect(isSourcePath('bin/tool.exe')).toBe(false)
     expect(isSourcePath('assets/photo.png')).toBe(false)
-    expect(isSourcePath('sheets/data.xlsx')).toBe(false)
+    expect(isSourcePath('deck.pptx')).toBe(false)
     expect(isSourcePath('legacy.doc')).toBe(false)
   })
 })

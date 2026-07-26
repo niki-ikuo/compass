@@ -57,14 +57,14 @@ Make `document` the strongest use case.
 Do not edit binaries in-app. Make them usable as text.
 
 - [x] Extract PDF text into the index from step 1
-- [x] Extract Office text where reliable (`.docx` first; skip hard formats)
+- [x] Extract Office text where reliable (`.docx` + `.xlsx`; skip hard formats)
 - [x] @-mention / search hits on extracted text
 - [x] Action: “Summarize to Markdown” → preview → apply (sidecar or new file)
 - [x] Keep “Open with default app” for real editing
 
-**Done:** PDF + Markdown folder can be asked and summarized with no copy-paste.
+**Done:** PDF + Markdown (+ spreadsheet text) folder can be asked and summarized with no copy-paste.
 
-**Touch:** `extractable-document.ts` / `docx-text.ts`, `project-indexer`, chat context / Agent `readFile` / keyword search, Explorer + PDF viewer “Summarize to Markdown”.
+**Touch:** `extractable-document.ts` / `docx-text.ts` / `xlsx-text.ts`, `project-indexer`, chat context / Agent `readFile` / keyword search, Explorer + PDF viewer “Summarize to Markdown”.
 
 **Depends on:** (1).
 
@@ -118,6 +118,8 @@ Build on shipped Change Sets ([AI_APPLY_UNDO.md](./AI_APPLY_UNDO.md)).
 | Minimal Git diff/commit UI | Only if 4 is not enough |
 | Native Anthropic API | If OpenAI-compat blocks real users |
 | macOS / Linux | After Windows text loop is solid |
+| `.pptx` / legacy `.doc` extraction | Only if users hit the gap after PDF/docx/xlsx |
+| Stronger local neural embeddings (offline model) | If API embeddings + hash still underdeliver |
 
 ---
 

@@ -73,6 +73,8 @@ export type MarkdownHeadingIssueKind =
   | 'level_jump'
   | 'duplicate_heading'
   | 'broken_link'
+  | 'broken_anchor'
+  | 'broken_media'
   | 'term_mismatch'
 
 export interface GlossaryTerm {
@@ -93,6 +95,11 @@ const DOC_LINK_EXT = /\.(md|markdown|mdx)$/i
 
 /** `](href "title")` / `<href>` からリンク先パスだけ取り出す。 */
 export function stripMarkdownHref(raw: string): string {
+  return parseMarkdownHref(raw).path
+}
+
+/** Split a markdown href into workspace-relative path + optional heading fragment. */
+export function parseMarkdownHref(raw: string): { path: string; hash: string } {
   let target = raw.trim()
   if (target.startsWith('<') && target.endsWith('>')) {
     target = target.slice(1, -1).trim()
@@ -100,9 +107,21 @@ export function stripMarkdownHref(raw: string): string {
   const titled = target.match(/^(\S+)(?:\s+("|').*\2)?$/)
   if (titled) target = titled[1]
   const hashIdx = target.indexOf('#')
-  if (hashIdx === 0) return ''
-  if (hashIdx > 0) target = target.slice(0, hashIdx)
-  return target.trim()
+  if (hashIdx < 0) return { path: target.trim(), hash: '' }
+  if (hashIdx === 0) return { path: '', hash: target.slice(1).trim() }
+  return {
+    path: target.slice(0, hashIdx).trim(),
+    hash: target.slice(hashIdx + 1).trim()
+  }
+}
+
+/** GitHub-ish heading slug for `#anchor` checks (ASCII + CJK kept). */
+export function markdownHeadingSlug(text: string): string {
+  return text
+    .trim()
+    .toLowerCase()
+    .replace(/[^\w\u3040-\u30ff\u3400-\u9fff\uf900-\ufaff\s-]/g, '')
+    .replace(/\s+/g, '-')
 }
 
 /**
@@ -308,6 +327,113 @@ export function findBrokenMarkdownDocLinks(
   return issues
 }
 
+/**
+ * `#heading` / `file.md#heading` のアンカーが文書内見出しに存在するか。
+ * 同一ファイル向けには `headings` を使い、他ファイルは `readFile` で読む。
+ */
+export function findBrokenMarkdownAnchors(
+  text: string,
+  fromFile: string,
+  options: {
+    headings?: MarkdownHeading[]
+    readFile?: (workspaceRelativePath: string) => string | null
+    fileExists?: (workspaceRelativePath: string) => boolean
+  } = {}
+): MarkdownHeadingIssue[] {
+  const issues: MarkdownHeadingIssue[] = []
+  const localHeadings = options.headings ?? parseMarkdownHeadings(text)
+  const localSlugs = new Set(localHeadings.map((h) => markdownHeadingSlug(h.text)))
+  const lines = text.split('\n')
+  let inFence = false
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]
+    if (/^(`{3,}|~{3,})/.test(line)) {
+      inFence = !inFence
+      continue
+    }
+    if (inFence) continue
+
+    MD_LINK.lastIndex = 0
+    let match: RegExpExecArray | null
+    while ((match = MD_LINK.exec(line)) !== null) {
+      if (match[1] === '!') continue
+      const parsed = parseMarkdownHref(match[3])
+      if (!parsed.hash) continue
+
+      if (!parsed.path) {
+        if (!localSlugs.has(markdownHeadingSlug(decodeURIComponent(parsed.hash)))) {
+          issues.push({
+            kind: 'broken_anchor',
+            line: i + 1,
+            message: `Broken heading anchor "#${parsed.hash}"`
+          })
+        }
+        continue
+      }
+
+      const resolved = resolveMarkdownLink(fromFile, match[3])
+      if (!resolved || !DOC_LINK_EXT.test(resolved)) continue
+      if (options.fileExists && !options.fileExists(resolved)) continue
+
+      let targetSlugs = localSlugs
+      if (resolved !== fromFile.replace(/\\/g, '/')) {
+        if (!options.readFile) continue
+        const content = options.readFile(resolved)
+        if (content === null) continue
+        targetSlugs = new Set(
+          parseMarkdownHeadings(content).map((h) => markdownHeadingSlug(h.text))
+        )
+      }
+      if (!targetSlugs.has(markdownHeadingSlug(decodeURIComponent(parsed.hash)))) {
+        issues.push({
+          kind: 'broken_anchor',
+          line: i + 1,
+          message: `Broken heading anchor "${parsed.path}#${parsed.hash}"`
+        })
+      }
+    }
+  }
+  return issues
+}
+
+/** 相対画像パス `![](…)` の存在確認。 */
+export function findBrokenMarkdownMediaLinks(
+  text: string,
+  fromFile: string,
+  exists?: (workspaceRelativePath: string) => boolean
+): MarkdownHeadingIssue[] {
+  if (!exists) return []
+  const issues: MarkdownHeadingIssue[] = []
+  const lines = text.split('\n')
+  let inFence = false
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]
+    if (/^(`{3,}|~{3,})/.test(line)) {
+      inFence = !inFence
+      continue
+    }
+    if (inFence) continue
+
+    MD_LINK.lastIndex = 0
+    let match: RegExpExecArray | null
+    while ((match = MD_LINK.exec(line)) !== null) {
+      if (match[1] !== '!') continue
+      const href = match[3]
+      const resolved = resolveMarkdownLink(fromFile, href)
+      if (!resolved) continue
+      if (exists(resolved)) continue
+      issues.push({
+        kind: 'broken_media',
+        line: i + 1,
+        message: `Broken media link "${stripMarkdownHref(href)}" → ${resolved}`
+      })
+    }
+  }
+  return issues
+}
+
 /** 壊れた ATX（#直後に空白なし）や空見出しを検出。フェンス内は無視。 */
 export function findBrokenAtxHeadings(text: string): MarkdownHeadingIssue[] {
   const issues: MarkdownHeadingIssue[] = []
@@ -366,6 +492,8 @@ export interface ValidateMarkdownDocumentOptions {
   relativePath?: string
   /** ワークスペース相対パスの存在確認。未指定ならリンク検査なし */
   fileExists?: (workspaceRelativePath: string) => boolean
+  /** 他 Markdown の見出しアンカー検証用。未指定なら他ファイルの #fragment はスキップ */
+  readFile?: (workspaceRelativePath: string) => string | null
   /** 用語集。未指定なら用語検査なし */
   glossaryTerms?: GlossaryTerm[]
 }
@@ -465,7 +593,7 @@ export function findTermIssues(text: string, terms: GlossaryTerm[]): MarkdownHea
   return issues
 }
 
-/** 文書向け verify: 壊れた ATX・階層ジャンプ・重複見出し・（任意）壊れた相対 doc リンク・用語。 */
+/** 文書向け verify: 壊れた ATX・階層ジャンプ・重複見出し・（任意）壊れた相対 doc/画像リンク・アンカー・用語。 */
 export function validateMarkdownDocument(
   text: string,
   options: ValidateMarkdownDocumentOptions = {}
@@ -476,9 +604,19 @@ export function validateMarkdownDocument(
     ...validateMarkdownHeadingStructure(headings),
     ...findDuplicateHeadings(headings)
   ]
-  if (options.relativePath && options.fileExists) {
+  if (options.relativePath) {
+    if (options.fileExists) {
+      issues.push(
+        ...findBrokenMarkdownDocLinks(text, options.relativePath, options.fileExists),
+        ...findBrokenMarkdownMediaLinks(text, options.relativePath, options.fileExists)
+      )
+    }
     issues.push(
-      ...findBrokenMarkdownDocLinks(text, options.relativePath, options.fileExists)
+      ...findBrokenMarkdownAnchors(text, options.relativePath, {
+        headings,
+        readFile: options.readFile,
+        fileExists: options.fileExists
+      })
     )
   }
   if (options.glossaryTerms && options.glossaryTerms.length > 0) {

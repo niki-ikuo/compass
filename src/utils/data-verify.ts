@@ -91,6 +91,13 @@ export function verifyCsvContent(content: string, delimiter = ','): DataVerifyIs
   }
 
   const issues: DataVerifyIssue[] = []
+  for (let c = 0; c < headerCols.length; c++) {
+    if (!stripCsvQuotes(headerCols[c]).trim()) {
+      issues.push({ message: `${label} header column ${c + 1} is empty` })
+      if (issues.length >= 20) return issues
+    }
+  }
+
   const bodyRows: string[][] = []
   for (let i = 1; i < dataLines.length; i++) {
     const cols = splitDelimitedLine(dataLines[i], delimiter)

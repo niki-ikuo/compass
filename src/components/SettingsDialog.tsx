@@ -1,6 +1,13 @@
 import { useState, useEffect, useRef } from 'react'
 import { useAppStore } from '@/stores/app-store'
-import type { AppSettings, ColorThemeId, LlmProviderId, TerminalShell, UseCasePreset } from '@/types'
+import type {
+  AppSettings,
+  ColorThemeId,
+  EmbeddingsMode,
+  LlmProviderId,
+  TerminalShell,
+  UseCasePreset
+} from '@/types'
 import { DEFAULT_SETTINGS, normalizeUseCasePreset } from '@/types'
 import { COLOR_THEMES, getColorThemeLabel } from '@/utils/color-theme'
 import {
@@ -72,7 +79,9 @@ function buildSettingsSnapshot(
     defaultUseCasePreset:
       normalizeUseCasePreset(settings.defaultUseCasePreset) ??
       DEFAULT_SETTINGS.defaultUseCasePreset,
-    rememberLastUseCasePreset: settings.rememberLastUseCasePreset === true
+    rememberLastUseCasePreset: settings.rememberLastUseCasePreset === true,
+    embeddingsMode: settings.embeddingsMode === 'api' ? 'api' : 'hash',
+    embeddingsModel: settings.embeddingsModel ?? ''
   }
   return {
     form,
@@ -505,6 +514,36 @@ export function SettingsPanel() {
                 <span className="field-hint">{t('settings.autoOpenAgentPreviewHint')}</span>
               </span>
             </label>
+
+            <label>
+              {t('settings.embeddingsMode')}
+              <select
+                value={form.embeddingsMode}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    embeddingsMode: (e.target.value === 'api' ? 'api' : 'hash') as EmbeddingsMode
+                  })
+                }
+              >
+                <option value="hash">{t('settings.embeddingsModeHash')}</option>
+                <option value="api">{t('settings.embeddingsModeApi')}</option>
+              </select>
+              <span className="field-hint">{t('settings.embeddingsModeHint')}</span>
+            </label>
+
+            {form.embeddingsMode === 'api' && (
+              <label>
+                {t('settings.embeddingsModel')}
+                <input
+                  type="text"
+                  value={form.embeddingsModel}
+                  onChange={(e) => setForm({ ...form, embeddingsModel: e.target.value })}
+                  placeholder="text-embedding-3-small"
+                />
+                <span className="field-hint">{t('settings.embeddingsModelHint')}</span>
+              </label>
+            )}
           </>
         )}
 

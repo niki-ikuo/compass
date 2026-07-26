@@ -6,7 +6,14 @@ import { normalizeUseCasePreset, DEFAULT_SETTINGS } from '../../src/types'
 import { runAgentExec, type AgentExecResult } from './agent-exec'
 import { runUseCaseLightVerify, shouldRunShellVerify } from './agent-verify-light'
 
-export type AgentVerifyCheck = 'test' | 'lint' | 'typecheck' | 'headings' | 'schema'
+export type AgentVerifyCheck =
+  | 'test'
+  | 'lint'
+  | 'typecheck'
+  | 'headings'
+  | 'links'
+  | 'glossary'
+  | 'schema'
 
 export type AgentVerifyCommandSource = 'script' | 'fallback' | 'missing'
 

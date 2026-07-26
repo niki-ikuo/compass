@@ -5,7 +5,7 @@ import { isImagePath } from './media-context'
 
 /**
  * テキスト索引 / RAG からパス段階で除外する（拡張子ベース）。
- * PDF / .docx は抽出テキストとして候補に含める。
+ * PDF / .docx / .xlsx は抽出テキストとして候補に含める。
  * 最終判定は内容のバイナリスニフ（抽出対象以外）と併用する。
  */
 export function isExcludedFromTextIndex(filePath: string): boolean {

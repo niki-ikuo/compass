@@ -54,6 +54,14 @@ export const ja = {
   'settings.rememberLastUseCasePreset': '最後に使った用途を覚える',
   'settings.rememberLastUseCasePresetHint':
     'オンにすると、送信成功時にデフォルトの用途をそのときの選択で更新します',
+  'settings.embeddingsMode': '意味検索の埋め込み',
+  'settings.embeddingsModeHash': 'ローカル（ハッシュ・オフライン）',
+  'settings.embeddingsModeApi': 'API（OpenAI 互換 /embeddings）',
+  'settings.embeddingsModeHint':
+    'API は同じプロバイダのキーを使います。失敗時はローカルへフォールバック。切替後は索引の再構築が必要です',
+  'settings.embeddingsModel': '埋め込みモデル',
+  'settings.embeddingsModelHint':
+    '空欄ならプロバイダ既定（例: OpenAI は text-embedding-3-small）',
   'settings.saveFailed': '保存に失敗しました',
   'settings.saved': '設定を保存しました',
 
@@ -360,6 +368,7 @@ export const ja = {
   'chat.agentToolName.readFile': 'ファイルを読む',
   'chat.agentToolName.listDir': 'フォルダを一覧',
   'chat.agentToolName.search': '検索',
+  'chat.agentToolName.searchMeaning': '意味検索',
   'chat.agentToolName.proposeActions': '変更を提案',
   'chat.agentToolName.exec': 'コマンドを実行',
   'chat.agentToolName.verify': '検証',
@@ -559,6 +568,7 @@ export const ja = {
   'undo.historyTitle': 'AI適用の履歴',
   'undo.historyEmpty': 'まだ適用履歴がありません',
   'undo.historyEntry': '{count} 件 — {paths}',
+  'undo.sourceTemplateManager': 'テンプレート管理',
   'undo.jumpToMessage': 'メッセージへ',
   'undo.saveSummary': '要約を保存',
   'undo.saveSummaryFailed': '要約の保存に失敗しました: {message}',
@@ -668,6 +678,9 @@ export const ja = {
   'ai.docxHeading': '## Word（抽出テキスト）: {path}',
   'ai.docxNoText':
     '（.docx からテキストを抽出できませんでした。空の文書か、非対応の形式の可能性があります）',
+  'ai.xlsxHeading': '## Excel（抽出テキスト）: {path}',
+  'ai.xlsxNoText':
+    '（.xlsx からテキストを抽出できませんでした。空のブックか、非対応の形式の可能性があります）',
   'ai.extractableTooLarge':
     '（ファイルが大きすぎるためテキストを抽出できませんでした。上限: 約 {maxMb}MB）',
   'ai.imageHeading': '## 画像: {path}',
@@ -796,6 +809,14 @@ export const en: Record<MessageKey, string> = {
   'settings.rememberLastUseCasePreset': 'Remember last use-case preset',
   'settings.rememberLastUseCasePresetHint':
     'When on, a successful send updates the default preset to the one you used',
+  'settings.embeddingsMode': 'Meaning-search embeddings',
+  'settings.embeddingsModeHash': 'Local (hash, offline)',
+  'settings.embeddingsModeApi': 'API (OpenAI-compatible /embeddings)',
+  'settings.embeddingsModeHint':
+    'API uses the same provider key. Falls back to local on failure. Rebuild the index after switching',
+  'settings.embeddingsModel': 'Embeddings model',
+  'settings.embeddingsModelHint':
+    'Leave blank for provider default (e.g. text-embedding-3-small on OpenAI)',
   'settings.saveFailed': 'Failed to save settings',
   'settings.saved': 'Settings saved',
 
@@ -1091,6 +1112,7 @@ export const en: Record<MessageKey, string> = {
   'chat.agentToolName.readFile': 'Read file',
   'chat.agentToolName.listDir': 'List folder',
   'chat.agentToolName.search': 'Search',
+  'chat.agentToolName.searchMeaning': 'Meaning search',
   'chat.agentToolName.proposeActions': 'Propose changes',
   'chat.agentToolName.exec': 'Run command',
   'chat.agentToolName.verify': 'Verify',
@@ -1285,6 +1307,7 @@ export const en: Record<MessageKey, string> = {
   'undo.historyTitle': 'AI apply history',
   'undo.historyEmpty': 'No applies recorded yet',
   'undo.historyEntry': '{count} change(s) — {paths}',
+  'undo.sourceTemplateManager': 'Template Manager',
   'undo.jumpToMessage': 'Go to message',
   'undo.saveSummary': 'Save summary',
   'undo.saveSummaryFailed': 'Failed to save summary: {message}',
@@ -1384,6 +1407,9 @@ export const en: Record<MessageKey, string> = {
   'ai.docxHeading': '## Word (extracted text): {path}',
   'ai.docxNoText':
     '(Could not extract text from this .docx. It may be empty or use an unsupported format.)',
+  'ai.xlsxHeading': '## Excel (extracted text): {path}',
+  'ai.xlsxNoText':
+    '(Could not extract text from this .xlsx. It may be empty or use an unsupported format.)',
   'ai.extractableTooLarge':
     '(File is too large to extract text. Limit: about {maxMb}MB)',
   'ai.imageHeading': '## Image: {path}',

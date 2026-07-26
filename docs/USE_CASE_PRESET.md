@@ -81,7 +81,7 @@ Keep them in separate UI controls as well.
 - Ask / Edit / Agent routing
 - `compass-actions` / `proposeActions` format
 - Agent tool list
-- `verify` contents (still test / lint / typecheck) — use-case-specific verify later
+- `verify` contents for **code** (still test / lint / typecheck). Document/data light verify (headings / links / glossary / schema) is shipped
 - Index generation itself (heading index is a separate task)
 - `temperature` / `maxTokens` (stay global)
 

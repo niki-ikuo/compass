@@ -33,6 +33,7 @@ function toolIcon(name: string): string {
     case 'readFile':
       return '📄'
     case 'search':
+    case 'searchMeaning':
       return '🔎'
     case 'exec':
       return '⌨️'

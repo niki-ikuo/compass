@@ -10,6 +10,12 @@ describe('verifyCsvContent', () => {
     const issues = verifyCsvContent('a,b\n1,2,3')
     expect(issues[0]?.message).toMatch(/Row 2/)
   })
+
+  it('flags empty header column names', () => {
+    const issues = verifyCsvContent('a,,c\n1,2,3')
+    expect(issues.some((i) => i.message.includes('header column 2 is empty'))).toBe(true)
+  })
+
   it('flags duplicate first-column keys and mixed types', () => {
     const issues = verifyCsvContent('id,age\n1,10\n1,yes\n')
     expect(issues.some((i) => i.message.includes('Duplicate key'))).toBe(true)

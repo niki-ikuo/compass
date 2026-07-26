@@ -1,6 +1,7 @@
 import { mkdir, readFile, writeFile } from 'fs/promises'
 import { join, relative, resolve } from 'path'
 import type {
+  EmbeddingsMode,
   WorkspaceSearchFileResult,
   WorkspaceSearchMatch,
   WorkspaceSearchMode,
@@ -16,6 +17,8 @@ import {
   keywordOverlapScore,
   quantizeEmbedding
 } from '../../src/utils/text-embedder'
+import { embedTextsViaApi } from './embeddings-client'
+import { getSettings } from './settings'
 
 const CHUNKS_FILE = 'chunks.json'
 const MAX_CHUNKS_TOTAL = 8000
@@ -36,6 +39,8 @@ export interface IndexedSemanticChunk {
 interface SemanticIndexFile {
   version: number
   dim: number
+  backend: EmbeddingsMode
+  model?: string
   chunkCount: number
   chunks: IndexedSemanticChunk[]
 }
@@ -52,20 +57,60 @@ export async function writeSemanticIndex(
 ): Promise<number> {
   const compassDir = join(workspaceRoot, '.compass')
   await mkdir(compassDir, { recursive: true })
-  const chunks: IndexedSemanticChunk[] = []
 
+  const pending: Array<{ chunk: TextChunk; embedSource: string }> = []
   for (const source of sources) {
-    if (chunks.length >= MAX_CHUNKS_TOTAL) break
+    if (pending.length >= MAX_CHUNKS_TOTAL) break
     const textChunks = chunkFileContent(source.path, source.content, source.language)
     for (const chunk of textChunks) {
-      if (chunks.length >= MAX_CHUNKS_TOTAL) break
-      chunks.push(toIndexedChunk(chunk))
+      if (pending.length >= MAX_CHUNKS_TOTAL) break
+      const embedSource = [chunk.heading, chunk.summary, chunk.text].filter(Boolean).join('\n')
+      pending.push({ chunk, embedSource })
     }
   }
 
+  let backend: EmbeddingsMode = 'hash'
+  let model = ''
+  let dim = EMBEDDING_DIM
+  let vectors: number[][] | null = null
+
+  const settings = await safeGetSettings()
+  if (settings?.embeddingsMode === 'api' && pending.length > 0) {
+    const api = await embedTextsViaApi(
+      pending.map((row) => row.embedSource),
+      settings
+    )
+    if (api && api.vectors.length === pending.length && api.meta.dim > 0) {
+      vectors = api.vectors
+      backend = 'api'
+      model = api.meta.model
+      dim = api.meta.dim
+    }
+  }
+
+  if (!vectors) {
+    vectors = pending.map((row) => quantizeEmbedding(embedText(row.embedSource)))
+    backend = 'hash'
+    model = ''
+    dim = EMBEDDING_DIM
+  }
+
+  const chunks: IndexedSemanticChunk[] = pending.map((row, i) => ({
+    id: row.chunk.id,
+    path: row.chunk.path,
+    heading: row.chunk.heading,
+    startLine: row.chunk.startLine,
+    endLine: row.chunk.endLine,
+    summary: row.chunk.summary,
+    snippet: snippetFromText(row.chunk.text),
+    embedding: quantizeEmbedding(vectors![i])
+  }))
+
   const payload: SemanticIndexFile = {
     version: EMBEDDING_VERSION,
-    dim: EMBEDDING_DIM,
+    dim,
+    backend,
+    model: model || undefined,
     chunkCount: chunks.length,
     chunks
   }
@@ -75,21 +120,35 @@ export async function writeSemanticIndex(
 
 export async function loadSemanticIndex(
   workspaceRoot: string
-): Promise<IndexedSemanticChunk[] | null> {
+): Promise<{ chunks: IndexedSemanticChunk[]; meta: Omit<SemanticIndexFile, 'chunks' | 'chunkCount'> } | null> {
   try {
     const raw = await readFile(join(workspaceRoot, '.compass', CHUNKS_FILE), 'utf-8')
     const data = JSON.parse(raw) as Partial<SemanticIndexFile>
     if (!Array.isArray(data.chunks)) return null
-    if (data.version !== EMBEDDING_VERSION || data.dim !== EMBEDDING_DIM) return null
-    return data.chunks.filter(isValidChunk)
+    if (data.version !== EMBEDDING_VERSION) return null
+    const dim = typeof data.dim === 'number' && data.dim > 0 ? data.dim : EMBEDDING_DIM
+    const backend: EmbeddingsMode = data.backend === 'api' ? 'api' : 'hash'
+    // Legacy hash indexes omit backend; require classic dim.
+    if (backend === 'hash' && dim !== EMBEDDING_DIM) return null
+    const chunks = data.chunks.filter((chunk) => isValidChunk(chunk, dim))
+    if (chunks.length === 0) return null
+    return {
+      chunks,
+      meta: {
+        version: EMBEDDING_VERSION,
+        dim,
+        backend,
+        model: typeof data.model === 'string' ? data.model : undefined
+      }
+    }
   } catch {
     return null
   }
 }
 
 export async function hasSemanticIndex(workspaceRoot: string): Promise<boolean> {
-  const chunks = await loadSemanticIndex(workspaceRoot)
-  return Boolean(chunks && chunks.length > 0)
+  const loaded = await loadSemanticIndex(workspaceRoot)
+  return Boolean(loaded && loaded.chunks.length > 0)
 }
 
 export async function searchSemanticWorkspace(
@@ -102,11 +161,12 @@ export async function searchSemanticWorkspace(
   }
 
   const mode: WorkspaceSearchMode = options.mode ?? 'hybrid'
-  let chunks = await loadSemanticIndex(workspaceRoot)
-  if (!chunks || chunks.length === 0) {
+  const loaded = await loadSemanticIndex(workspaceRoot)
+  if (!loaded || loaded.chunks.length === 0) {
     return { files: [], totalMatches: 0, truncated: false, filesSearched: 0 }
   }
 
+  let chunks = loaded.chunks
   const rootFilter = normalizeScope(workspaceRoot, options.rootPath)
   if (rootFilter) {
     chunks = chunks.filter((chunk) => {
@@ -123,18 +183,23 @@ export async function searchSemanticWorkspace(
     })
   }
 
-  const queryEmbedding = embedText(query)
+  const queryEmbedding = await embedQueryVector(query, loaded.meta)
   const scored = chunks
     .map((chunk) => {
-      const semantic = cosineSimilarity(queryEmbedding, chunk.embedding)
+      const semantic = queryEmbedding
+        ? cosineSimilarity(queryEmbedding, chunk.embedding)
+        : 0
       const haystack = `${chunk.heading ?? ''} ${chunk.summary} ${chunk.snippet}`
       const keyword = keywordOverlapScore(query, haystack)
       const headingBoost =
         chunk.heading && keywordOverlapScore(query, chunk.heading) > 0 ? 0.08 : 0
+      // If API query embed failed against an API index, degrade to keyword-only.
       const score =
-        mode === 'semantic'
-          ? semantic + headingBoost
-          : 0.55 * semantic + 0.45 * keyword + headingBoost
+        !queryEmbedding
+          ? keyword + headingBoost
+          : mode === 'semantic'
+            ? semantic + headingBoost
+            : 0.55 * semantic + 0.45 * keyword + headingBoost
       return { chunk, score, semantic, keyword }
     })
     .filter((row) => row.score >= MIN_SCORE)
@@ -206,17 +271,29 @@ export async function formatMeaningExcerptsForAi(
   return lines.join('\n')
 }
 
-function toIndexedChunk(chunk: TextChunk): IndexedSemanticChunk {
-  const embedSource = [chunk.heading, chunk.summary, chunk.text].filter(Boolean).join('\n')
-  return {
-    id: chunk.id,
-    path: chunk.path,
-    heading: chunk.heading,
-    startLine: chunk.startLine,
-    endLine: chunk.endLine,
-    summary: chunk.summary,
-    snippet: snippetFromText(chunk.text),
-    embedding: quantizeEmbedding(embedText(embedSource))
+async function embedQueryVector(
+  query: string,
+  meta: { backend: EmbeddingsMode; dim: number; model?: string }
+): Promise<number[] | null> {
+  if (meta.backend === 'api') {
+    const settings = await safeGetSettings()
+    // Prefer API query embed so space matches the index; fall back to null (keyword-only).
+    if (settings?.embeddingsMode === 'api') {
+      const api = await embedTextsViaApi([query], settings)
+      if (api && api.vectors[0] && api.vectors[0].length === meta.dim) {
+        return api.vectors[0]
+      }
+    }
+    return null
+  }
+  return embedText(query)
+}
+
+async function safeGetSettings() {
+  try {
+    return await getSettings()
+  } catch {
+    return null
   }
 }
 
@@ -262,13 +339,13 @@ function chunkToMatch(
   }
 }
 
-function isValidChunk(chunk: IndexedSemanticChunk): boolean {
+function isValidChunk(chunk: IndexedSemanticChunk, dim: number): boolean {
   return (
     typeof chunk.id === 'string' &&
     typeof chunk.path === 'string' &&
     typeof chunk.startLine === 'number' &&
     Array.isArray(chunk.embedding) &&
-    chunk.embedding.length === EMBEDDING_DIM
+    chunk.embedding.length === dim
   )
 }
 

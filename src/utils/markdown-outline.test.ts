@@ -117,6 +117,21 @@ describe('validateMarkdownDocument', () => {
     })
     expect(issues.some((i) => i.kind === 'term_mismatch')).toBe(true)
   })
+
+  it('flags broken heading anchors and missing media', () => {
+    const text = [
+      '# Title',
+      '',
+      'See [jump](#missing-section)',
+      '![chart](./chart.png)'
+    ].join('\n')
+    const issues = validateMarkdownDocument(text, {
+      relativePath: 'docs/a.md',
+      fileExists: (p) => p === 'docs/a.md'
+    })
+    expect(issues.some((i) => i.kind === 'broken_anchor')).toBe(true)
+    expect(issues.some((i) => i.kind === 'broken_media')).toBe(true)
+  })
 })
 
 describe('diffMarkdownHeadings', () => {

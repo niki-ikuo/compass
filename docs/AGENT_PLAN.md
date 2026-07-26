@@ -21,7 +21,6 @@ Agent is **not** “Edit but larger.” Edit stays a single-turn propose → hum
 ### Non-goals (still out of scope / later)
 
 - MCP / plugins (SPEC v3.0)
-- Semantic RAG (SPEC v2.1)
 - Cloud auth / multi-tenant (app remains local, workspace-scoped)
 - Auto-apply destructive changes without approval
 
@@ -166,7 +165,7 @@ Aligned with SPEC:
 
 | Spec | Scope | Status |
 |------|--------|--------|
-| v2.1 | Semantic search / RAG / embeddings | Not started |
+| v2.1 | Semantic search / RAG / embeddings | Shipped (hybrid + hash; optional API embeddings) |
 | v3.0 | MCP, plugins, native non–OpenAI APIs | Not started |
 | Policy | Optional auto-approve for trusted read-only tools only | Not started |
 
@@ -185,7 +184,7 @@ Phase 3  Restricted exec (separate from user PTY)      ✅ shipped
    ↓
 Phase 4  UX, limits, provider errors, plan/memory      ✅ shipped (v2.0)
    ↓
-Phase 5  RAG → MCP / plugins (SPEC v2.1 / v3.0)        ○ later
+Phase 5  MCP / plugins / native APIs (SPEC v3.0)       ○ later
 ```
 
 ---

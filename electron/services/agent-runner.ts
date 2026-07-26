@@ -150,7 +150,7 @@ const AGENT_TOOLS = [
     function: {
       name: 'readFile',
       description:
-        'Read a text file under the workspace. Path is relative to the workspace root. PDF and .docx return extracted text (not binary). Re-reads of an unchanged file return a cache hit (outline only); pass force=true to reload full contents from disk. For Markdown, optional heading returns only that section (from the heading through the next same-or-higher-level heading). When the use-case is data and the path is a tabular CSV/TSV/JSON array, prefer profileData / queryData instead of reading the whole file.',
+        'Read a text file under the workspace. Path is relative to the workspace root. PDF, .docx, and .xlsx return extracted text (not binary). Re-reads of an unchanged file return a cache hit (outline only); pass force=true to reload full contents from disk. For Markdown, optional heading returns only that section (from the heading through the next same-or-higher-level heading). When the use-case is data and the path is a tabular CSV/TSV/JSON array, prefer profileData / queryData instead of reading the whole file.',
       parameters: {
         type: 'object',
         properties: {

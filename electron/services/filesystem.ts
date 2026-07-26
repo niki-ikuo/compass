@@ -32,7 +32,7 @@ import { buildUniqueFileName } from '../../src/utils/unique-file-name'
 import { ApplyPatchError, applyUnifiedDiff } from '../../src/utils/apply-patch'
 import { replaceMarkdownSection } from '../../src/utils/markdown-outline'
 import { decodeFileBuffer, encodeContent } from './encoding'
-import { getImageMimeType, isImagePath, isPdfPath } from '../../src/utils/media-context'
+import { getImageMimeType, isImagePath } from '../../src/utils/media-context'
 import {
   BINARY_CHECK_BYTES,
   isBinaryExtensionPath,
@@ -40,7 +40,8 @@ import {
 } from '../../src/utils/binary-file'
 import { extractDocumentText } from '../../src/utils/extract-document-text'
 import {
-  isDocxPath,
+  getExtractableDocumentKind,
+  isExtractableDocumentPath,
   MAX_EXTRACTABLE_FILE_BYTES,
   MAX_EXTRACTED_TEXT_CHARS
 } from '../../src/utils/extractable-document'
@@ -644,7 +645,7 @@ async function readExtractableDocumentSafe(
           maxMb: Math.round(MAX_EXTRACTABLE_FILE_BYTES / (1024 * 1024))
         }),
         truncated: true,
-        kind: isPdfPath(filePath) ? 'pdf' : 'docx'
+        kind: getExtractableDocumentKind(filePath) ?? 'docx'
       }
     }
     const buffer = await readFile(filePath)
@@ -652,10 +653,15 @@ async function readExtractableDocumentSafe(
     const relativePath = toContextPathLabel(workspaceRoot, filePath)
     if (!extracted) return null
     if (!extracted.text.trim()) {
+      const emptyMessage =
+        extracted.kind === 'pdf'
+          ? t('ai.pdfNoText')
+          : extracted.kind === 'xlsx'
+            ? t('ai.xlsxNoText')
+            : t('ai.docxNoText')
       return {
         relativePath,
-        content:
-          extracted.kind === 'pdf' ? t('ai.pdfNoText') : t('ai.docxNoText'),
+        content: emptyMessage,
         truncated: false,
         kind: extracted.kind
       }
@@ -709,7 +715,7 @@ async function readContextFile(
   workspaceRoot: string
 ): Promise<ResolvedContextFile | null> {
   if (isImagePath(filePath)) return readImageFileSafe(filePath, workspaceRoot)
-  if (isPdfPath(filePath) || isDocxPath(filePath)) {
+  if (isExtractableDocumentPath(filePath)) {
     return readExtractableDocumentSafe(filePath, workspaceRoot)
   }
   return readTextFileSafe(filePath, workspaceRoot)

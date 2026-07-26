@@ -8,6 +8,7 @@ import type {
   WorkspaceChangeEntry,
   WorkspaceChangeSet,
   WorkspaceChangeSetSummary,
+  WorkspaceChangeSource,
   UndoAiApplyResult,
   UndoChatAppliesResult,
   UndoThroughAppliesResult
@@ -319,7 +320,7 @@ export function createChangeSetWithId(input: {
   workspaceRoot: string
   chatId: string
   messageId?: string
-  source: 'preview-all' | 'preview-file'
+  source: WorkspaceChangeSource
   entries: WorkspaceChangeEntry[]
 }): WorkspaceChangeSet {
   return {

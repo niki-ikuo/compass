@@ -2,6 +2,7 @@ import { mkdirSync, readFileSync, rmSync, writeFileSync, existsSync } from 'fs'
 import { join } from 'path'
 import { tmpdir } from 'os'
 import { afterEach, describe, expect, it } from 'vitest'
+import { TEMPLATE_MANAGER_UNDO_CHAT_ID } from '../../src/types'
 import {
   applyWorkspaceActionsRecordingUndo,
   listChangeSets,
@@ -266,5 +267,36 @@ describe('ai apply undo', () => {
     expect(listed[0].chatId).toBe('c2')
     expect(listed[0].status).toBe('applied')
     expect(listed[1].chatId).toBe('c1')
+  })
+
+  it('records and undoes Template Manager writes', async () => {
+    const root = makeTempRoot('templates')
+    tempRoots.push(root)
+    mkdirSync(join(root, '.compass', 'templates'), { recursive: true })
+
+    await applyWorkspaceActionsRecordingUndo(
+      root,
+      [
+        {
+          type: 'writeFile',
+          path: '.compass/templates/memo.md',
+          content: '# Memo\n'
+        }
+      ],
+      {
+        undo: {
+          chatId: TEMPLATE_MANAGER_UNDO_CHAT_ID,
+          source: 'template-manager'
+        }
+      }
+    )
+
+    expect(readFileSync(join(root, '.compass', 'templates', 'memo.md'), 'utf-8')).toBe('# Memo\n')
+    const listed = await listChangeSets(root)
+    expect(listed[0]?.source).toBe('template-manager')
+    expect(listed[0]?.chatId).toBe(TEMPLATE_MANAGER_UNDO_CHAT_ID)
+
+    await undoLastChangeSet(root)
+    expect(existsSync(join(root, '.compass', 'templates', 'memo.md'))).toBe(false)
   })
 })

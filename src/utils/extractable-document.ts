@@ -6,15 +6,19 @@ export const MAX_EXTRACTED_TEXT_CHARS = 48_000
 /** 抽出対象バイナリの読み込み上限（バイト） */
 export const MAX_EXTRACTABLE_FILE_BYTES = 20 * 1024 * 1024
 
-export type ExtractableDocumentKind = 'pdf' | 'docx'
+export type ExtractableDocumentKind = 'pdf' | 'docx' | 'xlsx'
 
 export function isDocxPath(filePath: string): boolean {
   return fileExtension(filePath) === 'docx'
 }
 
+export function isXlsxPath(filePath: string): boolean {
+  return fileExtension(filePath) === 'xlsx'
+}
+
 /** アプリ内編集せず、抽出テキストとして索引・検索・参照できる文書 */
 export function isExtractableDocumentPath(filePath: string): boolean {
-  return isPdfPath(filePath) || isDocxPath(filePath)
+  return isPdfPath(filePath) || isDocxPath(filePath) || isXlsxPath(filePath)
 }
 
 export function getExtractableDocumentKind(
@@ -22,6 +26,7 @@ export function getExtractableDocumentKind(
 ): ExtractableDocumentKind | null {
   if (isPdfPath(filePath)) return 'pdf'
   if (isDocxPath(filePath)) return 'docx'
+  if (isXlsxPath(filePath)) return 'xlsx'
   return null
 }
 

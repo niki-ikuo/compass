@@ -37,7 +37,7 @@
 
 ### Deferred (later)
 
-- ~~Vector search / RAG~~ → shipped in v2.1 (local embeddings + hybrid search via `.compass/chunks.json`)
+- ~~Vector search / RAG~~ → shipped in v2.1 (hybrid search via `.compass/chunks.json`; default local hash embeddings; optional OpenAI-compatible `/embeddings` in Settings)
 - MCP
 - Git integration
 
@@ -325,4 +325,4 @@ Compass is an **AI workspace** for local folders. MVP rests on four pillars:
 3. **Contextual AI chat** — dialogue that understands the current file and use case
 4. **Apply suggestions** — put AI output into the workspace after approval
 
-Core loop: “editor + contextual AI + apply changes.” Structure index, use-case presets, Ask / Edit / Agent (v2.0 Phases 0–4), and inline completions are shipped; RAG and MCP come later.
+Core loop: “editor + contextual AI + apply changes.” Structure index, use-case presets, Ask / Edit / Agent (v2.0 Phases 0–4), inline completions, and hybrid workspace search are shipped; MCP / plugins come later.

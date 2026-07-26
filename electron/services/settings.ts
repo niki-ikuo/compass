@@ -2,7 +2,13 @@ import { safeStorage } from 'electron'
 import { readFile, writeFile, mkdir } from 'fs/promises'
 import { join } from 'path'
 import { app } from 'electron'
-import type { AppSettings, ColorThemeId, LlmProviderId, UseCasePreset } from '../../src/types'
+import type {
+  AppSettings,
+  ColorThemeId,
+  EmbeddingsMode,
+  LlmProviderId,
+  UseCasePreset
+} from '../../src/types'
 import { DEFAULT_SETTINGS, normalizeUseCasePreset } from '../../src/types'
 import { isColorThemeId } from '../../src/utils/color-theme'
 import {
@@ -30,6 +36,8 @@ interface StoredSettings {
   defaultShellId: string
   defaultUseCasePreset: UseCasePreset
   rememberLastUseCasePreset: boolean
+  embeddingsMode: EmbeddingsMode
+  embeddingsModel: string
   lastWorkspaceRoot: string | null
   recentWorkspaceRoots: string[]
 }
@@ -68,6 +76,14 @@ function resolveUseCasePreset(value: unknown): UseCasePreset {
 
 function resolveRememberLastUseCasePreset(value: unknown): boolean {
   return typeof value === 'boolean' ? value : DEFAULT_SETTINGS.rememberLastUseCasePreset
+}
+
+function resolveEmbeddingsMode(value: unknown): EmbeddingsMode {
+  return value === 'api' ? 'api' : DEFAULT_SETTINGS.embeddingsMode
+}
+
+function resolveEmbeddingsModel(value: unknown): string {
+  return typeof value === 'string' ? value.trim() : DEFAULT_SETTINGS.embeddingsModel
 }
 
 function resolveProviderId(value: unknown, apiBaseUrl: string): LlmProviderId {
@@ -151,6 +167,8 @@ async function readStoredSettings(): Promise<StoredSettings> {
       rememberLastUseCasePreset: resolveRememberLastUseCasePreset(
         stored.rememberLastUseCasePreset
       ),
+      embeddingsMode: resolveEmbeddingsMode(stored.embeddingsMode),
+      embeddingsModel: resolveEmbeddingsModel(stored.embeddingsModel),
       lastWorkspaceRoot: stored.lastWorkspaceRoot ?? null,
       recentWorkspaceRoots:
         stored.recentWorkspaceRoots ??
@@ -174,6 +192,8 @@ async function readStoredSettings(): Promise<StoredSettings> {
       defaultShellId: DEFAULT_SETTINGS.defaultShellId,
       defaultUseCasePreset: DEFAULT_SETTINGS.defaultUseCasePreset,
       rememberLastUseCasePreset: DEFAULT_SETTINGS.rememberLastUseCasePreset,
+      embeddingsMode: DEFAULT_SETTINGS.embeddingsMode,
+      embeddingsModel: DEFAULT_SETTINGS.embeddingsModel,
       lastWorkspaceRoot: null,
       recentWorkspaceRoots: []
     }
@@ -219,7 +239,9 @@ function toAppSettings(stored: StoredSettings): AppSettings {
     autoOpenAgentPreview: stored.autoOpenAgentPreview,
     defaultShellId: stored.defaultShellId,
     defaultUseCasePreset: stored.defaultUseCasePreset,
-    rememberLastUseCasePreset: stored.rememberLastUseCasePreset
+    rememberLastUseCasePreset: stored.rememberLastUseCasePreset,
+    embeddingsMode: stored.embeddingsMode,
+    embeddingsModel: stored.embeddingsModel
   }
 }
 
@@ -269,7 +291,9 @@ export async function setSettings(settings: AppSettings): Promise<void> {
     defaultUseCasePreset: resolveUseCasePreset(settings.defaultUseCasePreset),
     rememberLastUseCasePreset: resolveRememberLastUseCasePreset(
       settings.rememberLastUseCasePreset
-    )
+    ),
+    embeddingsMode: resolveEmbeddingsMode(settings.embeddingsMode),
+    embeddingsModel: resolveEmbeddingsModel(settings.embeddingsModel)
   })
   setLocale(locale)
 }
