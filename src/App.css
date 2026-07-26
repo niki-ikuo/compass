@@ -5077,6 +5077,23 @@ body.is-resizing-terminal iframe {
   text-align: right;
 }
 
+.search-match-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.search-match-heading {
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-family: inherit;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .search-match-preview {
   flex: 1;
   min-width: 0;

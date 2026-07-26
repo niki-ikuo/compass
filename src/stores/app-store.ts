@@ -16,6 +16,8 @@ import type {
   FileEncoding,
   LeftSidebarView,
   EditorRevealRequest,
+  IndexBuildProgress,
+  WorkspaceSearchMode,
   WorkspaceSearchResult,
   AgentToolStep,
   UseCasePreset,
@@ -679,6 +681,7 @@ interface AppState {
   leftSidebarView: LeftSidebarView
   searchQuery: string
   searchReplace: string
+  searchMode: WorkspaceSearchMode
   searchCaseSensitive: boolean
   searchWholeWord: boolean
   searchUseRegex: boolean
@@ -694,6 +697,7 @@ interface AppState {
   cursorPosition: { line: number; column: number }
   llmConnection: LlmConnectionState
   indexStatus: 'idle' | 'indexing' | 'ready' | 'error'
+  indexProgress: IndexBuildProgress | null
   indexMeta: { fileCount: number; relationCount: number; indexedAt: string } | null
   pendingWorkspacePreview: {
     chatId: string
@@ -806,6 +810,7 @@ interface AppState {
   openSearchPanel: (options?: { replace?: boolean; rootPath?: string | null }) => void
   setSearchQuery: (query: string) => void
   setSearchReplace: (value: string) => void
+  setSearchMode: (mode: WorkspaceSearchMode) => void
   setSearchCaseSensitive: (value: boolean) => void
   setSearchWholeWord: (value: boolean) => void
   setSearchUseRegex: (value: boolean) => void
@@ -822,6 +827,7 @@ interface AppState {
   setCursorPosition: (line: number, column: number) => void
   setLlmConnection: (connection: LlmConnectionState) => void
   setIndexStatus: (status: 'idle' | 'indexing' | 'ready' | 'error') => void
+  setIndexProgress: (progress: IndexBuildProgress | null) => void
   setIndexMeta: (meta: { fileCount: number; relationCount: number; indexedAt: string } | null) => void
   setPendingWorkspacePreview: (
     preview: {
@@ -895,6 +901,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   leftSidebarView: 'explorer',
   searchQuery: '',
   searchReplace: '',
+  searchMode: 'hybrid',
   searchCaseSensitive: false,
   searchWholeWord: false,
   searchUseRegex: false,
@@ -915,6 +922,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     method: null
   },
   indexStatus: 'idle',
+  indexProgress: null,
   indexMeta: null,
   pendingWorkspacePreview: null,
   pendingAgentApprovalId: null,
@@ -1017,6 +1025,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       openFiles: [],
       activeFilePath: null,
       indexStatus: 'idle',
+      indexProgress: null,
       indexMeta: null,
       editorSelection: null,
       cursorPosition: { line: 1, column: 1 },
@@ -1673,6 +1682,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     })),
   setSearchQuery: (query) => set({ searchQuery: query }),
   setSearchReplace: (value) => set({ searchReplace: value }),
+  setSearchMode: (mode) => set({ searchMode: mode }),
   setSearchCaseSensitive: (value) => set({ searchCaseSensitive: value }),
   setSearchWholeWord: (value) => set({ searchWholeWord: value }),
   setSearchUseRegex: (value) => set({ searchUseRegex: value }),
@@ -1697,7 +1707,18 @@ export const useAppStore = create<AppState>((set, get) => ({
   setEditorSelection: (selection) => set({ editorSelection: selection }),
   setCursorPosition: (line, column) => set({ cursorPosition: { line, column } }),
   setLlmConnection: (connection) => set({ llmConnection: connection }),
-  setIndexStatus: (status) => set({ indexStatus: status }),
+  setIndexStatus: (status) =>
+    set({
+      indexStatus: status,
+      indexProgress:
+        status === 'indexing'
+          ? { phase: 'scan', current: 0, total: 0, percent: 0 }
+          : null
+    }),
+  setIndexProgress: (progress) =>
+    set((state) =>
+      state.indexStatus === 'indexing' ? { indexProgress: progress } : state
+    ),
   setIndexMeta: (meta) => set({ indexMeta: meta }),
 
   setPendingWorkspacePreview: (preview) => {

@@ -124,7 +124,8 @@ Defined as OpenAI function schemas in `AGENT_TOOLS` (`agent-runner.ts`). Dispatc
 |------|---------------|----------|-----------|
 | `readFile` | `agent-read-cache` | ≤ ~200 KB; outline; cache hit unless `force=true`; Markdown optional `heading` for one section | — |
 | `listDir` | runner | One level, ≤ 200 entries | — |
-| `search` | `workspace-search` | Content search, ≤ 30 hits | — |
+| `search` | `workspace-search` | Keyword content search, ≤ 30 hits | — |
+| `searchMeaning` | `workspace-search` / `semantic-index` | Hybrid meaning search (path + heading + snippet citations), ≤ 30 hits | — |
 | `proposeActions` | `agent-propose-actions` + `filesystem` | Normalize → preview → **pause** | Apply / Reject / partial / Ask Agent to fix |
 | `exec` | `agent-exec` | Workspace cwd, deny-list, timeout, output cap | Write-risk cmds need `ai:needExecApproval` |
 | `verify` | `agent-verify` | test / lint / typecheck via scripts or fallbacks; document/data light checks | — (uses internal exec for code) |

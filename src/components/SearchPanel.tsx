@@ -49,13 +49,20 @@ function MatchRow({
       type="button"
       className="search-match"
       onClick={() => onOpen(filePath, match)}
-      title={`${match.line}:${match.column}`}
+      title={
+        match.heading
+          ? `${match.heading} · L${match.line}`
+          : `${match.line}:${match.column}`
+      }
     >
       <span className="search-match-line">{match.line}</span>
-      <span className="search-match-preview">
-        {before}
-        <mark>{highlighted || match.matchText}</mark>
-        {after}
+      <span className="search-match-body">
+        {match.heading && <span className="search-match-heading">{match.heading}</span>}
+        <span className="search-match-preview">
+          {before}
+          <mark>{highlighted || match.matchText}</mark>
+          {after}
+        </span>
       </span>
     </button>
   )
@@ -102,6 +109,7 @@ export function SearchPanel() {
   const workspaceRoot = useAppStore((s) => s.workspaceRoot)
   const searchQuery = useAppStore((s) => s.searchQuery)
   const searchReplace = useAppStore((s) => s.searchReplace)
+  const searchMode = useAppStore((s) => s.searchMode)
   const searchCaseSensitive = useAppStore((s) => s.searchCaseSensitive)
   const searchWholeWord = useAppStore((s) => s.searchWholeWord)
   const searchUseRegex = useAppStore((s) => s.searchUseRegex)
@@ -116,6 +124,7 @@ export function SearchPanel() {
 
   const setSearchQuery = useAppStore((s) => s.setSearchQuery)
   const setSearchReplace = useAppStore((s) => s.setSearchReplace)
+  const setSearchMode = useAppStore((s) => s.setSearchMode)
   const setSearchCaseSensitive = useAppStore((s) => s.setSearchCaseSensitive)
   const setSearchWholeWord = useAppStore((s) => s.setSearchWholeWord)
   const setSearchUseRegex = useAppStore((s) => s.setSearchUseRegex)
@@ -175,6 +184,7 @@ export function SearchPanel() {
     try {
       const result = await window.compass.fs.search(workspaceRoot, {
         query,
+        mode: searchMode,
         caseSensitive: searchCaseSensitive,
         wholeWord: searchWholeWord,
         useRegex: searchUseRegex,
@@ -197,6 +207,7 @@ export function SearchPanel() {
   }, [
     workspaceRoot,
     searchQuery,
+    searchMode,
     searchCaseSensitive,
     searchWholeWord,
     searchUseRegex,
@@ -218,6 +229,7 @@ export function SearchPanel() {
   }, [
     workspaceRoot,
     searchQuery,
+    searchMode,
     searchCaseSensitive,
     searchWholeWord,
     searchUseRegex,
@@ -390,23 +402,39 @@ export function SearchPanel() {
 
         <div className="search-options">
           <ToggleChip
-            label="Aa"
-            title={t('search.matchCase')}
-            active={searchCaseSensitive}
-            onClick={() => setSearchCaseSensitive(!searchCaseSensitive)}
+            label={t('search.modeHybrid')}
+            title={t('search.modeHybridTitle')}
+            active={searchMode === 'hybrid'}
+            onClick={() => setSearchMode('hybrid')}
           />
           <ToggleChip
-            label="ab"
-            title={t('search.wholeWord')}
-            active={searchWholeWord}
-            onClick={() => setSearchWholeWord(!searchWholeWord)}
+            label={t('search.modeKeyword')}
+            title={t('search.modeKeywordTitle')}
+            active={searchMode === 'keyword'}
+            onClick={() => setSearchMode('keyword')}
           />
-          <ToggleChip
-            label=".*"
-            title={t('search.useRegex')}
-            active={searchUseRegex}
-            onClick={() => setSearchUseRegex(!searchUseRegex)}
-          />
+          {searchMode === 'keyword' && (
+            <>
+              <ToggleChip
+                label="Aa"
+                title={t('search.matchCase')}
+                active={searchCaseSensitive}
+                onClick={() => setSearchCaseSensitive(!searchCaseSensitive)}
+              />
+              <ToggleChip
+                label="ab"
+                title={t('search.wholeWord')}
+                active={searchWholeWord}
+                onClick={() => setSearchWholeWord(!searchWholeWord)}
+              />
+              <ToggleChip
+                label=".*"
+                title={t('search.useRegex')}
+                active={searchUseRegex}
+                onClick={() => setSearchUseRegex(!searchUseRegex)}
+              />
+            </>
+          )}
           <button
             type="button"
             className={`search-toggle${showFilters ? ' active' : ''}`}

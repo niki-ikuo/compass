@@ -27,6 +27,7 @@ import {
 } from '../../src/utils/context-budget'
 import { getSettings } from './settings'
 import { ensureProjectIndex, getProjectIndexContext } from './project-indexer'
+import { formatMeaningExcerptsForAi } from './semantic-index'
 import { resolveChatContext, isInsideWorkspace } from './filesystem'
 import { getLlmProvider, getProviderLabel } from '../../src/utils/llm-providers'
 import { withOpenWebUiChatCompat } from '../../src/utils/open-webui-compat'
@@ -237,6 +238,25 @@ export async function buildUserMessagePayload(request: ChatRequest): Promise<Use
     if (indexContext) {
       parts.push(indexContext.aiContext)
       parts.push('')
+    }
+
+    // Hybrid local search so Ask/Agent can answer “where is X?” without @ every file.
+    const lastUserForSearch = [...request.messages].reverse().find((m) => m.role === 'user')
+    if (lastUserForSearch?.content?.trim()) {
+      try {
+        const excerpts = await formatMeaningExcerptsForAi(
+          request.workspaceRoot,
+          lastUserForSearch.content,
+          6,
+          3200
+        )
+        if (excerpts) {
+          parts.push(excerpts)
+          parts.push('')
+        }
+      } catch {
+        // Search index is optional; continue without excerpts.
+      }
     }
   }
 

@@ -106,11 +106,12 @@ Structure index and workspace data live under the workspace’s `.compass/` (`pr
 | `files.json` | Paths, language, import/export, symbol overview |
 | `graph.json` | Import edges between files |
 | `summary.txt` | Summary text for the AI |
+| `chunks.json` | Text chunks + local embeddings (meaning / hybrid search) |
 | `chat-history.json` | Persisted chat sessions |
 | `settings.json` | Workspace settings (e.g. default use-case preset) |
 | `templates/` | Optional document templates |
 
-Relevant index slices are added to chat context. This is **not** embedding-based RAG.
+Relevant structure-index slices plus hybrid-search Related workspace excerpts are added to chat context. Embeddings are local (hash embeddings, no model download); Ask/Agent answers still use the online LLM.
 
 ## Multi-LLM
 

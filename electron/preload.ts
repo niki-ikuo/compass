@@ -9,6 +9,7 @@ import type {
   FileEncoding,
   FileTreeNode,
   IndexBuildResult,
+  IndexBuildProgress,
   EnsureIndexResult,
   ProjectIndexContext,
   ResolvedChatContext,
@@ -386,6 +387,17 @@ const compassAPI = {
       ): void => callback(status, workspaceRoot)
       ipcRenderer.on('index:status', handler)
       return () => ipcRenderer.removeListener('index:status', handler)
+    },
+    onProgress: (
+      callback: (workspaceRoot: string, progress: IndexBuildProgress) => void
+    ): (() => void) => {
+      const handler = (
+        _event: Electron.IpcRendererEvent,
+        workspaceRoot: string,
+        progress: IndexBuildProgress
+      ): void => callback(workspaceRoot, progress)
+      ipcRenderer.on('index:progress', handler)
+      return () => ipcRenderer.removeListener('index:progress', handler)
     }
   },
   chat: {

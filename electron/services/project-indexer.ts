@@ -1,7 +1,13 @@
 import { mkdir, readdir, readFile, stat, writeFile } from 'fs/promises'
 import { dirname, extname, join, relative } from 'path'
 import { t } from '../../src/i18n/runtime'
-import type { IndexBuildResult, ProjectIndexContext, UseCasePreset } from '../../src/types'
+import type {
+  IndexBuildPhase,
+  IndexBuildProgress,
+  IndexBuildResult,
+  ProjectIndexContext,
+  UseCasePreset
+} from '../../src/types'
 import {
   extractDataSchema,
   formatDataSchemaBrief,
@@ -16,8 +22,9 @@ import {
 } from '../../src/utils/markdown-outline'
 import { shouldSkipWorkspaceEntry } from './fs-ignore'
 import { decodeFileBuffer } from './encoding'
+import { writeSemanticIndex, type SemanticSourceFile } from './semantic-index'
 
-const INDEX_VERSION = 5
+const INDEX_VERSION = 6
 const COMPASS_DIR = '.compass'
 const IGNORED_DIRS = new Set([
   'node_modules',
@@ -546,6 +553,7 @@ export async function isProjectIndexStale(workspaceRoot: string): Promise<boolea
   let filesRaw: string
   try {
     filesRaw = await readFile(join(getCompassDir(workspaceRoot), 'files.json'), 'utf-8')
+    await readFile(join(getCompassDir(workspaceRoot), 'chunks.json'), 'utf-8')
   } catch {
     return true
   }
@@ -585,6 +593,59 @@ export async function isProjectIndexStale(workspaceRoot: string): Promise<boolea
 let activeBuild: { root: string; promise: Promise<IndexBuildResult> } | null = null
 let buildEpoch = 0
 
+type IndexProgressEmitter = (workspaceRoot: string, progress: IndexBuildProgress) => void
+let progressEmitter: IndexProgressEmitter | null = null
+let lastProgressEmitAt = 0
+let lastProgressPercent = -1
+let lastProgressRoot = ''
+
+/** Bind IPC (or tests) to receive build progress updates. */
+export function setIndexProgressEmitter(emitter: IndexProgressEmitter | null): void {
+  progressEmitter = emitter
+  lastProgressEmitAt = 0
+  lastProgressPercent = -1
+  lastProgressRoot = ''
+}
+
+function reportIndexProgress(
+  workspaceRoot: string,
+  phase: IndexBuildPhase,
+  current: number,
+  total: number,
+  options?: { force?: boolean; percent?: number }
+): void {
+  if (!progressEmitter) return
+  let percent: number
+  if (typeof options?.percent === 'number') {
+    percent = options.percent
+  } else if (total <= 0) {
+    percent = phase === 'scan' ? 0 : 100
+  } else if (phase === 'files') {
+    // Leave headroom for the write phase (95 → 100).
+    percent = Math.round((current / total) * 90)
+  } else {
+    percent = Math.round((current / total) * 100)
+  }
+  percent = Math.max(0, Math.min(100, percent))
+
+  const now = Date.now()
+  const rootChanged = lastProgressRoot !== workspaceRoot
+  const force = options?.force === true || rootChanged
+  if (
+    !force &&
+    percent === lastProgressPercent &&
+    now - lastProgressEmitAt < 80 &&
+    current < total
+  ) {
+    return
+  }
+
+  lastProgressEmitAt = now
+  lastProgressPercent = percent
+  lastProgressRoot = workspaceRoot
+  progressEmitter(workspaceRoot, { phase, current, total, percent })
+}
+
 /** Normalize roots so Windows path casing / separators compare equal. */
 export function normalizeWorkspaceRoot(workspaceRoot: string): string {
   return workspaceRoot.replace(/[/\\]+$/, '').replace(/\\/g, '/').toLowerCase()
@@ -608,6 +669,7 @@ async function runBuildProjectIndex(
   // even if the file scan takes a long time or is later superseded.
   const compassDir = await ensureCompassDir(workspaceRoot)
 
+  reportIndexProgress(workspaceRoot, 'scan', 0, 0, { force: true, percent: 0 })
   const absolutePaths = await listSourceFiles(workspaceRoot)
   if (epoch !== buildEpoch) {
     return {
@@ -618,11 +680,15 @@ async function runBuildProjectIndex(
     }
   }
 
+  const totalFiles = absolutePaths.length
+  reportIndexProgress(workspaceRoot, 'files', 0, totalFiles, { force: true, percent: 0 })
+
   const relativePaths = absolutePaths.map((p) => relative(workspaceRoot, p).replace(/\\/g, '/'))
   const fileSet = new Set(relativePaths)
   const files: IndexedFile[] = []
+  const semanticSources: SemanticSourceFile[] = []
 
-  for (const absPath of absolutePaths) {
+  for (let i = 0; i < absolutePaths.length; i++) {
     if (epoch !== buildEpoch) {
       return {
         workspaceRoot,
@@ -632,13 +698,20 @@ async function runBuildProjectIndex(
       }
     }
 
+    const absPath = absolutePaths[i]
     const relPath = relative(workspaceRoot, absPath).replace(/\\/g, '/')
     try {
       const info = await stat(absPath)
-      if (info.size > 256 * 1024) continue
+      if (info.size > 256 * 1024) {
+        reportIndexProgress(workspaceRoot, 'files', i + 1, totalFiles)
+        continue
+      }
 
       const buffer = await readFile(absPath)
-      if (buffer.includes(0)) continue
+      if (buffer.includes(0)) {
+        reportIndexProgress(workspaceRoot, 'files', i + 1, totalFiles)
+        continue
+      }
       const content = decodeFileBuffer(buffer).content
 
       const ext = extname(absPath).slice(1).toLowerCase()
@@ -667,9 +740,11 @@ async function runBuildProjectIndex(
       if (dataSchema) entry.dataSchema = dataSchema
 
       files.push(entry)
+      semanticSources.push({ path: relPath, content, language })
     } catch {
       // skip unreadable files
     }
+    reportIndexProgress(workspaceRoot, 'files', i + 1, totalFiles)
   }
 
   const edges: GraphEdge[] = []
@@ -701,10 +776,23 @@ async function runBuildProjectIndex(
     relationCount: edges.length
   }
 
+  reportIndexProgress(workspaceRoot, 'write', totalFiles, totalFiles, {
+    force: true,
+    percent: totalFiles === 0 ? 100 : 95
+  })
   await writeFile(join(compassDir, 'meta.json'), JSON.stringify(meta, null, 2), 'utf-8')
   await writeFile(join(compassDir, 'files.json'), JSON.stringify(files, null, 2), 'utf-8')
   await writeFile(join(compassDir, 'graph.json'), JSON.stringify({ edges }, null, 2), 'utf-8')
   await writeFile(join(compassDir, 'summary.txt'), buildSummary(files, edges), 'utf-8')
+  if (epoch === buildEpoch) {
+    await writeSemanticIndex(workspaceRoot, semanticSources)
+  }
+  if (epoch === buildEpoch) {
+    reportIndexProgress(workspaceRoot, 'write', totalFiles, totalFiles, {
+      force: true,
+      percent: 100
+    })
+  }
 
   return {
     workspaceRoot,

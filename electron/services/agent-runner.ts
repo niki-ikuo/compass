@@ -184,7 +184,8 @@ const AGENT_TOOLS = [
     type: 'function',
     function: {
       name: 'search',
-      description: 'Search file contents in the workspace for a text query.',
+      description:
+        'Exact/keyword search of file contents (literal text). Prefer searchMeaning for “where is X?” or topic/meaning questions.',
       parameters: {
         type: 'object',
         properties: {
@@ -194,6 +195,32 @@ const AGENT_TOOLS = [
             description: 'Optional subdirectory or file to scope the search'
           },
           caseSensitive: { type: 'boolean' }
+        },
+        required: ['query']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'searchMeaning',
+      description:
+        'Hybrid semantic search over workspace text chunks (local embeddings). Returns path, heading, and snippet citations. Use for finding relevant sections by meaning without knowing exact wording.',
+      parameters: {
+        type: 'object',
+        properties: {
+          query: {
+            type: 'string',
+            description: 'Natural-language or keyword query describing what to find'
+          },
+          path: {
+            type: 'string',
+            description: 'Optional subdirectory or file to scope the search'
+          },
+          maxResults: {
+            type: 'number',
+            description: 'Max hits to return (default 12, max 30)'
+          }
         },
         required: ['query']
       }
@@ -760,7 +787,11 @@ function normalizeToolArgsForCall(
     }
     return next
   }
-  if (name === 'search' && typeof args.path === 'string' && args.path.trim()) {
+  if (
+    (name === 'search' || name === 'searchMeaning') &&
+    typeof args.path === 'string' &&
+    args.path.trim()
+  ) {
     const relativePath = normalizeAgentRelativePath(workspaceRoot, args.path, {
       defaultToRoot: true
     })
@@ -932,6 +963,7 @@ async function executeSearch(
     }
     const result = await searchWorkspace(workspaceRoot, {
       query,
+      mode: 'keyword',
       caseSensitive: Boolean(args.caseSensitive),
       rootPath: scopedPath,
       maxResults: MAX_SEARCH_RESULTS
@@ -945,13 +977,73 @@ async function executeSearch(
     for (const file of result.files) {
       lines.push(`## ${file.relativePath}`)
       for (const match of file.matches.slice(0, 5)) {
-        lines.push(`L${match.line}: ${match.preview.trim()}`)
+        const heading = match.heading ? ` [${match.heading}]` : ''
+        lines.push(`L${match.line}${heading}: ${match.preview.trim()}`)
       }
     }
 
     return {
       ok: true,
       summary: `${result.totalMatches} matches in ${result.files.length} files`,
+      content: truncateForModel(lines.join('\n'))
+    }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    return { ok: false, summary: message, content: `Error: ${message}` }
+  }
+}
+
+async function executeSearchMeaning(
+  workspaceRoot: string,
+  args: Record<string, unknown>
+): Promise<{ ok: boolean; summary: string; content: string }> {
+  const query = typeof args.query === 'string' ? args.query : ''
+  if (!query.trim()) {
+    return { ok: false, summary: 'query is required', content: 'Error: query is required' }
+  }
+
+  try {
+    let scopedPath: string | undefined
+    if (typeof args.path === 'string' && args.path.trim()) {
+      const resolved = await resolveAgentToolPath(workspaceRoot, args.path, {
+        allowRoot: true,
+        defaultToRoot: true
+      })
+      scopedPath = resolved.absolutePath
+    }
+
+    const requested =
+      typeof args.maxResults === 'number' && Number.isFinite(args.maxResults)
+        ? Math.floor(args.maxResults)
+        : 12
+    const maxResults = Math.min(MAX_SEARCH_RESULTS, Math.max(1, requested))
+
+    const result = await searchWorkspace(workspaceRoot, {
+      query,
+      mode: 'hybrid',
+      rootPath: scopedPath,
+      maxResults
+    })
+
+    const lines: string[] = [
+      `# searchMeaning: ${query}`,
+      `hits: ${result.totalMatches}${result.truncated ? ' (truncated)' : ''}`,
+      `chunksSearched: ${result.filesSearched}`,
+      'Cite path + heading + line when answering.'
+    ]
+    for (const file of result.files) {
+      for (const match of file.matches) {
+        const heading = match.heading ? ` — ${match.heading}` : ''
+        const score =
+          typeof match.score === 'number' ? ` score=${match.score.toFixed(3)}` : ''
+        lines.push(`## ${file.relativePath}${heading} (L${match.line})${score}`)
+        lines.push(match.preview.trim())
+      }
+    }
+
+    return {
+      ok: true,
+      summary: `${result.totalMatches} meaning hits in ${result.files.length} files`,
       content: truncateForModel(lines.join('\n'))
     }
   } catch (err) {
@@ -1200,6 +1292,8 @@ async function executeTool(
       return executeListDir(workspaceRoot, args)
     case 'search':
       return executeSearch(workspaceRoot, args)
+    case 'searchMeaning':
+      return executeSearchMeaning(workspaceRoot, args)
     case 'exec':
       return executeExec(webContents, chatId, workspaceRoot, callId, args, signal)
     case 'verify':

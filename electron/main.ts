@@ -52,7 +52,8 @@ import {
   buildProjectIndex,
   ensureProjectIndex,
   getProjectIndexContext,
-  isProjectIndexStale
+  isProjectIndexStale,
+  setIndexProgressEmitter
 } from './services/project-indexer'
 import { startIndexWatcher, stopIndexWatcher } from './services/index-watcher'
 import { loadChatHistory, saveChatHistory } from './services/chat-history'
@@ -765,7 +766,16 @@ function registerIpcHandlers(): void {
     setAiHelpMenuVisible(Boolean(visible))
   })
 
+  const bindIndexProgress = (sender: Electron.WebContents): void => {
+    setIndexProgressEmitter((root, progress) => {
+      if (!sender.isDestroyed()) {
+        sender.send('index:progress', root, progress)
+      }
+    })
+  }
+
   ipcMain.handle('index:build', async (event, workspaceRoot: string) => {
+    bindIndexProgress(event.sender)
     event.sender.send('index:status', 'indexing', workspaceRoot)
     try {
       const result = await buildProjectIndex(workspaceRoot)
@@ -779,6 +789,7 @@ function registerIpcHandlers(): void {
   })
 
   ipcMain.handle('index:ensureFresh', async (event, workspaceRoot: string) => {
+    bindIndexProgress(event.sender)
     const stale = await isProjectIndexStale(workspaceRoot)
     if (stale) {
       event.sender.send('index:status', 'indexing', workspaceRoot)
@@ -798,6 +809,7 @@ function registerIpcHandlers(): void {
   })
 
   ipcMain.handle('index:watch', (event, workspaceRoot: string) => {
+    bindIndexProgress(event.sender)
     startIndexWatcher(workspaceRoot, event.sender)
   })
 

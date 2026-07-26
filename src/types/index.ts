@@ -517,6 +517,16 @@ export interface IndexBuildResult {
   indexedAt: string
 }
 
+export type IndexBuildPhase = 'scan' | 'files' | 'write'
+
+export interface IndexBuildProgress {
+  phase: IndexBuildPhase
+  current: number
+  total: number
+  /** 0–100 */
+  percent: number
+}
+
 export interface EnsureIndexResult extends IndexBuildResult {
   rebuilt: boolean
 }
@@ -547,6 +557,8 @@ export interface TerminalShell {
   args: string[]
 }
 
+export type WorkspaceSearchMode = 'keyword' | 'hybrid' | 'semantic'
+
 export interface WorkspaceSearchOptions {
   query: string
   caseSensitive?: boolean
@@ -556,6 +568,8 @@ export interface WorkspaceSearchOptions {
   exclude?: string
   rootPath?: string
   maxResults?: number
+  /** Default: keyword. Hybrid/semantic use local chunk embeddings under `.compass/`. */
+  mode?: WorkspaceSearchMode
 }
 
 export interface WorkspaceSearchMatch {
@@ -564,6 +578,12 @@ export interface WorkspaceSearchMatch {
   endColumn: number
   preview: string
   matchText: string
+  /** Nearest Markdown heading / section title when available */
+  heading?: string
+  /** Relevance score for hybrid/semantic hits (0–1+) */
+  score?: number
+  /** Section end line for meaning hits */
+  endLine?: number
 }
 
 export interface WorkspaceSearchFileResult {
@@ -816,6 +836,9 @@ export interface CompassAPI {
     onUpdated: (callback: (result: IndexBuildResult) => void) => () => void
     onStatus: (
       callback: (status: 'indexing' | 'ready' | 'error', workspaceRoot: string) => void
+    ) => () => void
+    onProgress: (
+      callback: (workspaceRoot: string, progress: IndexBuildProgress) => void
     ) => () => void
   }
   chat: {

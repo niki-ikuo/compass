@@ -22,12 +22,12 @@ Related: [SPEC.md](./SPEC.md), [USE_CASE_PRESET.md](./USE_CASE_PRESET.md), [AI_A
 
 Ship semantic / hybrid search over folder text.
 
-- [ ] Index Markdown headings + short section summaries into `.compass/`
-- [ ] Chunk workspace text (honor ignore rules)
-- [ ] Local embeddings or hybrid keyword + embedding search
-- [ ] Left Search: query → path + heading + snippet → open at heading
-- [ ] Agent tool: `searchMeaning` (or extend `search`) returns citations
-- [ ] Ask/Agent can answer “where is X?” without manual `@` on every file
+- [x] Index Markdown headings + short section summaries into `.compass/`
+- [x] Chunk workspace text (honor ignore rules)
+- [x] Local embeddings or hybrid keyword + embedding search
+- [x] Left Search: query → path + heading + snippet → open at heading
+- [x] Agent tool: `searchMeaning` (or extend `search`) returns citations
+- [x] Ask/Agent can answer “where is X?” without manual `@` on every file
 
 **Done:** mixed `notes/` + `docs/` folder finds the right section without opening every file.
 

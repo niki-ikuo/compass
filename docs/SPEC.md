@@ -37,7 +37,7 @@
 
 ### Deferred (later)
 
-- Vector search / RAG (`.compass` is a structure index, not embedding search) — SPEC v2.1
+- ~~Vector search / RAG~~ → shipped in v2.1 (local embeddings + hybrid search via `.compass/chunks.json`)
 - MCP
 - Git integration
 

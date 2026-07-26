@@ -11,6 +11,8 @@ import type {
 } from '../../src/types'
 import { shouldSkipWorkspaceEntry } from './fs-ignore'
 import { decodeFileBuffer, encodeContent } from './encoding'
+import { ensureProjectIndex } from './project-indexer'
+import { searchSemanticWorkspace } from './semantic-index'
 
 const IGNORED_DIRS = new Set([
   'node_modules',
@@ -202,6 +204,20 @@ export async function searchWorkspace(
     return { files: [], totalMatches: 0, truncated: false, filesSearched: 0 }
   }
 
+  const mode = options.mode ?? 'keyword'
+  if (mode === 'hybrid' || mode === 'semantic') {
+    try {
+      await ensureProjectIndex(workspaceRoot)
+    } catch {
+      // Fall through; semantic search may still work with an older index.
+    }
+    const semantic = await searchSemanticWorkspace(workspaceRoot, options)
+    if (semantic.totalMatches > 0 || mode === 'semantic') {
+      return semantic
+    }
+    // Hybrid with no embedding hits: fall back to keyword search.
+  }
+
   const searchRoot = resolveSearchRoot(workspaceRoot, options.rootPath)
   const matcher = buildMatcher(query, options)
   const maxResults = options.maxResults ?? DEFAULT_MAX_RESULTS
@@ -250,7 +266,17 @@ export async function searchWorkspace(
     )
     if (matches.length === 0) continue
 
-    files.push({ path: filePath, relativePath, matches })
+    const headingByLine = languageLooksMarkdown(relativePath)
+      ? buildHeadingLookup(content)
+      : null
+    const enriched = headingByLine
+      ? matches.map((match) => ({
+          ...match,
+          heading: headingBeforeLine(headingByLine, match.line)
+        }))
+      : matches
+
+    files.push({ path: filePath, relativePath, matches: enriched })
     totalMatches += matches.length
     if (fileTruncated) {
       truncated = true
@@ -259,6 +285,39 @@ export async function searchWorkspace(
   }
 
   return { files, totalMatches, truncated, filesSearched }
+}
+
+function languageLooksMarkdown(relativePath: string): boolean {
+  return /\.(md|markdown|mdx)$/i.test(relativePath)
+}
+
+function buildHeadingLookup(content: string): Array<{ line: number; text: string }> {
+  const headings: Array<{ line: number; text: string }> = []
+  const lines = content.split(/\r?\n/)
+  let inFence = false
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]
+    if (/^(`{3,}|~{3,})/.test(line)) {
+      inFence = !inFence
+      continue
+    }
+    if (inFence) continue
+    const match = line.match(/^(#{1,6})\s+(.+?)\s*#*\s*$/)
+    if (match) headings.push({ line: i + 1, text: match[2].trim() })
+  }
+  return headings
+}
+
+function headingBeforeLine(
+  headings: Array<{ line: number; text: string }>,
+  line: number
+): string | undefined {
+  let found: string | undefined
+  for (const heading of headings) {
+    if (heading.line > line) break
+    found = heading.text
+  }
+  return found
 }
 
 export async function replaceInWorkspace(

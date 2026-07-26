@@ -124,7 +124,8 @@ OpenAI function schema は `AGENT_TOOLS`（`agent-runner.ts`）。`executeTool` 
 |--------|----------|------|--------------|
 | `readFile` | `agent-read-cache` | 最大約 200 KB、アウトライン、`force=true` 以外はキャッシュ。Markdown は任意の `heading` で該当セクションのみ | なし |
 | `listDir` | runner | 1 階層、最大 200 エントリ | なし |
-| `search` | `workspace-search` | 本文検索、最大 30 件 | なし |
+| `search` | `workspace-search` | キーワード本文検索、最大 30 件 | なし |
+| `searchMeaning` | `workspace-search` / `semantic-index` | ハイブリッド意味検索（引用: パス・見出し・スニペット）、最大 30 件 | なし |
 | `proposeActions` | `agent-propose-actions` + `filesystem` | 正規化 → プレビュー → **一時停止** | 適用 / 却下 / 部分適用 / Agent に修正させる |
 | `exec` | `agent-exec` | cwd は WS 内、deny-list、タイムアウト、出力上限 | 書込系は `ai:needExecApproval` |
 | `verify` | `agent-verify` | test / lint / typecheck（スクリプト or フォールバック）；document/data 向け light チェック | なし（code は内部 exec） |

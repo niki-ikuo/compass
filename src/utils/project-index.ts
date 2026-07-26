@@ -8,28 +8,32 @@ function isCurrentWorkspace(workspaceRoot: string): boolean {
 }
 
 export async function buildWorkspaceIndex(workspaceRoot: string): Promise<void> {
-  const { setIndexStatus, setIndexMeta } = useAppStore.getState()
+  const { setIndexStatus, setIndexMeta, setIndexProgress } = useAppStore.getState()
   setIndexStatus('indexing')
   try {
     const result = await window.compass.index.build(workspaceRoot)
     if (!isCurrentWorkspace(workspaceRoot)) return
     setIndexMeta(result)
+    setIndexProgress(null)
     setIndexStatus('ready')
   } catch {
     if (!isCurrentWorkspace(workspaceRoot)) return
+    setIndexProgress(null)
     setIndexStatus('error')
   }
 }
 
 export async function ensureWorkspaceIndex(workspaceRoot: string): Promise<void> {
-  const { setIndexStatus, setIndexMeta } = useAppStore.getState()
+  const { setIndexStatus, setIndexMeta, setIndexProgress } = useAppStore.getState()
   try {
     const result = await window.compass.index.ensureFresh(workspaceRoot)
     if (!isCurrentWorkspace(workspaceRoot)) return
     setIndexMeta(result)
+    setIndexProgress(null)
     setIndexStatus('ready')
   } catch {
     if (!isCurrentWorkspace(workspaceRoot)) return
+    setIndexProgress(null)
     setIndexStatus('error')
   }
 }

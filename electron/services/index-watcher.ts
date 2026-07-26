@@ -1,7 +1,12 @@
 import { watch, type FSWatcher } from 'fs'
 import type { WebContents } from 'electron'
 import type { IndexBuildResult } from '../../src/types'
-import { buildProjectIndex, isSourcePath, sameWorkspaceRoot } from './project-indexer'
+import {
+  buildProjectIndex,
+  isSourcePath,
+  sameWorkspaceRoot,
+  setIndexProgressEmitter
+} from './project-indexer'
 
 const DEBOUNCE_MS = 800
 
@@ -75,6 +80,10 @@ export function startIndexWatcher(workspaceRoot: string, webContents: WebContent
 
   watchedRoot = workspaceRoot
   targetWebContents = webContents
+  setIndexProgressEmitter((root, progress) => {
+    if (!targetWebContents || targetWebContents.isDestroyed()) return
+    targetWebContents.send('index:progress', root, progress)
+  })
 
   try {
     watcher = watch(workspaceRoot, { recursive: true }, (_eventType, filename) => {
@@ -113,6 +122,7 @@ export function stopIndexWatcher(): void {
 
   watchedRoot = null
   targetWebContents = null
+  setIndexProgressEmitter(null)
 }
 
 export function getWatchedWorkspaceRoot(): string | null {

@@ -106,11 +106,12 @@ Renderer からは `window.compass.*` を呼び出します。実装の正は `e
 | `files.json` | パス・言語・import/export・シンボル概要 |
 | `graph.json` | ファイル間 import エッジ |
 | `summary.txt` | AI 向け要約テキスト |
+| `chunks.json` | テキストチャンク + ローカル埋め込み（意味 / ハイブリッド検索用） |
 | `chat-history.json` | 永続化されたチャット履歴 |
 | `settings.json` | ワークスペース設定（例: 既定の用途プリセット） |
 | `templates/` | 任意の文書テンプレート |
 
-チャット時に索引の関連部分をコンテキストへ載せる。埋め込みベクトルによる RAG 検索ではない。
+チャット時に構造索引の関連部分と、ハイブリッド検索の Related workspace excerpts をコンテキストへ載せる。埋め込みはローカル（モデルダウンロードなしのハッシュ埋め込み）で、Ask/Agent の回答自体はオンライン LLM を使う。
 
 ## マルチ LLM
 

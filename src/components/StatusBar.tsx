@@ -19,6 +19,7 @@ export function StatusBar() {
   const settings = useAppStore((s) => s.settings)
   const workspaceRoot = useAppStore((s) => s.workspaceRoot)
   const indexStatus = useAppStore((s) => s.indexStatus)
+  const indexProgress = useAppStore((s) => s.indexProgress)
   const indexMeta = useAppStore((s) => s.indexMeta)
   const reopenFileWithEncoding = useAppStore((s) => s.reopenFileWithEncoding)
   const setFileEncoding = useAppStore((s) => s.setFileEncoding)
@@ -105,7 +106,10 @@ export function StatusBar() {
   }
 
   const indexStatusLabel = () => {
-    if (indexStatus === 'indexing') return t('status.indexing')
+    if (indexStatus === 'indexing') {
+      const percent = indexProgress?.percent ?? 0
+      return t('status.indexingProgress', { percent })
+    }
     if (indexStatus === 'ready' && indexMeta) {
       return t('status.indexFiles', { count: indexMeta.fileCount })
     }

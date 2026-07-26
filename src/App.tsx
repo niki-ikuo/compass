@@ -307,34 +307,38 @@ export function App() {
   useEffect(() => {
     const setIndexStatus = useAppStore.getState().setIndexStatus
     const setIndexMeta = useAppStore.getState().setIndexMeta
+    const setIndexProgress = useAppStore.getState().setIndexProgress
+
+    const sameRoot = (root: string): boolean => {
+      const current = useAppStore.getState().workspaceRoot
+      if (!current) return false
+      return (
+        current.replace(/[/\\]+$/, '').replace(/\\/g, '/').toLowerCase() ===
+        root.replace(/[/\\]+$/, '').replace(/\\/g, '/').toLowerCase()
+      )
+    }
 
     const unsubUpdated = window.compass.index.onUpdated((result) => {
-      const current = useAppStore.getState().workspaceRoot
-      if (
-        !current ||
-        current.replace(/[/\\]+$/, '').replace(/\\/g, '/').toLowerCase() !==
-          result.workspaceRoot.replace(/[/\\]+$/, '').replace(/\\/g, '/').toLowerCase()
-      ) {
-        return
-      }
+      if (!sameRoot(result.workspaceRoot)) return
       setIndexMeta(result)
       setIndexStatus('ready')
     })
     const unsubStatus = window.compass.index.onStatus((status, root) => {
-      const current = useAppStore.getState().workspaceRoot
-      if (
-        !current ||
-        current.replace(/[/\\]+$/, '').replace(/\\/g, '/').toLowerCase() !==
-          root.replace(/[/\\]+$/, '').replace(/\\/g, '/').toLowerCase()
-      ) {
-        return
-      }
+      if (!sameRoot(root)) return
       setIndexStatus(status)
+    })
+    const unsubProgress = window.compass.index.onProgress((root, progress) => {
+      if (!sameRoot(root)) return
+      // Late 100% events can arrive after status is already ready (IPC reorder).
+      // Never reopen indexing from progress alone.
+      if (useAppStore.getState().indexStatus !== 'indexing') return
+      setIndexProgress(progress)
     })
 
     return () => {
       unsubUpdated()
       unsubStatus()
+      unsubProgress()
     }
   }, [])
 

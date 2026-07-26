@@ -161,12 +161,13 @@ export function recordToolObservation(
     return
   }
 
-  if (toolName === 'search') {
+  if (toolName === 'search' || toolName === 'searchMeaning') {
     const query = typeof args.query === 'string' ? args.query.trim() : ''
     if (!query) return
     const hits = extractSearchHitPaths(result.content).slice(0, 5)
     const hitPart = hits.length > 0 ? ` → ${hits.join(', ')}` : ''
-    pushEntry(state, 'search', `search "${query}" — ${result.summary}${hitPart}`)
+    const label = toolName === 'searchMeaning' ? 'searchMeaning' : 'search'
+    pushEntry(state, 'search', `${label} "${query}" — ${result.summary}${hitPart}`)
     return
   }
 
@@ -305,8 +306,12 @@ export function rebuildMemoryFromSteps(
         summary: step.summary,
         content: step.observation ?? ''
       })
-    } else if (step.name === 'search' && step.args && step.summary) {
-      recordToolObservation(state, 'search', step.args, {
+    } else if (
+      (step.name === 'search' || step.name === 'searchMeaning') &&
+      step.args &&
+      step.summary
+    ) {
+      recordToolObservation(state, step.name, step.args, {
         ok: true,
         summary: step.summary,
         content: step.observation ?? ''
