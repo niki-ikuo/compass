@@ -2,6 +2,10 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { SettingsIcon, ExplorerIcon, ChatIcon, TerminalIcon } from './icons/ToolbarIcons'
 import { useAppStore } from '@/stores/app-store'
 import { patchAppSettings } from '@/utils/patch-app-settings'
+import {
+  openOrCreateWorkspaceGlossary,
+  openOrCreateWorkspaceRules
+} from '@/utils/workspace-rules'
 import { useI18n } from '@/i18n'
 
 interface MenuBarProps {
@@ -148,6 +152,21 @@ export function MenuBar({
     { label: t('menu.openFolder'), shortcut: 'Ctrl+O', action: onOpenFolder },
     { label: t('menu.closeFolder'), shortcut: 'Ctrl+Shift+W', action: onCloseFolder },
     { label: t('menu.save'), shortcut: 'Ctrl+S', action: onSave },
+    { separator: true, label: '', action: () => {} },
+    {
+      label: t('menu.workspaceRules'),
+      action: () => {
+        if (!workspaceRoot) return
+        void openOrCreateWorkspaceRules(workspaceRoot)
+      }
+    },
+    {
+      label: t('menu.workspaceGlossary'),
+      action: () => {
+        if (!workspaceRoot) return
+        void openOrCreateWorkspaceGlossary(workspaceRoot)
+      }
+    },
     { separator: true, label: '', action: () => {} },
     { label: t('menu.settings'), shortcut: 'Ctrl+,', action: onOpenSettings },
     { separator: true, label: '', action: () => {} },

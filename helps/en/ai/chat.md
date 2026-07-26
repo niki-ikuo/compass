@@ -34,6 +34,8 @@ Use the right-hand chat to ask AI about the current file or selection.
 
 Separately from Ask / Edit / Agent, use-case presets (General / Document / Data / Code) control tone and approach.
 
+Workspace-wide tone and terms live in `.compass/rules.md` (optional `.compass/glossary.md`). Open via **File → Edit Workspace Rules** or the rules button in the chat header. They are auto-attached to Ask / Edit / Agent within the context budget.
+
 | Preset | Typical Agent extras |
 |--------|----------------------|
 | **Document** | Read Markdown by heading; light checks for headings / relative links |

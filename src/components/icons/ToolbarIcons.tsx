@@ -358,3 +358,29 @@ export function StopIcon() {
     </svg>
   )
 }
+
+/** ワークスペースルール（箇条書きドキュメント） */
+export function WorkspaceRulesIcon() {
+  return (
+    <svg {...iconProps}>
+      <path
+        d="M3.5 1.5h5.5L12.5 4.5V14.5H3.5V1.5z"
+        stroke="currentColor"
+        strokeWidth="1.2"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M9 1.5v3h3"
+        stroke="currentColor"
+        strokeWidth="1.2"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M5.5 7.5h5M5.5 10h5M5.5 12.5h3"
+        stroke="currentColor"
+        strokeWidth="1.2"
+        strokeLinecap="round"
+      />
+    </svg>
+  )
+}

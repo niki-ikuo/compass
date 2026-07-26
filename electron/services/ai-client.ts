@@ -28,6 +28,7 @@ import {
 import { getSettings } from './settings'
 import { ensureProjectIndex, getProjectIndexContext } from './project-indexer'
 import { formatMeaningExcerptsForAi } from './semantic-index'
+import { formatWorkspaceRulesForAi } from './workspace-rules'
 import { resolveChatContext, isInsideWorkspace } from './filesystem'
 import { getLlmProvider, getProviderLabel } from '../../src/utils/llm-providers'
 import { withOpenWebUiChatCompat } from '../../src/utils/open-webui-compat'
@@ -371,6 +372,19 @@ export async function buildUserMessagePayload(request: ChatRequest): Promise<Use
   if (request.mode === 'agent') {
     parts.push(t('ai.agentModeReminder'))
     parts.push('')
+  }
+
+  // Near the question so truncateKeepingEnd keeps tone/terms under budget pressure.
+  if (request.workspaceRoot) {
+    try {
+      const rulesBlock = await formatWorkspaceRulesForAi(request.workspaceRoot)
+      if (rulesBlock) {
+        parts.push(rulesBlock)
+        parts.push('')
+      }
+    } catch {
+      // Rules are optional; continue without them.
+    }
   }
 
   // Near the user question so reply language is not drowned out by long context/code.

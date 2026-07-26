@@ -237,6 +237,7 @@ export async function writeFileContent(
   content: string,
   encoding: FileEncoding = 'utf8'
 ): Promise<void> {
+  await mkdir(dirname(filePath), { recursive: true })
   await writeFile(filePath, encodeContent(content, encoding))
 }
 

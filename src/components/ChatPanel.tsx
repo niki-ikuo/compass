@@ -28,7 +28,7 @@ import { AgentStepTimeline } from './AgentStepTimeline'
 import { AgentPlanPanel } from './AgentPlanPanel'
 import { collectAgentStepsThrough } from '@/utils/agent-plan'
 import { AnimatedStatus } from './AnimatedEllipsis'
-import { ChatHistoryIcon, PlusIcon, CloseIcon } from './icons/ToolbarIcons'
+import { ChatHistoryIcon, PlusIcon, CloseIcon, WorkspaceRulesIcon } from './icons/ToolbarIcons'
 import {
   buildDisplayContentForActions,
   inferWorkspaceActionsFromCodeBlocks,
@@ -73,6 +73,7 @@ import {
   hasTabReorderDrag,
   resolveTabDropIndex
 } from '@/utils/tab-reorder'
+import { openOrCreateWorkspaceRules } from '@/utils/workspace-rules'
 import { useI18n, getDateLocale } from '@/i18n'
 
 function selectionRefKey(ref: ChatSelectionRef): string {
@@ -1541,6 +1542,18 @@ export function ChatPanel() {
             ↩
           </button>
           <button
+            type="button"
+            className="btn-icon"
+            disabled={!workspaceRoot}
+            onClick={() => {
+              if (!workspaceRoot) return
+              void openOrCreateWorkspaceRules(workspaceRoot)
+            }}
+            title={t('rules.edit')}
+          >
+            <WorkspaceRulesIcon />
+          </button>
+          <button
             className="btn-icon"
             onClick={() => createChatSession()}
             title={t('chat.newChat')}
@@ -1557,6 +1570,7 @@ export function ChatPanel() {
             <p className="hint">{t('chat.emptyModes')}</p>
             <p className="hint">{t('chat.emptyContext')}</p>
             <p className="hint">{t('chat.emptyPasteHint')}</p>
+            {workspaceRoot ? <p className="hint">{t('chat.emptyRulesHint')}</p> : null}
           </div>
         )}
         {chatMessages.map((msg, index) => {

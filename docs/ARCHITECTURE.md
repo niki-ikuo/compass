@@ -112,8 +112,10 @@ Indexing policy is **include text / exclude binary** (not an extension allowlist
 | `chat-history.json` | Persisted chat sessions |
 | `settings.json` | Workspace settings (e.g. default use-case preset) |
 | `templates/` | Optional document templates |
+| `rules.md` | Human-editable workspace rules (auto-attached to Ask / Edit / Agent) |
+| `glossary.md` | Optional glossary (document verify + AI context) |
 
-Relevant structure-index slices plus hybrid-search Related workspace excerpts are added to chat context. Embeddings are local (hash embeddings, no model download); Ask/Agent answers still use the online LLM.
+Relevant structure-index slices, hybrid-search Related workspace excerpts, and `.compass/rules.md` (plus optional glossary) are added to chat context. Embeddings are local (hash embeddings, no model download); Ask/Agent answers still use the online LLM.
 
 ## Multi-LLM
 

@@ -48,8 +48,10 @@ A `.compass/` directory may appear at the workspace root.
 | `chat-history.json` | Persisted chat history |
 | `settings.json` | Workspace settings (e.g. default use-case preset) |
 | `templates/` | Document templates (optional) |
+| `rules.md` | Workspace rules (auto-attached to Ask / Edit / Agent) |
+| `glossary.md` | Optional glossary (document verify + AI context) |
 
-You usually don’t need to edit these by hand.
+You usually don’t need to edit the index or history by hand. For tone and terms, use **File → Edit Workspace Rules** (or the chat rules button) to edit `rules.md`.
 
 ## FAQ
 

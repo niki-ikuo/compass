@@ -15,6 +15,8 @@ export const CONTEXT_BUDGET = {
   currentFileTokens: 30_000,
   refsTokens: 36_000,
   perRefFileTokens: 6_000,
+  /** `.compass/rules.md` + optional glossary auto-attached to Ask / Edit / Agent */
+  rulesTokens: 3_000,
   maxImages: 2,
   /** Raw base64 char cap per image (~75KB) */
   maxImageBase64Chars: 75_000,

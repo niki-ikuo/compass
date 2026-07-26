@@ -112,8 +112,10 @@ Renderer からは `window.compass.*` を呼び出します。実装の正は `e
 | `chat-history.json` | 永続化されたチャット履歴 |
 | `settings.json` | ワークスペース設定（例: 既定の用途プリセット） |
 | `templates/` | 任意の文書テンプレート |
+| `rules.md` | 人が編集するワークスペースルール（Ask / Edit / Agent に自動添付） |
+| `glossary.md` | 任意の用語集（文書 verify + AI コンテキスト） |
 
-チャット時に構造索引の関連部分と、ハイブリッド検索の Related workspace excerpts をコンテキストへ載せる。埋め込みはローカル（モデルダウンロードなしのハッシュ埋め込み）で、Ask/Agent の回答自体はオンライン LLM を使う。
+チャット時に構造索引の関連部分と、ハイブリッド検索の Related workspace excerpts、および `.compass/rules.md`（と任意の glossary）をコンテキストへ載せる。埋め込みはローカル（モデルダウンロードなしのハッシュ埋め込み）で、Ask/Agent の回答自体はオンライン LLM を使う。
 
 ## マルチ LLM
 
