@@ -98,11 +98,13 @@ Build on shipped Change Sets ([AI_APPLY_UNDO.md](./AI_APPLY_UNDO.md)).
 
 ### 6. Data results stay in the folder
 
-- [ ] Ask across multiple CSV/JSON files
-- [ ] “Save result as Markdown/CSV” via preview → apply
-- [ ] Re-run last saved query from that note
+- [x] Ask across multiple CSV/JSON files
+- [x] “Save result as Markdown/CSV” via preview → apply
+- [x] Re-run last saved query from that note
 
 **Done:** data answers become files next to the sources.
+
+**Touch:** `data-result` (sidecar / frontmatter), Explorer Ask about data / Save result, re-run from `.result.md`, `ai.preset.data` role, Agent `queryData.paths`.
 
 **Depends on:** (1) helpful but not required for a thin first cut.
 

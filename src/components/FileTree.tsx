@@ -41,6 +41,14 @@ import { openWorkspaceFile } from '@/utils/open-workspace-file'
 import { isHtmlFilePath, pathToFileUrl } from '@/utils/browser-tab'
 import { isExtractableDocumentPath } from '@/utils/extractable-document'
 import { buildSummarizeToMarkdownRequest } from '@/utils/summarize-to-markdown'
+import {
+  buildAskAcrossDataRequest,
+  buildRerunDataQueryRequest,
+  buildSaveDataResultRequest,
+  isDataResultNotePath,
+  isTabularDataAbsolutePath,
+  parseDataResultFrontmatter
+} from '@/utils/data-result'
 
 type InputMode = 'create-file' | 'create-folder' | 'rename'
 
@@ -1003,6 +1011,19 @@ export function FileTree() {
     [selectedPaths, visibleNodes]
   )
 
+  const getDataFileTargets = useCallback(
+    (contextNode: FileTreeNode | null): FileTreeNode[] => {
+      const store = useAppStore.getState()
+      return getChatAttachTargets(contextNode).filter(
+        (n) =>
+          !n.isDirectory &&
+          !n.isPreview &&
+          isTabularDataAbsolutePath(n.path, store.workspaceRoot)
+      )
+    },
+    [getChatAttachTargets]
+  )
+
   const getMoveSourcePaths = useCallback(
     (dragNode: FileTreeNode): string[] => {
       if (isWorkspaceRootPath(dragNode.path)) return []
@@ -1192,6 +1213,91 @@ export function FileTree() {
         preset: request.preset,
         contextRefs: [request.contextRef]
       })
+    },
+    [t]
+  )
+
+  const askAboutData = useCallback(
+    (contextNode: FileTreeNode | null) => {
+      setContextMenu(null)
+      const targets = getDataFileTargets(contextNode)
+      if (targets.length === 0) return
+      const store = useAppStore.getState()
+      const request = buildAskAcrossDataRequest(
+        targets.map((n) => n.path),
+        store.workspaceRoot,
+        (vars) => t('chat.askAboutDataPrompt', vars)
+      )
+      if (!request) return
+      store.requestChatComposerSend({
+        text: request.text,
+        mode: request.mode,
+        preset: request.preset,
+        contextRefs: request.contextRefs
+      })
+    },
+    [getDataFileTargets, t]
+  )
+
+  const saveDataResult = useCallback(
+    (contextNode: FileTreeNode | null) => {
+      setContextMenu(null)
+      const targets = getDataFileTargets(contextNode)
+      if (targets.length === 0) return
+      const store = useAppStore.getState()
+      const request = buildSaveDataResultRequest(
+        targets.map((n) => n.path),
+        store.workspaceRoot,
+        (vars) => t('chat.saveDataResultPrompt', vars)
+      )
+      if (!request) return
+      store.requestChatComposerSend({
+        text: request.text,
+        mode: request.mode,
+        preset: request.preset,
+        contextRefs: request.contextRefs
+      })
+    },
+    [getDataFileTargets, t]
+  )
+
+  const rerunDataQuery = useCallback(
+    async (node: FileTreeNode) => {
+      setContextMenu(null)
+      if (node.isPreview || node.isDirectory) return
+      const store = useAppStore.getState()
+      if (!store.workspaceRoot) return
+      try {
+        const open = store.openFiles.find((f) => f.path === node.path)
+        const content =
+          open && typeof open.content === 'string'
+            ? open.content
+            : (await window.compass.fs.readFile(node.path)).content
+        const { meta } = parseDataResultFrontmatter(content)
+        if (!meta) {
+          setError(t('explorer.rerunDataQueryFailed'))
+          return
+        }
+        const request = buildRerunDataQueryRequest(
+          node.path,
+          content,
+          store.workspaceRoot,
+          (vars) => t('chat.rerunDataQueryPrompt', vars)
+        )
+        if (!request) {
+          setError(t('explorer.rerunDataQueryFailed'))
+          return
+        }
+        setError(null)
+        store.requestChatComposerSend({
+          text: request.text,
+          mode: request.mode,
+          preset: request.preset,
+          contextRefs: request.contextRefs
+        })
+      } catch (err) {
+        setError(getErrorMessage(err, t('explorer.rerunDataQueryFailed')))
+      }
     },
     [t]
   )
@@ -1875,6 +1981,7 @@ export function FileTree() {
 
   const deleteTargets = contextMenu ? getDeleteTargets(contextMenu.node) : []
   const chatAttachTargets = contextMenu ? getChatAttachTargets(contextMenu.node) : []
+  const dataFileTargets = contextMenu ? getDataFileTargets(contextMenu.node) : []
   const canRename =
     contextMenu?.node &&
     deleteTargets.length === 1 &&
@@ -1894,6 +2001,14 @@ export function FileTree() {
       !contextMenu.node.isDirectory &&
       isExtractableDocumentPath(contextMenu.node.path)
   )
+  const canAskAboutData = dataFileTargets.length > 0
+  const canSaveDataResult = dataFileTargets.length > 0
+  const canRerunDataQuery = Boolean(
+    contextMenu?.node &&
+      !contextMenu.node.isPreview &&
+      !contextMenu.node.isDirectory &&
+      isDataResultNotePath(contextMenu.node.path)
+  )
   const canOpenInTabBrowser = Boolean(
     contextMenu?.node &&
       !contextMenu.node.isPreview &&
@@ -1903,7 +2018,13 @@ export function FileTree() {
   const canSearchInFolder = Boolean(
     contextMenu?.node && contextMenu.node.isDirectory && !contextMenu.node.isPreview
   )
-  const hasContextActions = canAddToChat || canSearchInFolder || canSummarizeToMarkdown
+  const hasContextActions =
+    canAddToChat ||
+    canSearchInFolder ||
+    canSummarizeToMarkdown ||
+    canAskAboutData ||
+    canSaveDataResult ||
+    canRerunDataQuery
   const hasOpenActions = canOpenInTabBrowser || canOpenWithDefaultApp || canShowInOsExplorer
   const hasMutateActions = canRename || canDelete
   const isRootDropTarget = dropTargetPath === normalizeNodePath(workspaceRoot)
@@ -2056,6 +2177,34 @@ export function FileTree() {
                   onClick={() => summarizeToMarkdown(contextMenu.node!)}
                 >
                   {t('explorer.summarizeToMarkdown')}
+                </button>
+              )}
+              {canAskAboutData && (
+                <button
+                  onMouseEnter={closeCreateSubmenu}
+                  onClick={() => askAboutData(contextMenu.node)}
+                >
+                  {dataFileTargets.length > 1
+                    ? t('explorer.askAboutDataMany', { count: dataFileTargets.length })
+                    : t('explorer.askAboutData')}
+                </button>
+              )}
+              {canSaveDataResult && (
+                <button
+                  onMouseEnter={closeCreateSubmenu}
+                  onClick={() => saveDataResult(contextMenu.node)}
+                >
+                  {dataFileTargets.length > 1
+                    ? t('explorer.saveDataResultMany', { count: dataFileTargets.length })
+                    : t('explorer.saveDataResult')}
+                </button>
+              )}
+              {canRerunDataQuery && (
+                <button
+                  onMouseEnter={closeCreateSubmenu}
+                  onClick={() => void rerunDataQuery(contextMenu.node!)}
+                >
+                  {t('explorer.rerunDataQuery')}
                 </button>
               )}
               {canSearchInFolder && (

@@ -39,7 +39,7 @@ Workspace-wide tone and terms live in `.compass/rules.md` (optional `.compass/gl
 | Preset | Typical Agent extras |
 |--------|----------------------|
 | **Document** | Read Markdown by heading; light checks for headings / relative links |
-| **Data** | Column profiles and read-only queries on CSV / TSV / JSON |
+| **Data** | Column profiles and read-only queries on CSV / TSV / JSON; save answers next to sources as `.result.md` / `.result.csv` |
 | **Code** / **General** | Standard tools (read / search / propose / exec / verify) |
 
 ## How to open
@@ -59,6 +59,7 @@ Workspace-wide tone and terms live in `.compass/rules.md` (optional `.compass/gl
 - You can also drag **editor tabs** into chat as references
 - Replies stream in
 - History is saved to `.compass/chat-history.json` in the workspace
+- For CSV / JSON: select one or more files in Explorer → **Ask about data** or **Save result as Markdown/CSV** (Agent + Data; preview → apply). Saved `.result.md` notes keep the query in frontmatter — right-click the note (or its editor tab) → **Re-run query**
 
 ### Applying Edit proposals
 

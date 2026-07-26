@@ -68,7 +68,8 @@ Agent is not “a longer Edit.” The model calls tools, observes results, and t
 - Agent `exec` is a short-lived child process — not the integrated terminal
 - Turn / tool limits may ask you to continue
 - `profileData` / `queryData` appear only when the use case is **Data** (queries are read-only)
-- CSV-like files load into an in-run temporary SQLite sandbox (not a persistent DB). For tables, Agent should prefer `profileData` then `queryData` (avoid whole-table `readFile`). A tool-step summary of `imported …` (fresh load) or `cached …` (reuse in the same run) means the table is in the sandbox
+- CSV-like files load into an in-run temporary SQLite sandbox (not a persistent DB). For tables, Agent should prefer `profileData` then `queryData` (avoid whole-table `readFile`). Pass multiple paths to `queryData` for JOINs. A tool-step summary of `imported …` (fresh load) or `cached …` (reuse in the same run) means the table is in the sandbox
+- To keep answers in the folder, use Explorer **Save result as Markdown/CSV** (or ask Agent to `proposeActions` writeFile a sidecar `.result.md` / `.result.csv` with `kind: data-result` frontmatter). Re-run from that note later
 
 ## FAQ
 
@@ -79,7 +80,7 @@ A. Not currently. Use Edit, or switch to a tools-capable provider such as OpenAI
 A. It may be waiting for approval or a continue confirmation. You can also cancel.
 
 **Q. How do I analyze a CSV with Agent?**  
-A. Set the use case to **Data**, then ask (e.g. “profile sales.csv and summarize null rates”). Tabular files should go through temporary SQLite (`profileData` / `queryData`); Agent can profile columns and run read-only queries without writing files until you approve a change. Check the step summary for `imported` / `cached` / `import failed` to see whether the load succeeded.
+A. Set the use case to **Data**, then ask (e.g. “profile sales.csv and summarize null rates”), or use Explorer **Ask about data** on one or more CSV/JSON files. Tabular files should go through temporary SQLite (`profileData` / `queryData`); Agent can profile columns and run read-only queries without writing files until you approve a change. Check the step summary for `imported` / `cached` / `import failed` to see whether the load succeeded. Use **Save result as Markdown/CSV** when you want the answer as a file next to the sources.
 
 ## Related
 

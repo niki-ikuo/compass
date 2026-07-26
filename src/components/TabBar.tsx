@@ -17,6 +17,11 @@ import { prepareCloseFiles, saveDirtyFiles } from '@/utils/unsaved-files'
 import { useI18n } from '@/i18n'
 import { CloseIcon } from './icons/ToolbarIcons'
 import type { OpenFile } from '@/types'
+import {
+  buildRerunDataQueryRequest,
+  isDataResultNotePath,
+  parseDataResultFrontmatter
+} from '@/utils/data-result'
 
 interface TabContextMenuState {
   x: number
@@ -67,6 +72,35 @@ export function TabBar() {
   const openTabsKey = openFiles.map((file) => file.path).join('|')
 
   const closeContextMenu = () => setContextMenu(null)
+
+  const rerunDataQueryFromTab = () => {
+    if (!contextMenu) return
+    const store = useAppStore.getState()
+    const file = store.openFiles.find((f) => f.path === contextMenu.path)
+    if (!file || !store.workspaceRoot || !isDataResultNotePath(file.path)) {
+      closeContextMenu()
+      return
+    }
+    const { meta } = parseDataResultFrontmatter(file.content)
+    if (!meta) {
+      closeContextMenu()
+      return
+    }
+    const request = buildRerunDataQueryRequest(
+      file.path,
+      file.content,
+      store.workspaceRoot,
+      (vars) => t('chat.rerunDataQueryPrompt', vars)
+    )
+    closeContextMenu()
+    if (!request) return
+    store.requestChatComposerSend({
+      text: request.text,
+      mode: request.mode,
+      preset: request.preset,
+      contextRefs: request.contextRefs
+    })
+  }
 
   const runClosePaths = async (paths: string[], activatePath?: string) => {
     if (closingRef.current || paths.length === 0) return
@@ -140,6 +174,14 @@ export function TabBar() {
   if (openFiles.length === 0) return null
 
   const canCloseOthers = openFiles.length > 1
+  const contextMenuFile = contextMenu
+    ? openFiles.find((f) => f.path === contextMenu.path)
+    : null
+  const canRerunDataQuery = Boolean(
+    contextMenuFile &&
+      isDataResultNotePath(contextMenuFile.path) &&
+      parseDataResultFrontmatter(contextMenuFile.content).meta
+  )
 
   return (
     <div
@@ -282,6 +324,11 @@ export function TabBar() {
           style={{ left: contextMenu.x, top: contextMenu.y }}
           onClick={(e) => e.stopPropagation()}
         >
+          {canRerunDataQuery && (
+            <button type="button" onClick={rerunDataQueryFromTab}>
+              {t('explorer.rerunDataQuery')}
+            </button>
+          )}
           <button
             type="button"
             onClick={() => void runClosePaths([contextMenu.path])}

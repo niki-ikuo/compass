@@ -68,7 +68,8 @@ Agent は「長い Edit」ではありません。モデルがツールを呼び
 - Agent の `exec` は短い子プロセス用で、下の統合ターミナルとは別物
 - ターン数・ツール回数に上限がある（続行確認が出ることがある）
 - `profileData` / `queryData` は用途が **データ** のときだけ使える（クエリは読み取り専用）
-- CSV 等は応答中だけの一時 SQLite に取込まれる（永続 DB ではない）。表データは原則 `profileData` → `queryData`（表の全文 `readFile` は避ける）。ツール行の summary が `imported …`（新規取込）または `cached …`（同一ラン内の再利用）なら取込済み
+- CSV 等は応答中だけの一時 SQLite に取込まれる（永続 DB ではない）。表データは原則 `profileData` → `queryData`（表の全文 `readFile` は避ける）。複数ファイルは `queryData` の paths で JOIN。ツール行の summary が `imported …`（新規取込）または `cached …`（同一ラン内の再利用）なら取込済み
+- 答えをフォルダに残すときは、エクスプローラーの **結果を Markdown/CSV に保存**（または Agent がソース横の `.result.md` / `.result.csv` を `proposeActions` の writeFile。frontmatter に `kind: data-result`）。あとからそのノートで再実行できる
 
 ## よくある質問
 
@@ -79,7 +80,7 @@ A. 現状できません。Edit を使うか、OpenAI / Gemini など tools 対�
 A. 承認待ちか、上限到達の続行待ちのことがあります。キャンセルもできます。
 
 **Q. CSV を Agent で調べたい**  
-A. 用途を **データ** にして依頼してください（例:「sales.csv をプロファイルして欠損率をまとめて」）。表は原則一時 SQLite（`profileData` / `queryData`）で扱い、列の調査や読み取り専用クエリはファイル変更の承認前に行えます。取込成否はステップ表示の `imported` / `cached` / `import failed` で確認できます。
+A. 用途を **データ** にして依頼するか、エクスプローラーで CSV/JSON を選んで **データについて聞く** を使ってください（例:「sales.csv をプロファイルして欠損率をまとめて」）。表は原則一時 SQLite（`profileData` / `queryData`）で扱い、列の調査や読み取り専用クエリはファイル変更の承認前に行えます。取込成否はステップ表示の `imported` / `cached` / `import failed` で確認できます。答えをファイルに残すときは **結果を Markdown/CSV に保存** を使います。
 
 ## 関連
 

@@ -109,7 +109,8 @@ Keep mode constraints (Edit requires `compass-actions`, Ask forbids changes, etc
 - Treat CSV / JSON / YAML as structure
 - Prefer column names, types, missing values, duplicates, nesting
 - Avoid schema-breaking edits (no silent column/key renames, etc.)
-- Agent: for tabular CSV/TSV/JSON of any size, prefer `profileData` then `queryData` (temp SQLite); avoid whole-table `readFile`
+- Agent: for tabular CSV/TSV/JSON of any size, prefer `profileData` then `queryData` (temp SQLite; `paths` for multi-file JOINs); avoid whole-table `readFile`
+- Persist answers next to sources as `.result.md` / `.result.csv` via `proposeActions` writeFile (YAML frontmatter `kind: data-result` with `sources` / `sql` / `format` for re-run)
 - Summarize with examples; name rows/keys when needed
 
 ### `general`

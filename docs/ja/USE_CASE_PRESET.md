@@ -109,7 +109,8 @@ UI でも同じドロップダウンに同居させない。
 - CSV / JSON / YAML を構造として扱う
 - 列名・型・欠損・重複・ネストの説明を優先
 - 変更時はスキーマ破壊を避ける（列順・キー名の勝手な変更禁止など）
-- Agent: 表形式の CSV/TSV/JSON はサイズに関係なく `profileData` → `queryData`（一時 SQLite）を優先し、表の全文 `readFile` は避ける
+- Agent: 表形式の CSV/TSV/JSON はサイズに関係なく `profileData` → `queryData`（一時 SQLite、複数は `paths` で JOIN）を優先し、表の全文 `readFile` は避ける
+- 答えをソース横の `.result.md` / `.result.csv` に `proposeActions` の writeFile で残す（YAML frontmatter `kind: data-result` に `sources` / `sql` / `format` を付けて再実行可能に）
 - 要約＋代表例。必要なら対象行・キーを明示
 
 ### `general`

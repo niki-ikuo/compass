@@ -205,6 +205,12 @@ export const ja = {
   'explorer.addToChat': 'チャットに追加',
   'explorer.addToChatMany': '{count} 件をチャットに追加',
   'explorer.summarizeToMarkdown': 'Markdown に要約',
+  'explorer.askAboutData': 'データについて聞く',
+  'explorer.askAboutDataMany': '{count} 件のデータについて聞く',
+  'explorer.saveDataResult': '結果を Markdown/CSV に保存',
+  'explorer.saveDataResultMany': '{count} 件の結果を保存',
+  'explorer.rerunDataQuery': 'クエリを再実行',
+  'explorer.rerunDataQueryFailed': '結果ノートからクエリを読めませんでした',
   'explorer.deleteConfirmOne': '「{name}」{kind}を削除しますか？',
   'explorer.deleteConfirmMany': '選択した {count} 件の項目を削除しますか？',
   'explorer.deleteMany': '{count} 件を削除',
@@ -303,6 +309,14 @@ export const ja = {
   'chat.pasteMediaFailed': '貼り付けたファイルの保存に失敗しました',
   'chat.summarizeToMarkdownPrompt':
     '{mention} の抽出テキストを Markdown に要約し、```compass-actions``` の writeFile で `{sidecar}` に書いてください（既存なら上書き）。見出し付きの読みやすい要約にし、元ファイルは編集しないでください。',
+  'chat.askAboutDataPrompt':
+    '{mentions} について調べてください。複数ファイルなら queryData の paths で JOIN / 突き合わせ、profileData → queryData で集計し、要点と代表行を示してください。ソースファイルは編集しないでください。',
+  'chat.saveDataResultPrompt':
+    '{mentions} への答えをフォルダに残してください。profileData → queryData（複数なら paths で JOIN）で調べ、proposeActions の writeFile で `{sidecarMd}` に Markdown 結果を書いてください（既存なら上書き）。先頭に YAML frontmatter（kind: data-result、sources: カンマ区切り相対パス、sql: 実行した SELECT、format: markdown または csv）を付け、本文は見出し・要約・Markdown 表にしてください。表形式の全行が有用なら同じ内容を `{sidecarCsv}` にも writeFile してください。ソース CSV/JSON は編集しないでください。',
+  'chat.rerunDataQueryPrompt':
+    '{mention} に保存されたクエリを再実行してください。sources: {sources} / sql: {sql}。profileData → queryData で同じ（または同等の）SELECT を実行し、proposeActions の writeFile で `{sidecarMd}` を更新（同じ frontmatter 形式で sql/sources/format を維持）。表結果が必要なら `{sidecarCsv}` も更新。ソースファイルは編集しないでください。',
+  'chat.emptyDataHint':
+    'CSV / JSON は複数選んでエクスプローラーから「データについて聞く」「結果を Markdown/CSV に保存」できます。保存した `.result.md` からクエリを再実行できます',
   'chat.dropFileNeedsWorkspace':
     '外部ファイルをドロップするには、先にフォルダを開いてください',
   'chat.externalFolderNotAllowed':
@@ -624,13 +638,13 @@ export const ja = {
   'ai.preset.document.role':
     'あなたは文書編集アシスタントです。日本語で回答してください。Markdown / テキストの推敲・構成・要約を主とし、見出し階層・用語の一貫・読みやすさを優先してください。PDF / .docx は抽出テキストとして参照・検索できます（バイナリ自体は編集しない）。要約を残すときは sidecar の `.summary.md` へ writeFile してください。「正しい実装」より読者向けの明確さを重視し、変更時は章単位なら replaceSection（path + heading + その章の内容）、それ以外は小さな applyPatch を推奨し全文書き換えは避けてください。他の章を壊さないこと。`.compass/rules.md` と `.compass/glossary.md` があればトーン・用語に従ってください。',
   'ai.preset.data.role':
-    'あなたはデータ整理アシスタントです。日本語で回答してください。CSV / TSV / JSON（オブジェクト配列）は構造化データとして扱い、列名・型・欠損・重複・ネストを優先してください。表データの調査はサイズに関係なく、まず profileData で一時 SQLite に取込んでから概要を取り、集計・絞り込み・JOIN は queryData（読み取り専用 SELECT）で行ってください。表全体の readFile は避けてください（例外: 非表テキスト、YAML 表、取込失敗後、パッチ用のごく短い抜粋）。変更時はスキーマ破壊を避け（列順・キー名の勝手な変更禁止）。ファイルへの書き戻しは proposeActions のみ（SQL での更新禁止）です。結果は要約と代表例で示し、必要なら対象行・キーを明示してください。',
+    'あなたはデータ整理アシスタントです。日本語で回答してください。CSV / TSV / JSON（オブジェクト配列）は構造化データとして扱い、列名・型・欠損・重複・ネストを優先してください。表データの調査はサイズに関係なく、まず profileData で一時 SQLite に取込んでから概要を取り、集計・絞り込み・JOIN は queryData（読み取り専用 SELECT、複数ファイルは paths）で行ってください。表全体の readFile は避けてください（例外: 非表テキスト、YAML 表、取込失敗後、パッチ用のごく短い抜粋）。変更時はスキーマ破壊を避け（列順・キー名の勝手な変更禁止）。ファイルへの書き戻しは proposeActions のみ（SQL での更新禁止）です。結果をフォルダに残すときはソース横の `.result.md`（任意で `.result.csv`）へ writeFile し、Markdown 先頭に YAML frontmatter（kind: data-result、sources、sql、format）を付けて再実行できるようにしてください。チャットだけの答えは要約と代表例で示し、必要なら対象行・キーを明示してください。',
   'ai.preset.general.role':
     'あなたは汎用ワークスペースアシスタントです。日本語で回答してください。フォルダ内のメモ・タスク・雑多なテキストの整理・分類・次アクション提示を主とし、断定しすぎず、過剰な技術用語を避けてください。',
   'ai.preset.document.reminder':
     '[文書向け] 見出し階層を壊さない。章単位は replaceSection、それ以外は小さな差分を優先。ワークスペースルール／用語集があれば従う。',
   'ai.preset.data.reminder':
-    '[データ向け] 表は原則 profileData → queryData（一時 SQLite）。表の全文 readFile はしない。列名・キー名・列順を勝手に変えない。書き戻しは proposeActions のみ。',
+    '[データ向け] 表は原則 profileData → queryData（一時 SQLite、複数は paths）。表の全文 readFile はしない。列名・キー名・列順を勝手に変えない。書き戻しは proposeActions のみ。結果保存はソース横の .result.md（frontmatter: kind/sources/sql/format）と必要なら .result.csv。',
   'ai.preset.general.reminder': '[一般向け] 短く整理し、次のアクションを示す。',
   'ai.editSystemPrompt':
     'Editモードでは、ファイル/フォルダの作成・変更・削除は必ず```compass-actions```コードブロック内のJSONだけで返してください。通常の```css```や```html```などのコードブロックでファイル全体を提示してはいけません。説明文は短くし、実際の変更内容はcompass-actionsに含めてください。形式は {"actions":[{"type":"mkdir","path":"relative/path"},{"type":"applyPatch","path":"relative/file.ts","patch":"@@ -10,3 +10,4 @@\\n context\\n-old\\n+new\\n context"},{"type":"replaceSection","path":"relative/doc.md","heading":"セットアップ","content":"## セットアップ\\n..."},{"type":"writeFile","path":"relative/file.ts","content":"..."},{"type":"deleteFile","path":"relative/file.ts"},{"type":"deleteDir","path":"relative/folder"}]} とし、既存ファイルの修正は全文 writeFile より applyPatch（unified diff の hunk）を優先してください。Markdown の特定見出し配下だけ書き換えるときは replaceSection を使い、他の章を触らないでください。patch は @@ -start,count +start,count @@ 形式の unified diff のみ（*** Begin Patch / *** Update File: は禁止）。同一ファイルへの変更は1つの applyPatch にまとめてください。pathはワークスペース直下からの相対パス（例: style.css。フォルダ名を重複して含めない）のみ使用してください。プロジェクト構造インデックス(.compass)が提供された場合は、ファイル間の関係を踏まえて回答してください。ワークスペースルール（.compass/rules.md）や用語集があれば従ってください。',
@@ -926,6 +940,12 @@ export const en: Record<MessageKey, string> = {
   'explorer.addToChat': 'Add to Chat',
   'explorer.addToChatMany': 'Add {count} to Chat',
   'explorer.summarizeToMarkdown': 'Summarize to Markdown',
+  'explorer.askAboutData': 'Ask about data',
+  'explorer.askAboutDataMany': 'Ask about {count} data files',
+  'explorer.saveDataResult': 'Save result as Markdown/CSV',
+  'explorer.saveDataResultMany': 'Save result for {count} files',
+  'explorer.rerunDataQuery': 'Re-run query',
+  'explorer.rerunDataQueryFailed': 'Could not read a query from this result note',
   'explorer.deleteConfirmOne': 'Delete {kind} "{name}"?',
   'explorer.deleteConfirmMany': 'Delete {count} selected items?',
   'explorer.deleteMany': 'Delete {count}',
@@ -1021,6 +1041,14 @@ export const en: Record<MessageKey, string> = {
   'chat.pasteMediaFailed': 'Failed to save the pasted file',
   'chat.summarizeToMarkdownPrompt':
     'Summarize the extracted text from {mention} as Markdown and write it to `{sidecar}` with a writeFile action inside ```compass-actions``` (overwrite if it already exists). Use clear headings, keep it readable, and do not edit the source file.',
+  'chat.askAboutDataPrompt':
+    'Inspect {mentions}. For multiple files, JOIN / compare via queryData paths; use profileData → queryData for aggregates; summarize with representative rows. Do not edit the source files.',
+  'chat.saveDataResultPrompt':
+    'Persist the answer for {mentions} in the folder. Use profileData → queryData (paths for multiple files / JOINs), then proposeActions writeFile to `{sidecarMd}` as Markdown (overwrite if it exists). Start with YAML frontmatter (kind: data-result, sources: comma-separated relative paths, sql: the SELECT you ran, format: markdown or csv), then headings, a short summary, and a Markdown table. If full tabular rows are useful, also writeFile `{sidecarCsv}`. Do not edit the source CSV/JSON files.',
+  'chat.rerunDataQueryPrompt':
+    'Re-run the query saved in {mention}. sources: {sources} / sql: {sql}. Use profileData → queryData with the same (or equivalent) SELECT, then proposeActions writeFile to refresh `{sidecarMd}` (keep the same frontmatter shape for sql/sources/format). Update `{sidecarCsv}` when a table export is useful. Do not edit the source files.',
+  'chat.emptyDataHint':
+    'Select one or more CSV / JSON files in Explorer to Ask about data or Save result as Markdown/CSV. Re-run the query from a saved `.result.md` note',
   'chat.dropFileNeedsWorkspace': 'Open a folder before dropping external files',
   'chat.externalFolderNotAllowed':
     'External folders cannot be added to chat. Drop files only',
@@ -1326,13 +1354,13 @@ export const en: Record<MessageKey, string> = {
   'ai.preset.document.role':
     'You are a document-editing assistant. Respond in English. Prioritize drafting, structuring, and summarizing Markdown/text; keep heading hierarchy, terminology, and readability consistent. PDF / .docx are available as extracted text for reference and search (do not edit the binaries). When saving a summary, writeFile a sidecar `.summary.md`. Prefer clarity for readers over "correct implementation." For a single Markdown chapter, prefer replaceSection (path + heading + section body); otherwise prefer small applyPatch edits over full-file rewrites. Do not rewrite other chapters. Follow `.compass/rules.md` and `.compass/glossary.md` when present.',
   'ai.preset.data.role':
-    'You are a data-organization assistant. Respond in English. Treat CSV / TSV / JSON (array of objects) as structured data; prioritize column names, types, missing values, duplicates, and nesting. For tabular files of any size, always start with profileData (loads into the in-run temporary SQLite sandbox), then use queryData (read-only SELECT) for aggregates, filters, and JOINs. Avoid whole-table readFile except for non-tabular text, YAML tables, after an import failure, or a tiny excerpt needed for a patch. Avoid schema-breaking changes (do not reorder columns or rename keys casually). Never write files via SQL — use proposeActions only. Summarize with representative examples and name target rows/keys when needed.',
+    'You are a data-organization assistant. Respond in English. Treat CSV / TSV / JSON (array of objects) as structured data; prioritize column names, types, missing values, duplicates, and nesting. For tabular files of any size, always start with profileData (loads into the in-run temporary SQLite sandbox), then use queryData (read-only SELECT; use paths for multiple files / JOINs) for aggregates, filters, and JOINs. Avoid whole-table readFile except for non-tabular text, YAML tables, after an import failure, or a tiny excerpt needed for a patch. Avoid schema-breaking changes (do not reorder columns or rename keys casually). Never write files via SQL — use proposeActions only. When persisting answers, writeFile a sidecar `.result.md` (and optionally `.result.csv`) next to the sources, with YAML frontmatter (kind: data-result, sources, sql, format) so the query can be re-run. For chat-only answers, summarize with representative examples and name target rows/keys when needed.',
   'ai.preset.general.role':
     'You are a general workspace assistant. Respond in English. Help organize notes, tasks, and mixed text in the folder: classify, structure, and suggest next actions without over-asserting. Avoid unnecessary technical jargon.',
   'ai.preset.document.reminder':
     '[Document] Do not break heading hierarchy. Prefer replaceSection for chapter edits; otherwise small patches. Follow workspace rules / glossary when present.',
   'ai.preset.data.reminder':
-    '[Data] For tables: profileData then queryData (temp SQLite). No whole-table readFile. Do not rename/reorder columns/keys casually; write only via proposeActions.',
+    '[Data] For tables: profileData then queryData (temp SQLite; paths for multiple). No whole-table readFile. Do not rename/reorder columns/keys casually; write only via proposeActions. Persist results as .result.md next to sources (frontmatter: kind/sources/sql/format) and .result.csv when useful.',
   'ai.preset.general.reminder': '[General] Keep it short; suggest clear next actions.',
   'ai.editSystemPrompt':
     'In Edit mode, create/update/delete files and folders only via a ```compass-actions``` JSON code block. Do not present full file contents in normal ```css``` / ```html``` (etc.) code blocks. Keep explanations short; put the actual changes in compass-actions. Format: {"actions":[{"type":"mkdir","path":"relative/path"},{"type":"applyPatch","path":"relative/file.ts","patch":"@@ -10,3 +10,4 @@\\n context\\n-old\\n+new\\n context"},{"type":"replaceSection","path":"relative/doc.md","heading":"Setup","content":"## Setup\\n..."},{"type":"writeFile","path":"relative/file.ts","content":"..."},{"type":"deleteFile","path":"relative/file.ts"},{"type":"deleteDir","path":"relative/folder"}]}. Prefer applyPatch (unified-diff hunks) for edits to existing files over full writeFile rewrites. For rewriting one Markdown heading subtree only, use replaceSection and leave other chapters untouched. The patch must be unified diff with @@ -start,count +start,count @@ hunks only—never Cursor/OpenAI *** Begin Patch / *** Update File: wrappers. Combine all edits to the same file into one applyPatch. Paths must be relative to the workspace root (e.g. style.css; do not duplicate folder names). If a project structure index (.compass) is provided, use file relationships in your answer. Follow workspace rules (.compass/rules.md) and glossary when present.',

@@ -1571,6 +1571,7 @@ export function ChatPanel() {
             <p className="hint">{t('chat.emptyContext')}</p>
             <p className="hint">{t('chat.emptyPasteHint')}</p>
             {workspaceRoot ? <p className="hint">{t('chat.emptyRulesHint')}</p> : null}
+            {workspaceRoot ? <p className="hint">{t('chat.emptyDataHint')}</p> : null}
           </div>
         )}
         {chatMessages.map((msg, index) => {
