@@ -157,6 +157,7 @@ idle → thinking → tool_call → (waiting_approval)? → applying? → thinki
 | document / data light verify | 出荷済み — 見出し / 相対リンク；CSV/TSV/JSON/YAML スキーマ |
 | Markdown セクション `readFile` | 出荷済み — 任意の `heading` 引数 |
 | Data Agent サンドボックス | 出荷済み — 用途 `data` 時の `profileData` / `queryData`（`agent-data-sandbox.ts`、sql.js） |
+| 信頼できる読取の自動実行 | Phase 1 で出荷済み — `readFile` / `listDir` / `search` / `searchMeaning`（および data の `profileData` / `queryData`）は承認不要。ゲートは `proposeActions` と危険な `exec` のみ |
 
 ---
 
@@ -168,7 +169,7 @@ SPEC に合わせる:
 |------|------|------|
 | v2.1 | セマンティック検索 / RAG / 埋め込み | 出荷済み（ハイブリッド + ハッシュ。任意で API 埋め込み） |
 | v3.0 | MCP、プラグイン、非 OpenAI 互換ネイティブ API | 未着手 |
-| ポリシー | 信頼できる読取専用ツールのみ、任意の自動承認 | 未着手 |
+| ポリシー | 任意の自動承認 UI / MCP 時代のツール allowlist（現行の組込読取ツールはすでに自動実行） | 未着手 |
 
 ---
 

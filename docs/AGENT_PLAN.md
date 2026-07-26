@@ -156,6 +156,7 @@ End-to-end tool loop without mutating the workspace.
 | Document / data light verify | Shipped — headings / relative links; CSV/TSV/JSON/YAML schema checks |
 | Markdown section `readFile` | Shipped — optional `heading` argument |
 | Data Agent sandbox | Shipped — `profileData` / `queryData` when use-case is `data` (`agent-data-sandbox.ts`, sql.js) |
+| Trusted read-only auto-run | Shipped with Phase 1 — `readFile` / `listDir` / `search` / `searchMeaning` (and data `profileData` / `queryData`) need no user approval; gates remain `proposeActions` + risky `exec` |
 
 ---
 
@@ -167,7 +168,7 @@ Aligned with SPEC:
 |------|--------|--------|
 | v2.1 | Semantic search / RAG / embeddings | Shipped (hybrid + hash; optional API embeddings) |
 | v3.0 | MCP, plugins, native non–OpenAI APIs | Not started |
-| Policy | Optional auto-approve for trusted read-only tools only | Not started |
+| Policy | Optional user-facing auto-approve settings / MCP-era tool allowlist (current built-in read tools already auto-run) | Not started |
 
 ---
 
