@@ -1,8 +1,9 @@
 import { FileTree } from './FileTree'
 import { SearchPanel } from './SearchPanel'
+import { WorkspaceOutline } from './WorkspaceOutline'
 import { useAppStore } from '@/stores/app-store'
 import { useI18n } from '@/i18n'
-import { ExplorerIcon, SearchIcon } from './icons/ToolbarIcons'
+import { ExplorerIcon, OutlineIcon, SearchIcon } from './icons/ToolbarIcons'
 
 export function LeftSidebar() {
   const { t } = useI18n()
@@ -10,9 +11,11 @@ export function LeftSidebar() {
   const setLeftSidebarView = useAppStore((s) => s.setLeftSidebarView)
   const workspaceRoot = useAppStore((s) => s.workspaceRoot)
   const openSearchPanel = useAppStore((s) => s.openSearchPanel)
+  const openOutlinePanel = useAppStore((s) => s.openOutlinePanel)
 
   const explorerActive = leftSidebarView === 'explorer'
   const searchActive = leftSidebarView === 'search'
+  const outlineActive = leftSidebarView === 'outline'
 
   return (
     <div className="left-sidebar">
@@ -28,6 +31,19 @@ export function LeftSidebar() {
         >
           <ExplorerIcon />
           <span>{t('sidebar.explorer')}</span>
+        </button>
+        <button
+          type="button"
+          role="tab"
+          className={`left-sidebar-view-btn${outlineActive ? ' active' : ''}`}
+          aria-selected={outlineActive}
+          disabled={!workspaceRoot}
+          title={workspaceRoot ? t('sidebar.outline') : t('outline.noWorkspace')}
+          aria-label={t('sidebar.outline')}
+          onClick={() => openOutlinePanel()}
+        >
+          <OutlineIcon />
+          <span>{t('sidebar.outline')}</span>
         </button>
         <button
           type="button"
@@ -50,6 +66,9 @@ export function LeftSidebar() {
           aria-hidden={!explorerActive}
         >
           <FileTree />
+        </div>
+        <div className="left-sidebar-panel" hidden={!outlineActive} aria-hidden={!outlineActive}>
+          <WorkspaceOutline />
         </div>
         <div className="left-sidebar-panel" hidden={!searchActive} aria-hidden={!searchActive}>
           <SearchPanel />

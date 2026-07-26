@@ -26,12 +26,12 @@
 - OpenAI-compatible API (multi-LLM: provider presets, per-provider API keys, model selection)
 - Settings (API keys, etc.)
 - Integrated terminal (xterm.js + node-pty)
-- Workspace structure index (`.compass/` — file list, import graph for code, etc. for AI context)
+- Workspace structure index (`.compass/` — index text / skip binary; file list, import graph for code, etc. for AI context)
 - Chat history persisted per workspace (`.compass/chat-history.json`)
 - Use-case presets (`general` / `document` / `data` / `code`) — orthogonal to Ask / Edit / Agent; see [USE_CASE_PRESET.md](./USE_CASE_PRESET.md)
 - Inline completions (ghost text / Tab accept; toggle in Settings)
 - Doc templates (built-in Markdown presets; workspace `.compass/templates/`)
-- Left sidebar Explorer / Search tabs (workspace text search)
+- Left sidebar Explorer / Outline / Search tabs (cross-file heading jump + workspace text search)
 - Offline help + AI Help (`helps/` + `help:*` IPC)
 - Agent UX when tools unsupported — hide Agent toggle per provider; guided Edit fallback — see [AGENT_PLAN.md](./AGENT_PLAN.md) §7
 
@@ -50,8 +50,8 @@
 │  Menu bar  [File] [Edit] [View] [Settings]               │
 ├──────────┬───────────────────────────────┬───────────────┤
 │ Explorer │  Tabs: plan.md  notes.md      │               │
-│ / Search │───────────────────────────────│   AI chat     │
-│          │                               │               │
+│ / Outline│───────────────────────────────│   AI chat     │
+│ / Search │                               │               │
 │  📁 docs │   Monaco Editor               │  ┌──────────┐ │
 │   📄 plan│   (syntax highlighting)       │  │ history  │ │
 │   📄 data│                               │  └──────────┘ │
@@ -66,7 +66,7 @@
 |------|------|
 | Window size | Default 1280×800, resizable |
 | Layout | 3 panes (left sidebar 20% / editor 50% / chat 30%), panels collapsible |
-| Left sidebar | Explorer (file tree) and Search (workspace text search) tabs |
+| Left sidebar | Explorer / Outline (all Markdown headings) / Search tabs |
 
 ---
 

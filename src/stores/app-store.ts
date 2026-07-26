@@ -264,7 +264,9 @@ function getWriteActionsForFile(
 
   const writeAction = preview.actions.find(
     (action) =>
-      (action.type === 'writeFile' || action.type === 'applyPatch') &&
+      (action.type === 'writeFile' ||
+        action.type === 'applyPatch' ||
+        action.type === 'replaceSection') &&
       action.path.replace(/\\/g, '/') === rel
   )
   if (writeAction) actions.push(writeAction)
@@ -298,7 +300,11 @@ function removeFileFromPendingPreview(
   )
 
   const remainingActions = preview.actions.filter((action) => {
-    if (action.type === 'writeFile' || action.type === 'applyPatch') {
+    if (
+      action.type === 'writeFile' ||
+      action.type === 'applyPatch' ||
+      action.type === 'replaceSection'
+    ) {
       return action.path.replace(/\\/g, '/') !== relativePath
     }
     if (action.type === 'mkdir') {
@@ -808,6 +814,7 @@ interface AppState {
   setShowTerminal: (show: boolean) => void
   setLeftSidebarView: (view: LeftSidebarView) => void
   openSearchPanel: (options?: { replace?: boolean; rootPath?: string | null }) => void
+  openOutlinePanel: () => void
   setSearchQuery: (query: string) => void
   setSearchReplace: (value: string) => void
   setSearchMode: (mode: WorkspaceSearchMode) => void
@@ -1672,6 +1679,11 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
   setShowTerminal: (show) => set({ showTerminal: show }),
   setLeftSidebarView: (view) => set({ leftSidebarView: view }),
+  openOutlinePanel: () =>
+    set({
+      showFileTree: true,
+      leftSidebarView: 'outline'
+    }),
   openSearchPanel: (options) =>
     set((state) => ({
       showFileTree: true,

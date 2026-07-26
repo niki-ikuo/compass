@@ -30,6 +30,7 @@ import { t } from '../../src/i18n/runtime'
 import { normalizeWorkspaceActionPath } from '../../src/utils/workspace-actions'
 import { buildUniqueFileName } from '../../src/utils/unique-file-name'
 import { ApplyPatchError, applyUnifiedDiff } from '../../src/utils/apply-patch'
+import { replaceMarkdownSection } from '../../src/utils/markdown-outline'
 import { decodeFileBuffer, encodeContent } from './encoding'
 import { getImageMimeType, isImagePath, isPdfPath } from '../../src/utils/media-context'
 import {
@@ -50,6 +51,7 @@ const PATHED_ACTION_TYPES = new Set([
   'mkdir',
   'writeFile',
   'applyPatch',
+  'replaceSection',
   'deleteFile',
   'deleteDir'
 ])
@@ -61,8 +63,8 @@ function isPathedAction(
 }
 
 /**
- * Resolve applyPatch → writeFile using current disk contents so preview/apply
- * use the exact bytes the user approved.
+ * Resolve applyPatch / replaceSection → writeFile using current disk contents
+ * so preview/apply use the exact bytes the user approved.
  */
 export async function materializeWorkspaceActions(
   workspaceRoot: string,
@@ -71,17 +73,16 @@ export async function materializeWorkspaceActions(
   const out: WorkspaceAction[] = []
 
   for (const action of actions) {
-    if (action.type !== 'applyPatch') {
+    if (action.type !== 'applyPatch' && action.type !== 'replaceSection') {
       out.push(action)
       continue
     }
 
     const relativePath = normalizeActionPath(workspaceRoot, action.path)
     if (!relativePath) {
-      throw new ApplyPatchError(t('fs.patchEmptyPath'))
-    }
-    if (typeof action.patch !== 'string' || !action.patch.trim()) {
-      throw new ApplyPatchError(t('fs.patchEmpty', { path: relativePath }))
+      throw new ApplyPatchError(
+        action.type === 'replaceSection' ? t('fs.sectionEmptyPath') : t('fs.patchEmptyPath')
+      )
     }
 
     const filePath = resolveInsideWorkspace(workspaceRoot, relativePath)
@@ -95,15 +96,37 @@ export async function materializeWorkspaceActions(
       oldContent = (await readFileContent(filePath)).content
     }
 
-    try {
-      const newContent = applyUnifiedDiff(oldContent, action.patch)
-      out.push({ type: 'writeFile', path: relativePath, content: newContent })
-    } catch (err) {
-      if (err instanceof ApplyPatchError) {
-        throw new ApplyPatchError(t('fs.patchFailed', { path: relativePath, reason: err.message }))
+    if (action.type === 'applyPatch') {
+      if (typeof action.patch !== 'string' || !action.patch.trim()) {
+        throw new ApplyPatchError(t('fs.patchEmpty', { path: relativePath }))
       }
-      throw err
+      try {
+        const newContent = applyUnifiedDiff(oldContent, action.patch)
+        out.push({ type: 'writeFile', path: relativePath, content: newContent })
+      } catch (err) {
+        if (err instanceof ApplyPatchError) {
+          throw new ApplyPatchError(t('fs.patchFailed', { path: relativePath, reason: err.message }))
+        }
+        throw err
+      }
+      continue
     }
+
+    if (!exists) {
+      throw new Error(t('fs.sectionMissingFile', { path: relativePath }))
+    }
+    const heading = typeof action.heading === 'string' ? action.heading.trim() : ''
+    if (!heading) {
+      throw new Error(t('fs.sectionEmptyHeading', { path: relativePath }))
+    }
+    if (typeof action.content !== 'string') {
+      throw new Error(t('fs.sectionEmptyContent', { path: relativePath }))
+    }
+    const newContent = replaceMarkdownSection(oldContent, heading, action.content)
+    if (newContent === null) {
+      throw new Error(t('fs.sectionNotFound', { path: relativePath, heading }))
+    }
+    out.push({ type: 'writeFile', path: relativePath, content: newContent })
   }
 
   return out

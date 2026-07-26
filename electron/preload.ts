@@ -12,6 +12,7 @@ import type {
   IndexBuildProgress,
   EnsureIndexResult,
   ProjectIndexContext,
+  WorkspaceOutline,
   ResolvedChatContext,
   ActionPreviewItem,
   WorkspaceAction,
@@ -371,6 +372,8 @@ const compassAPI = {
       }
     ): Promise<ProjectIndexContext | null> =>
       ipcRenderer.invoke('index:getContext', workspaceRoot, options),
+    getOutline: (workspaceRoot: string): Promise<WorkspaceOutline | null> =>
+      ipcRenderer.invoke('index:getOutline', workspaceRoot),
     onUpdated: (callback: (result: IndexBuildResult) => void): (() => void) => {
       const handler = (_event: Electron.IpcRendererEvent, result: IndexBuildResult): void =>
         callback(result)

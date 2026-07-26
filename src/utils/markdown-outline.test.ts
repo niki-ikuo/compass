@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import {
   compactDiffLines,
+  compactProseDiffLines,
   diffMarkdownHeadings,
   extractMarkdownSection,
   extractMarkdownSummary,
+  parseGlossaryMarkdown,
   parseMarkdownDocLinks,
   parseMarkdownHeadings,
+  replaceMarkdownSection,
   resolveMarkdownLink,
   validateMarkdownDocument
 } from '@/utils/markdown-outline'
@@ -55,6 +58,24 @@ describe('extractMarkdownSection', () => {
   })
 })
 
+describe('replaceMarkdownSection', () => {
+  it('replaces one heading subtree without touching siblings', () => {
+    const text = ['# Title', '', '## Setup', 'old', '## Next', 'keep'].join('\n')
+    const next = replaceMarkdownSection(text, 'Setup', '## Setup\nnew body')
+    expect(next).toBe(['# Title', '', '## Setup', 'new body', '## Next', 'keep'].join('\n'))
+  })
+
+  it('prepends the original heading when body has none', () => {
+    const text = ['## Setup', 'old', '## Next', 'keep'].join('\n')
+    const next = replaceMarkdownSection(text, 'Setup', 'rewritten')
+    expect(next).toBe(['## Setup', 'rewritten', '## Next', 'keep'].join('\n'))
+  })
+
+  it('returns null when heading is missing', () => {
+    expect(replaceMarkdownSection('# A\n', 'Missing', 'x')).toBeNull()
+  })
+})
+
 describe('parseMarkdownDocLinks / resolveMarkdownLink', () => {
   it('resolves relative doc links and skips urls / images', () => {
     const text = [
@@ -86,6 +107,15 @@ describe('validateMarkdownDocument', () => {
     })
     expect(issues.some((i) => i.kind === 'duplicate_heading')).toBe(true)
     expect(issues.some((i) => i.kind === 'broken_link')).toBe(true)
+  })
+
+  it('flags glossary term mismatches', () => {
+    const glossary = parseGlossaryMarkdown('API Key | apikey\n')
+    expect(glossary).toEqual([{ preferred: 'API Key', avoid: ['apikey'] }])
+    const issues = validateMarkdownDocument('Use an apikey here.\n', {
+      glossaryTerms: glossary
+    })
+    expect(issues.some((i) => i.kind === 'term_mismatch')).toBe(true)
   })
 })
 
@@ -119,5 +149,25 @@ describe('compactDiffLines', () => {
     expect(compact).toContainEqual({ type: 'add', content: 'new' })
     expect(compact).toContainEqual({ type: 'same', content: 'd' })
     expect(compact.at(-1)).toEqual({ type: 'skip', count: 2 })
+  })
+})
+
+describe('compactProseDiffLines', () => {
+  it('inserts nearest heading context before a change region', () => {
+    const oldText = ['# Title', '', '## Setup', 'alpha', 'beta', 'gamma', 'delta'].join('\n')
+    const lines = [
+      { type: 'same' as const, content: '# Title' },
+      { type: 'same' as const, content: '' },
+      { type: 'same' as const, content: '## Setup' },
+      { type: 'same' as const, content: 'alpha' },
+      { type: 'same' as const, content: 'beta' },
+      { type: 'remove' as const, content: 'gamma' },
+      { type: 'add' as const, content: 'gamma2' },
+      { type: 'same' as const, content: 'delta' }
+    ]
+    const compact = compactProseDiffLines(lines, oldText, 1)
+    expect(compact).toContainEqual({ type: 'heading', level: 2, text: 'Setup' })
+    expect(compact).toContainEqual({ type: 'remove', content: 'gamma' })
+    expect(compact).toContainEqual({ type: 'add', content: 'gamma2' })
   })
 })

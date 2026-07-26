@@ -73,6 +73,14 @@ export type MarkdownHeadingIssueKind =
   | 'level_jump'
   | 'duplicate_heading'
   | 'broken_link'
+  | 'term_mismatch'
+
+export interface GlossaryTerm {
+  /** 推奨表記 */
+  preferred: string
+  /** 避ける表記 */
+  avoid: string[]
+}
 
 export interface MarkdownHeadingIssue {
   kind: MarkdownHeadingIssueKind
@@ -157,17 +165,21 @@ export function parseMarkdownDocLinks(text: string, fromFile: string): string[] 
   return out
 }
 
-/**
- * 指定見出し（テキスト一致、大文字小文字無視可）から
- * 同レベル以上の次見出し直前までのセクション本文を返す。
- */
-export function extractMarkdownSection(text: string, headingText: string): string | null {
+function findHeadingIndex(headings: MarkdownHeading[], headingText: string): number {
   const needle = headingText.replace(/^#+\s*/, '').trim()
-  if (!needle) return null
-  const headings = parseMarkdownHeadings(text)
-  const idx = headings.findIndex(
+  if (!needle) return -1
+  return headings.findIndex(
     (h) => h.text === needle || h.text.toLowerCase() === needle.toLowerCase()
   )
+}
+
+/** 指定見出しから同レベル以上の次見出し直前までの行範囲（0-based, end exclusive）。 */
+export function findMarkdownSectionRange(
+  text: string,
+  headingText: string
+): { startLine: number; endExclusive: number; heading: MarkdownHeading } | null {
+  const headings = parseMarkdownHeadings(text)
+  const idx = findHeadingIndex(headings, headingText)
   if (idx < 0) return null
 
   const start = headings[idx]
@@ -179,7 +191,60 @@ export function extractMarkdownSection(text: string, headingText: string): strin
       break
     }
   }
-  return lines.slice(start.line - 1, endExclusive).join('\n')
+  return { startLine: start.line - 1, endExclusive, heading: start }
+}
+
+/**
+ * 指定見出し（テキスト一致、大文字小文字無視可）から
+ * 同レベル以上の次見出し直前までのセクション本文を返す。
+ */
+export function extractMarkdownSection(text: string, headingText: string): string | null {
+  const range = findMarkdownSectionRange(text, headingText)
+  if (!range) return null
+  return text.split('\n').slice(range.startLine, range.endExclusive).join('\n')
+}
+
+/**
+ * 見出し配下だけを差し替える。newSectionBody が見出し行で始まらない場合は
+ * 元の見出し行を先頭に付与する（他章は触らない）。
+ */
+export function replaceMarkdownSection(
+  text: string,
+  headingText: string,
+  newSectionBody: string
+): string | null {
+  const range = findMarkdownSectionRange(text, headingText)
+  if (!range) return null
+
+  const lines = text.split('\n')
+  const normalized = newSectionBody.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
+  const bodyLines = normalized.split('\n')
+  const firstContent = bodyLines.find((line) => line.trim().length > 0)
+  const startsWithHeading = Boolean(firstContent && ATX_HEADING.test(firstContent))
+
+  let replacementLines: string[]
+  if (startsWithHeading) {
+    replacementLines = bodyLines
+  } else {
+    const headingLine = lines[range.startLine]
+    const trimmed = normalized.replace(/^\n+/, '').replace(/\n+$/, '')
+    replacementLines = trimmed ? [headingLine, ...trimmed.split('\n')] : [headingLine]
+  }
+
+  return [...lines.slice(0, range.startLine), ...replacementLines, ...lines.slice(range.endExclusive)].join(
+    '\n'
+  )
+}
+
+/** 指定行（1-based）直前までの直近見出し。 */
+export function headingAtLine(text: string, line: number): MarkdownHeading | null {
+  const headings = parseMarkdownHeadings(text)
+  let best: MarkdownHeading | null = null
+  for (const h of headings) {
+    if (h.line <= line) best = h
+    else break
+  }
+  return best
 }
 
 /** 同一レベル・同一テキストの見出し重複。 */
@@ -301,9 +366,106 @@ export interface ValidateMarkdownDocumentOptions {
   relativePath?: string
   /** ワークスペース相対パスの存在確認。未指定ならリンク検査なし */
   fileExists?: (workspaceRelativePath: string) => boolean
+  /** 用語集。未指定なら用語検査なし */
+  glossaryTerms?: GlossaryTerm[]
 }
 
-/** 文書向け verify: 壊れた ATX・階層ジャンプ・重複見出し・（任意）壊れた相対 doc リンク。 */
+/**
+ * `.compass/glossary.md` 向けの薄い用語集パーサ。
+ * 行形式: `推奨 | 避け1, 避け2` または表行 `| 推奨 | 避け |`
+ */
+export function parseGlossaryMarkdown(text: string): GlossaryTerm[] {
+  const terms: GlossaryTerm[] = []
+  const seen = new Set<string>()
+  const lines = text.split('\n')
+  let inFence = false
+
+  for (const line of lines) {
+    if (/^(`{3,}|~{3,})/.test(line)) {
+      inFence = !inFence
+      continue
+    }
+    if (inFence) continue
+    const trimmed = line.trim()
+    if (!trimmed || trimmed.startsWith('#')) continue
+    if (/^\|?\s*:?-+:?\s*\|/.test(trimmed)) continue
+
+    let preferred = ''
+    let avoidRaw = ''
+    const table = trimmed.match(/^\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|?\s*$/)
+    if (table) {
+      preferred = table[1].trim()
+      avoidRaw = table[2].trim()
+      if (/^preferred$/i.test(preferred) || /^推奨/.test(preferred)) continue
+      if (/^avoid$/i.test(avoidRaw) || /^避け/.test(avoidRaw)) continue
+    } else {
+      const pipe = trimmed.match(/^([^|#]+?)\s*\|\s*(.+)$/)
+      if (!pipe) continue
+      preferred = pipe[1].trim()
+      avoidRaw = pipe[2].trim()
+    }
+
+    if (!preferred || !avoidRaw) continue
+    const avoid = avoidRaw
+      .split(/[,、]/)
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0 && s.toLowerCase() !== preferred.toLowerCase())
+    if (avoid.length === 0) continue
+    const key = preferred.toLowerCase()
+    if (seen.has(key)) continue
+    seen.add(key)
+    terms.push({ preferred, avoid })
+  }
+  return terms
+}
+
+/** 用語集の「避け」表記が本文に出ていれば term_mismatch。フェンス内は無視。 */
+export function findTermIssues(text: string, terms: GlossaryTerm[]): MarkdownHeadingIssue[] {
+  if (terms.length === 0) return []
+  const issues: MarkdownHeadingIssue[] = []
+  const lines = text.split('\n')
+  let inFence = false
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]
+    if (/^(`{3,}|~{3,})/.test(line)) {
+      inFence = !inFence
+      continue
+    }
+    if (inFence) continue
+
+    const lower = line.toLowerCase()
+    for (const term of terms) {
+      for (const avoid of term.avoid) {
+        if (!avoid) continue
+        const needle = avoid.toLowerCase()
+        let from = 0
+        while (from <= lower.length) {
+          const at = lower.indexOf(needle, from)
+          if (at < 0) break
+          const before = at === 0 ? '' : lower[at - 1]
+          const after = at + needle.length >= lower.length ? '' : lower[at + needle.length]
+          const boundaryBefore = !/[a-z0-9_]/i.test(before)
+          const boundaryAfter = !/[a-z0-9_]/i.test(after)
+          // CJK / 記号混じりは部分一致、ASCII 語は単語境界
+          const isAsciiWord = /^[a-z0-9][a-z0-9_-]*$/i.test(avoid)
+          if (!isAsciiWord || (boundaryBefore && boundaryAfter)) {
+            issues.push({
+              kind: 'term_mismatch',
+              line: i + 1,
+              message: `Prefer "${term.preferred}" instead of "${avoid}"`
+            })
+            break
+          }
+          from = at + needle.length
+        }
+      }
+    }
+  }
+  return issues
+}
+
+/** 文書向け verify: 壊れた ATX・階層ジャンプ・重複見出し・（任意）壊れた相対 doc リンク・用語。 */
 export function validateMarkdownDocument(
   text: string,
   options: ValidateMarkdownDocumentOptions = {}
@@ -318,6 +480,9 @@ export function validateMarkdownDocument(
     issues.push(
       ...findBrokenMarkdownDocLinks(text, options.relativePath, options.fileExists)
     )
+  }
+  if (options.glossaryTerms && options.glossaryTerms.length > 0) {
+    issues.push(...findTermIssues(text, options.glossaryTerms))
   }
   return issues
 }
@@ -376,6 +541,7 @@ export function diffMarkdownHeadings(
 export type CompactDiffEntry =
   | { type: 'add' | 'remove' | 'same'; content: string }
   | { type: 'skip'; count: number }
+  | { type: 'heading'; level: number; text: string }
 
 /**
  * 変更行の前後 context 行だけ残し、離れた unchanged を skip に折りたたむ。
@@ -417,6 +583,70 @@ export function compactDiffLines(
     if (skipCount > 0) {
       result.push({ type: 'skip', count: skipCount })
       skipCount = 0
+    }
+    result.push({ type: lines[i].type, content: lines[i].content })
+  }
+  if (skipCount > 0) result.push({ type: 'skip', count: skipCount })
+  return result
+}
+
+/**
+ * 散文 Diff: 変更塊の前に直近見出しラベルを差し込み、ノイズを畳む。
+ * oldText は見出し解決用（削除行・共通行の行番号基準）。
+ */
+export function compactProseDiffLines(
+  lines: Array<{ type: 'add' | 'remove' | 'same'; content: string }>,
+  oldText: string,
+  context = 2
+): CompactDiffEntry[] {
+  if (lines.length === 0) return []
+
+  const oldLineByIndex = new Array<number>(lines.length)
+  let oldLine = 1
+  for (let i = 0; i < lines.length; i++) {
+    oldLineByIndex[i] = oldLine
+    if (lines[i].type === 'same' || lines[i].type === 'remove') {
+      oldLine += 1
+    }
+  }
+
+  const keep = new Array<boolean>(lines.length).fill(false)
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i].type === 'same') continue
+    const from = Math.max(0, i - context)
+    const to = Math.min(lines.length - 1, i + context)
+    for (let j = from; j <= to; j++) keep[j] = true
+  }
+
+  if (!keep.some(Boolean)) {
+    return compactDiffLines(lines, context)
+  }
+
+  const result: CompactDiffEntry[] = []
+  let skipCount = 0
+  let lastHeadingKey = ''
+  let regionStart = true
+
+  for (let i = 0; i < lines.length; i++) {
+    if (!keep[i]) {
+      skipCount += 1
+      regionStart = true
+      continue
+    }
+    if (skipCount > 0) {
+      result.push({ type: 'skip', count: skipCount })
+      skipCount = 0
+    }
+    if (regionStart) {
+      const heading = headingAtLine(oldText, oldLineByIndex[i])
+      if (heading) {
+        const key = `${heading.level}\0${heading.text}`
+        if (key !== lastHeadingKey) {
+          result.push({ type: 'heading', level: heading.level, text: heading.text })
+          lastHeadingKey = key
+        }
+      }
+      regionStart = false
     }
     result.push({ type: lines[i].type, content: lines[i].content })
   }

@@ -409,6 +409,11 @@ export type WorkspaceAction =
   | { type: 'writeFile'; path: string; content: string }
   /** Unified-diff surgical edit; preview resolves to writeFile with final content. */
   | { type: 'applyPatch'; path: string; patch: string }
+  /**
+   * Replace one Markdown heading subtree. Preview materializes to writeFile
+   * (other sections untouched).
+   */
+  | { type: 'replaceSection'; path: string; heading: string; content: string }
   | { type: 'deleteFile'; path: string }
   | { type: 'deleteDir'; path: string }
 
@@ -612,7 +617,25 @@ export interface WorkspaceReplaceResult {
   errors: Array<{ path: string; message: string }>
 }
 
-export type LeftSidebarView = 'explorer' | 'search'
+export type LeftSidebarView = 'explorer' | 'search' | 'outline'
+
+export interface WorkspaceOutlineHeading {
+  level: number
+  text: string
+  /** 1-based line number */
+  line: number
+}
+
+export interface WorkspaceOutlineEntry {
+  path: string
+  headings: WorkspaceOutlineHeading[]
+}
+
+export interface WorkspaceOutline {
+  workspaceRoot: string
+  indexedAt: string | null
+  files: WorkspaceOutlineEntry[]
+}
 
 export interface HelpDocMeta {
   id: string
@@ -833,6 +856,7 @@ export interface CompassAPI {
         preset?: UseCasePreset | null
       }
     ) => Promise<ProjectIndexContext | null>
+    getOutline: (workspaceRoot: string) => Promise<WorkspaceOutline | null>
     onUpdated: (callback: (result: IndexBuildResult) => void) => () => void
     onStatus: (
       callback: (status: 'indexing' | 'ready' | 'error', workspaceRoot: string) => void

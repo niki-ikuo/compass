@@ -1649,6 +1649,10 @@ export function ChatPanel() {
           oldText={activeFile.content}
           newText={pendingCode.code}
           title={t('chat.applyToEditor')}
+          prose={
+            activeFile.language === 'markdown' ||
+            /\.(md|markdown|mdx)$/i.test(activeFile.path)
+          }
           onApply={handleApplyCode}
           onReject={() => setPendingCode(null)}
         />

@@ -231,20 +231,27 @@ const AGENT_TOOLS = [
     function: {
       name: 'proposeActions',
       description:
-        'Propose workspace file/folder changes for the user to preview and approve. Paths must be relative to the workspace root. Changes are NOT applied until the user approves. Pass `actions` as a real JSON array (never a stringified JSON blob). Prefer applyPatch (unified diff with @@ -start,count +start,count @@ hunks) for edits to existing files—send only the changed hunks, not the whole file. Never use Cursor/OpenAI *** Begin Patch / *** Update File: wrappers. Combine all edits to the same file into one applyPatch action. Use writeFile for new files or tiny full rewrites. Truncated writeFile/applyPatch payloads are rejected.',
+        'Propose workspace file/folder changes for the user to preview and approve. Paths must be relative to the workspace root. Changes are NOT applied until the user approves. Pass `actions` as a real JSON array (never a stringified JSON blob). Prefer applyPatch (unified diff with @@ -start,count +start,count @@ hunks) for edits to existing files—send only the changed hunks, not the whole file. For Markdown section rewrites, prefer replaceSection (path + heading + section content) so other chapters stay untouched. Never use Cursor/OpenAI *** Begin Patch / *** Update File: wrappers. Combine all edits to the same file into one applyPatch action (or one replaceSection per heading). Use writeFile for new files or tiny full rewrites. Truncated writeFile/applyPatch/replaceSection payloads are rejected.',
       parameters: {
         type: 'object',
         properties: {
           actions: {
             type: 'array',
             description:
-              'Array of mkdir / writeFile / applyPatch / deleteFile / deleteDir objects. Must be an array, not a JSON string.',
+              'Array of mkdir / writeFile / applyPatch / replaceSection / deleteFile / deleteDir objects. Must be an array, not a JSON string.',
             items: {
               type: 'object',
               properties: {
                 type: {
                   type: 'string',
-                  enum: ['mkdir', 'writeFile', 'applyPatch', 'deleteFile', 'deleteDir']
+                  enum: [
+                    'mkdir',
+                    'writeFile',
+                    'applyPatch',
+                    'replaceSection',
+                    'deleteFile',
+                    'deleteDir'
+                  ]
                 },
                 path: {
                   type: 'string',
@@ -253,7 +260,12 @@ const AGENT_TOOLS = [
                 content: {
                   type: 'string',
                   description:
-                    'Full file contents (required for writeFile). Prefer applyPatch for existing files instead of large rewrites.'
+                    'Full file contents (writeFile) or Markdown section body (replaceSection). Prefer applyPatch/replaceSection for existing files instead of large rewrites.'
+                },
+                heading: {
+                  type: 'string',
+                  description:
+                    'Markdown heading text for replaceSection (without leading #). Replaces that heading subtree only.'
                 },
                 patch: {
                   type: 'string',
@@ -301,7 +313,7 @@ const AGENT_TOOLS = [
     function: {
       name: 'verify',
       description:
-        'Post-edit verification. In code use-case: run project test / lint / typecheck via package scripts or safe fallbacks. In document use-case: check markdown heading structure, duplicate headings, and broken relative .md links on edited files. In data use-case: check CSV column counts, duplicate first-column keys, mixed column types, and JSON/YAML shape. Prefer after proposeActions is applied. Pass paths to limit which files are checked for document/data; otherwise the last applied paths are used. On failure, fix with proposeActions and verify again. If all checks are skipped because scripts/files are missing, do not narrate that skip in the final user-facing reply.',
+        'Post-edit verification. In code use-case: run project test / lint / typecheck via package scripts or safe fallbacks. In document use-case: check markdown heading structure, duplicate headings, broken relative .md links, and glossary term mismatches (`.compass/glossary.md`) on edited files. In data use-case: check CSV column counts, duplicate first-column keys, mixed column types, and JSON/YAML shape. Prefer after proposeActions is applied. Pass paths to limit which files are checked for document/data; otherwise the last applied paths are used. On failure, fix with proposeActions and verify again. If all checks are skipped because scripts/files are missing, do not narrate that skip in the final user-facing reply.',
       parameters: {
         type: 'object',
         properties: {
@@ -636,6 +648,7 @@ function parseProposeActions(
       path?: string
       content?: string
       patch?: string
+      heading?: string
     }
     if (typeof action.path !== 'string' || !action.path.trim()) continue
     if (action.type === 'mkdir') {
@@ -646,6 +659,15 @@ function parseProposeActions(
     } else if (action.type === 'applyPatch') {
       if (typeof action.patch !== 'string' || !action.patch.trim()) continue
       actions.push({ type: 'applyPatch', path: action.path, patch: action.patch })
+    } else if (action.type === 'replaceSection') {
+      if (typeof action.heading !== 'string' || !action.heading.trim()) continue
+      if (typeof action.content !== 'string') continue
+      actions.push({
+        type: 'replaceSection',
+        path: action.path,
+        heading: action.heading,
+        content: action.content
+      })
     } else if (action.type === 'deleteFile' || action.type === 'deleteDir') {
       actions.push({ type: action.type, path: action.path })
     }
@@ -665,7 +687,13 @@ function sanitizeProposeActionsArgs(args: Record<string, unknown>): Record<strin
   const raw = Array.isArray(args.actions) ? args.actions : []
   const actions = raw.slice(0, 40).map((item) => {
     if (!item || typeof item !== 'object') return { type: 'unknown' }
-    const a = item as { type?: string; path?: string; content?: string; patch?: string }
+    const a = item as {
+      type?: string
+      path?: string
+      content?: string
+      patch?: string
+      heading?: string
+    }
     if (a.type === 'writeFile') {
       const len = typeof a.content === 'string' ? a.content.length : 0
       return { type: 'writeFile', path: a.path, contentChars: len }
@@ -673,6 +701,10 @@ function sanitizeProposeActionsArgs(args: Record<string, unknown>): Record<strin
     if (a.type === 'applyPatch') {
       const len = typeof a.patch === 'string' ? a.patch.length : 0
       return { type: 'applyPatch', path: a.path, patchChars: len }
+    }
+    if (a.type === 'replaceSection') {
+      const len = typeof a.content === 'string' ? a.content.length : 0
+      return { type: 'replaceSection', path: a.path, heading: a.heading, contentChars: len }
     }
     return { type: a.type, path: a.path }
   })

@@ -2,6 +2,10 @@ import { resolve } from 'path'
 import { defineConfig, externalizeDepsPlugin } from 'electron-vite'
 import react from '@vitejs/plugin-react'
 
+const srcAlias = {
+  '@': resolve('src')
+}
+
 export default defineConfig({
   main: {
     build: {
@@ -10,6 +14,9 @@ export default defineConfig({
           index: resolve(__dirname, 'electron/main.ts')
         }
       }
+    },
+    resolve: {
+      alias: srcAlias
     },
     plugins: [externalizeDepsPlugin()]
   },
@@ -20,6 +27,9 @@ export default defineConfig({
           index: resolve(__dirname, 'electron/preload.ts')
         }
       }
+    },
+    resolve: {
+      alias: srcAlias
     },
     plugins: [externalizeDepsPlugin()]
   },
@@ -34,9 +44,7 @@ export default defineConfig({
       }
     },
     resolve: {
-      alias: {
-        '@': resolve('src')
-      }
+      alias: srcAlias
     },
     plugins: [react()]
   }

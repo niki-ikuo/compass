@@ -1,4 +1,4 @@
-import { fileExtension } from '@/utils/media-context'
+import { fileExtension } from './media-context'
 
 /** OS 既定アプリで開く対象（Office / OpenDocument）。CSV などテキスト扱いは含めない。 */
 const EXTERNAL_OPEN_EXTENSIONS = new Set([

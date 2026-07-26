@@ -70,6 +70,25 @@ export function SearchIcon() {
   )
 }
 
+export function OutlineIcon() {
+  return (
+    <svg {...iconProps}>
+      <path
+        d="M3 4h10M5 8h8M5 12h8"
+        stroke="currentColor"
+        strokeWidth="1.2"
+        strokeLinecap="round"
+      />
+      <path
+        d="M3 8h.01M3 12h.01"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+      />
+    </svg>
+  )
+}
+
 export function TerminalIcon() {
   return (
     <svg {...iconProps}><rect

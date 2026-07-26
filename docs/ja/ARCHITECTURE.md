@@ -100,6 +100,8 @@ Renderer からは `window.compass.*` を呼び出します。実装の正は `e
 
 構造索引とワークスペースデータはワークスペース直下の `.compass/` に保存する（`project-indexer.ts`、`chat-history.ts`、`workspace-settings.ts` など）。
 
+索引方針は **テキストなら入れる / バイナリは入れない**（拡張子の許可リストではない）。既知バイナリ・画像/PDF・Office はパスで除外し、残りは内容スニフ（NUL 検出、UTF-16 はテキスト扱い）とサイズ上限で判定する（`indexable-text.ts` / `binary-file.ts`）。
+
 | ファイル | 内容 |
 |----------|------|
 | `meta.json` | バージョン・更新時刻など |

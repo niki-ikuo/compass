@@ -39,12 +39,14 @@ Ship semantic / hybrid search over folder text.
 
 Make `document` the strongest use case.
 
-- [ ] Workspace outline: all Markdown headings across files, jump to file+heading
-- [ ] Section-scoped edit: propose/apply only one heading subtree
-- [ ] Diff UI for prose (collapse noise; show heading context)
-- [ ] Stronger document verify: duplicate headings, broken `.md` links, basic term checks
+- [x] Workspace outline: all Markdown headings across files, jump to file+heading
+- [x] Section-scoped edit: propose/apply only one heading subtree
+- [x] Diff UI for prose (collapse noise; show heading context)
+- [x] Stronger document verify: duplicate headings, broken `.md` links, basic term checks
 
 **Done:** rewrite a procedure doc by section; apply without wrecking the rest of the file.
+
+**Touch:** LeftSidebar Outline, `index:getOutline`, `replaceSection` action, `DocumentDiffContent`, `.compass/glossary.md` term verify.
 
 **Depends on:** (1) for cross-file outline data if shared.
 

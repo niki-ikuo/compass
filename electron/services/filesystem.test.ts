@@ -96,6 +96,33 @@ describe('materializeWorkspaceActions / preview / apply', () => {
     ])
   })
 
+  it('materializes replaceSection into writeFile without touching other chapters', async () => {
+    const root = makeTempRoot('section')
+    tempRoots.push(root)
+    writeFileSync(
+      join(root, 'guide.md'),
+      ['# Doc', '', '## Setup', 'old', '## Next', 'keep'].join('\n'),
+      'utf-8'
+    )
+
+    const materialized = await materializeWorkspaceActions(root, [
+      {
+        type: 'replaceSection',
+        path: 'guide.md',
+        heading: 'Setup',
+        content: '## Setup\nnew'
+      }
+    ])
+
+    expect(materialized).toEqual([
+      {
+        type: 'writeFile',
+        path: 'guide.md',
+        content: ['# Doc', '', '## Setup', 'new', '## Next', 'keep'].join('\n')
+      }
+    ])
+  })
+
   it('previews and applies mkdir / writeFile / delete in order', async () => {
     const root = makeTempRoot('apply')
     tempRoots.push(root)

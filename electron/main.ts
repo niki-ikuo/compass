@@ -52,6 +52,7 @@ import {
   buildProjectIndex,
   ensureProjectIndex,
   getProjectIndexContext,
+  getWorkspaceOutline,
   isProjectIndexStale,
   setIndexProgressEmitter
 } from './services/project-indexer'
@@ -831,6 +832,10 @@ function registerIpcHandlers(): void {
       return getProjectIndexContext(workspaceRoot, options)
     }
   )
+
+  ipcMain.handle('index:getOutline', async (_event, workspaceRoot: string) => {
+    return getWorkspaceOutline(workspaceRoot)
+  })
 
   ipcMain.handle('chat:loadHistory', async (_event, workspaceRoot: string) => {
     return loadChatHistory(workspaceRoot)

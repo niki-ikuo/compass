@@ -3699,6 +3699,153 @@ body:has(.monaco-editor .find-widget.visible) .workbench-hover-container .action
   white-space: nowrap;
 }
 
+.diff-line.diff-heading-context {
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+  border-top: 1px solid var(--border);
+  margin-top: 2px;
+}
+
+.diff-line.diff-heading-context .diff-prefix {
+  color: var(--accent);
+}
+
+.workspace-outline-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.workspace-outline-toolbar {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.workspace-outline-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 4px 0 8px;
+}
+
+.workspace-outline-empty {
+  padding: 16px 12px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.workspace-outline-file {
+  margin: 0 4px 2px;
+}
+
+.workspace-outline-file-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 4px 8px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.workspace-outline-file-header:hover {
+  background: var(--bg-hover);
+}
+
+.workspace-outline-file-chevron {
+  width: 12px;
+  flex-shrink: 0;
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.workspace-outline-file-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.workspace-outline-file-count {
+  flex-shrink: 0;
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.workspace-outline-headings {
+  display: flex;
+  flex-direction: column;
+  padding: 0 0 4px;
+}
+
+.workspace-outline-heading {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  width: 100%;
+  padding: 3px 8px 3px 20px;
+  border: none;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.workspace-outline-heading:hover {
+  background: var(--bg-hover);
+}
+
+.workspace-outline-heading.level-2 {
+  padding-left: 28px;
+}
+
+.workspace-outline-heading.level-3 {
+  padding-left: 36px;
+}
+
+.workspace-outline-heading.level-4 {
+  padding-left: 44px;
+}
+
+.workspace-outline-heading.level-5,
+.workspace-outline-heading.level-6 {
+  padding-left: 52px;
+}
+
+.workspace-outline-heading-mark {
+  flex-shrink: 0;
+  color: var(--text-secondary);
+  font-family: 'Cascadia Code', Consolas, monospace;
+  font-size: 10px;
+}
+
+.workspace-outline-heading-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workspace-outline-heading-line {
+  flex-shrink: 0;
+  color: var(--text-secondary);
+  font-size: 10px;
+}
+
 .btn-apply,
 .btn-reject,
 .btn-primary,

@@ -3,10 +3,19 @@ const EXTENSION_MAP: Record<string, string> = {
   tsx: 'typescript',
   js: 'javascript',
   jsx: 'javascript',
+  mjs: 'javascript',
+  cjs: 'javascript',
   py: 'python',
   json: 'json',
   md: 'markdown',
   markdown: 'markdown',
+  mdx: 'markdown',
+  txt: 'plaintext',
+  vb: 'vb',
+  vbs: 'vb',
+  bas: 'vb',
+  frm: 'vb',
+  cls: 'vb',
   csv: 'csv',
   tsv: 'tsv',
   html: 'html',
@@ -25,8 +34,14 @@ const EXTENSION_MAP: Record<string, string> = {
   c: 'c',
   h: 'c',
   sh: 'shell',
+  bash: 'shell',
   bat: 'bat',
-  ps1: 'powershell'
+  cmd: 'bat',
+  ps1: 'powershell',
+  rb: 'ruby',
+  php: 'php',
+  r: 'r',
+  toml: 'toml'
 }
 
 export function getLanguageFromPath(filePath: string): string {

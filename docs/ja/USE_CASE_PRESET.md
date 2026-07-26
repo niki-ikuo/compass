@@ -249,7 +249,7 @@ defaultUseCasePreset?: UseCasePreset
 ### Document Agent 強化 — 出荷済み
 
 - Markdown の `readFile` で任意 `heading` によるセクション読み
-- document light verify: 重複見出し・壊れた相対 `.md` リンク
+- document light verify: 重複見出し・壊れた相対 `.md` リンク・`.compass/glossary.md` 用語
 - 索引コンテキストで Documents を優先し、兄弟／文書リンクを追う
 
 ### Data Agent ツール — 出荷済み

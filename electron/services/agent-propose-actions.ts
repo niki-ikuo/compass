@@ -2,7 +2,14 @@
  * proposeActions の引数パース／回復（LLM が actions を文字列化するケース向け）。
  */
 
-const ACTION_TYPES = new Set(['writeFile', 'applyPatch', 'mkdir', 'deleteFile', 'deleteDir'])
+const ACTION_TYPES = new Set([
+  'writeFile',
+  'applyPatch',
+  'replaceSection',
+  'mkdir',
+  'deleteFile',
+  'deleteDir'
+])
 
 export function buildJsonParseAttempts(raw: string): string[] {
   const trimmed = raw.trim()
@@ -206,7 +213,7 @@ function actionsIncludeContentPayload(actions: unknown[]): boolean {
   return actions.some((item) => {
     if (!item || typeof item !== 'object' || Array.isArray(item)) return false
     const type = (item as { type?: unknown }).type
-    return type === 'writeFile' || type === 'applyPatch'
+    return type === 'writeFile' || type === 'applyPatch' || type === 'replaceSection'
   })
 }
 
@@ -412,7 +419,8 @@ export function coerceProposeActionsArgs(args: Record<string, unknown>): Record<
     if (
       !value.includes('actions') &&
       !value.includes('writeFile') &&
-      !value.includes('applyPatch')
+      !value.includes('applyPatch') &&
+      !value.includes('replaceSection')
     ) {
       continue
     }

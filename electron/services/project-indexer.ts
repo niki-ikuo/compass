@@ -6,7 +6,8 @@ import type {
   IndexBuildProgress,
   IndexBuildResult,
   ProjectIndexContext,
-  UseCasePreset
+  UseCasePreset,
+  WorkspaceOutline
 } from '../../src/types'
 import {
   extractDataSchema,
@@ -23,8 +24,10 @@ import {
 import { shouldSkipWorkspaceEntry } from './fs-ignore'
 import { decodeFileBuffer } from './encoding'
 import { writeSemanticIndex, type SemanticSourceFile } from './semantic-index'
+import { isProbablyBinaryBytes } from '../../src/utils/binary-file'
+import { isTextIndexCandidatePath } from '../../src/utils/indexable-text'
 
-const INDEX_VERSION = 6
+const INDEX_VERSION = 7
 const COMPASS_DIR = '.compass'
 const IGNORED_DIRS = new Set([
   'node_modules',
@@ -34,31 +37,6 @@ const IGNORED_DIRS = new Set([
   'release',
   '.next',
   '.compass'
-])
-
-const SOURCE_EXTENSIONS = new Set([
-  'ts',
-  'tsx',
-  'js',
-  'jsx',
-  'py',
-  'go',
-  'rs',
-  'java',
-  'cs',
-  'cpp',
-  'c',
-  'h',
-  'json',
-  'md',
-  'markdown',
-  'css',
-  'scss',
-  'html',
-  'yaml',
-  'yml',
-  'csv',
-  'tsv'
 ])
 
 interface IndexedSymbol {
@@ -96,16 +74,49 @@ function getLanguage(ext: string): string {
     tsx: 'typescript',
     js: 'javascript',
     jsx: 'javascript',
+    mjs: 'javascript',
+    cjs: 'javascript',
     py: 'python',
     md: 'markdown',
     markdown: 'markdown',
+    mdx: 'markdown',
     json: 'json',
     css: 'css',
+    scss: 'css',
     html: 'html',
+    htm: 'html',
     yaml: 'yaml',
     yml: 'yaml',
     csv: 'csv',
-    tsv: 'tsv'
+    tsv: 'tsv',
+    txt: 'text',
+    vb: 'vb',
+    vbs: 'vb',
+    bas: 'vb',
+    frm: 'vb',
+    cls: 'vb',
+    go: 'go',
+    rs: 'rust',
+    java: 'java',
+    cs: 'csharp',
+    cpp: 'cpp',
+    c: 'c',
+    h: 'c',
+    xml: 'xml',
+    sql: 'sql',
+    sh: 'shell',
+    bash: 'shell',
+    bat: 'bat',
+    cmd: 'bat',
+    ps1: 'powershell',
+    rb: 'ruby',
+    php: 'php',
+    r: 'r',
+    toml: 'toml',
+    ini: 'ini',
+    cfg: 'text',
+    conf: 'text',
+    log: 'text'
   }
   return map[ext] ?? (ext || 'text')
 }
@@ -217,6 +228,7 @@ function extractSymbols(content: string, language: string): IndexedSymbol[] {
   return symbols.slice(0, 40)
 }
 
+/** 既知バイナリ以外のファイルを候補収集。内容のテキスト判定は build 時に行う。 */
 async function listSourceFiles(dirPath: string): Promise<string[]> {
   const result: string[] = []
   const entries = await readdir(dirPath, { withFileTypes: true })
@@ -228,10 +240,9 @@ async function listSourceFiles(dirPath: string): Promise<string[]> {
       result.push(...sub)
     } else {
       if (shouldSkipWorkspaceEntry(entry.name, false)) continue
-      const ext = extname(entry.name).slice(1).toLowerCase()
-      if (SOURCE_EXTENSIONS.has(ext)) {
-        result.push(join(dirPath, entry.name))
-      }
+      const absPath = join(dirPath, entry.name)
+      if (!isTextIndexCandidatePath(absPath)) continue
+      result.push(absPath)
     }
   }
 
@@ -509,7 +520,7 @@ export function isSourcePath(relativePath: string): boolean {
   const ext = extname(relativePath).slice(1).toLowerCase()
   // Directory-level events (no extension) still matter for add/remove.
   if (!ext) return true
-  return SOURCE_EXTENSIONS.has(ext)
+  return isTextIndexCandidatePath(relativePath)
 }
 
 interface IndexMeta {
@@ -708,7 +719,7 @@ async function runBuildProjectIndex(
       }
 
       const buffer = await readFile(absPath)
-      if (buffer.includes(0)) {
+      if (isProbablyBinaryBytes(buffer)) {
         reportIndexProgress(workspaceRoot, 'files', i + 1, totalFiles)
         continue
       }
@@ -1015,6 +1026,38 @@ export async function getProjectIndexContext(
       indexedAt: meta.indexedAt,
       fileCount: meta.fileCount,
       aiContext: aiContext.slice(0, contextBudget)
+    }
+  } catch {
+    return null
+  }
+}
+
+/** 索引済み Markdown の見出し一覧（ワークスペース横断アウトライン UI 用）。 */
+export async function getWorkspaceOutline(workspaceRoot: string): Promise<WorkspaceOutline | null> {
+  try {
+    const compassDir = getCompassDir(workspaceRoot)
+    const [metaRaw, filesRaw] = await Promise.all([
+      readFile(join(compassDir, 'meta.json'), 'utf-8').catch(() => null),
+      readFile(join(compassDir, 'files.json'), 'utf-8')
+    ])
+    const meta = metaRaw ? (JSON.parse(metaRaw) as { indexedAt?: string }) : null
+    const files = JSON.parse(filesRaw) as IndexedFile[]
+    const outlineFiles = files
+      .filter((f) => f.language === 'markdown' && f.headings && f.headings.length > 0)
+      .map((f) => ({
+        path: f.path,
+        headings: (f.headings ?? []).map((h) => ({
+          level: h.level,
+          text: h.text,
+          line: h.line
+        }))
+      }))
+      .sort((a, b) => a.path.localeCompare(b.path, undefined, { sensitivity: 'base' }))
+
+    return {
+      workspaceRoot,
+      indexedAt: meta?.indexedAt ?? null,
+      files: outlineFiles
     }
   } catch {
     return null

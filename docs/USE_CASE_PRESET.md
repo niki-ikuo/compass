@@ -249,7 +249,7 @@ Approval flows (Edit / Agent) stay the same. The preset only changes *what* is w
 ### Document Agent strengthen — shipped
 
 - Markdown `readFile` with optional `heading` for section reads
-- Document light verify: duplicate headings and broken relative `.md` links
+- Document light verify: duplicate headings, broken relative `.md` links, `.compass/glossary.md` terms
 - Index context prioritizes Documents and follows sibling / doc links
 
 ### Data Agent tools — shipped

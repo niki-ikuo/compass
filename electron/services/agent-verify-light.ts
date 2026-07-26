@@ -3,7 +3,10 @@ import { existsSync } from 'fs'
 import { join } from 'path'
 import type { UseCasePreset } from '../../src/types'
 import { normalizeUseCasePreset, DEFAULT_SETTINGS } from '../../src/types'
-import { validateMarkdownDocument } from '../../src/utils/markdown-outline'
+import {
+  parseGlossaryMarkdown,
+  validateMarkdownDocument
+} from '../../src/utils/markdown-outline'
 import { verifyDataFile } from '../../src/utils/data-verify'
 import type { AgentVerifyCheckResult } from './agent-verify'
 import { decodeFileBuffer } from './encoding'
@@ -48,6 +51,14 @@ async function readWorkspaceFile(
   }
 }
 
+async function loadGlossaryTerms(workspaceRoot: string) {
+  const glossaryPath = join(workspaceRoot, '.compass', 'glossary.md')
+  if (!existsSync(glossaryPath)) return []
+  const content = await readWorkspaceFile(workspaceRoot, '.compass/glossary.md')
+  if (content === null) return []
+  return parseGlossaryMarkdown(content)
+}
+
 export async function runDocumentLightVerify(
   workspaceRoot: string,
   paths: string[] | undefined
@@ -69,6 +80,7 @@ export async function runDocumentLightVerify(
     ]
   }
 
+  const glossaryTerms = await loadGlossaryTerms(workspaceRoot)
   const issueLines: string[] = []
   for (const rel of targets) {
     const content = await readWorkspaceFile(workspaceRoot, rel)
@@ -79,7 +91,8 @@ export async function runDocumentLightVerify(
     const issues = validateMarkdownDocument(content, {
       relativePath: rel,
       fileExists: (workspaceRelativePath) =>
-        existsSync(join(workspaceRoot, workspaceRelativePath))
+        existsSync(join(workspaceRoot, workspaceRelativePath)),
+      glossaryTerms
     })
     for (const issue of issues) {
       issueLines.push(`${rel}:L${issue.line} ${issue.message}`)

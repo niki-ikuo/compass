@@ -68,6 +68,15 @@ function parseActionsJson(raw: string): WorkspaceAction[] {
             action.patch.trim().length > 0
           )
         }
+        if (action.type === 'replaceSection') {
+          return (
+            typeof action.path === 'string' &&
+            action.path.length > 0 &&
+            typeof action.heading === 'string' &&
+            action.heading.trim().length > 0 &&
+            typeof action.content === 'string'
+          )
+        }
         if (action.type === 'deleteFile' || action.type === 'deleteDir') {
           return typeof action.path === 'string' && action.path.length > 0
         }
@@ -228,6 +237,7 @@ export function normalizeWorkspaceActions(
         action.type === 'mkdir' ||
         action.type === 'writeFile' ||
         action.type === 'applyPatch' ||
+        action.type === 'replaceSection' ||
         action.type === 'deleteFile' ||
         action.type === 'deleteDir'
       ) {
@@ -293,8 +303,15 @@ export function getWorkspaceActionsLabel(code: string): { label: string; meta: s
     const parsed = JSON.parse(code.trim()) as { actions?: WorkspaceAction[] }
     const actions = parsed.actions ?? []
     const writeActions = actions.filter(
-      (action): action is Extract<WorkspaceAction, { type: 'writeFile' | 'applyPatch' }> =>
-        action.type === 'writeFile' || action.type === 'applyPatch'
+      (
+        action
+      ): action is Extract<
+        WorkspaceAction,
+        { type: 'writeFile' | 'applyPatch' | 'replaceSection' }
+      > =>
+        action.type === 'writeFile' ||
+        action.type === 'applyPatch' ||
+        action.type === 'replaceSection'
     )
     const mkdirActions = actions.filter(
       (action): action is Extract<WorkspaceAction, { type: 'mkdir' }> => action.type === 'mkdir'
@@ -309,9 +326,15 @@ export function getWorkspaceActionsLabel(code: string): { label: string; meta: s
 
     if (filePaths.length === 1 && dirPaths.length === 0 && deletePaths.length === 0) {
       const only = writeActions[0]
+      const meta =
+        only.type === 'applyPatch'
+          ? t('actions.applyPatch')
+          : only.type === 'replaceSection'
+            ? t('actions.replaceSection')
+            : t('actions.changeProposal')
       return {
         label: filePaths[0],
-        meta: only.type === 'applyPatch' ? t('actions.applyPatch') : t('actions.changeProposal')
+        meta
       }
     }
     if (dirPaths.length === 1 && filePaths.length === 0 && deletePaths.length === 0) {

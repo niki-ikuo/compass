@@ -126,7 +126,7 @@ OpenAI function schema は `AGENT_TOOLS`（`agent-runner.ts`）。`executeTool` 
 | `listDir` | runner | 1 階層、最大 200 エントリ | なし |
 | `search` | `workspace-search` | キーワード本文検索、最大 30 件 | なし |
 | `searchMeaning` | `workspace-search` / `semantic-index` | ハイブリッド意味検索（引用: パス・見出し・スニペット）、最大 30 件 | なし |
-| `proposeActions` | `agent-propose-actions` + `filesystem` | 正規化 → プレビュー → **一時停止** | 適用 / 却下 / 部分適用 / Agent に修正させる |
+| `proposeActions` | `agent-propose-actions` + `filesystem` | 正規化 → プレビュー → **一時停止**（`replaceSection` で章単位置換可） | 適用 / 却下 / 部分適用 / Agent に修正させる |
 | `exec` | `agent-exec` | cwd は WS 内、deny-list、タイムアウト、出力上限 | 書込系は `ai:needExecApproval` |
 | `verify` | `agent-verify` | test / lint / typecheck（スクリプト or フォールバック）；document/data 向け light チェック | なし（code は内部 exec） |
 | `profileData` | `agent-data-sandbox` | **data 用途のみ** — 列プロファイル（型 / null / ユニーク / サンプル）；ラン内 SQLite へ取込 | なし |
@@ -163,7 +163,7 @@ OpenAI function schema は `AGENT_TOOLS`（`agent-runner.ts`）。`executeTool` 
 
 1. ChatPanel / store が Edit と同じプレビュー UI を表示
 2. ユーザー Apply → `fs.applyActions`
-3. Main がアクションを実体化。**`applyPatch`** はディスク上の原文に `applyUnifiedDiff`（`src/utils/apply-patch.ts`）を当ててから `writeFile` 相当で保存
+3. Main がアクションを実体化。**`applyPatch`** はディスク上の原文に `applyUnifiedDiff`（`src/utils/apply-patch.ts`）を当ててから `writeFile` 相当で保存。**`replaceSection`** は見出し配下だけ `replaceMarkdownSection` で差し替えてから同様に保存
 4. 成功 → `ai:resolveApproval({ approved: true, detail })` → ループ再開
 5. 却下 → `approved: false` → ループ継続（再提案可）
 6. 適用失敗 → プレビュー残置。**Agent に修正させる** で失敗観測を返し再提案可能に
