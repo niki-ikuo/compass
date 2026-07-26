@@ -17,7 +17,10 @@ import {
   keywordOverlapScore,
   quantizeEmbedding
 } from '../../src/utils/text-embedder'
-import { embedTextsViaApi } from './embeddings-client'
+import {
+  EMBEDDINGS_QUERY_TIMEOUT_MS,
+  embedTextsViaApi
+} from './embeddings-client'
 import { getSettings } from './settings'
 
 const CHUNKS_FILE = 'chunks.json'
@@ -279,9 +282,12 @@ async function embedQueryVector(
     const settings = await safeGetSettings()
     // Prefer API query embed so space matches the index; fall back to null (keyword-only).
     if (settings?.embeddingsMode === 'api') {
-      const api = await embedTextsViaApi([query], settings)
+      const api = await embedTextsViaApi([query], settings, {
+        timeoutMs: EMBEDDINGS_QUERY_TIMEOUT_MS
+      })
       if (api && api.vectors[0] && api.vectors[0].length === meta.dim) {
-        return api.vectors[0]
+        // Match indexed vectors (also quantized) for stable cosine scores.
+        return quantizeEmbedding(api.vectors[0])
       }
     }
     return null

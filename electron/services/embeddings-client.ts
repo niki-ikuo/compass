@@ -19,7 +19,10 @@ function buildApiHeaders(settings: AppSettings): Record<string, string> {
 }
 
 const BATCH_SIZE = 64
-const REQUEST_TIMEOUT_MS = 60_000
+/** Default for bulk index builds. Query embeds should pass a shorter timeout. */
+export const EMBEDDINGS_REQUEST_TIMEOUT_MS = 60_000
+/** Interactive search should fail fast and fall back to keyword scoring. */
+export const EMBEDDINGS_QUERY_TIMEOUT_MS = 4_000
 
 export interface EmbeddingsBackendMeta {
   backend: EmbeddingsMode
@@ -53,7 +56,8 @@ export function resolveEmbeddingsModel(settings: AppSettings): string {
  */
 export async function embedTextsViaApi(
   texts: string[],
-  settings?: AppSettings
+  settings?: AppSettings,
+  options?: { timeoutMs?: number }
 ): Promise<{ vectors: number[][]; meta: EmbeddingsBackendMeta } | null> {
   if (texts.length === 0) {
     return { vectors: [], meta: { backend: 'api', model: '', dim: 0 } }
@@ -69,12 +73,13 @@ export async function embedTextsViaApi(
   if (provider.requiresApiKey && !resolved.apiKey.trim()) return null
   if (!resolved.apiBaseUrl.trim()) return null
 
+  const timeoutMs = options?.timeoutMs ?? EMBEDDINGS_REQUEST_TIMEOUT_MS
   const vectors: number[][] = []
   let dim = 0
 
   for (let i = 0; i < texts.length; i += BATCH_SIZE) {
     const batch = texts.slice(i, i + BATCH_SIZE)
-    const batchVectors = await fetchEmbeddingBatch(resolved, model, batch)
+    const batchVectors = await fetchEmbeddingBatch(resolved, model, batch, timeoutMs)
     if (!batchVectors) return null
     if (batchVectors.length !== batch.length) return null
     for (const vec of batchVectors) {
@@ -94,11 +99,12 @@ export async function embedTextsViaApi(
 async function fetchEmbeddingBatch(
   settings: AppSettings,
   model: string,
-  input: string[]
+  input: string[],
+  timeoutMs: number
 ): Promise<number[][] | null> {
   const base = settings.apiBaseUrl.replace(/\/$/, '')
   const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
   try {
     const response = await fetch(`${base}/embeddings`, {
       method: 'POST',

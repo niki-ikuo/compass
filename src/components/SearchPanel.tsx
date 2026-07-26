@@ -142,6 +142,7 @@ export function SearchPanel() {
   const queryInputRef = useRef<HTMLInputElement>(null)
   const replaceInputRef = useRef<HTMLInputElement>(null)
   const searchTokenRef = useRef(0)
+  const prevSearchModeRef = useRef(searchMode)
   const [expandedFiles, setExpandedFiles] = useState<Set<string>>(new Set())
   const [showFilters, setShowFilters] = useState(false)
   const [isReplacing, setIsReplacing] = useState(false)
@@ -222,9 +223,18 @@ export function SearchPanel() {
 
   useEffect(() => {
     if (!workspaceRoot || !searchQuery.trim()) return
+
+    // Drop in-flight results as soon as inputs change (don't wait for debounce).
+    searchTokenRef.current += 1
+
+    const modeChanged = prevSearchModeRef.current !== searchMode
+    prevSearchModeRef.current = searchMode
+    // Mode toggles should feel instant; typing still debounces.
+    const delayMs = modeChanged ? 0 : 300
+
     const timer = window.setTimeout(() => {
       void runSearch()
-    }, 300)
+    }, delayMs)
     return () => window.clearTimeout(timer)
   }, [
     workspaceRoot,

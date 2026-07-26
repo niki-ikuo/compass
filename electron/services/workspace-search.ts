@@ -12,7 +12,7 @@ import type {
 import { shouldSkipWorkspaceEntry } from './fs-ignore'
 import { decodeFileBuffer, encodeContent } from './encoding'
 import { ensureProjectIndex } from './project-indexer'
-import { searchSemanticWorkspace } from './semantic-index'
+import { hasSemanticIndex, searchSemanticWorkspace } from './semantic-index'
 import { extractDocumentText } from '../../src/utils/extract-document-text'
 import {
   isExtractableDocumentPath,
@@ -201,6 +201,9 @@ function replaceInContent(
   return { content: next, count }
 }
 
+/** Prefer semantic hits, but don't leave the UI empty while API embeds stall. */
+const HYBRID_SEMANTIC_GRACE_MS = 800
+
 export async function searchWorkspace(
   workspaceRoot: string,
   options: WorkspaceSearchOptions
@@ -212,18 +215,80 @@ export async function searchWorkspace(
 
   const mode = options.mode ?? 'keyword'
   if (mode === 'hybrid' || mode === 'semantic') {
+    await prepareSemanticIndexForSearch(workspaceRoot, mode)
+
+    if (mode === 'hybrid') {
+      return searchHybridWorkspace(workspaceRoot, options)
+    }
+
+    return searchSemanticWorkspace(workspaceRoot, options)
+  }
+
+  return searchKeywordWorkspace(workspaceRoot, options)
+}
+
+/**
+ * Avoid blocking interactive search on a full API re-index.
+ * Rebuild only when there is no usable chunks index; otherwise refresh in background.
+ */
+async function prepareSemanticIndexForSearch(
+  workspaceRoot: string,
+  mode: 'hybrid' | 'semantic'
+): Promise<void> {
+  const hasIndex = await hasSemanticIndex(workspaceRoot)
+  if (!hasIndex) {
+    if (mode === 'hybrid') {
+      // First-time API indexing can take minutes — don't block hybrid UI.
+      void ensureProjectIndex(workspaceRoot).catch(() => {})
+      return
+    }
     try {
       await ensureProjectIndex(workspaceRoot)
     } catch {
-      // Fall through; semantic search may still work with an older index.
+      // Semantic-only may return empty until the index exists.
     }
-    const semantic = await searchSemanticWorkspace(workspaceRoot, options)
-    if (semantic.totalMatches > 0 || mode === 'semantic') {
-      return semantic
-    }
-    // Hybrid with no embedding hits: fall back to keyword search.
+    return
   }
 
+  // Keep the index fresh without stalling the query path.
+  void ensureProjectIndex(workspaceRoot).catch(() => {})
+}
+
+async function searchHybridWorkspace(
+  workspaceRoot: string,
+  options: WorkspaceSearchOptions
+): Promise<WorkspaceSearchResult> {
+  const semanticPromise = searchSemanticWorkspace(workspaceRoot, options)
+  const keywordPromise = searchKeywordWorkspace(workspaceRoot, options)
+
+  const first = await Promise.race([
+    semanticPromise.then((r) => ({ source: 'semantic' as const, r })),
+    keywordPromise.then((r) => ({ source: 'keyword' as const, r }))
+  ])
+
+  if (first.source === 'semantic') {
+    if (first.r.totalMatches > 0) return first.r
+    return keywordPromise
+  }
+
+  // Keyword finished first — give semantic a short grace period for better ranking.
+  const semantic = await Promise.race([
+    semanticPromise,
+    sleep(HYBRID_SEMANTIC_GRACE_MS).then(() => null)
+  ])
+  if (semantic && semantic.totalMatches > 0) return semantic
+  return first.r
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+async function searchKeywordWorkspace(
+  workspaceRoot: string,
+  options: WorkspaceSearchOptions
+): Promise<WorkspaceSearchResult> {
+  const query = options.query ?? ''
   const searchRoot = resolveSearchRoot(workspaceRoot, options.rootPath)
   const matcher = buildMatcher(query, options)
   const maxResults = options.maxResults ?? DEFAULT_MAX_RESULTS
