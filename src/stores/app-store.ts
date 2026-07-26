@@ -923,6 +923,7 @@ interface AppState {
   setLeftSidebarView: (view: LeftSidebarView) => void
   openSearchPanel: (options?: { replace?: boolean; rootPath?: string | null }) => void
   openOutlinePanel: () => void
+  openGitPanel: () => void
   setSearchQuery: (query: string) => void
   setSearchReplace: (value: string) => void
   setSearchMode: (mode: WorkspaceSearchMode) => void
@@ -1806,6 +1807,11 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({
       showFileTree: true,
       leftSidebarView: 'outline'
+    }),
+  openGitPanel: () =>
+    set({
+      showFileTree: true,
+      leftSidebarView: 'git'
     }),
   openSearchPanel: (options) =>
     set((state) => ({

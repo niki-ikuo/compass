@@ -115,7 +115,7 @@ Build on shipped Change Sets ([AI_APPLY_UNDO.md](./AI_APPLY_UNDO.md)).
 | Item | When |
 |------|------|
 | MCP / plugins | After 1–4 shipped |
-| Minimal Git diff/commit UI | Only if 4 is not enough |
+| ~~Minimal Git diff/commit UI~~ | Shipped (Left sidebar Git tab: status / diff / stage / commit) |
 | Native Anthropic API | If OpenAI-compat blocks real users |
 | macOS / Linux | After Windows text loop is solid |
 | `.pptx` / legacy `.doc` extraction | Only if users hit the gap after PDF/docx/xlsx |

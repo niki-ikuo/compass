@@ -667,7 +667,60 @@ export interface WorkspaceReplaceResult {
   errors: Array<{ path: string; message: string }>
 }
 
-export type LeftSidebarView = 'explorer' | 'search' | 'outline'
+export type LeftSidebarView = 'explorer' | 'search' | 'outline' | 'git'
+
+export type GitStatusKind =
+  | 'modified'
+  | 'added'
+  | 'deleted'
+  | 'renamed'
+  | 'copied'
+  | 'untracked'
+  | 'ignored'
+  | 'conflict'
+
+export type GitDiffSide = 'auto' | 'staged' | 'unstaged'
+
+export interface GitStatusEntry {
+  path: string
+  originalPath?: string
+  /** Index status letter (XY first char) */
+  x: string
+  /** Working tree status letter (XY second char) */
+  y: string
+  kind: GitStatusKind
+  staged: boolean
+  unstaged: boolean
+  untracked: boolean
+}
+
+export interface GitStatusResult {
+  available: boolean
+  isRepo: boolean
+  branch: string | null
+  upstream: string | null
+  ahead: number
+  behind: number
+  entries: GitStatusEntry[]
+  error?: string
+}
+
+export interface GitDiffResult {
+  path: string
+  side: Exclude<GitDiffSide, 'auto'>
+  patch: string
+  truncated: boolean
+}
+
+export interface GitStageResult {
+  paths: string[]
+}
+
+export interface GitCommitResult {
+  hash: string
+  message: string
+  summary: string
+}
 
 export interface WorkspaceOutlineHeading {
   level: number
@@ -814,6 +867,21 @@ export interface CompassAPI {
     ) => Promise<UndoChatAppliesResult>
     listAiApplies: (workspaceRoot: string) => Promise<WorkspaceChangeSetSummary[]>
   }
+  git: {
+    status: (workspaceRoot: string) => Promise<GitStatusResult>
+    diff: (
+      workspaceRoot: string,
+      path: string,
+      side?: GitDiffSide
+    ) => Promise<GitDiffResult>
+    stage: (workspaceRoot: string, paths: string[]) => Promise<GitStageResult>
+    unstage: (workspaceRoot: string, paths: string[]) => Promise<GitStageResult>
+    commit: (
+      workspaceRoot: string,
+      message: string,
+      options?: { paths?: string[] }
+    ) => Promise<GitCommitResult>
+  }
   ai: {
     chat: (request: ChatRequest) => Promise<void>
     cancel: (chatId?: string) => Promise<boolean>
@@ -890,6 +958,7 @@ export interface CompassAPI {
     onFindInFiles: (callback: () => void) => () => void
     onReplaceInFiles: (callback: () => void) => () => void
     onShowOutline: (callback: () => void) => () => void
+    onShowGit: (callback: () => void) => () => void
     onOpenHelp: (callback: () => void) => () => void
     onOpenAiHelp: (callback: () => void) => () => void
     setAiHelpVisible: (visible: boolean) => Promise<void>

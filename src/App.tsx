@@ -29,6 +29,7 @@ export function App() {
   const setChatPanelWidthRatio = useAppStore((s) => s.setChatPanelWidthRatio)
   const openSettingsTab = useAppStore((s) => s.openSettingsTab)
   const openSearchPanel = useAppStore((s) => s.openSearchPanel)
+  const openGitPanel = useAppStore((s) => s.openGitPanel)
   const openOutlinePanel = useAppStore((s) => s.openOutlinePanel)
   const workspaceRoot = useAppStore((s) => s.workspaceRoot)
   const setWorkspaceRoot = useAppStore((s) => s.setWorkspaceRoot)
@@ -294,6 +295,10 @@ export function App() {
         if (!useAppStore.getState().workspaceRoot) return
         openOutlinePanel()
       }),
+      window.compass.menu.onShowGit(() => {
+        if (!useAppStore.getState().workspaceRoot) return
+        openGitPanel()
+      }),
       window.compass.menu.onOpenHelp(() => openHelp()),
       window.compass.menu.onOpenAiHelp(() => openHelpAsk())
     ]
@@ -306,6 +311,7 @@ export function App() {
     setShowTerminal,
     openSearchPanel,
     openOutlinePanel,
+    openGitPanel,
     openHelp,
     openHelpAsk
   ])

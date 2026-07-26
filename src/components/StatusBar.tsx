@@ -24,9 +24,12 @@ export function StatusBar() {
   const indexMeta = useAppStore((s) => s.indexMeta)
   const reopenFileWithEncoding = useAppStore((s) => s.reopenFileWithEncoding)
   const setFileEncoding = useAppStore((s) => s.setFileEncoding)
+  const openGitPanel = useAppStore((s) => s.openGitPanel)
 
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
+  const [gitBranch, setGitBranch] = useState<string | null>(null)
+  const [gitChangeCount, setGitChangeCount] = useState(0)
 
   const activeFile = openFiles.find((f) => f.path === activeFilePath) ?? null
   const isMedia = activeFile ? isMediaOpenFile(activeFile) : false
@@ -63,6 +66,42 @@ export function StatusBar() {
     window.addEventListener('mousedown', onPointerDown)
     return () => window.removeEventListener('mousedown', onPointerDown)
   }, [menuOpen])
+
+  useEffect(() => {
+    if (!workspaceRoot) {
+      setGitBranch(null)
+      setGitChangeCount(0)
+      return
+    }
+    let cancelled = false
+    const load = async (): Promise<void> => {
+      try {
+        const status = await window.compass.git.status(workspaceRoot)
+        if (cancelled) return
+        if (!status.available || !status.isRepo) {
+          setGitBranch(null)
+          setGitChangeCount(0)
+          return
+        }
+        setGitBranch(status.branch ?? 'HEAD')
+        setGitChangeCount(status.entries.length)
+      } catch {
+        if (!cancelled) {
+          setGitBranch(null)
+          setGitChangeCount(0)
+        }
+      }
+    }
+    void load()
+    const onFocus = (): void => {
+      void load()
+    }
+    window.addEventListener('focus', onFocus)
+    return () => {
+      cancelled = true
+      window.removeEventListener('focus', onFocus)
+    }
+  }, [workspaceRoot])
 
   const connectionStatus = (): { label: string; hint: string } => {
     switch (llmConnection.status) {
@@ -165,6 +204,17 @@ export function StatusBar() {
 
   return (
     <div className="status-bar">
+      {gitBranch && (
+        <button
+          type="button"
+          className="status-item status-git-button"
+          onClick={() => openGitPanel()}
+          title={t('status.gitOpen')}
+        >
+          {t('status.gitBranch', { branch: gitBranch })}
+          {gitChangeCount > 0 ? ` · ${gitChangeCount}` : ''}
+        </button>
+      )}
       <span className="status-item">
         {activeFilePath ? getFileName(activeFilePath) : t('status.noFile')}
       </span>
@@ -241,7 +291,7 @@ export function StatusBar() {
           type="button"
           className={`status-item status-embeddings-badge status-embeddings-${embeddingsQuality}`}
           onClick={handleRebuildIndex}
-          disabled={!workspaceRoot || indexStatus === 'indexing'}
+          disabled={!workspaceRoot}
           title={`${embeddingsLabels.detail}\n${t('status.rebuildIndex')}`}
         >
           {embeddingsLabels.short}

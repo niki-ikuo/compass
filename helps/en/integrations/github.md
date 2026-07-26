@@ -1,37 +1,50 @@
 ---
-title: GitHub integration
+title: Git / GitHub
 keywords:
   - GitHub
   - Git
+  - commit
+  - diff
+  - status
   - Issue
   - PR
   - Repository
 category: integrations
 related:
   - ../getting-started/open-project.md
-  - ../ai/agent.md
+  - ../ai/chat.md
   - mcp.md
 ---
 
-# GitHub integration
+# Git / GitHub
 
-## Status
+## Git in Compass (status / diff / commit)
 
-**Not available.** Git / GitHub integration is deferred in the product spec. This page does not invent fake setup steps.
+Open the **Git** tab in the left sidebar (`Ctrl+Shift+G`), or click the branch name in the status bar.
 
-## What you can do today
+You can:
 
-- [Open a cloned folder as a project](../getting-started/open-project.md)
-- Edit in the editor and fix with [AI chat](../ai/chat.md) / [Agent](../ai/agent.md)
-- Do Git operations outside Compass (Git Bash / terminal / other tools)
+- See changed / staged / untracked files
+- Open a file’s diff
+- Stage or unstage files
+- Commit with a message
 
-## This page later
+Requires **Git on PATH** (for example Git for Windows) and a folder that is already a Git repository (`git init` or a clone).
 
-When implemented, this page will cover auth, Issues / PRs, and how diffs are sent. Requests welcome via GitHub Issues.
+This is separate from [AI Apply Undo](../ai/chat.md): Undo restores Compass backups under `.compass/ai-undo/` and does not create Git commits.
+
+## Not included yet
+
+- Push / pull / fetch
+- Branch create / switch UI
+- GitHub auth, Issues, or Pull Requests
+- MCP
+
+Use the integrated terminal or an external Git client for those.
 
 ## Related
 
 - [Open a project](../getting-started/open-project.md)
-- [Agent](../ai/agent.md)
+- [AI chat](../ai/chat.md)
 - [MCP](mcp.md)
 - [FAQ](../troubleshooting/faq.md)

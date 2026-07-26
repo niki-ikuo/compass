@@ -1,0 +1,464 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useAppStore } from '@/stores/app-store'
+import { openWorkspaceFile } from '@/utils/open-workspace-file'
+import type { GitDiffResult, GitStatusEntry, GitStatusKind, GitStatusResult } from '@/types'
+import { useI18n, type MessageKey } from '@/i18n'
+
+function toAbsolutePath(workspaceRoot: string, relativePath: string): string {
+  const root = workspaceRoot.replace(/\\/g, '/').replace(/\/+$/, '')
+  const rel = relativePath.replace(/\\/g, '/').replace(/^\.\//, '')
+  return `${root}/${rel}`
+}
+
+function kindLabelKey(kind: GitStatusKind): MessageKey {
+  switch (kind) {
+    case 'modified':
+      return 'git.kind.modified'
+    case 'added':
+      return 'git.kind.added'
+    case 'deleted':
+      return 'git.kind.deleted'
+    case 'renamed':
+      return 'git.kind.renamed'
+    case 'copied':
+      return 'git.kind.copied'
+    case 'untracked':
+      return 'git.kind.untracked'
+    case 'ignored':
+      return 'git.kind.ignored'
+    case 'conflict':
+      return 'git.kind.conflict'
+    default:
+      return 'git.kind.modified'
+  }
+}
+
+function kindBadge(kind: GitStatusKind): string {
+  switch (kind) {
+    case 'modified':
+      return 'M'
+    case 'added':
+      return 'A'
+    case 'deleted':
+      return 'D'
+    case 'renamed':
+      return 'R'
+    case 'copied':
+      return 'C'
+    case 'untracked':
+      return 'U'
+    case 'ignored':
+      return '!'
+    case 'conflict':
+      return '!'
+    default:
+      return 'M'
+  }
+}
+
+function parsePatchLines(patch: string): Array<{ type: 'add' | 'remove' | 'context' | 'meta'; text: string }> {
+  if (!patch.trim()) return []
+  return patch.split('\n').map((line) => {
+    if (line.startsWith('+++') || line.startsWith('---') || line.startsWith('diff ') || line.startsWith('index ') || line.startsWith('new file') || line.startsWith('deleted file') || line.startsWith('@@')) {
+      return { type: 'meta' as const, text: line }
+    }
+    if (line.startsWith('+')) return { type: 'add' as const, text: line.slice(1) }
+    if (line.startsWith('-')) return { type: 'remove' as const, text: line.slice(1) }
+    if (line.startsWith(' ')) return { type: 'context' as const, text: line.slice(1) }
+    return { type: 'meta' as const, text: line }
+  })
+}
+
+function FileRow({
+  entry,
+  selected,
+  onSelect,
+  onStage,
+  onUnstage,
+  onOpen
+}: {
+  entry: GitStatusEntry
+  selected: boolean
+  onSelect: () => void
+  onStage?: () => void
+  onUnstage?: () => void
+  onOpen: () => void
+}) {
+  const { t } = useI18n()
+  const label = entry.originalPath ? `${entry.originalPath} → ${entry.path}` : entry.path
+
+  return (
+    <div className={`git-file-row${selected ? ' selected' : ''}`}>
+      <button
+        type="button"
+        className="git-file-main"
+        onClick={onSelect}
+        onDoubleClick={onOpen}
+        title={t(kindLabelKey(entry.kind))}
+      >
+        <span className={`git-file-badge git-kind-${entry.kind}`} aria-hidden>
+          {kindBadge(entry.kind)}
+        </span>
+        <span className="git-file-path" title={label}>
+          {label}
+        </span>
+      </button>
+      <div className="git-file-actions">
+        {onStage && (
+          <button type="button" className="git-file-action" onClick={onStage} title={t('git.stage')}>
+            +
+          </button>
+        )}
+        {onUnstage && (
+          <button
+            type="button"
+            className="git-file-action"
+            onClick={onUnstage}
+            title={t('git.unstage')}
+          >
+            −
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
+export function GitPanel() {
+  const { t } = useI18n()
+  const workspaceRoot = useAppStore((s) => s.workspaceRoot)
+  const leftSidebarView = useAppStore((s) => s.leftSidebarView)
+
+  const [status, setStatus] = useState<GitStatusResult | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [selectedPath, setSelectedPath] = useState<string | null>(null)
+  const [diff, setDiff] = useState<GitDiffResult | null>(null)
+  const [diffLoading, setDiffLoading] = useState(false)
+  const [commitMessage, setCommitMessage] = useState('')
+  const [committing, setCommitting] = useState(false)
+  const [busyPaths, setBusyPaths] = useState(false)
+  const [notice, setNotice] = useState<string | null>(null)
+  const refreshToken = useRef(0)
+
+  const refresh = useCallback(async () => {
+    if (!workspaceRoot) {
+      setStatus(null)
+      setError(null)
+      return
+    }
+    const token = ++refreshToken.current
+    setLoading(true)
+    setError(null)
+    try {
+      const next = await window.compass.git.status(workspaceRoot)
+      if (token !== refreshToken.current) return
+      setStatus(next)
+      if (next.error && !next.isRepo) {
+        setError(next.error)
+      } else if (next.error) {
+        setError(next.error)
+      }
+    } catch (err) {
+      if (token !== refreshToken.current) return
+      setError(err instanceof Error ? err.message : String(err))
+      setStatus(null)
+    } finally {
+      if (token === refreshToken.current) setLoading(false)
+    }
+  }, [workspaceRoot])
+
+  useEffect(() => {
+    if (leftSidebarView !== 'git') return
+    void refresh()
+  }, [leftSidebarView, refresh, workspaceRoot])
+
+  useEffect(() => {
+    if (leftSidebarView !== 'git' || !workspaceRoot) return
+    const onFocus = (): void => {
+      void refresh()
+    }
+    window.addEventListener('focus', onFocus)
+    return () => window.removeEventListener('focus', onFocus)
+  }, [leftSidebarView, workspaceRoot, refresh])
+
+  const staged = useMemo(
+    () => status?.entries.filter((e) => e.staged) ?? [],
+    [status]
+  )
+  const unstagedTracked = useMemo(
+    () => status?.entries.filter((e) => e.unstaged && e.kind !== 'untracked') ?? [],
+    [status]
+  )
+  const untracked = useMemo(
+    () => status?.entries.filter((e) => e.kind === 'untracked') ?? [],
+    [status]
+  )
+  // Partially staged files appear in both staged and unstaged lists
+  const changes = useMemo(() => {
+    const seen = new Set<string>()
+    const list: GitStatusEntry[] = []
+    for (const e of [...unstagedTracked, ...untracked]) {
+      if (seen.has(e.path)) continue
+      seen.add(e.path)
+      list.push(e)
+    }
+    return list
+  }, [unstagedTracked, untracked])
+
+  const loadDiff = useCallback(
+    async (path: string, preferStaged: boolean) => {
+      if (!workspaceRoot) return
+      setSelectedPath(path)
+      setDiffLoading(true)
+      setDiff(null)
+      try {
+        const side = preferStaged ? 'staged' : 'auto'
+        const next = await window.compass.git.diff(workspaceRoot, path, side)
+        setDiff(next)
+      } catch (err) {
+        setError(err instanceof Error ? err.message : String(err))
+      } finally {
+        setDiffLoading(false)
+      }
+    },
+    [workspaceRoot]
+  )
+
+  const openPath = useCallback(
+    async (rel: string) => {
+      if (!workspaceRoot) return
+      await openWorkspaceFile(toAbsolutePath(workspaceRoot, rel))
+    },
+    [workspaceRoot]
+  )
+
+  const runStage = async (paths: string[], unstage = false): Promise<void> => {
+    if (!workspaceRoot || paths.length === 0) return
+    setBusyPaths(true)
+    setError(null)
+    try {
+      if (unstage) {
+        await window.compass.git.unstage(workspaceRoot, paths)
+      } else {
+        await window.compass.git.stage(workspaceRoot, paths)
+      }
+      await refresh()
+      if (selectedPath && paths.includes(selectedPath)) {
+        await loadDiff(selectedPath, !unstage)
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setBusyPaths(false)
+    }
+  }
+
+  const handleCommit = async (): Promise<void> => {
+    if (!workspaceRoot) return
+    const message = commitMessage.trim()
+    if (!message) {
+      setError(t('git.emptyMessage'))
+      return
+    }
+    setCommitting(true)
+    setError(null)
+    setNotice(null)
+    try {
+      const result = await window.compass.git.commit(workspaceRoot, message)
+      setCommitMessage('')
+      setNotice(t('git.commitSuccess', { hash: result.hash || 'ok' }))
+      setDiff(null)
+      setSelectedPath(null)
+      await refresh()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setCommitting(false)
+    }
+  }
+
+  const diffLines = useMemo(() => (diff ? parsePatchLines(diff.patch) : []), [diff])
+
+  if (!workspaceRoot) {
+    return (
+      <div className="git-panel">
+        <div className="git-empty">{t('git.noWorkspace')}</div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="git-panel">
+      <div className="git-toolbar">
+        <div className="git-branch" title={t('git.branch')}>
+          {status?.isRepo ? (
+            <>
+              <span className="git-branch-name">{status.branch ?? 'HEAD'}</span>
+              {(status.ahead > 0 || status.behind > 0) && (
+                <span className="git-ahead-behind">
+                  {t('git.aheadBehind', {
+                    ahead: String(status.ahead),
+                    behind: String(status.behind)
+                  })}
+                </span>
+              )}
+            </>
+          ) : (
+            <span className="git-branch-name muted">{t('sidebar.git')}</span>
+          )}
+        </div>
+        <button
+          type="button"
+          className="git-toolbar-btn"
+          onClick={() => void refresh()}
+          disabled={loading || busyPaths}
+          title={t('git.refresh')}
+        >
+          {t('git.refresh')}
+        </button>
+      </div>
+
+      {loading && !status && <div className="git-empty">{t('git.loading')}</div>}
+
+      {error && <div className="git-error">{t('git.error', { message: error })}</div>}
+      {notice && <div className="git-notice">{notice}</div>}
+
+      {status && !status.available && (
+        <div className="git-empty">{status.error ?? t('git.notFound')}</div>
+      )}
+
+      {status?.available && !status.isRepo && (
+        <div className="git-empty">
+          <div>{t('git.notRepo')}</div>
+          <div className="git-empty-hint">{t('git.notRepoHint')}</div>
+        </div>
+      )}
+
+      {status?.isRepo && (
+        <>
+          <div className="git-commit-box">
+            <label className="git-commit-label" htmlFor="git-commit-message">
+              {t('git.commitMessage')}
+            </label>
+            <textarea
+              id="git-commit-message"
+              className="git-commit-input"
+              rows={3}
+              value={commitMessage}
+              placeholder={t('git.commitMessagePlaceholder')}
+              onChange={(e) => setCommitMessage(e.target.value)}
+              disabled={committing}
+            />
+            <button
+              type="button"
+              className="git-commit-btn"
+              disabled={committing || busyPaths || staged.length === 0 || !commitMessage.trim()}
+              onClick={() => void handleCommit()}
+            >
+              {t('git.commit')}
+              {staged.length > 0 ? ` (${staged.length})` : ''}
+            </button>
+          </div>
+
+          <div className="git-section">
+            <div className="git-section-header">
+              <span>
+                {t('git.staged')}
+                {staged.length > 0 ? ` · ${staged.length}` : ''}
+              </span>
+              {staged.length > 0 && (
+                <button
+                  type="button"
+                  className="git-section-action"
+                  disabled={busyPaths}
+                  onClick={() => void runStage(staged.map((e) => e.path), true)}
+                >
+                  {t('git.unstageAll')}
+                </button>
+              )}
+            </div>
+            {staged.length === 0 ? (
+              <div className="git-section-empty">{t('git.selectHint')}</div>
+            ) : (
+              staged.map((entry) => (
+                <FileRow
+                  key={`staged-${entry.path}`}
+                  entry={entry}
+                  selected={selectedPath === entry.path}
+                  onSelect={() => void loadDiff(entry.path, true)}
+                  onUnstage={() => void runStage([entry.path], true)}
+                  onOpen={() => void openPath(entry.path)}
+                />
+              ))
+            )}
+          </div>
+
+          <div className="git-section">
+            <div className="git-section-header">
+              <span>
+                {t('git.changes')}
+                {changes.length > 0 ? ` · ${changes.length}` : ''}
+              </span>
+              {changes.length > 0 && (
+                <button
+                  type="button"
+                  className="git-section-action"
+                  disabled={busyPaths}
+                  onClick={() => void runStage(changes.map((e) => e.path))}
+                >
+                  {t('git.stageAll')}
+                </button>
+              )}
+            </div>
+            {changes.length === 0 && staged.length === 0 ? (
+              <div className="git-section-empty">{t('git.empty')}</div>
+            ) : changes.length === 0 ? null : (
+              changes.map((entry) => (
+                <FileRow
+                  key={`change-${entry.path}`}
+                  entry={entry}
+                  selected={selectedPath === entry.path}
+                  onSelect={() => void loadDiff(entry.path, false)}
+                  onStage={() => void runStage([entry.path])}
+                  onOpen={() => void openPath(entry.path)}
+                />
+              ))
+            )}
+          </div>
+
+          <div className="git-diff">
+            <div className="git-diff-header">
+              {selectedPath
+                ? t('git.diffTitle', { path: selectedPath })
+                : t('git.showDiff')}
+              {diff && (
+                <span className="git-diff-side">
+                  {diff.side === 'staged' ? t('git.diffStaged') : t('git.diffUnstaged')}
+                </span>
+              )}
+            </div>
+            <div className="git-diff-body">
+              {diffLoading && <div className="git-empty">{t('git.loading')}</div>}
+              {!diffLoading && selectedPath && diff && !diff.patch.trim() && (
+                <div className="git-empty">{t('git.diffEmpty')}</div>
+              )}
+              {!diffLoading &&
+                diffLines.map((line, i) => (
+                  <div key={i} className={`git-diff-line git-diff-${line.type}`}>
+                    <span className="git-diff-prefix">
+                      {line.type === 'add' ? '+' : line.type === 'remove' ? '-' : ' '}
+                    </span>
+                    <span className="git-diff-text">{line.text}</span>
+                  </div>
+                ))}
+              {diff?.truncated && (
+                <div className="git-diff-truncated">{t('git.diffTruncated')}</div>
+              )}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  )
+}

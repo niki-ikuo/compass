@@ -89,6 +89,22 @@ export function OutlineIcon() {
   )
 }
 
+export function GitIcon() {
+  return (
+    <svg {...iconProps}>
+      <circle cx="4.5" cy="11.5" r="1.75" stroke="currentColor" strokeWidth="1.2" />
+      <circle cx="4.5" cy="4.5" r="1.75" stroke="currentColor" strokeWidth="1.2" />
+      <circle cx="11.5" cy="8" r="1.75" stroke="currentColor" strokeWidth="1.2" />
+      <path
+        d="M4.5 6.25v3.5M6.1 5.3l3.9 1.7M6.1 10.7l3.9-1.7"
+        stroke="currentColor"
+        strokeWidth="1.2"
+        strokeLinecap="round"
+      />
+    </svg>
+  )
+}
+
 export function TerminalIcon() {
   return (
     <svg {...iconProps}><rect

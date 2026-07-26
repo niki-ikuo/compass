@@ -47,6 +47,7 @@ npm run dev
 | Agent ツールループ | `electron/services/agent-runner.ts`、`agent-exec.ts`、`agent-data-sandbox.ts`、[AGENT.md](./AGENT.md)、[AGENT_PLAN.md](./AGENT_PLAN.md) |
 | オフラインヘルプ / AI ヘルプ | `electron/services/help.ts`、`help-ask.ts`、`helps/`、`src/components/HelpDialog.tsx`、`HelpAskDialog.tsx` |
 | ワークスペース検索 | `electron/services/workspace-search.ts`、`src/components/SearchPanel.tsx`、`LeftSidebar.tsx` |
+| Git UI | `electron/services/git.ts`、`src/components/GitPanel.tsx`、`git:*` IPC |
 | ワークスペース設定 | `electron/services/workspace-settings.ts`（`.compass/settings.json`） |
 | インライン補完 | `src/utils/inline-completions.ts`、`ai:complete` / `ai:cancelComplete` |
 | LLM プロバイダ定義 | `src/utils/llm-providers.ts` |

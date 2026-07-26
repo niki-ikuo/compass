@@ -31,15 +31,16 @@
 - 用途プリセット（`general` / `document` / `data` / `code`）— Ask / Edit / Agent とは別軸 — [USE_CASE_PRESET.md](./USE_CASE_PRESET.md)
 - インライン補完（ゴーストテキスト / Tab で確定。設定で ON/OFF）
 - 文書テンプレート（内蔵 Markdown 雛形、ワークスペース `.compass/templates/`）
-- 左サイドバーのエクスプローラー / アウトライン / 検索タブ（横断見出しジャンプ・ワークスペース内テキスト検索）
+- 左サイドバーのエクスプローラー / アウトライン / 検索 / Git タブ（横断見出しジャンプ・ワークスペース内テキスト検索・status/diff/commit）
 - オフラインヘルプ + AIヘルプ（`helps/` + `help:*` IPC）
 - tools 非対応時の Agent UX — プロバイダ別 Agent トグル非表示、Edit への誘導フォールバック — [AGENT_PLAN.md](./AGENT_PLAN.md) §7
+- 最小 Git UI（status / diff / stage / commit。システム `git` を使用。push / PR / GitHub 認証は未対応）
 
 ### 後回し（後続）
 
 - ~~ベクトル検索 / RAG による意味検索~~ → v2.1 実装済み（ハイブリッド検索、`.compass/chunks.json`。既定はニューラルな OpenAI 互換 `/embeddings`、失敗時・オフラインはハッシュへフォールバック）
 - MCP連携
-- Git統合
+- ~~Git統合~~ → 最小の status/diff/commit は実装済み（push / PR / GitHub 認証は後続）
 
 ---
 
@@ -52,6 +53,7 @@
 │ エクスプ │  タブ: plan.md  notes.md      │               │
 │ / アウトラ │───────────────────────────────│   AI チャット  │
 │ イン / 検索│                               │               │
+│ / Git    │                               │               │
 │  📁 docs │   Monaco Editor               │  ┌──────────┐ │
 │   📄 plan│   (シンタックスハイライト)     │  │会話履歴  │ │
 │   📄 data│                               │  └──────────┘ │
@@ -66,7 +68,7 @@
 |------|------|
 | ウィンドウサイズ | デフォルト 1280×800、リサイズ可能 |
 | レイアウト | 3ペイン（左サイドバー 20% / エディタ 50% / チャット 30%）、パネル折りたたみ可 |
-| 左サイドバー | エクスプローラー / アウトライン（全 Markdown 見出し）/ 検索タブ |
+| 左サイドバー | エクスプローラー / アウトライン（全 Markdown 見出し）/ 検索 / Git（status·diff·commit）タブ |
 
 ---
 

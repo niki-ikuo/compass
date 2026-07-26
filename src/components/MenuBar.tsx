@@ -119,6 +119,7 @@ export function MenuBar({
   const workspaceRoot = useAppStore((s) => s.workspaceRoot)
   const openSearchPanel = useAppStore((s) => s.openSearchPanel)
   const openOutlinePanel = useAppStore((s) => s.openOutlinePanel)
+  const openGitPanel = useAppStore((s) => s.openGitPanel)
   const openBrowserTab = useAppStore((s) => s.openBrowserTab)
   const llmConnection = useAppStore((s) => s.llmConnection)
   const editorMinimapEnabled = useAppStore((s) => s.settings.editorMinimapEnabled !== false)
@@ -269,6 +270,14 @@ export function MenuBar({
       action: () => {
         if (!workspaceRoot) return
         openSearchPanel({ replace: false })
+      }
+    },
+    {
+      label: t('menu.showGit'),
+      shortcut: 'Ctrl+Shift+G',
+      action: () => {
+        if (!workspaceRoot) return
+        openGitPanel()
       }
     },
     { separator: true, label: '', action: () => {} },

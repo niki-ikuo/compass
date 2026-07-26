@@ -47,7 +47,12 @@ import type {
   HelpAskRequest,
   HelpAskResult,
   LlmConnectionTestResult,
-  LocaleId
+  LocaleId,
+  GitStatusResult,
+  GitDiffResult,
+  GitDiffSide,
+  GitStageResult,
+  GitCommitResult
 } from '../src/types'
 import { DEFAULT_SETTINGS } from '../src/types'
 import { applyColorTheme, parseColorThemeArg } from '../src/utils/color-theme'
@@ -139,6 +144,25 @@ const compassAPI = {
       workspaceRoot: string,
       options: WorkspaceReplaceOptions
     ): Promise<WorkspaceReplaceResult> => ipcRenderer.invoke('fs:replace', workspaceRoot, options)
+  },
+  git: {
+    status: (workspaceRoot: string): Promise<GitStatusResult> =>
+      ipcRenderer.invoke('git:status', workspaceRoot),
+    diff: (
+      workspaceRoot: string,
+      path: string,
+      side?: GitDiffSide
+    ): Promise<GitDiffResult> => ipcRenderer.invoke('git:diff', workspaceRoot, path, side),
+    stage: (workspaceRoot: string, paths: string[]): Promise<GitStageResult> =>
+      ipcRenderer.invoke('git:stage', workspaceRoot, paths),
+    unstage: (workspaceRoot: string, paths: string[]): Promise<GitStageResult> =>
+      ipcRenderer.invoke('git:unstage', workspaceRoot, paths),
+    commit: (
+      workspaceRoot: string,
+      message: string,
+      options?: { paths?: string[] }
+    ): Promise<GitCommitResult> =>
+      ipcRenderer.invoke('git:commit', workspaceRoot, message, options)
   },
   ai: {
     chat: (request: ChatRequest): Promise<void> => ipcRenderer.invoke('ai:chat', request),
@@ -350,6 +374,11 @@ const compassAPI = {
       const handler = (): void => callback()
       ipcRenderer.on('menu:show-outline', handler)
       return () => ipcRenderer.removeListener('menu:show-outline', handler)
+    },
+    onShowGit: (callback: () => void): (() => void) => {
+      const handler = (): void => callback()
+      ipcRenderer.on('menu:show-git', handler)
+      return () => ipcRenderer.removeListener('menu:show-git', handler)
     },
     onOpenHelp: (callback: () => void): (() => void) => {
       const handler = (): void => callback()

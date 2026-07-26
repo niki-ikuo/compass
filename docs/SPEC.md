@@ -31,15 +31,16 @@
 - Use-case presets (`general` / `document` / `data` / `code`) — orthogonal to Ask / Edit / Agent; see [USE_CASE_PRESET.md](./USE_CASE_PRESET.md)
 - Inline completions (ghost text / Tab accept; toggle in Settings)
 - Doc templates (built-in Markdown presets; workspace `.compass/templates/`)
-- Left sidebar Explorer / Outline / Search tabs (cross-file heading jump + workspace text search)
+- Left sidebar Explorer / Outline / Search / Git tabs (cross-file heading jump + workspace text search + status/diff/commit)
 - Offline help + AI Help (`helps/` + `help:*` IPC)
 - Agent UX when tools unsupported — hide Agent toggle per provider; guided Edit fallback — see [AGENT_PLAN.md](./AGENT_PLAN.md) §7
+- Minimal Git UI (status / diff / stage / commit via system `git`; no push/PR/GitHub auth yet)
 
 ### Deferred (later)
 
 - ~~Vector search / RAG~~ → shipped in v2.1 (hybrid search via `.compass/chunks.json`; default neural OpenAI-compatible `/embeddings`; hash fallback offline / on failure)
 - MCP
-- Git integration
+- ~~Git integration~~ → minimal status/diff/commit shipped (push / PR / GitHub auth still later)
 
 ---
 
@@ -52,6 +53,7 @@
 │ Explorer │  Tabs: plan.md  notes.md      │               │
 │ / Outline│───────────────────────────────│   AI chat     │
 │ / Search │                               │               │
+│ / Git    │                               │               │
 │  📁 docs │   Monaco Editor               │  ┌──────────┐ │
 │   📄 plan│   (syntax highlighting)       │  │ history  │ │
 │   📄 data│                               │  └──────────┘ │
@@ -66,7 +68,7 @@
 |------|------|
 | Window size | Default 1280×800, resizable |
 | Layout | 3 panes (left sidebar 20% / editor 50% / chat 30%), panels collapsible |
-| Left sidebar | Explorer / Outline (all Markdown headings) / Search tabs |
+| Left sidebar | Explorer / Outline (all Markdown headings) / Search / Git (status·diff·commit) tabs |
 
 ---
 

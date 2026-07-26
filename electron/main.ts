@@ -3,7 +3,7 @@ import { join } from 'path'
 import appIcon from '../resources/icon.ico?asset'
 import packageJson from '../package.json'
 import { t } from '../src/i18n/runtime'
-import type { FileEncoding, UseCasePreset } from '../src/types'
+import type { FileEncoding, GitDiffSide, UseCasePreset } from '../src/types'
 import {
   COLOR_THEME_ARG_PREFIX,
   getThemeBackgroundColor
@@ -33,6 +33,13 @@ import {
   undoChatApplies,
   undoLastChangeSet
 } from './services/ai-undo'
+import {
+  commitGit,
+  getGitDiff,
+  getGitStatus,
+  stageGitPaths,
+  unstageGitPaths
+} from './services/git'
 import { cancelChat, cancelInlineCompletion, completeInline, streamChat } from './services/ai-client'
 import { runAgent, resolveAgentApproval, resolveAgentContinue } from './services/agent-runner'
 import {
@@ -331,6 +338,11 @@ function createMenu(): void {
           // Accelerator lives on Edit → Find in Files; View entry is for discoverability.
           label: t('menu.showWorkspaceSearch'),
           click: () => mainWindow?.webContents.send('menu:find-in-files')
+        },
+        {
+          label: t('menu.showGit'),
+          accelerator: 'CmdOrCtrl+Shift+G',
+          click: () => mainWindow?.webContents.send('menu:show-git')
         },
         { type: 'separator' },
         {
@@ -915,6 +927,43 @@ function registerIpcHandlers(): void {
   ipcMain.handle('terminal:setCwd', (_event, cwd: string) => {
     setAllTerminalsCwd(cwd)
   })
+
+  ipcMain.handle('git:status', async (_event, workspaceRoot: string) => {
+    return getGitStatus(workspaceRoot)
+  })
+
+  ipcMain.handle(
+    'git:diff',
+    async (_event, workspaceRoot: string, path: string, side?: GitDiffSide) => {
+      return getGitDiff(workspaceRoot, path, side)
+    }
+  )
+
+  ipcMain.handle(
+    'git:stage',
+    async (_event, workspaceRoot: string, paths: string[]) => {
+      return stageGitPaths(workspaceRoot, paths)
+    }
+  )
+
+  ipcMain.handle(
+    'git:unstage',
+    async (_event, workspaceRoot: string, paths: string[]) => {
+      return unstageGitPaths(workspaceRoot, paths)
+    }
+  )
+
+  ipcMain.handle(
+    'git:commit',
+    async (
+      _event,
+      workspaceRoot: string,
+      message: string,
+      options?: { paths?: string[] }
+    ) => {
+      return commitGit(workspaceRoot, message, options)
+    }
+  )
 }
 
 app.whenReady().then(async () => {

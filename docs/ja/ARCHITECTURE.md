@@ -17,7 +17,7 @@ Compass はローカルフォルダ向けの AI ワークスペースです。El
 ┌─────────────────────┴───────────────────────────┐
 │                  Main Process                   │
 │  filesystem / ai-client / agent-runner / settings / terminal   │
-│  project-indexer / chat-history / help / workspace-settings など │
+│  project-indexer / chat-history / help / git / workspace-settings など │
 └─────────────────────────────────────────────────┘
 ```
 
@@ -25,7 +25,7 @@ Compass はローカルフォルダ向けの AI ワークスペースです。El
 |----|----------|
 | Renderer (`src/`) | UI、編集状態、チャット表示、ユーザー操作 |
 | Preload (`electron/preload.ts`) | `window.compass` API の公開 |
-| Main (`electron/`) | FS、AI SSE、設定保存、索引、PTY、ヘルプ、ワークスペース検索 |
+| Main (`electron/`) | FS、AI SSE、設定保存、索引、PTY、ヘルプ、ワークスペース検索、Git CLI |
 
 ## ディレクトリ役割
 
@@ -52,6 +52,7 @@ electron/
     ├── chat-history.ts     # チャット履歴
     ├── open-editors.ts     # 開いているエディタタブの永続化
     ├── workspace-search.ts # ワークスペース内テキスト検索
+    ├── git.ts              # 最小 Git（status / diff / stage / commit。システム git）
     ├── terminal.ts         # PTY
     ├── help.ts / help-ask.ts  # オフラインヘルプ + AI ヘルプ
     └── encoding.ts         # 文字コード
@@ -60,7 +61,7 @@ src/
 ├── App.tsx                 # ルート UI・ワークスペース起動
 ├── utils/agent-plan.ts     # Agent plan 共有（todos/checkpoint）。main は agent-plan.ts から再エクスポート
 ├── components/AgentPlanPanel.tsx  # チャット計画チェックリスト
-├── components/             # 画面コンポーネント（LeftSidebar、SearchPanel、Help* など）
+├── components/             # 画面コンポーネント（LeftSidebar、SearchPanel、GitPanel、Help* など）
 ├── stores/app-store.ts     # Zustand ストア
 ├── utils/                  # プレビュー・索引・エンコーディング等
 └── types/                  # 共有型定義
@@ -73,6 +74,7 @@ Renderer からは `window.compass.*` を呼び出します。実装の正は `e
 | 名前空間 | 用途 |
 |----------|------|
 | `fs:*` | フォルダ選択、読み書き、作成・移動・削除、アクション適用、ワークスペース検索 / 置換 |
+| `git:*` | status / diff / stage・unstage / commit（システム `git`） |
 | `ai:*` | チャット送信、チャンク / 完了 / エラー / ツールイベント、インライン補完、接続テスト |
 | `settings:*` | アプリ設定の取得・保存 |
 | `workspace:*` | 最近開いたフォルダ、ワークスペース設定（`.compass/settings.json`） |

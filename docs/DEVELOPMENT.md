@@ -47,6 +47,7 @@ npm run dev
 | Agent tool loop | `electron/services/agent-runner.ts`, `agent-exec.ts`, `agent-data-sandbox.ts`, [AGENT.md](./AGENT.md), [AGENT_PLAN.md](./AGENT_PLAN.md) |
 | Offline help / AI Help | `electron/services/help.ts`, `help-ask.ts`, `helps/`, `src/components/HelpDialog.tsx`, `HelpAskDialog.tsx` |
 | Workspace search | `electron/services/workspace-search.ts`, `src/components/SearchPanel.tsx`, `LeftSidebar.tsx` |
+| Git UI | `electron/services/git.ts`, `src/components/GitPanel.tsx`, `git:*` IPC |
 | Workspace settings | `electron/services/workspace-settings.ts` (`.compass/settings.json`) |
 | Inline completions | `src/utils/inline-completions.ts`, `ai:complete` / `ai:cancelComplete` |
 | LLM provider presets | `src/utils/llm-providers.ts` |

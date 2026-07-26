@@ -115,7 +115,7 @@ v2.0 以降の実装順。対象は **ローカルのあらゆるテキスト**�
 | 項目 | 時期 |
 |------|------|
 | MCP / プラグイン | 1–4 出荷後 |
-| 最小の Git diff/commit UI | 4 だけでは足りないと分かったときだけ |
+| ~~最小の Git diff/commit UI~~ | 実装済み（左サイドバー Git タブ: status / diff / stage / commit） |
 | Anthropic ネイティブ API | OpenAI 互換が実ユーザーを止めるとき |
 | macOS / Linux | Windows のテキストループが固まってから |
 | `.pptx` / 古い `.doc` 抽出 | PDF/docx/xlsx のあと需要があれば |

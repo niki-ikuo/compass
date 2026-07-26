@@ -1,37 +1,50 @@
 ---
-title: GitHub連携
+title: Git / GitHub
 keywords:
   - GitHub
   - Git
+  - コミット
+  - 差分
+  - status
   - Issue
   - PR
   - リポジトリ
 category: integrations
 related:
   - ../getting-started/open-project.md
-  - ../ai/agent.md
+  - ../ai/chat.md
   - mcp.md
 ---
 
-# GitHub連携
+# Git / GitHub
 
-## 現状
+## Compass 内の Git（status / diff / commit）
 
-**未対応です。** 製品仕様上、Git 統合・GitHub 連携は後回しです。偽の「連携手順」は書きません。
+左サイドバーの **Git** タブ（`Ctrl+Shift+G`）、またはステータスバーのブランチ名から開けます。
 
-## いまできること
+できること:
 
-- ローカルに clone したフォルダを [プロジェクトとして開く](../getting-started/open-project.md)
-- エディタでファイルを編集し、[AIチャット](../ai/chat.md) / [Agent](../ai/agent.md) で直す
-- Git 操作自体は外部（Git Bash / ターミナル / 別ツール）で行う
+- 変更 / ステージ済み / 未追跡ファイルの一覧
+- ファイルの差分表示
+- ステージ / ステージ解除
+- メッセージ付きコミット
 
-## このページの扱い
+**PATH 上の `git`**（例: Git for Windows）と、すでに Git リポジトリになっているフォルダ（`git init` または clone）が必要です。
 
-実装されたら、ここに「認証」「Issue / PR」「差分の送り方」などを追記します。要望は GitHub Issue へ。
+[AI 適用の取り消し](../ai/chat.md) とは別物です。Undo は `.compass/ai-undo/` のバックアップを戻すだけで、Git コミットは作りません。
+
+## まだないもの
+
+- push / pull / fetch
+- ブランチ作成・切り替え UI
+- GitHub 認証、Issue、Pull Request
+- MCP
+
+これらは統合ターミナルや外部の Git クライアントを使ってください。
 
 ## 関連
 
 - [プロジェクトを開く](../getting-started/open-project.md)
-- [Agent](../ai/agent.md)
+- [AIチャット](../ai/chat.md)
 - [MCP](mcp.md)
 - [FAQ](../troubleshooting/faq.md)

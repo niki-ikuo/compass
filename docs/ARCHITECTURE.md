@@ -17,7 +17,7 @@ Compass is an AI workspace for local folders. It uses Electron’s three-layer m
 ┌─────────────────────┴───────────────────────────┐
 │                  Main Process                   │
 │  filesystem / ai-client / agent-runner / settings / terminal   │
-│  project-indexer / chat-history / help / workspace-settings … │
+│  project-indexer / chat-history / help / git / workspace-settings … │
 └───────────────────────────────────────────────────────────────┘
 ```
 
@@ -25,7 +25,7 @@ Compass is an AI workspace for local folders. It uses Electron’s three-layer m
 |-------|------------------|
 | Renderer (`src/`) | UI, editor state, chat display, user actions |
 | Preload (`electron/preload.ts`) | Exposes `window.compass` |
-| Main (`electron/`) | FS, AI SSE, settings, index, PTY, help, workspace search |
+| Main (`electron/`) | FS, AI SSE, settings, index, PTY, help, workspace search, Git CLI |
 
 ## Directory roles
 
@@ -52,6 +52,7 @@ electron/
     ├── chat-history.ts     # Chat history
     ├── open-editors.ts     # Persist open editor tabs
     ├── workspace-search.ts # Workspace text search
+    ├── git.ts              # Minimal Git status / diff / stage / commit (system git)
     ├── terminal.ts         # PTY
     ├── help.ts / help-ask.ts  # Offline help + AI Help
     └── encoding.ts         # Character encoding
@@ -60,7 +61,7 @@ src/
 ├── App.tsx                 # Root UI / workspace bootstrap
 ├── utils/agent-plan.ts     # Shared Agent plan (todos/checkpoint); main re-exports via agent-plan.ts
 ├── components/AgentPlanPanel.tsx  # Chat plan checklist
-├── components/             # UI components (incl. LeftSidebar, SearchPanel, Help*)
+├── components/             # UI components (incl. LeftSidebar, SearchPanel, GitPanel, Help*)
 ├── stores/app-store.ts     # Zustand store
 ├── utils/                  # Preview, index helpers, encoding, etc.
 └── types/                  # Shared types
@@ -73,6 +74,7 @@ The renderer calls `window.compass.*`. The source of truth is `electron/preload.
 | Namespace | Purpose |
 |-----------|---------|
 | `fs:*` | Folder pick, read/write, create/move/delete, apply actions, workspace search / replace |
+| `git:*` | Status, diff, stage / unstage, commit (system `git` CLI) |
 | `ai:*` | Chat send, chunk / done / error / tool events, inline completions, connection test |
 | `settings:*` | Get / save app settings |
 | `workspace:*` | Recent folders; workspace settings (`.compass/settings.json`) |
