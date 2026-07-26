@@ -37,10 +37,20 @@ interface StoredSettings {
   defaultUseCasePreset: UseCasePreset
   rememberLastUseCasePreset: boolean
   embeddingsMode: EmbeddingsMode
+  /** Empty = same as chat provider. */
+  embeddingsProviderId: '' | LlmProviderId
   embeddingsModel: string
+  /**
+   * Bumped when embeddings defaults change.
+   * v0 / missing → migrate to neural `api` default (old default was `hash`).
+   */
+  embeddingsSettingsVersion: number
   lastWorkspaceRoot: string | null
   recentWorkspaceRoots: string[]
 }
+
+/** Current embeddings settings schema version (neural API default). */
+export const EMBEDDINGS_SETTINGS_VERSION = 1
 
 function resolveColorTheme(value: unknown): ColorThemeId {
   return isColorThemeId(value) ? value : DEFAULT_SETTINGS.colorTheme
@@ -79,7 +89,13 @@ function resolveRememberLastUseCasePreset(value: unknown): boolean {
 }
 
 function resolveEmbeddingsMode(value: unknown): EmbeddingsMode {
-  return value === 'api' ? 'api' : DEFAULT_SETTINGS.embeddingsMode
+  if (value === 'hash' || value === 'api') return value
+  return DEFAULT_SETTINGS.embeddingsMode
+}
+
+function resolveEmbeddingsProviderId(value: unknown): '' | LlmProviderId {
+  if (value === '' || value == null) return ''
+  return isLlmProviderId(value) ? value : ''
 }
 
 function resolveEmbeddingsModel(value: unknown): string {
@@ -167,8 +183,7 @@ async function readStoredSettings(): Promise<StoredSettings> {
       rememberLastUseCasePreset: resolveRememberLastUseCasePreset(
         stored.rememberLastUseCasePreset
       ),
-      embeddingsMode: resolveEmbeddingsMode(stored.embeddingsMode),
-      embeddingsModel: resolveEmbeddingsModel(stored.embeddingsModel),
+      ...resolveEmbeddingsStoredFields(stored),
       lastWorkspaceRoot: stored.lastWorkspaceRoot ?? null,
       recentWorkspaceRoots:
         stored.recentWorkspaceRoots ??
@@ -193,10 +208,45 @@ async function readStoredSettings(): Promise<StoredSettings> {
       defaultUseCasePreset: DEFAULT_SETTINGS.defaultUseCasePreset,
       rememberLastUseCasePreset: DEFAULT_SETTINGS.rememberLastUseCasePreset,
       embeddingsMode: DEFAULT_SETTINGS.embeddingsMode,
+      embeddingsProviderId: DEFAULT_SETTINGS.embeddingsProviderId,
       embeddingsModel: DEFAULT_SETTINGS.embeddingsModel,
+      embeddingsSettingsVersion: EMBEDDINGS_SETTINGS_VERSION,
       lastWorkspaceRoot: null,
       recentWorkspaceRoots: []
     }
+  }
+}
+
+function resolveEmbeddingsStoredFields(stored: Partial<StoredSettings>): Pick<
+  StoredSettings,
+  | 'embeddingsMode'
+  | 'embeddingsProviderId'
+  | 'embeddingsModel'
+  | 'embeddingsSettingsVersion'
+> {
+  const version =
+    typeof stored.embeddingsSettingsVersion === 'number' &&
+    Number.isFinite(stored.embeddingsSettingsVersion)
+      ? stored.embeddingsSettingsVersion
+      : 0
+  const embeddingsProviderId = resolveEmbeddingsProviderId(stored.embeddingsProviderId)
+  const embeddingsModel = resolveEmbeddingsModel(stored.embeddingsModel)
+
+  // Pre-v1 installs stored the old default `hash`. Prefer neural API going forward.
+  if (version < EMBEDDINGS_SETTINGS_VERSION) {
+    return {
+      embeddingsMode: 'api',
+      embeddingsProviderId,
+      embeddingsModel,
+      embeddingsSettingsVersion: EMBEDDINGS_SETTINGS_VERSION
+    }
+  }
+
+  return {
+    embeddingsMode: resolveEmbeddingsMode(stored.embeddingsMode),
+    embeddingsProviderId,
+    embeddingsModel,
+    embeddingsSettingsVersion: EMBEDDINGS_SETTINGS_VERSION
   }
 }
 
@@ -241,6 +291,7 @@ function toAppSettings(stored: StoredSettings): AppSettings {
     defaultUseCasePreset: stored.defaultUseCasePreset,
     rememberLastUseCasePreset: stored.rememberLastUseCasePreset,
     embeddingsMode: stored.embeddingsMode,
+    embeddingsProviderId: stored.embeddingsProviderId,
     embeddingsModel: stored.embeddingsModel
   }
 }
@@ -293,7 +344,9 @@ export async function setSettings(settings: AppSettings): Promise<void> {
       settings.rememberLastUseCasePreset
     ),
     embeddingsMode: resolveEmbeddingsMode(settings.embeddingsMode),
-    embeddingsModel: resolveEmbeddingsModel(settings.embeddingsModel)
+    embeddingsProviderId: resolveEmbeddingsProviderId(settings.embeddingsProviderId),
+    embeddingsModel: resolveEmbeddingsModel(settings.embeddingsModel),
+    embeddingsSettingsVersion: EMBEDDINGS_SETTINGS_VERSION
   })
   setLocale(locale)
 }

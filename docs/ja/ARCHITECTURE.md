@@ -108,14 +108,14 @@ Renderer からは `window.compass.*` を呼び出します。実装の正は `e
 | `files.json` | パス・言語・import/export・シンボル概要 |
 | `graph.json` | ファイル間 import エッジ |
 | `summary.txt` | AI 向け要約テキスト |
-| `chunks.json` | テキストチャンク + ローカル埋め込み（意味 / ハイブリッド検索用） |
+| `chunks.json` | テキストチャンク + 埋め込み（既定は API `/embeddings`、失敗時はハッシュ） |
 | `chat-history.json` | 永続化されたチャット履歴 |
 | `settings.json` | ワークスペース設定（例: 既定の用途プリセット） |
 | `templates/` | 任意の文書テンプレート |
 | `rules.md` | 人が編集するワークスペースルール（Ask / Edit / Agent に自動添付） |
 | `glossary.md` | 任意の用語集（文書 verify + AI コンテキスト） |
 
-チャット時に構造索引の関連部分と、ハイブリッド検索の Related workspace excerpts、および `.compass/rules.md`（と任意の glossary）をコンテキストへ載せる。埋め込みは既定でローカルハッシュ（モデルダウンロードなし）。Settings で OpenAI 互換 `/embeddings` に切替可能（失敗時はハッシュへフォールバック）。Ask/Agent の回答自体はオンライン LLM を使う。
+チャット時に構造索引の関連部分と、ハイブリッド検索の Related workspace excerpts、および `.compass/rules.md`（と任意の glossary）をコンテキストへ載せる。埋め込みは既定で OpenAI 互換 `/embeddings`（埋め込み専用に Ollama も可）。失敗時やキー未設定時はローカルハッシュへフォールバック。Ask/Agent の回答自体はオンライン LLM を使う。
 
 ## マルチ LLM
 

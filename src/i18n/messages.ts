@@ -55,13 +55,18 @@ export const ja = {
   'settings.rememberLastUseCasePresetHint':
     'オンにすると、送信成功時にデフォルトの用途をそのときの選択で更新します',
   'settings.embeddingsMode': '意味検索の埋め込み',
-  'settings.embeddingsModeHash': 'ローカル（ハッシュ・オフライン）',
-  'settings.embeddingsModeApi': 'API（OpenAI 互換 /embeddings）',
+  'settings.embeddingsModeHash': '簡易（ハッシュ・オフライン）',
+  'settings.embeddingsModeApi': 'ニューラル（API / Ollama）',
   'settings.embeddingsModeHint':
-    'API は同じプロバイダのキーを使います。失敗時はローカルへフォールバック。切替後は索引の再構築が必要です',
+    '既定はニューラル埋め込みです。失敗時のみハッシュへフォールバック。切替・プロバイダ変更後は索引を再構築します',
+  'settings.embeddingsProvider': '埋め込みプロバイダ',
+  'settings.embeddingsProviderSame': 'チャットと同じ',
+  'settings.embeddingsProviderHint':
+    'Ollama を選ぶとローカルの nomic-embed-text 等を使えます（チャットがクラウドでも可）',
   'settings.embeddingsModel': '埋め込みモデル',
   'settings.embeddingsModelHint':
-    '空欄ならプロバイダ既定（例: OpenAI は text-embedding-3-small）',
+    '空欄ならプロバイダ既定（OpenAI: text-embedding-3-small / Ollama: nomic-embed-text）',
+  'settings.embeddingsRebuildQueued': '埋め込み設定を反映するため索引を再構築しています',
   'settings.saveFailed': '保存に失敗しました',
   'settings.saved': '設定を保存しました',
 
@@ -506,6 +511,23 @@ export const ja = {
   'status.reopenWithEncoding': 'エンコード付きで再度開く',
   'status.saveWithEncoding': 'エンコードして保存',
   'status.rebuildIndex': 'クリックでインデックスを再構築',
+  'status.embeddingsApiShort': 'API · {model}',
+  'status.embeddingsApiShortNoModel': 'API 埋め込み',
+  'status.embeddingsApiDetail':
+    '意味検索はニューラル埋め込み（{model}）で索引済み · {count} チャンク',
+  'status.embeddingsApiDetailNoModel':
+    '意味検索はニューラル埋め込みで索引済み · {count} チャンク',
+  'status.embeddingsHashShort': 'Hash',
+  'status.embeddingsHashDetail':
+    '意味検索は簡易ハッシュ埋め込みで索引済み · {count} チャンク',
+  'status.embeddingsFallbackShort': '意味検索 API失敗',
+  'status.embeddingsFallbackDetail':
+    'ニューラル埋め込みに失敗し、簡易ハッシュに落ちています（{count} チャンク）。設定と接続を確認して索引を再構築してください',
+  'status.embeddingsUnavailableShort': '意味検索 API未設定',
+  'status.embeddingsUnavailableDetail':
+    'API キーまたは埋め込みモデルが無いため、簡易ハッシュで索引しています（{count} チャンク）。設定でキーを入れて再構築してください',
+  'search.embeddingsStatus': '索引の埋め込み: {label}',
+  'search.embeddingsRebuild': '索引を再構築',
 
   // terminal
   'terminal.disconnected':
@@ -810,13 +832,18 @@ export const en: Record<MessageKey, string> = {
   'settings.rememberLastUseCasePresetHint':
     'When on, a successful send updates the default preset to the one you used',
   'settings.embeddingsMode': 'Meaning-search embeddings',
-  'settings.embeddingsModeHash': 'Local (hash, offline)',
-  'settings.embeddingsModeApi': 'API (OpenAI-compatible /embeddings)',
+  'settings.embeddingsModeHash': 'Simple (hash, offline)',
+  'settings.embeddingsModeApi': 'Neural (API / Ollama)',
   'settings.embeddingsModeHint':
-    'API uses the same provider key. Falls back to local on failure. Rebuild the index after switching',
+    'Neural embeddings are the default. Falls back to hash on failure. Changing mode or provider rebuilds the index',
+  'settings.embeddingsProvider': 'Embeddings provider',
+  'settings.embeddingsProviderSame': 'Same as chat',
+  'settings.embeddingsProviderHint':
+    'Pick Ollama for local nomic-embed-text (even when chat uses a cloud provider)',
   'settings.embeddingsModel': 'Embeddings model',
   'settings.embeddingsModelHint':
-    'Leave blank for provider default (e.g. text-embedding-3-small on OpenAI)',
+    'Leave blank for provider default (OpenAI: text-embedding-3-small / Ollama: nomic-embed-text)',
+  'settings.embeddingsRebuildQueued': 'Rebuilding the index to apply embeddings settings',
   'settings.saveFailed': 'Failed to save settings',
   'settings.saved': 'Settings saved',
 
@@ -1247,6 +1274,23 @@ export const en: Record<MessageKey, string> = {
   'status.reopenWithEncoding': 'Reopen with Encoding',
   'status.saveWithEncoding': 'Save with Encoding',
   'status.rebuildIndex': 'Click to rebuild index',
+  'status.embeddingsApiShort': 'API · {model}',
+  'status.embeddingsApiShortNoModel': 'API embeddings',
+  'status.embeddingsApiDetail':
+    'Meaning search indexed with neural embeddings ({model}) · {count} chunks',
+  'status.embeddingsApiDetailNoModel':
+    'Meaning search indexed with neural embeddings · {count} chunks',
+  'status.embeddingsHashShort': 'Hash',
+  'status.embeddingsHashDetail':
+    'Meaning search indexed with simple hash embeddings · {count} chunks',
+  'status.embeddingsFallbackShort': 'Meaning search: API failed',
+  'status.embeddingsFallbackDetail':
+    'Neural embeddings failed; using simple hash ({count} chunks). Check Settings/connection and rebuild the index',
+  'status.embeddingsUnavailableShort': 'Meaning search: API not set',
+  'status.embeddingsUnavailableDetail':
+    'No API key or embeddings model; using simple hash ({count} chunks). Add a key in Settings and rebuild',
+  'search.embeddingsStatus': 'Index embeddings: {label}',
+  'search.embeddingsRebuild': 'Rebuild index',
 
   'terminal.disconnected':
     '\r\n\x1b[31m[Terminal disconnected. Open a new tab with +]\x1b[0m',

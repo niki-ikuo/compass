@@ -342,9 +342,14 @@ export interface AppSettings {
   rememberLastUseCasePreset: boolean
   /**
    * Workspace meaning search embeddings.
-   * `hash` = offline feature-hash (default). `api` = OpenAI-compatible `/embeddings`.
+   * `api` = OpenAI-compatible `/embeddings` (default; neural). `hash` = offline feature-hash fallback.
    */
   embeddingsMode: EmbeddingsMode
+  /**
+   * Provider used for `/embeddings` when mode is `api`.
+   * Empty string = same as chat `providerId` (use that provider's key / base URL).
+   */
+  embeddingsProviderId: '' | LlmProviderId
   /** Embeddings model id when embeddingsMode is `api` (provider-specific). */
   embeddingsModel: string
 }
@@ -544,11 +549,27 @@ export type ActionPreviewItem =
       exists: boolean
     }
 
+/** Actual embeddings used in `.compass/chunks.json` (not just Settings intent). */
+export interface SemanticEmbeddingsInfo {
+  backend: EmbeddingsMode
+  model?: string
+  chunkCount: number
+  settingsFingerprint?: string
+  /**
+   * `api` = neural index; `hash` = intentional hash;
+   * `fallback` = wanted API but wrote hash after failure;
+   * `unavailable` = wanted API but credentials/model were missing.
+   */
+  quality: 'api' | 'hash' | 'fallback' | 'unavailable'
+}
+
 export interface IndexBuildResult {
   workspaceRoot: string
   fileCount: number
   relationCount: number
   indexedAt: string
+  /** null when chunks.json is missing or unreadable */
+  embeddings: SemanticEmbeddingsInfo | null
 }
 
 export type IndexBuildPhase = 'scan' | 'files' | 'write'
@@ -953,6 +974,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   defaultShellId: 'powershell',
   defaultUseCasePreset: 'general',
   rememberLastUseCasePreset: true,
-  embeddingsMode: 'hash',
+  embeddingsMode: 'api',
+  embeddingsProviderId: '',
   embeddingsModel: ''
 }

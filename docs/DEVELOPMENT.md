@@ -86,7 +86,7 @@ import { useAppStore } from '@/stores/app-store'
    Monaco `InlineCompletionsProvider` (`src/utils/inline-completions.ts`) calls `ai:complete` (invoke, non-streaming). Setting: `inlineCompletionsEnabled`. Prompts follow UI locale via `ai.inlineCompletion*` in `messages.ts`. Overlapping requests are aborted when a new `complete` starts; explicit stop uses `ai:cancelComplete` (settings OFF / provider re-register). Do not abort on every Monaco `CancellationToken` (empty results).
 
 5. **Workspace index (`.compass/`)**  
-   Opening a folder builds and watches a structure index under `.compass/` (`files.json`, `graph.json`, `chunks.json`, etc.). See `project-indexer.ts` / `index-watcher.ts`. Hybrid meaning search uses hash embeddings by default (optional API embeddings in Settings).
+   Opening a folder builds and watches a structure index under `.compass/` (`files.json`, `graph.json`, `chunks.json`, etc.). See `project-indexer.ts` / `index-watcher.ts`. Hybrid meaning search uses API `/embeddings` by default (hash fallback; optional separate Ollama embeddings provider in Settings).
 
 6. **Ask / Edit / Agent**  
    Ask is explain-only. Edit proposes changes via `compass-actions` and requires user approval. Agent is a separate tool-call loop (`agent-runner`) with preview-gated writes — see [AGENT.md](./AGENT.md).

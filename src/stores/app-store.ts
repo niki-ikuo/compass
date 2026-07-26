@@ -17,6 +17,7 @@ import type {
   LeftSidebarView,
   EditorRevealRequest,
   IndexBuildProgress,
+  IndexBuildResult,
   WorkspaceSearchMode,
   WorkspaceSearchResult,
   AgentToolStep,
@@ -801,7 +802,10 @@ interface AppState {
   llmConnection: LlmConnectionState
   indexStatus: 'idle' | 'indexing' | 'ready' | 'error'
   indexProgress: IndexBuildProgress | null
-  indexMeta: { fileCount: number; relationCount: number; indexedAt: string } | null
+  indexMeta: Pick<
+    IndexBuildResult,
+    'fileCount' | 'relationCount' | 'indexedAt' | 'embeddings'
+  > | null
   pendingWorkspacePreview: {
     chatId: string
     actions: WorkspaceAction[]
@@ -939,7 +943,12 @@ interface AppState {
   setLlmConnection: (connection: LlmConnectionState) => void
   setIndexStatus: (status: 'idle' | 'indexing' | 'ready' | 'error') => void
   setIndexProgress: (progress: IndexBuildProgress | null) => void
-  setIndexMeta: (meta: { fileCount: number; relationCount: number; indexedAt: string } | null) => void
+  setIndexMeta: (
+    meta: Pick<
+      IndexBuildResult,
+      'fileCount' | 'relationCount' | 'indexedAt' | 'embeddings'
+    > | null
+  ) => void
   setPendingWorkspacePreview: (
     preview: {
       actions: WorkspaceAction[]

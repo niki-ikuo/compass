@@ -37,7 +37,7 @@
 
 ### 後回し（後続）
 
-- ~~ベクトル検索 / RAG による意味検索~~ → v2.1 実装済み（ハイブリッド検索、`.compass/chunks.json`。既定はローカルハッシュ埋め込み、Settings で OpenAI 互換 `/embeddings` も可）
+- ~~ベクトル検索 / RAG による意味検索~~ → v2.1 実装済み（ハイブリッド検索、`.compass/chunks.json`。既定はニューラルな OpenAI 互換 `/embeddings`、失敗時・オフラインはハッシュへフォールバック）
 - MCP連携
 - Git統合
 

@@ -1,7 +1,9 @@
 import { mkdir, readFile, writeFile } from 'fs/promises'
 import { join, relative, resolve } from 'path'
 import type {
+  AppSettings,
   EmbeddingsMode,
+  SemanticEmbeddingsInfo,
   WorkspaceSearchFileResult,
   WorkspaceSearchMatch,
   WorkspaceSearchMode,
@@ -17,6 +19,11 @@ import {
   keywordOverlapScore,
   quantizeEmbedding
 } from '../../src/utils/text-embedder'
+import {
+  resolveEmbeddingsConnection,
+  resolveEmbeddingsModel,
+  resolveEmbeddingsProviderId
+} from '../../src/utils/embeddings'
 import {
   EMBEDDINGS_QUERY_TIMEOUT_MS,
   embedTextsViaApi
@@ -44,8 +51,69 @@ interface SemanticIndexFile {
   dim: number
   backend: EmbeddingsMode
   model?: string
+  /**
+   * Settings intent at build time (`hash` or `api:<provider>:<model>`).
+   * Used to detect rebuild needs without looping when API embed fails → hash fallback.
+   */
+  settingsFingerprint?: string
   chunkCount: number
   chunks: IndexedSemanticChunk[]
+}
+
+/**
+ * Stable key for current embeddings settings (intent + whether the endpoint is usable).
+ * Includes ready/unready so adding an API key triggers a rebuild; a failed embed with
+ * credentials still present keeps the same fingerprint (no rebuild loop).
+ */
+export function embeddingsSettingsFingerprint(settings: AppSettings): string {
+  if (settings.embeddingsMode !== 'api') return 'hash'
+  const providerId = resolveEmbeddingsProviderId(settings)
+  const model = resolveEmbeddingsModel(settings, providerId) || '(none)'
+  const ready = resolveEmbeddingsConnection(settings) ? 'ready' : 'unready'
+  return `api:${providerId}:${model}:${ready}`
+}
+
+/** Classify what the on-disk index actually represents vs Settings intent. */
+export function classifyEmbeddingsQuality(
+  backend: EmbeddingsMode,
+  settingsFingerprint?: string
+): SemanticEmbeddingsInfo['quality'] {
+  if (backend === 'api') return 'api'
+  if (!settingsFingerprint || settingsFingerprint === 'hash') return 'hash'
+  if (settingsFingerprint.startsWith('api:') && settingsFingerprint.endsWith(':unready')) {
+    return 'unavailable'
+  }
+  if (settingsFingerprint.startsWith('api:')) return 'fallback'
+  return 'hash'
+}
+
+export function toSemanticEmbeddingsInfo(meta: {
+  backend: EmbeddingsMode
+  model?: string
+  settingsFingerprint?: string
+  chunkCount: number
+}): SemanticEmbeddingsInfo {
+  return {
+    backend: meta.backend,
+    model: meta.model,
+    chunkCount: meta.chunkCount,
+    settingsFingerprint: meta.settingsFingerprint,
+    quality: classifyEmbeddingsQuality(meta.backend, meta.settingsFingerprint)
+  }
+}
+
+/** Read actual embeddings backend from `.compass/chunks.json`. */
+export async function getSemanticEmbeddingsInfo(
+  workspaceRoot: string
+): Promise<SemanticEmbeddingsInfo | null> {
+  const loaded = await loadSemanticIndex(workspaceRoot)
+  if (!loaded) return null
+  return toSemanticEmbeddingsInfo({
+    backend: loaded.meta.backend,
+    model: loaded.meta.model,
+    settingsFingerprint: loaded.meta.settingsFingerprint,
+    chunkCount: loaded.chunks.length
+  })
 }
 
 export interface SemanticSourceFile {
@@ -57,7 +125,7 @@ export interface SemanticSourceFile {
 export async function writeSemanticIndex(
   workspaceRoot: string,
   sources: SemanticSourceFile[]
-): Promise<number> {
+): Promise<SemanticEmbeddingsInfo> {
   const compassDir = join(workspaceRoot, '.compass')
   await mkdir(compassDir, { recursive: true })
 
@@ -78,7 +146,11 @@ export async function writeSemanticIndex(
   let vectors: number[][] | null = null
 
   const settings = await safeGetSettings()
-  if (settings?.embeddingsMode === 'api' && pending.length > 0) {
+  const settingsFingerprint = settings
+    ? embeddingsSettingsFingerprint(settings)
+    : 'hash'
+
+  if (settings && resolveEmbeddingsConnection(settings) && pending.length > 0) {
     const api = await embedTextsViaApi(
       pending.map((row) => row.embedSource),
       settings
@@ -114,11 +186,17 @@ export async function writeSemanticIndex(
     dim,
     backend,
     model: model || undefined,
+    settingsFingerprint,
     chunkCount: chunks.length,
     chunks
   }
   await writeFile(join(compassDir, CHUNKS_FILE), JSON.stringify(payload), 'utf-8')
-  return chunks.length
+  return toSemanticEmbeddingsInfo({
+    backend,
+    model: model || undefined,
+    settingsFingerprint,
+    chunkCount: chunks.length
+  })
 }
 
 export async function loadSemanticIndex(
@@ -141,7 +219,9 @@ export async function loadSemanticIndex(
         version: EMBEDDING_VERSION,
         dim,
         backend,
-        model: typeof data.model === 'string' ? data.model : undefined
+        model: typeof data.model === 'string' ? data.model : undefined,
+        settingsFingerprint:
+          typeof data.settingsFingerprint === 'string' ? data.settingsFingerprint : undefined
       }
     }
   } catch {
@@ -281,7 +361,7 @@ async function embedQueryVector(
   if (meta.backend === 'api') {
     const settings = await safeGetSettings()
     // Prefer API query embed so space matches the index; fall back to null (keyword-only).
-    if (settings?.embeddingsMode === 'api') {
+    if (settings) {
       const api = await embedTextsViaApi([query], settings, {
         timeoutMs: EMBEDDINGS_QUERY_TIMEOUT_MS
       })

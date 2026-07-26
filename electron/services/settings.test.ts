@@ -63,8 +63,48 @@ describe('getSettings / setSettings', () => {
       apiKey: '',
       model: DEFAULT_SETTINGS.model,
       colorTheme: DEFAULT_SETTINGS.colorTheme,
-      locale: DEFAULT_SETTINGS.locale
+      locale: DEFAULT_SETTINGS.locale,
+      embeddingsMode: 'api',
+      embeddingsProviderId: ''
     })
+  })
+
+  it('migrates pre-v1 hash default to neural api embeddings', async () => {
+    writeFileSync(
+      join(electronState.userData, 'settings.json'),
+      JSON.stringify({
+        providerId: 'openai',
+        apiBaseUrl: 'https://api.openai.com/v1',
+        encryptedApiKey: null,
+        model: 'gpt-4o-mini',
+        temperature: 0.2,
+        maxTokens: 4096,
+        colorTheme: 'light',
+        locale: 'en',
+        embeddingsMode: 'hash'
+      }),
+      'utf-8'
+    )
+
+    const settings = await getSettings()
+    expect(settings.embeddingsMode).toBe('api')
+
+    await setSettings(settings)
+    const raw = JSON.parse(
+      readFileSync(join(electronState.userData, 'settings.json'), 'utf-8')
+    ) as { embeddingsMode: string; embeddingsSettingsVersion: number }
+    expect(raw.embeddingsMode).toBe('api')
+    expect(raw.embeddingsSettingsVersion).toBe(1)
+  })
+
+  it('preserves explicit hash after embeddings settings version is current', async () => {
+    await setSettings({
+      ...DEFAULT_SETTINGS,
+      embeddingsMode: 'hash',
+      embeddingsProviderId: ''
+    })
+    const settings = await getSettings()
+    expect(settings.embeddingsMode).toBe('hash')
   })
 
   it('round-trips settings with base64 fallback encryption', async () => {

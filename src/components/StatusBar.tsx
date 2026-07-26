@@ -3,6 +3,7 @@ import { useAppStore } from '@/stores/app-store'
 import { getFileName, getLanguageFromPath } from '@/utils/language'
 import { FILE_ENCODINGS, getEncodingLabel } from '@/utils/file-encoding'
 import { buildWorkspaceIndex } from '@/utils/project-index'
+import { formatEmbeddingsStatus } from '@/utils/embeddings-status'
 import { getLlmProvider } from '@/utils/llm-providers'
 import { refreshLlmConnection } from '@/utils/llm-connection'
 import type { FileEncoding } from '@/types'
@@ -105,16 +106,35 @@ export function StatusBar() {
     }
   }
 
+  const embeddingsLabels = formatEmbeddingsStatus(indexMeta?.embeddings, (key, params) =>
+    t(key as MessageKey, params)
+  )
+
+  const embeddingsQuality = indexMeta?.embeddings?.quality
+  const embeddingsWarn =
+    embeddingsQuality === 'fallback' || embeddingsQuality === 'unavailable'
+
   const indexStatusLabel = () => {
     if (indexStatus === 'indexing') {
       const percent = indexProgress?.percent ?? 0
       return t('status.indexingProgress', { percent })
     }
     if (indexStatus === 'ready' && indexMeta) {
-      return t('status.indexFiles', { count: indexMeta.fileCount })
+      const files = t('status.indexFiles', { count: indexMeta.fileCount })
+      // Warn states get their own badge — keep the file count clean.
+      if (embeddingsWarn || !embeddingsLabels) return files
+      return `${files} · ${embeddingsLabels.short}`
     }
     if (indexStatus === 'error') return t('status.indexError')
     return workspaceRoot ? t('status.indexMissing') : ''
+  }
+
+  const indexTitle = (): string => {
+    const rebuild = t('status.rebuildIndex')
+    if (!embeddingsWarn && embeddingsLabels?.detail) {
+      return `${embeddingsLabels.detail}\n${rebuild}`
+    }
+    return rebuild
   }
 
   const handleRebuildIndex = (): void => {
@@ -211,9 +231,20 @@ export function StatusBar() {
           className="status-item status-index-button"
           onClick={handleRebuildIndex}
           disabled={!workspaceRoot || indexStatus === 'indexing'}
-          title={t('status.rebuildIndex')}
+          title={indexTitle()}
         >
           {indexLabel}
+        </button>
+      )}
+      {indexStatus === 'ready' && embeddingsWarn && embeddingsLabels && (
+        <button
+          type="button"
+          className={`status-item status-embeddings-badge status-embeddings-${embeddingsQuality}`}
+          onClick={handleRebuildIndex}
+          disabled={!workspaceRoot || indexStatus === 'indexing'}
+          title={`${embeddingsLabels.detail}\n${t('status.rebuildIndex')}`}
+        >
+          {embeddingsLabels.short}
         </button>
       )}
       <span

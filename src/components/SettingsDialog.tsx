@@ -10,10 +10,12 @@ import type {
 } from '@/types'
 import { DEFAULT_SETTINGS, normalizeUseCasePreset } from '@/types'
 import { COLOR_THEMES, getColorThemeLabel } from '@/utils/color-theme'
+import { EMBEDDINGS_PROVIDER_IDS } from '@/utils/embeddings'
 import {
   LLM_PROVIDERS,
   getLlmProvider,
   getModelOptions,
+  getProviderLabel,
   resolveModelForProvider
 } from '@/utils/llm-providers'
 import { USE_CASE_PRESET_OPTIONS } from '@/utils/use-case-preset'
@@ -80,7 +82,8 @@ function buildSettingsSnapshot(
       normalizeUseCasePreset(settings.defaultUseCasePreset) ??
       DEFAULT_SETTINGS.defaultUseCasePreset,
     rememberLastUseCasePreset: settings.rememberLastUseCasePreset === true,
-    embeddingsMode: settings.embeddingsMode === 'api' ? 'api' : 'hash',
+    embeddingsMode: settings.embeddingsMode === 'hash' ? 'hash' : 'api',
+    embeddingsProviderId: settings.embeddingsProviderId ?? '',
     embeddingsModel: settings.embeddingsModel ?? ''
   }
   return {
@@ -200,7 +203,18 @@ export function SettingsPanel() {
       }
 
       void refreshLlmConnection()
-      setMessage(t('settings.saved'))
+
+      const embeddingsChanged =
+        openSnapshot.embeddingsMode !== toSave.embeddingsMode ||
+        openSnapshot.embeddingsProviderId !== toSave.embeddingsProviderId ||
+        openSnapshot.embeddingsModel !== toSave.embeddingsModel
+
+      if (workspaceRoot && embeddingsChanged) {
+        void window.compass.index.build(workspaceRoot)
+        setMessage(t('settings.embeddingsRebuildQueued'))
+      } else {
+        setMessage(t('settings.saved'))
+      }
     } catch {
       setMessage(t('settings.saveFailed'))
     } finally {
@@ -522,27 +536,54 @@ export function SettingsPanel() {
                 onChange={(e) =>
                   setForm({
                     ...form,
-                    embeddingsMode: (e.target.value === 'api' ? 'api' : 'hash') as EmbeddingsMode
+                    embeddingsMode: (e.target.value === 'hash' ? 'hash' : 'api') as EmbeddingsMode
                   })
                 }
               >
-                <option value="hash">{t('settings.embeddingsModeHash')}</option>
                 <option value="api">{t('settings.embeddingsModeApi')}</option>
+                <option value="hash">{t('settings.embeddingsModeHash')}</option>
               </select>
               <span className="field-hint">{t('settings.embeddingsModeHint')}</span>
             </label>
 
             {form.embeddingsMode === 'api' && (
-              <label>
-                {t('settings.embeddingsModel')}
-                <input
-                  type="text"
-                  value={form.embeddingsModel}
-                  onChange={(e) => setForm({ ...form, embeddingsModel: e.target.value })}
-                  placeholder="text-embedding-3-small"
-                />
-                <span className="field-hint">{t('settings.embeddingsModelHint')}</span>
-              </label>
+              <>
+                <label>
+                  {t('settings.embeddingsProvider')}
+                  <select
+                    value={form.embeddingsProviderId || ''}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        embeddingsProviderId: (e.target.value || '') as AppSettings['embeddingsProviderId']
+                      })
+                    }
+                  >
+                    <option value="">{t('settings.embeddingsProviderSame')}</option>
+                    {EMBEDDINGS_PROVIDER_IDS.map((id) => (
+                      <option key={id} value={id}>
+                        {getProviderLabel(id)}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="field-hint">{t('settings.embeddingsProviderHint')}</span>
+                </label>
+                <label>
+                  {t('settings.embeddingsModel')}
+                  <input
+                    type="text"
+                    value={form.embeddingsModel}
+                    onChange={(e) => setForm({ ...form, embeddingsModel: e.target.value })}
+                    placeholder={
+                      form.embeddingsProviderId === 'ollama' ||
+                      (!form.embeddingsProviderId && form.providerId === 'ollama')
+                        ? 'nomic-embed-text'
+                        : 'text-embedding-3-small'
+                    }
+                  />
+                  <span className="field-hint">{t('settings.embeddingsModelHint')}</span>
+                </label>
+              </>
             )}
           </>
         )}

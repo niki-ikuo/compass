@@ -2,9 +2,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAppStore } from '@/stores/app-store'
 import { toWorkspaceRelativePath } from '@/utils/workspace-actions'
 import { buildWorkspaceIndex } from '@/utils/project-index'
+import { formatEmbeddingsStatus } from '@/utils/embeddings-status'
 import { openWorkspaceFile } from '@/utils/open-workspace-file'
 import type { WorkspaceSearchFileResult, WorkspaceSearchMatch } from '@/types'
-import { useI18n } from '@/i18n'
+import { useI18n, type MessageKey } from '@/i18n'
 import { ChevronRightIcon } from './icons/ToolbarIcons'
 
 function ToggleChip({
@@ -121,6 +122,7 @@ export function SearchPanel() {
   const searchError = useAppStore((s) => s.searchError)
   const searchReplaceOpen = useAppStore((s) => s.searchReplaceOpen)
   const openFiles = useAppStore((s) => s.openFiles)
+  const indexMeta = useAppStore((s) => s.indexMeta)
 
   const setSearchQuery = useAppStore((s) => s.setSearchQuery)
   const setSearchReplace = useAppStore((s) => s.setSearchReplace)
@@ -146,6 +148,14 @@ export function SearchPanel() {
   const [expandedFiles, setExpandedFiles] = useState<Set<string>>(new Set())
   const [showFilters, setShowFilters] = useState(false)
   const [isReplacing, setIsReplacing] = useState(false)
+
+  const embeddingsLabels = useMemo(
+    () =>
+      formatEmbeddingsStatus(indexMeta?.embeddings, (key, params) =>
+        t(key as MessageKey, params)
+      ),
+    [indexMeta?.embeddings, t]
+  )
 
   useEffect(() => {
     queryInputRef.current?.focus()
@@ -454,6 +464,37 @@ export function SearchPanel() {
             {t('search.filter')}
           </button>
         </div>
+
+        {searchMode === 'hybrid' && embeddingsLabels && (
+          indexMeta?.embeddings?.quality === 'fallback' ||
+          indexMeta?.embeddings?.quality === 'unavailable' ? (
+            <div
+              className={`search-embeddings-alert search-embeddings-${indexMeta.embeddings.quality}`}
+              role="alert"
+            >
+              <div className="search-embeddings-alert-body">
+                <strong className="search-embeddings-alert-title">
+                  {embeddingsLabels.short}
+                </strong>
+                <p className="search-embeddings-alert-detail">{embeddingsLabels.detail}</p>
+              </div>
+              <button
+                type="button"
+                className="search-embeddings-alert-action"
+                disabled={!workspaceRoot}
+                onClick={() => {
+                  if (workspaceRoot) void buildWorkspaceIndex(workspaceRoot)
+                }}
+              >
+                {t('search.embeddingsRebuild')}
+              </button>
+            </div>
+          ) : (
+            <div className="search-embeddings-status" title={embeddingsLabels.detail}>
+              {t('search.embeddingsStatus', { label: embeddingsLabels.short })}
+            </div>
+          )
+        )}
 
         {showFilters && (
           <div className="search-filters">

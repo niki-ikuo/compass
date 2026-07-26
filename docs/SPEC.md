@@ -37,7 +37,7 @@
 
 ### Deferred (later)
 
-- ~~Vector search / RAG~~ → shipped in v2.1 (hybrid search via `.compass/chunks.json`; default local hash embeddings; optional OpenAI-compatible `/embeddings` in Settings)
+- ~~Vector search / RAG~~ → shipped in v2.1 (hybrid search via `.compass/chunks.json`; default neural OpenAI-compatible `/embeddings`; hash fallback offline / on failure)
 - MCP
 - Git integration
 

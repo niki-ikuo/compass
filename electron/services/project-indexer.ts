@@ -6,6 +6,7 @@ import type {
   IndexBuildProgress,
   IndexBuildResult,
   ProjectIndexContext,
+  SemanticEmbeddingsInfo,
   UseCasePreset,
   WorkspaceOutline
 } from '../../src/types'
@@ -23,7 +24,14 @@ import {
 } from '../../src/utils/markdown-outline'
 import { shouldSkipWorkspaceEntry } from './fs-ignore'
 import { decodeFileBuffer } from './encoding'
-import { writeSemanticIndex, type SemanticSourceFile } from './semantic-index'
+import { getSettings } from './settings'
+import {
+  embeddingsSettingsFingerprint,
+  getSemanticEmbeddingsInfo,
+  loadSemanticIndex,
+  writeSemanticIndex,
+  type SemanticSourceFile
+} from './semantic-index'
 import { isProbablyBinaryBytes } from '../../src/utils/binary-file'
 import { extractDocumentText } from '../../src/utils/extract-document-text'
 import {
@@ -699,12 +707,12 @@ async function runBuildProjectIndex(
   reportIndexProgress(workspaceRoot, 'scan', 0, 0, { force: true, percent: 0 })
   const absolutePaths = await listSourceFiles(workspaceRoot)
   if (epoch !== buildEpoch) {
-    return {
+    return withEmbeddingsInfo(workspaceRoot, {
       workspaceRoot,
       fileCount: 0,
       relationCount: 0,
       indexedAt: new Date().toISOString()
-    }
+    })
   }
 
   const totalFiles = absolutePaths.length
@@ -717,12 +725,12 @@ async function runBuildProjectIndex(
 
   for (let i = 0; i < absolutePaths.length; i++) {
     if (epoch !== buildEpoch) {
-      return {
+      return withEmbeddingsInfo(workspaceRoot, {
         workspaceRoot,
         fileCount: 0,
         relationCount: 0,
         indexedAt: new Date().toISOString()
-      }
+      })
     }
 
     const absPath = absolutePaths[i]
@@ -803,12 +811,12 @@ async function runBuildProjectIndex(
   }
 
   if (epoch !== buildEpoch) {
-    return {
+    return withEmbeddingsInfo(workspaceRoot, {
       workspaceRoot,
       fileCount: files.length,
       relationCount: edges.length,
       indexedAt: new Date().toISOString()
-    }
+    })
   }
 
   const indexedAt = new Date().toISOString()
@@ -829,8 +837,9 @@ async function runBuildProjectIndex(
   await writeFile(join(compassDir, 'files.json'), JSON.stringify(files, null, 2), 'utf-8')
   await writeFile(join(compassDir, 'graph.json'), JSON.stringify({ edges }, null, 2), 'utf-8')
   await writeFile(join(compassDir, 'summary.txt'), buildSummary(files, edges), 'utf-8')
+  let embeddings: SemanticEmbeddingsInfo | null = null
   if (epoch === buildEpoch) {
-    await writeSemanticIndex(workspaceRoot, semanticSources)
+    embeddings = await writeSemanticIndex(workspaceRoot, semanticSources)
   }
   if (epoch === buildEpoch) {
     reportIndexProgress(workspaceRoot, 'write', totalFiles, totalFiles, {
@@ -839,11 +848,27 @@ async function runBuildProjectIndex(
     })
   }
 
-  return {
+  return withEmbeddingsInfo(
     workspaceRoot,
-    fileCount: files.length,
-    relationCount: edges.length,
-    indexedAt
+    {
+      workspaceRoot,
+      fileCount: files.length,
+      relationCount: edges.length,
+      indexedAt
+    },
+    embeddings
+  )
+}
+
+async function withEmbeddingsInfo(
+  workspaceRoot: string,
+  result: Omit<IndexBuildResult, 'embeddings'>,
+  embeddings?: SemanticEmbeddingsInfo | null
+): Promise<IndexBuildResult> {
+  return {
+    ...result,
+    embeddings:
+      embeddings !== undefined ? embeddings : await getSemanticEmbeddingsInfo(workspaceRoot)
   }
 }
 
@@ -865,22 +890,47 @@ export interface EnsureIndexResult extends IndexBuildResult {
 }
 
 export async function ensureProjectIndex(workspaceRoot: string): Promise<EnsureIndexResult> {
-  const stale = await isProjectIndexStale(workspaceRoot)
+  const stale =
+    (await isProjectIndexStale(workspaceRoot)) ||
+    (await isSemanticEmbeddingsStale(workspaceRoot))
   if (!stale) {
     const meta = await readIndexMeta(workspaceRoot)
     if (meta) {
-      return {
+      const base = await withEmbeddingsInfo(workspaceRoot, {
         workspaceRoot,
         fileCount: meta.fileCount,
         relationCount: meta.relationCount,
-        indexedAt: meta.indexedAt,
-        rebuilt: false
-      }
+        indexedAt: meta.indexedAt
+      })
+      return { ...base, rebuilt: false }
     }
   }
 
   const result = await buildProjectIndex(workspaceRoot)
   return { ...result, rebuilt: true }
+}
+
+/**
+ * True when chunks.json was built under different embeddings settings
+ * (e.g. migrated from hash → API). Compares settings fingerprint so a failed
+ * API embed → hash fallback does not rebuild in a loop.
+ */
+export async function isSemanticEmbeddingsStale(workspaceRoot: string): Promise<boolean> {
+  let settings
+  try {
+    settings = await getSettings()
+  } catch {
+    return false
+  }
+
+  const loaded = await loadSemanticIndex(workspaceRoot)
+  if (!loaded) return true
+
+  const desired = embeddingsSettingsFingerprint(settings)
+  const actual = loaded.meta.settingsFingerprint
+  // Legacy indexes lack fingerprint — rebuild once under current settings.
+  if (!actual) return true
+  return actual !== desired
 }
 
 /** Pull a `## Heading` section (until the next `## `) out of summary.txt. */

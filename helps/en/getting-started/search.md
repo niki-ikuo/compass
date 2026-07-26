@@ -34,7 +34,7 @@ Or use **View → Show Search**, or **Edit → Find in Files** (Ctrl+Shift+F). S
 
 | Mode | Use when |
 |------|----------|
-| **Meaning** | Looking by topic or wording (hybrid keyword + local embeddings over the index) |
+| **Meaning** | Looking by topic or wording (hybrid keyword + neural embeddings over the index; Settings → Chat) |
 | **Text** | Exact-ish text match. Replace is available here |
 
 ## What you can do

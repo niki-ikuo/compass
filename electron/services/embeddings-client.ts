@@ -1,17 +1,35 @@
-import type { AppSettings, EmbeddingsMode, LlmProviderId } from '../../src/types'
-import { getLlmProvider } from '../../src/utils/llm-providers'
+import type { AppSettings, EmbeddingsMode } from '../../src/types'
+import type { LlmProviderId } from '../../src/types'
+import {
+  defaultEmbeddingsModel,
+  resolveEmbeddingsConnection,
+  resolveEmbeddingsModel,
+  resolveEmbeddingsProviderId,
+  type EmbeddingsConnection
+} from '../../src/utils/embeddings'
 import { jsonStringifyUtf8Safe } from '../../src/utils/utf8-text'
 import { getSettings } from './settings'
 
+export {
+  defaultEmbeddingsModel,
+  resolveEmbeddingsConnection,
+  resolveEmbeddingsModel,
+  resolveEmbeddingsProviderId
+}
+export type { EmbeddingsConnection }
+
 /** Local copy — avoid importing ai-client (circular via semantic-index). */
-function buildApiHeaders(settings: AppSettings): Record<string, string> {
+function buildApiHeaders(
+  providerId: LlmProviderId,
+  apiKey: string
+): Record<string, string> {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json'
   }
-  if (settings.apiKey) {
-    headers.Authorization = `Bearer ${settings.apiKey}`
+  if (apiKey) {
+    headers.Authorization = `Bearer ${apiKey}`
   }
-  if (settings.providerId === 'openrouter') {
+  if (providerId === 'openrouter') {
     headers['HTTP-Referer'] = 'https://github.com/compass-editor'
     headers['X-Title'] = 'Compass'
   }
@@ -30,26 +48,6 @@ export interface EmbeddingsBackendMeta {
   dim: number
 }
 
-/** Default embedding model when Settings leaves embeddingsModel blank. */
-export function defaultEmbeddingsModel(providerId: LlmProviderId): string {
-  switch (providerId) {
-    case 'openai':
-      return 'text-embedding-3-small'
-    case 'ollama':
-      return 'nomic-embed-text'
-    case 'openrouter':
-      return 'openai/text-embedding-3-small'
-    default:
-      return ''
-  }
-}
-
-export function resolveEmbeddingsModel(settings: AppSettings): string {
-  const explicit = settings.embeddingsModel.trim()
-  if (explicit) return explicit
-  return defaultEmbeddingsModel(settings.providerId)
-}
-
 /**
  * OpenAI-compatible `POST /embeddings`. Returns null on any failure
  * (caller should fall back to local hash embeddings).
@@ -64,14 +62,8 @@ export async function embedTextsViaApi(
   }
 
   const resolved = settings ?? (await getSettings())
-  if (resolved.embeddingsMode !== 'api') return null
-
-  const model = resolveEmbeddingsModel(resolved)
-  if (!model) return null
-
-  const provider = getLlmProvider(resolved.providerId)
-  if (provider.requiresApiKey && !resolved.apiKey.trim()) return null
-  if (!resolved.apiBaseUrl.trim()) return null
+  const connection = resolveEmbeddingsConnection(resolved)
+  if (!connection) return null
 
   const timeoutMs = options?.timeoutMs ?? EMBEDDINGS_REQUEST_TIMEOUT_MS
   const vectors: number[][] = []
@@ -79,7 +71,7 @@ export async function embedTextsViaApi(
 
   for (let i = 0; i < texts.length; i += BATCH_SIZE) {
     const batch = texts.slice(i, i + BATCH_SIZE)
-    const batchVectors = await fetchEmbeddingBatch(resolved, model, batch, timeoutMs)
+    const batchVectors = await fetchEmbeddingBatch(connection, batch, timeoutMs)
     if (!batchVectors) return null
     if (batchVectors.length !== batch.length) return null
     for (const vec of batchVectors) {
@@ -92,24 +84,23 @@ export async function embedTextsViaApi(
 
   return {
     vectors,
-    meta: { backend: 'api', model, dim }
+    meta: { backend: 'api', model: connection.model, dim }
   }
 }
 
 async function fetchEmbeddingBatch(
-  settings: AppSettings,
-  model: string,
+  connection: EmbeddingsConnection,
   input: string[],
   timeoutMs: number
 ): Promise<number[][] | null> {
-  const base = settings.apiBaseUrl.replace(/\/$/, '')
+  const base = connection.apiBaseUrl.replace(/\/$/, '')
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), timeoutMs)
   try {
     const response = await fetch(`${base}/embeddings`, {
       method: 'POST',
-      headers: buildApiHeaders(settings),
-      body: jsonStringifyUtf8Safe({ model, input }),
+      headers: buildApiHeaders(connection.providerId, connection.apiKey),
+      body: jsonStringifyUtf8Safe({ model: connection.model, input }),
       signal: controller.signal
     })
     if (!response.ok) return null

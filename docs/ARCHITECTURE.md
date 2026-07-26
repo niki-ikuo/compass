@@ -108,14 +108,14 @@ Indexing policy is **include text / exclude binary** (not an extension allowlist
 | `files.json` | Paths, language, import/export, symbol overview |
 | `graph.json` | Import edges between files |
 | `summary.txt` | Summary text for the AI |
-| `chunks.json` | Text chunks + embeddings (hash by default; optional API `/embeddings`) |
+| `chunks.json` | Text chunks + embeddings (API `/embeddings` by default; hash fallback) |
 | `chat-history.json` | Persisted chat sessions |
 | `settings.json` | Workspace settings (e.g. default use-case preset) |
 | `templates/` | Optional document templates |
 | `rules.md` | Human-editable workspace rules (auto-attached to Ask / Edit / Agent) |
 | `glossary.md` | Optional glossary (document verify + AI context) |
 
-Relevant structure-index slices, hybrid-search Related workspace excerpts, and `.compass/rules.md` (plus optional glossary) are added to chat context. Embeddings default to local hash (no model download); Settings can switch to OpenAI-compatible `/embeddings` (falls back to hash on failure). Ask/Agent answers still use the online LLM.
+Relevant structure-index slices, hybrid-search Related workspace excerpts, and `.compass/rules.md` (plus optional glossary) are added to chat context. Embeddings default to OpenAI-compatible `/embeddings` (optional separate Ollama provider); falls back to local hash on failure or when credentials/model are unavailable. Ask/Agent answers still use the online LLM.
 
 ## Multi-LLM
 
