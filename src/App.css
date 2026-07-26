@@ -3316,6 +3316,14 @@ body:has(.monaco-editor .find-widget.visible) .workbench-hover-container .action
 .ai-apply-history-modal {
   width: min(640px, 92vw);
   max-height: 80vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.ai-apply-history-modal .modal-body {
+  min-width: 0;
+  overflow-x: hidden;
 }
 
 .ai-apply-history-empty {
@@ -3332,6 +3340,7 @@ body:has(.monaco-editor .find-widget.visible) .workbench-hover-container .action
   gap: 0;
   max-height: 60vh;
   overflow: auto;
+  min-width: 0;
 }
 
 .ai-apply-timeline {
@@ -3352,6 +3361,7 @@ body:has(.monaco-editor .find-widget.visible) .workbench-hover-container .action
 .ai-apply-history-item {
   position: relative;
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
@@ -3360,6 +3370,8 @@ body:has(.monaco-editor .find-widget.visible) .workbench-hover-container .action
   border-radius: 4px;
   margin-bottom: 8px;
   background: var(--bg-primary, var(--background));
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .ai-apply-timeline .ai-apply-history-item::before {
@@ -3382,6 +3394,11 @@ body:has(.monaco-editor .find-widget.visible) .workbench-hover-container .action
   background: var(--text-secondary);
 }
 
+.ai-apply-history-main {
+  flex: 1 1 12rem;
+  min-width: 0;
+}
+
 .ai-apply-history-meta {
   display: flex;
   flex-wrap: wrap;
@@ -3396,18 +3413,26 @@ body:has(.monaco-editor .find-widget.visible) .workbench-hover-container .action
   color: var(--text-primary);
 }
 
+.ai-apply-history-chat,
+.ai-apply-history-time {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
 .ai-apply-history-message {
   font-size: 12px;
   color: var(--text-secondary);
   margin-bottom: 4px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  white-space: normal;
 }
 
 .ai-apply-history-paths {
   font-size: 12px;
   color: var(--text-primary);
+  overflow-wrap: anywhere;
   word-break: break-word;
 }
 
@@ -3416,14 +3441,19 @@ body:has(.monaco-editor .find-widget.visible) .workbench-hover-container .action
   flex-direction: column;
   align-items: stretch;
   gap: 6px;
-  flex-shrink: 0;
+  flex: 0 1 auto;
+  max-width: 100%;
+  min-width: 0;
 }
 
 .ai-apply-history-actions .btn-secondary,
 .ai-apply-history-actions .btn-reject {
   font-size: 11px;
   padding: 2px 8px;
-  white-space: nowrap;
+  white-space: normal;
+  text-align: center;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .chat-message.focus-flash {
