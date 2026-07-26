@@ -39,6 +39,8 @@ import {
 import { FileTreeNodeIcon } from './icons/FileTypeIcons'
 import { openWorkspaceFile } from '@/utils/open-workspace-file'
 import { isHtmlFilePath, pathToFileUrl } from '@/utils/browser-tab'
+import { isExtractableDocumentPath } from '@/utils/extractable-document'
+import { buildSummarizeToMarkdownRequest } from '@/utils/summarize-to-markdown'
 
 type InputMode = 'create-file' | 'create-folder' | 'rename'
 
@@ -1175,6 +1177,25 @@ export function FileTree() {
     [t]
   )
 
+  const summarizeToMarkdown = useCallback(
+    (node: FileTreeNode) => {
+      setContextMenu(null)
+      if (node.isPreview || node.isDirectory) return
+      const store = useAppStore.getState()
+      const request = buildSummarizeToMarkdownRequest(node.path, store.workspaceRoot, (vars) =>
+        t('chat.summarizeToMarkdownPrompt', vars)
+      )
+      if (!request) return
+      store.requestChatComposerSend({
+        text: request.text,
+        mode: request.mode,
+        preset: request.preset,
+        contextRefs: [request.contextRef]
+      })
+    },
+    [t]
+  )
+
   const openInTabBrowser = useCallback((node: FileTreeNode) => {
     setContextMenu(null)
     if (node.isPreview || node.isDirectory || !isHtmlFilePath(node.path)) return
@@ -1867,6 +1888,12 @@ export function FileTree() {
   const canOpenWithDefaultApp = Boolean(
     contextMenu?.node && !contextMenu.node.isPreview && !contextMenu.node.isDirectory
   )
+  const canSummarizeToMarkdown = Boolean(
+    contextMenu?.node &&
+      !contextMenu.node.isPreview &&
+      !contextMenu.node.isDirectory &&
+      isExtractableDocumentPath(contextMenu.node.path)
+  )
   const canOpenInTabBrowser = Boolean(
     contextMenu?.node &&
       !contextMenu.node.isPreview &&
@@ -1876,7 +1903,7 @@ export function FileTree() {
   const canSearchInFolder = Boolean(
     contextMenu?.node && contextMenu.node.isDirectory && !contextMenu.node.isPreview
   )
-  const hasContextActions = canAddToChat || canSearchInFolder
+  const hasContextActions = canAddToChat || canSearchInFolder || canSummarizeToMarkdown
   const hasOpenActions = canOpenInTabBrowser || canOpenWithDefaultApp || canShowInOsExplorer
   const hasMutateActions = canRename || canDelete
   const isRootDropTarget = dropTargetPath === normalizeNodePath(workspaceRoot)
@@ -2021,6 +2048,14 @@ export function FileTree() {
                   {chatAttachTargets.length > 1
                     ? t('explorer.addToChatMany', { count: chatAttachTargets.length })
                     : t('explorer.addToChat')}
+                </button>
+              )}
+              {canSummarizeToMarkdown && (
+                <button
+                  onMouseEnter={closeCreateSubmenu}
+                  onClick={() => summarizeToMarkdown(contextMenu.node!)}
+                >
+                  {t('explorer.summarizeToMarkdown')}
                 </button>
               )}
               {canSearchInFolder && (

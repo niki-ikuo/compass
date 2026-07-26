@@ -1536,6 +1536,15 @@ body:has(.monaco-editor .find-widget.visible) .workbench-hover-container .action
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+
+.media-viewer-action {
+  flex-shrink: 0;
+  margin-left: auto;
+  font-size: 12px;
+  padding: 4px 10px;
 }
 
 .media-viewer-body {

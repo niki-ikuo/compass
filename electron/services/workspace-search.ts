@@ -13,6 +13,12 @@ import { shouldSkipWorkspaceEntry } from './fs-ignore'
 import { decodeFileBuffer, encodeContent } from './encoding'
 import { ensureProjectIndex } from './project-indexer'
 import { searchSemanticWorkspace } from './semantic-index'
+import { extractDocumentText } from '../../src/utils/extract-document-text'
+import {
+  isExtractableDocumentPath,
+  MAX_EXTRACTABLE_FILE_BYTES,
+  MAX_EXTRACTED_TEXT_CHARS
+} from '../../src/utils/extractable-document'
 
 const IGNORED_DIRS = new Set([
   'node_modules',
@@ -247,18 +253,27 @@ export async function searchWorkspace(
     if (matchesGlobList(relativePath, options.exclude, false)) continue
 
     let buffer: Buffer
+    const extractable = isExtractableDocumentPath(relativePath)
     try {
       const info = await stat(filePath)
-      if (info.size > MAX_FILE_BYTES) continue
+      if (info.size > (extractable ? MAX_EXTRACTABLE_FILE_BYTES : MAX_FILE_BYTES)) continue
       buffer = await readFile(filePath)
     } catch {
       continue
     }
 
-    if (isProbablyBinary(buffer)) continue
+    let content: string
+    if (extractable) {
+      const extracted = extractDocumentText(relativePath, buffer, MAX_EXTRACTED_TEXT_CHARS)
+      if (!extracted?.text.trim()) continue
+      content = extracted.text
+    } else if (isProbablyBinary(buffer)) {
+      continue
+    } else {
+      content = decodeFileBuffer(buffer).content
+    }
 
     filesSearched++
-    const content = decodeFileBuffer(buffer).content
     const { matches, truncated: fileTruncated } = searchInContent(
       content,
       matcher,

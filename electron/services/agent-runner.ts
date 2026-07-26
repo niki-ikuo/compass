@@ -27,6 +27,12 @@ import {
 import type { ChatContentPart } from '../../src/utils/chat-content-parts'
 import { decodeFileBuffer } from './encoding'
 import { previewWorkspaceActions, resolveInsideWorkspace } from './filesystem'
+import { extractDocumentText } from '../../src/utils/extract-document-text'
+import {
+  isExtractableDocumentPath,
+  MAX_EXTRACTABLE_FILE_BYTES,
+  MAX_EXTRACTED_TEXT_CHARS
+} from '../../src/utils/extractable-document'
 import { searchWorkspace } from './workspace-search'
 import { runAgentExec, classifyAgentExecCommand } from './agent-exec'
 import {
@@ -144,7 +150,7 @@ const AGENT_TOOLS = [
     function: {
       name: 'readFile',
       description:
-        'Read a text file under the workspace. Path is relative to the workspace root. Re-reads of an unchanged file return a cache hit (outline only); pass force=true to reload full contents from disk. For Markdown, optional heading returns only that section (from the heading through the next same-or-higher-level heading). When the use-case is data and the path is a tabular CSV/TSV/JSON array, prefer profileData / queryData instead of reading the whole file.',
+        'Read a text file under the workspace. Path is relative to the workspace root. PDF and .docx return extracted text (not binary). Re-reads of an unchanged file return a cache hit (outline only); pass force=true to reload full contents from disk. For Markdown, optional heading returns only that section (from the heading through the next same-or-higher-level heading). When the use-case is data and the path is a tabular CSV/TSV/JSON array, prefer profileData / queryData instead of reading the whole file.',
       parameters: {
         type: 'object',
         properties: {
@@ -872,12 +878,33 @@ async function executeReadFile(
 
     let text: string
     let truncated = false
-    const buffer = await readFile(absolutePath)
-    if (info.size > MAX_READ_BYTES) {
-      text = decodeFileBuffer(buffer.subarray(0, MAX_READ_BYTES)).content
-      truncated = true
+    if (isExtractableDocumentPath(relativePath)) {
+      if (info.size > MAX_EXTRACTABLE_FILE_BYTES) {
+        return {
+          ok: false,
+          summary: `file too large to extract (${relativePath})`,
+          content: `Error: ${relativePath} is larger than ${MAX_EXTRACTABLE_FILE_BYTES} bytes`
+        }
+      }
+      const buffer = await readFile(absolutePath)
+      const extracted = extractDocumentText(relativePath, buffer, MAX_EXTRACTED_TEXT_CHARS)
+      if (!extracted?.text.trim()) {
+        return {
+          ok: false,
+          summary: `no extractable text (${relativePath})`,
+          content: `Error: could not extract text from ${relativePath}`
+        }
+      }
+      text = extracted.text
+      truncated = extracted.truncated
     } else {
-      text = decodeFileBuffer(buffer).content
+      const buffer = await readFile(absolutePath)
+      if (info.size > MAX_READ_BYTES) {
+        text = decodeFileBuffer(buffer.subarray(0, MAX_READ_BYTES)).content
+        truncated = true
+      } else {
+        text = decodeFileBuffer(buffer).content
+      }
     }
 
     const outline = buildFileOutline(relativePath, text)

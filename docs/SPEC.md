@@ -89,7 +89,8 @@
 | Open folder | Dialog picks workspace root |
 | Tree | Recursive listing; hide `node_modules` / `.git` |
 | File ops | Open, save, create (v1.1+); rename (F2); reveal in OS file manager |
-| Office / OpenDocument | Open with the OS default app (not the Monaco editor); Explorer also offers “Open with Default App” |
+| Office / OpenDocument | Open with the OS default app (not the Monaco editor); Explorer also offers “Open with Default App”. `.docx` text is extracted for index / search / @-mention; “Summarize to Markdown” writes a `.summary.md` sidecar via preview → apply |
+| PDF | In-app preview; extracted text is indexed and searchable; “Summarize to Markdown” same as `.docx` |
 | Doc templates | Built-in Markdown presets (including blank Markdown); workspace `.compass/templates/*.md` overrides same-name IDs and adds extras (optional YAML frontmatter: `label`, `fileName`, `order`). Manage via Explorer → New → Manage Templates… |
 | Dirty close / quit | Prompt to save before closing dirty editor tabs or quitting the app |
 

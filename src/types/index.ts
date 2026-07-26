@@ -70,8 +70,8 @@ export interface ChatSelectionRef {
   text: string
 }
 
-/** チャット参照の解決結果種別（テキスト / PDF 抽出 / 画像） */
-export type ResolvedContextKind = 'text' | 'pdf' | 'image'
+/** チャット参照の解決結果種別（テキスト / PDF・docx 抽出 / 画像） */
+export type ResolvedContextKind = 'text' | 'pdf' | 'docx' | 'image'
 
 export interface ResolvedContextFile {
   relativePath: string

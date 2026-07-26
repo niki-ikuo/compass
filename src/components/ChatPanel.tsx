@@ -139,6 +139,8 @@ export function ChatPanel() {
   const prevActiveChatIdRef = useRef<string | null>(null)
   const prevMessageCountRef = useRef(-1)
   const hasSettledScrollRef = useRef(false)
+  /** Strict Mode の effect 二重実行で同一リクエストを二重送信しない */
+  const processedComposerSendRequestIdRef = useRef<number | null>(null)
 
   const chatSessions = useAppStore((s) => s.chatSessions)
   const activeChatId = useAppStore((s) => s.activeChatId)
@@ -173,6 +175,8 @@ export function ChatPanel() {
   const deleteChatSession = useAppStore((s) => s.deleteChatSession)
   const chatComposerInsertRequest = useAppStore((s) => s.chatComposerInsertRequest)
   const clearChatComposerInsertRequest = useAppStore((s) => s.clearChatComposerInsertRequest)
+  const chatComposerSendRequest = useAppStore((s) => s.chatComposerSendRequest)
+  const clearChatComposerSendRequest = useAppStore((s) => s.clearChatComposerSendRequest)
   const settings = useAppStore((s) => s.settings)
   const setSettings = useAppStore((s) => s.setSettings)
 
@@ -454,17 +458,25 @@ export function ChatPanel() {
     inputComposerRef.current?.clear()
   }
 
-  const handleSend = async (overrides?: { text?: string; mode?: ChatMode }) => {
+  const handleSend = async (overrides?: {
+    text?: string
+    mode?: ChatMode
+    preset?: UseCasePreset
+  }) => {
     const text = (overrides?.text ?? inputComposerRef.current?.getValue() ?? '').trim()
     const chatId = activeChatId
-    if (!text || !chatId || loadingChatIds.includes(chatId)) return
+    // レンダー閉じ込みの loadingChatIds だけでなく store を見る（連続/二重送信ガード）
+    const loadingIds = useAppStore.getState().loadingChatIds
+    if (!text || !chatId || loadingIds.includes(chatId)) return
 
     const messageMode = overrides?.mode ?? sendMode
-    const messagePreset = resolveEffectiveUseCasePreset({
-      uiPreset: sendPreset,
-      workspacePreset: workspaceDefaultUseCasePreset,
-      appPreset: settings.defaultUseCasePreset
-    })
+    const messagePreset =
+      overrides?.preset ??
+      resolveEffectiveUseCasePreset({
+        uiPreset: sendPreset,
+        workspacePreset: workspaceDefaultUseCasePreset,
+        appPreset: settings.defaultUseCasePreset
+      })
     if (messageMode === 'agent' && !isAgentModeAvailable(settings.providerId)) {
       setSendMode('edit')
       lastSentModeRef.current = 'edit'
@@ -907,6 +919,21 @@ export function ChatPanel() {
     // pinSelectionAndInsert / insertMentionAtCursor は毎レンダー新しい参照なので request id のみ監視
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chatComposerInsertRequest?.id])
+
+  useEffect(() => {
+    if (!chatComposerSendRequest) return
+    const requestId = chatComposerSendRequest.id
+    // Strict Mode: setup→cleanup→setup で同一クロージャが二度走るため id で一度だけ処理
+    if (processedComposerSendRequestIdRef.current === requestId) return
+    processedComposerSendRequestIdRef.current = requestId
+    const { text, mode, preset } = chatComposerSendRequest
+    clearChatComposerSendRequest()
+    setSendMode(mode)
+    if (preset) setSendPreset(preset)
+    void handleSend({ text, mode, preset })
+    // handleSend は毎レンダー新しい参照なので request id のみ監視
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chatComposerSendRequest?.id])
 
   const isChatDrop = (dataTransfer: DataTransfer) =>
     hasChatContextDrag(dataTransfer) ||

@@ -56,13 +56,15 @@ Make `document` the strongest use case.
 
 Do not edit binaries in-app. Make them usable as text.
 
-- [ ] Extract PDF text into the index from step 1
-- [ ] Extract Office text where reliable (`.docx` first; skip hard formats)
-- [ ] @-mention / search hits on extracted text
-- [ ] Action: “Summarize to Markdown” → preview → apply (sidecar or new file)
-- [ ] Keep “Open with default app” for real editing
+- [x] Extract PDF text into the index from step 1
+- [x] Extract Office text where reliable (`.docx` first; skip hard formats)
+- [x] @-mention / search hits on extracted text
+- [x] Action: “Summarize to Markdown” → preview → apply (sidecar or new file)
+- [x] Keep “Open with default app” for real editing
 
 **Done:** PDF + Markdown folder can be asked and summarized with no copy-paste.
+
+**Touch:** `extractable-document.ts` / `docx-text.ts`, `project-indexer`, chat context / Agent `readFile` / keyword search, Explorer + PDF viewer “Summarize to Markdown”.
 
 **Depends on:** (1).
 

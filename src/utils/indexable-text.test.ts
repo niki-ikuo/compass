@@ -24,16 +24,22 @@ describe('isExcludedFromTextIndex / isTextIndexCandidatePath', () => {
     }
   })
 
-  it('excludes binary, media, and Office paths', () => {
+  it('includes extractable PDF / docx for the text index', () => {
+    expect(isExcludedFromTextIndex('scan.pdf')).toBe(false)
+    expect(isTextIndexCandidatePath('docs/spec.PDF')).toBe(true)
+    expect(isExcludedFromTextIndex('doc.docx')).toBe(false)
+    expect(isTextIndexCandidatePath('notes.DOCX')).toBe(true)
+  })
+
+  it('excludes binary, images, and non-extractable Office paths', () => {
     for (const path of [
       'app.exe',
       'lib.dll',
       'archive.zip',
       'font.woff2',
       'photo.png',
-      'scan.pdf',
       'sheet.xlsx',
-      'doc.docx',
+      'legacy.doc',
       'deck.pptx'
     ]) {
       expect(isExcludedFromTextIndex(path)).toBe(true)

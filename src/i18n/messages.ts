@@ -200,6 +200,7 @@ export const ja = {
   'explorer.searchInFolder': 'フォルダ内を検索',
   'explorer.addToChat': 'チャットに追加',
   'explorer.addToChatMany': '{count} 件をチャットに追加',
+  'explorer.summarizeToMarkdown': 'Markdown に要約',
   'explorer.deleteConfirmOne': '「{name}」{kind}を削除しますか？',
   'explorer.deleteConfirmMany': '選択した {count} 件の項目を削除しますか？',
   'explorer.deleteMany': '{count} 件を削除',
@@ -296,6 +297,8 @@ export const ja = {
   'chat.pasteMediaNeedsWorkspace':
     '画像や PDF を貼るには、先にフォルダを開いてください',
   'chat.pasteMediaFailed': '貼り付けたファイルの保存に失敗しました',
+  'chat.summarizeToMarkdownPrompt':
+    '{mention} の抽出テキストを Markdown に要約し、```compass-actions``` の writeFile で `{sidecar}` に書いてください（既存なら上書き）。見出し付きの読みやすい要約にし、元ファイルは編集しないでください。',
   'chat.dropFileNeedsWorkspace':
     '外部ファイルをドロップするには、先にフォルダを開いてください',
   'chat.externalFolderNotAllowed':
@@ -608,7 +611,7 @@ export const ja = {
   'ai.preset.code.role':
     'あなたはコーディングアシスタントです。日本語で回答してください。コード・依存関係・プロジェクト構造インデックス(.compass)を重視して回答してください。',
   'ai.preset.document.role':
-    'あなたは文書編集アシスタントです。日本語で回答してください。Markdown / テキストの推敲・構成・要約を主とし、見出し階層・用語の一貫・読みやすさを優先してください。「正しい実装」より読者向けの明確さを重視し、変更時は章単位なら replaceSection（path + heading + その章の内容）、それ以外は小さな applyPatch を推奨し全文書き換えは避けてください。他の章を壊さないこと。`.compass/glossary.md` があれば用語に従ってください。',
+    'あなたは文書編集アシスタントです。日本語で回答してください。Markdown / テキストの推敲・構成・要約を主とし、見出し階層・用語の一貫・読みやすさを優先してください。PDF / .docx は抽出テキストとして参照・検索できます（バイナリ自体は編集しない）。要約を残すときは sidecar の `.summary.md` へ writeFile してください。「正しい実装」より読者向けの明確さを重視し、変更時は章単位なら replaceSection（path + heading + その章の内容）、それ以外は小さな applyPatch を推奨し全文書き換えは避けてください。他の章を壊さないこと。`.compass/glossary.md` があれば用語に従ってください。',
   'ai.preset.data.role':
     'あなたはデータ整理アシスタントです。日本語で回答してください。CSV / TSV / JSON（オブジェクト配列）は構造化データとして扱い、列名・型・欠損・重複・ネストを優先してください。表データの調査はサイズに関係なく、まず profileData で一時 SQLite に取込んでから概要を取り、集計・絞り込み・JOIN は queryData（読み取り専用 SELECT）で行ってください。表全体の readFile は避けてください（例外: 非表テキスト、YAML 表、取込失敗後、パッチ用のごく短い抜粋）。変更時はスキーマ破壊を避け（列順・キー名の勝手な変更禁止）。ファイルへの書き戻しは proposeActions のみ（SQL での更新禁止）です。結果は要約と代表例で示し、必要なら対象行・キーを明示してください。',
   'ai.preset.general.role':
@@ -637,6 +640,11 @@ export const ja = {
   'ai.pdfHeading': '## PDF（抽出テキスト）: {path}',
   'ai.pdfNoText':
     '（PDF からテキストを抽出できませんでした。スキャン画像や埋め込みフォントの可能性があります）',
+  'ai.docxHeading': '## Word（抽出テキスト）: {path}',
+  'ai.docxNoText':
+    '（.docx からテキストを抽出できませんでした。空の文書か、非対応の形式の可能性があります）',
+  'ai.extractableTooLarge':
+    '（ファイルが大きすぎるためテキストを抽出できませんでした。上限: 約 {maxMb}MB）',
   'ai.imageHeading': '## 画像: {path}',
   'ai.imageAttachedNote': '（この画像はビジョン入力として添付されています）',
   'ai.imageTooLarge': '（画像が大きすぎるため添付できませんでした。上限: 約 {maxMb}MB）',
@@ -895,6 +903,7 @@ export const en: Record<MessageKey, string> = {
   'explorer.searchInFolder': 'Find in Folder',
   'explorer.addToChat': 'Add to Chat',
   'explorer.addToChatMany': 'Add {count} to Chat',
+  'explorer.summarizeToMarkdown': 'Summarize to Markdown',
   'explorer.deleteConfirmOne': 'Delete {kind} "{name}"?',
   'explorer.deleteConfirmMany': 'Delete {count} selected items?',
   'explorer.deleteMany': 'Delete {count}',
@@ -988,6 +997,8 @@ export const en: Record<MessageKey, string> = {
     'Paste editor selections, screenshots, or PDFs into chat to attach them as references. You can also drop files from Explorer (folders are not allowed)',
   'chat.pasteMediaNeedsWorkspace': 'Open a folder before pasting images or PDFs',
   'chat.pasteMediaFailed': 'Failed to save the pasted file',
+  'chat.summarizeToMarkdownPrompt':
+    'Summarize the extracted text from {mention} as Markdown and write it to `{sidecar}` with a writeFile action inside ```compass-actions``` (overwrite if it already exists). Use clear headings, keep it readable, and do not edit the source file.',
   'chat.dropFileNeedsWorkspace': 'Open a folder before dropping external files',
   'chat.externalFolderNotAllowed':
     'External folders cannot be added to chat. Drop files only',
@@ -1284,7 +1295,7 @@ export const en: Record<MessageKey, string> = {
   'ai.preset.code.role':
     'You are a coding assistant. Respond in English. Focus on code, dependencies, and the project structure index (.compass) when available.',
   'ai.preset.document.role':
-    'You are a document-editing assistant. Respond in English. Prioritize drafting, structuring, and summarizing Markdown/text; keep heading hierarchy, terminology, and readability consistent. Prefer clarity for readers over "correct implementation." For a single Markdown chapter, prefer replaceSection (path + heading + section body); otherwise prefer small applyPatch edits over full-file rewrites. Do not rewrite other chapters. Follow `.compass/glossary.md` when present.',
+    'You are a document-editing assistant. Respond in English. Prioritize drafting, structuring, and summarizing Markdown/text; keep heading hierarchy, terminology, and readability consistent. PDF / .docx are available as extracted text for reference and search (do not edit the binaries). When saving a summary, writeFile a sidecar `.summary.md`. Prefer clarity for readers over "correct implementation." For a single Markdown chapter, prefer replaceSection (path + heading + section body); otherwise prefer small applyPatch edits over full-file rewrites. Do not rewrite other chapters. Follow `.compass/glossary.md` when present.',
   'ai.preset.data.role':
     'You are a data-organization assistant. Respond in English. Treat CSV / TSV / JSON (array of objects) as structured data; prioritize column names, types, missing values, duplicates, and nesting. For tabular files of any size, always start with profileData (loads into the in-run temporary SQLite sandbox), then use queryData (read-only SELECT) for aggregates, filters, and JOINs. Avoid whole-table readFile except for non-tabular text, YAML tables, after an import failure, or a tiny excerpt needed for a patch. Avoid schema-breaking changes (do not reorder columns or rename keys casually). Never write files via SQL — use proposeActions only. Summarize with representative examples and name target rows/keys when needed.',
   'ai.preset.general.role':
@@ -1313,6 +1324,11 @@ export const en: Record<MessageKey, string> = {
   'ai.pdfHeading': '## PDF (extracted text): {path}',
   'ai.pdfNoText':
     '(Could not extract text from this PDF. It may be a scan or use embedded fonts.)',
+  'ai.docxHeading': '## Word (extracted text): {path}',
+  'ai.docxNoText':
+    '(Could not extract text from this .docx. It may be empty or use an unsupported format.)',
+  'ai.extractableTooLarge':
+    '(File is too large to extract text. Limit: about {maxMb}MB)',
   'ai.imageHeading': '## Image: {path}',
   'ai.imageAttachedNote': '(This image is attached as vision input.)',
   'ai.imageTooLarge': '(Image is too large to attach. Limit: about {maxMb}MB)',

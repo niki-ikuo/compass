@@ -733,6 +733,13 @@ interface AppState {
     mentions: string[]
     selection?: ChatSelectionRef
   } | null
+  /** チャットへ本文を載せて送信するリクエスト（要約→Markdown など） */
+  chatComposerSendRequest: {
+    id: number
+    text: string
+    mode: ChatMode
+    preset?: UseCasePreset
+  } | null
   panelLayout: { fileTreeWidthRatio: number; chatWidthRatio: number; terminalHeight: number }
 
   setWorkspaceRoot: (root: string | null) => void
@@ -868,6 +875,13 @@ interface AppState {
     selection?: ChatSelectionRef
   ) => void
   clearChatComposerInsertRequest: () => void
+  requestChatComposerSend: (request: {
+    text: string
+    mode: ChatMode
+    preset?: UseCasePreset
+    contextRefs?: ChatContextRef[]
+  }) => void
+  clearChatComposerSendRequest: () => void
   setFileTreeWidthRatio: (ratio: number) => void
   setChatPanelWidthRatio: (ratio: number) => void
   setTerminalHeight: (height: number) => void
@@ -939,6 +953,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   lastAiUndoError: null,
   aiApplyHistory: [],
   chatComposerInsertRequest: null,
+  chatComposerSendRequest: null,
   panelLayout: {
     fileTreeWidthRatio: initialPanelLayout.fileTreeWidthRatio,
     chatWidthRatio: initialPanelLayout.chatWidthRatio,
@@ -2330,6 +2345,55 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   clearChatComposerInsertRequest: () => set({ chatComposerInsertRequest: null }),
+
+  requestChatComposerSend: (request) => {
+    const text = request.text.trim()
+    if (!text) return
+    set((state) => {
+      const openSessions = getOpenSessions(state.chatSessions)
+      const ensured =
+        openSessions.length === 0
+          ? ensureOpenChatSession(state.chatSessions)
+          : {
+              sessions: state.chatSessions,
+              activeChatId:
+                state.activeChatId && openSessions.some((s) => s.id === state.activeChatId)
+                  ? state.activeChatId
+                  : openSessions[openSessions.length - 1].id
+            }
+
+      let sessions = ensured.sessions
+      const activeChatId = ensured.activeChatId
+      if (request.contextRefs && request.contextRefs.length > 0 && activeChatId) {
+        sessions = updateSessionById(sessions, activeChatId, (session) => {
+          const existing = new Set(session.contextRefs.map((r) => r.path.replace(/\\/g, '/')))
+          const merged = [...session.contextRefs]
+          for (const ref of request.contextRefs!) {
+            const key = ref.path.replace(/\\/g, '/')
+            if (existing.has(key)) continue
+            existing.add(key)
+            merged.push(ref)
+          }
+          return { ...session, contextRefs: merged, updatedAt: Date.now() }
+        })
+      }
+
+      return {
+        showChat: true,
+        chatSessions: sessions,
+        activeChatId,
+        chatComposerSendRequest: {
+          id: (state.chatComposerSendRequest?.id ?? 0) + 1,
+          text,
+          mode: request.mode,
+          preset: request.preset
+        }
+      }
+    })
+    scheduleChatHistorySave(get().workspaceRoot)
+  },
+
+  clearChatComposerSendRequest: () => set({ chatComposerSendRequest: null }),
 
   setFileTreeWidthRatio: (ratio) =>
     set((state) => ({

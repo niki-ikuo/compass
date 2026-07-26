@@ -1,6 +1,9 @@
 import { useEffect, useMemo } from 'react'
 import { getFileName } from '@/utils/language'
 import { useI18n } from '@/i18n'
+import { useAppStore } from '@/stores/app-store'
+import { isExtractableDocumentPath } from '@/utils/extractable-document'
+import { buildSummarizeToMarkdownRequest } from '@/utils/summarize-to-markdown'
 
 function base64ToBlobUrl(base64: string, mimeType: string): string {
   const binary = atob(base64)
@@ -21,6 +24,7 @@ interface MediaViewerProps {
 export function MediaViewer({ path, viewKind, mimeType, base64 }: MediaViewerProps) {
   const { t } = useI18n()
   const fileName = getFileName(path)
+  const canSummarize = viewKind === 'pdf' && isExtractableDocumentPath(path)
 
   const objectUrl = useMemo(
     () => base64ToBlobUrl(base64, mimeType),
@@ -33,6 +37,20 @@ export function MediaViewer({ path, viewKind, mimeType, base64 }: MediaViewerPro
     }
   }, [objectUrl])
 
+  const summarizeToMarkdown = (): void => {
+    const store = useAppStore.getState()
+    const request = buildSummarizeToMarkdownRequest(path, store.workspaceRoot, (vars) =>
+      t('chat.summarizeToMarkdownPrompt', vars)
+    )
+    if (!request) return
+    store.requestChatComposerSend({
+      text: request.text,
+      mode: request.mode,
+      preset: request.preset,
+      contextRefs: [request.contextRef]
+    })
+  }
+
   return (
     <div className="media-viewer">
       <div className="media-viewer-toolbar">
@@ -42,6 +60,15 @@ export function MediaViewer({ path, viewKind, mimeType, base64 }: MediaViewerPro
         <span className="media-viewer-filename" title={path}>
           {fileName}
         </span>
+        {canSummarize && (
+          <button
+            type="button"
+            className="btn-secondary media-viewer-action"
+            onClick={summarizeToMarkdown}
+          >
+            {t('explorer.summarizeToMarkdown')}
+          </button>
+        )}
       </div>
       <div className={`media-viewer-body${viewKind === 'pdf' ? ' is-pdf' : ''}`}>
         {viewKind === 'image' ? (

@@ -38,7 +38,12 @@ import {
   isBinaryExtensionPath,
   isProbablyBinaryBytes
 } from '../../src/utils/binary-file'
-import { extractPdfText } from '../../src/utils/pdf-text'
+import { extractDocumentText } from '../../src/utils/extract-document-text'
+import {
+  isDocxPath,
+  MAX_EXTRACTABLE_FILE_BYTES,
+  MAX_EXTRACTED_TEXT_CHARS
+} from '../../src/utils/extractable-document'
 import { shouldSkipWorkspaceEntry } from './fs-ignore'
 
 function normalizeActionPath(workspaceRoot: string, actionPath: string): string {
@@ -138,7 +143,6 @@ const MAX_FOLDER_FILES = 25
 /** Vision 向け画像の上限（バイト） */
 const MAX_IMAGE_BYTES = 4 * 1024 * 1024
 const MAX_IMAGES_PER_REQUEST = 6
-const MAX_PDF_TEXT_CHARS = 48_000
 
 export type ReadDirOptions = {
   /** ディレクトリが無いとき例外ではなく空配列を返す（任意フォルダの読み取り用） */
@@ -625,29 +629,41 @@ async function readTextFileSafe(
   }
 }
 
-async function readPdfFileSafe(
+async function readExtractableDocumentSafe(
   filePath: string,
   workspaceRoot: string
 ): Promise<ResolvedContextFile | null> {
   try {
     const info = await stat(filePath)
     if (!info.isFile()) return null
+    if (info.size > MAX_EXTRACTABLE_FILE_BYTES) {
+      return {
+        relativePath: toContextPathLabel(workspaceRoot, filePath),
+        content: t('ai.extractableTooLarge', {
+          maxMb: Math.round(MAX_EXTRACTABLE_FILE_BYTES / (1024 * 1024))
+        }),
+        truncated: true,
+        kind: isPdfPath(filePath) ? 'pdf' : 'docx'
+      }
+    }
     const buffer = await readFile(filePath)
-    const extracted = extractPdfText(buffer, MAX_PDF_TEXT_CHARS)
+    const extracted = extractDocumentText(filePath, buffer, MAX_EXTRACTED_TEXT_CHARS)
     const relativePath = toContextPathLabel(workspaceRoot, filePath)
+    if (!extracted) return null
     if (!extracted.text.trim()) {
       return {
         relativePath,
-        content: t('ai.pdfNoText'),
+        content:
+          extracted.kind === 'pdf' ? t('ai.pdfNoText') : t('ai.docxNoText'),
         truncated: false,
-        kind: 'pdf'
+        kind: extracted.kind
       }
     }
     return {
       relativePath,
       content: extracted.text,
       truncated: extracted.truncated,
-      kind: 'pdf'
+      kind: extracted.kind
     }
   } catch {
     return null
@@ -692,7 +708,9 @@ async function readContextFile(
   workspaceRoot: string
 ): Promise<ResolvedContextFile | null> {
   if (isImagePath(filePath)) return readImageFileSafe(filePath, workspaceRoot)
-  if (isPdfPath(filePath)) return readPdfFileSafe(filePath, workspaceRoot)
+  if (isPdfPath(filePath) || isDocxPath(filePath)) {
+    return readExtractableDocumentSafe(filePath, workspaceRoot)
+  }
   return readTextFileSafe(filePath, workspaceRoot)
 }
 

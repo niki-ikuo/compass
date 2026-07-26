@@ -25,9 +25,16 @@ import { shouldSkipWorkspaceEntry } from './fs-ignore'
 import { decodeFileBuffer } from './encoding'
 import { writeSemanticIndex, type SemanticSourceFile } from './semantic-index'
 import { isProbablyBinaryBytes } from '../../src/utils/binary-file'
+import { extractDocumentText } from '../../src/utils/extract-document-text'
+import {
+  isExtractableDocumentPath,
+  MAX_EXTRACTABLE_FILE_BYTES,
+  MAX_EXTRACTED_TEXT_CHARS
+} from '../../src/utils/extractable-document'
 import { isTextIndexCandidatePath } from '../../src/utils/indexable-text'
 
-const INDEX_VERSION = 7
+const INDEX_VERSION = 8
+const MAX_TEXT_FILE_BYTES = 256 * 1024
 const COMPASS_DIR = '.compass'
 const IGNORED_DIRS = new Set([
   'node_modules',
@@ -90,6 +97,8 @@ function getLanguage(ext: string): string {
     csv: 'csv',
     tsv: 'tsv',
     txt: 'text',
+    pdf: 'pdf',
+    docx: 'docx',
     vb: 'vb',
     vbs: 'vb',
     bas: 'vb',
@@ -414,8 +423,9 @@ export function buildSummary(files: IndexedFile[], edges: GraphEdge[]): string {
   const documents = files
     .filter(
       (f) =>
-        f.language === 'markdown' &&
-        ((f.headings && f.headings.length > 0) || Boolean(f.summary))
+        (f.language === 'markdown' &&
+          ((f.headings && f.headings.length > 0) || Boolean(f.summary))) ||
+        ((f.language === 'pdf' || f.language === 'docx') && Boolean(f.summary))
     )
     .sort((a, b) => documentScore(b) - documentScore(a) || a.path.localeCompare(b.path))
 
@@ -423,8 +433,10 @@ export function buildSummary(files: IndexedFile[], edges: GraphEdge[]): string {
     lines.push('## Documents')
     for (const file of documents.slice(0, 40)) {
       const brief = formatDocumentBrief(file, 10)
+      const kindLabel =
+        file.language === 'pdf' || file.language === 'docx' ? `, ${file.language}` : ''
       lines.push(
-        `- ${file.path} (${t('ai.indexLines', { count: file.lines })})` +
+        `- ${file.path} (${t('ai.indexLines', { count: file.lines })}${kindLabel})` +
           (brief ? ` | ${brief}` : '')
       )
     }
@@ -713,20 +725,35 @@ async function runBuildProjectIndex(
     const relPath = relative(workspaceRoot, absPath).replace(/\\/g, '/')
     try {
       const info = await stat(absPath)
-      if (info.size > 256 * 1024) {
+      const extractable = isExtractableDocumentPath(absPath)
+      const maxBytes = extractable ? MAX_EXTRACTABLE_FILE_BYTES : MAX_TEXT_FILE_BYTES
+      if (info.size > maxBytes) {
         reportIndexProgress(workspaceRoot, 'files', i + 1, totalFiles)
         continue
       }
 
       const buffer = await readFile(absPath)
-      if (isProbablyBinaryBytes(buffer)) {
-        reportIndexProgress(workspaceRoot, 'files', i + 1, totalFiles)
-        continue
-      }
-      const content = decodeFileBuffer(buffer).content
+      let content: string
+      let language: string
 
-      const ext = extname(absPath).slice(1).toLowerCase()
-      const language = getLanguage(ext)
+      if (extractable) {
+        const extracted = extractDocumentText(relPath, buffer, MAX_EXTRACTED_TEXT_CHARS)
+        if (!extracted?.text.trim()) {
+          reportIndexProgress(workspaceRoot, 'files', i + 1, totalFiles)
+          continue
+        }
+        content = extracted.text
+        language = extracted.kind
+      } else {
+        if (isProbablyBinaryBytes(buffer)) {
+          reportIndexProgress(workspaceRoot, 'files', i + 1, totalFiles)
+          continue
+        }
+        content = decodeFileBuffer(buffer).content
+        const ext = extname(absPath).slice(1).toLowerCase()
+        language = getLanguage(ext)
+      }
+
       const lines = content.split('\n').length
 
       const entry: IndexedFile = {
@@ -745,6 +772,9 @@ async function runBuildProjectIndex(
         if (headings.length > 0) entry.headings = headings
         if (summary) entry.summary = summary
         if (docLinks.length > 0) entry.docLinks = docLinks
+      } else if (language === 'pdf' || language === 'docx') {
+        const summary = extractMarkdownSummary(content, 200)
+        if (summary) entry.summary = summary
       }
 
       const dataSchema = extractDataSchema(relPath, content)

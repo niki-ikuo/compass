@@ -100,7 +100,7 @@ The renderer calls `window.compass.*`. The source of truth is `electron/preload.
 
 Structure index and workspace data live under the workspace’s `.compass/` (`project-indexer.ts`, `chat-history.ts`, `workspace-settings.ts`, …).
 
-Indexing policy is **include text / exclude binary** (not an extension allowlist). Known binaries, images/PDF, and Office files are path-excluded; remaining candidates are accepted via content sniff (NUL detection; UTF-16 treated as text) and a size cap (`indexable-text.ts` / `binary-file.ts`).
+Indexing policy is **include text / exclude binary** (not an extension allowlist). Known binaries, images, and non-extractable Office files are path-excluded. **PDF and `.docx`** are included via extracted text (`extractable-document.ts` / `pdf-text.ts` / `docx-text.ts`); remaining candidates are accepted via content sniff (NUL detection; UTF-16 treated as text) and a size cap (`indexable-text.ts` / `binary-file.ts`). Real Office editing stays “Open with default app”.
 
 | File | Contents |
 |------|----------|
