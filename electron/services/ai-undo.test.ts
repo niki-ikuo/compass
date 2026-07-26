@@ -134,28 +134,78 @@ describe('ai apply undo', () => {
     expect(readFileSync(join(root, 'keep.txt'), 'utf-8')).toBe('live')
   })
 
-  it('undoChangeSet rejects when not the latest applied', async () => {
-    const root = makeTempRoot('not-latest')
+  it('undoChangeSet cascades from tip through the target', async () => {
+    const root = makeTempRoot('cascade')
     tempRoots.push(root)
     writeFileSync(join(root, 'a.txt'), 'A0', 'utf-8')
     writeFileSync(join(root, 'b.txt'), 'B0', 'utf-8')
+    writeFileSync(join(root, 'c.txt'), 'C0', 'utf-8')
+
+    const first = await applyWorkspaceActionsRecordingUndo(
+      root,
+      [{ type: 'writeFile', path: 'a.txt', content: 'A1' }],
+      { undo: { chatId: 'chat-a', source: 'preview-file', messageId: 'msg-a' } }
+    )
+    await applyWorkspaceActionsRecordingUndo(
+      root,
+      [{ type: 'writeFile', path: 'b.txt', content: 'B1' }],
+      { undo: { chatId: 'chat-b', source: 'preview-file', messageId: 'msg-b' } }
+    )
+    await applyWorkspaceActionsRecordingUndo(
+      root,
+      [{ type: 'writeFile', path: 'c.txt', content: 'C1' }],
+      { undo: { chatId: 'chat-c', source: 'preview-file', messageId: 'msg-c' } }
+    )
+
+    const result = await undoChangeSet(root, first.changeSet!.id)
+    expect(result.undone).toHaveLength(3)
+    expect(result.undone.map((item) => item.id)).toEqual([
+      expect.any(String),
+      expect.any(String),
+      first.changeSet!.id
+    ])
+    expect(result.undone[result.undone.length - 1].id).toBe(first.changeSet!.id)
+    expect(readFileSync(join(root, 'a.txt'), 'utf-8')).toBe('A0')
+    expect(readFileSync(join(root, 'b.txt'), 'utf-8')).toBe('B0')
+    expect(readFileSync(join(root, 'c.txt'), 'utf-8')).toBe('C0')
+    expect(await peekLastAppliedChangeSet(root)).toBeNull()
+  })
+
+  it('persists messageId on change sets and list summaries', async () => {
+    const root = makeTempRoot('message-id')
+    tempRoots.push(root)
+    writeFileSync(join(root, 'a.txt'), 'A0', 'utf-8')
+
+    const result = await applyWorkspaceActionsRecordingUndo(
+      root,
+      [{ type: 'writeFile', path: 'a.txt', content: 'A1' }],
+      { undo: { chatId: 'chat-1', source: 'preview-all', messageId: 'assistant-42' } }
+    )
+    expect(result.changeSet?.messageId).toBe('assistant-42')
+
+    const listed = await listChangeSets(root)
+    expect(listed[0].messageId).toBe('assistant-42')
+    expect(listed[0].summary).toContain('a.txt')
+  })
+
+  it('undoChangeSet rejects missing or already-undone targets', async () => {
+    const root = makeTempRoot('missing-target')
+    tempRoots.push(root)
+    writeFileSync(join(root, 'a.txt'), 'A0', 'utf-8')
 
     const first = await applyWorkspaceActionsRecordingUndo(
       root,
       [{ type: 'writeFile', path: 'a.txt', content: 'A1' }],
       { undo: { chatId: 'chat-a', source: 'preview-file' } }
     )
-    await applyWorkspaceActionsRecordingUndo(
-      root,
-      [{ type: 'writeFile', path: 'b.txt', content: 'B1' }],
-      { undo: { chatId: 'chat-b', source: 'preview-file' } }
-    )
+    await undoLastChangeSet(root)
 
     await expect(undoChangeSet(root, first.changeSet!.id)).rejects.toThrow(
-      /newer apply|より新しい適用/i
+      /matching|not found|見つかりません|取り消せ/i
     )
-    expect(readFileSync(join(root, 'a.txt'), 'utf-8')).toBe('A1')
-    expect(readFileSync(join(root, 'b.txt'), 'utf-8')).toBe('B1')
+    await expect(undoChangeSet(root, 'cs_missing')).rejects.toThrow(
+      /matching|not found|見つかりません|取り消せ/i
+    )
   })
 
   it('undoChatApplies undoes tip applies for one chat and stops on another chat', async () => {

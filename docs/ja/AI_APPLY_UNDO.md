@@ -2,7 +2,7 @@
 
 [English](../AI_APPLY_UNDO.md) | **日本語**
 
-状態: **Phase 2 実装済み**（メッセージ横 Undo、適用履歴一覧、Agent 向け Undo 通知強化、このチャットの適用取り消し）。Phase 3 はバックログ。関連: [AGENT.md](./AGENT.md)（プレビュー／適用ゲート）、[ARCHITECTURE.md](./ARCHITECTURE.md)、[SPEC.md](./SPEC.md)。
+状態: **Phase 2 + タイムライン（§人が使える Apply 履歴）実装済み**（メッセージ横 Undo、適用履歴タイムライン、tip→対象の連鎖 Undo、要約 `.md` 保存、Agent 向け Undo 通知強化、このチャットの適用取り消し）。関連: [AGENT.md](./AGENT.md)（プレビュー／適用ゲート）、[ARCHITECTURE.md](./ARCHITECTURE.md)、[SPEC.md](./SPEC.md)、[TEXT_WORKSPACE_PLAN.md](./TEXT_WORKSPACE_PLAN.md)。
 
 Apply 後 Undo の設計記録。Phase 1 で Change Set 基盤、Phase 2 で発見性・チャット単位操作を追加。
 
@@ -229,7 +229,7 @@ Agent:
 
 ### Phase 3 — 任意／やらなくてよいものも含む
 
-- フルの履歴タイムライン UI
+- ~~フルの履歴タイムライン UI~~（実装済み: メッセージ紐づけ・連鎖 Undo・要約保存）
 - git 自動 stash 連携
 - Template Manager への同基盤適用
 - 設定画面での保持件数・サイズ

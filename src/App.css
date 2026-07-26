@@ -3314,7 +3314,7 @@ body:has(.monaco-editor .find-widget.visible) .workbench-hover-container .action
 }
 
 .ai-apply-history-modal {
-  width: min(560px, 92vw);
+  width: min(640px, 92vw);
   max-height: 80vh;
 }
 
@@ -3329,23 +3329,57 @@ body:has(.monaco-editor .find-widget.visible) .workbench-hover-container .action
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 0;
   max-height: 60vh;
   overflow: auto;
 }
 
+.ai-apply-timeline {
+  position: relative;
+  padding-left: 14px;
+}
+
+.ai-apply-timeline::before {
+  content: '';
+  position: absolute;
+  left: 4px;
+  top: 8px;
+  bottom: 8px;
+  width: 2px;
+  background: var(--border);
+}
+
 .ai-apply-history-item {
+  position: relative;
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
-  padding: 8px 10px;
+  padding: 10px 10px 10px 12px;
   border: 1px solid var(--border);
   border-radius: 4px;
+  margin-bottom: 8px;
+  background: var(--bg-primary, var(--background));
+}
+
+.ai-apply-timeline .ai-apply-history-item::before {
+  content: '';
+  position: absolute;
+  left: -12px;
+  top: 16px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent, var(--text-secondary));
+  border: 2px solid var(--bg-primary, var(--background));
 }
 
 .ai-apply-history-item.status-undone {
   opacity: 0.7;
+}
+
+.ai-apply-history-item.status-undone::before {
+  background: var(--text-secondary);
 }
 
 .ai-apply-history-meta {
@@ -3362,10 +3396,47 @@ body:has(.monaco-editor .find-widget.visible) .workbench-hover-container .action
   color: var(--text-primary);
 }
 
+.ai-apply-history-message {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .ai-apply-history-paths {
   font-size: 12px;
   color: var(--text-primary);
   word-break: break-word;
+}
+
+.ai-apply-history-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.ai-apply-history-actions .btn-secondary,
+.ai-apply-history-actions .btn-reject {
+  font-size: 11px;
+  padding: 2px 8px;
+  white-space: nowrap;
+}
+
+.chat-message.focus-flash {
+  animation: chat-message-focus-flash 1.2s ease;
+}
+
+@keyframes chat-message-focus-flash {
+  0% {
+    background: color-mix(in srgb, var(--accent, #4a90d9) 28%, transparent);
+  }
+  100% {
+    background: transparent;
+  }
 }
 
 .action-preview-error {

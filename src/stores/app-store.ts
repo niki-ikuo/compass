@@ -419,6 +419,38 @@ function bannerFromChangeSet(changeSet: WorkspaceChangeSet): {
   }
 }
 
+/** Ensure an assistant message exists before Apply so Change Set can store messageId. */
+function ensureAssistantMessageForApply(
+  sessions: ChatSession[],
+  chatId: string
+): { sessions: ChatSession[]; messageId: string } {
+  const session = sessions.find((item) => item.id === chatId)
+  if (!session) {
+    return { sessions, messageId: generateId() }
+  }
+  const last = session.messages[session.messages.length - 1]
+  if (last?.role === 'assistant') {
+    return { sessions, messageId: last.id }
+  }
+  const messageId = generateId()
+  return {
+    sessions: updateSessionById(sessions, chatId, (current) => ({
+      ...current,
+      messages: [
+        ...current.messages,
+        {
+          id: messageId,
+          role: 'assistant' as const,
+          content: '',
+          timestamp: Date.now()
+        }
+      ],
+      updatedAt: Date.now()
+    })),
+    messageId
+  }
+}
+
 function attachAppliedChangeSetToSessions(
   sessions: ChatSession[],
   chatId: string,
@@ -427,18 +459,27 @@ function attachAppliedChangeSetToSessions(
   const record = toChatAppliedChangeSet(changeSet)
   return updateSessionById(sessions, chatId, (session) => {
     const messages = [...session.messages]
+    const byMessageId = changeSet.messageId
+      ? messages.findIndex((message) => message.id === changeSet.messageId)
+      : -1
     const lastIdx = messages.length - 1
-    const last = lastIdx >= 0 ? messages[lastIdx] : null
-    if (last?.role === 'assistant') {
-      const existing = last.appliedChangeSets ?? []
-      messages[lastIdx] = {
-        ...last,
+    const idx =
+      byMessageId >= 0
+        ? byMessageId
+        : lastIdx >= 0 && messages[lastIdx].role === 'assistant'
+          ? lastIdx
+          : -1
+    if (idx >= 0) {
+      const target = messages[idx]
+      const existing = target.appliedChangeSets ?? []
+      messages[idx] = {
+        ...target,
         appliedChangeSets: [...existing, record]
       }
       return { ...session, messages, updatedAt: Date.now() }
     }
     messages.push({
-      id: generateId(),
+      id: changeSet.messageId ?? generateId(),
       role: 'assistant',
       content: '',
       timestamp: Date.now(),
@@ -446,6 +487,62 @@ function attachAppliedChangeSetToSessions(
     })
     return { ...session, messages, updatedAt: Date.now() }
   })
+}
+
+function applyUndoneChangeSetsToStore(
+  get: () => {
+    workspaceRoot: string | null
+    openFiles: OpenFile[]
+    activeFilePath: string | null
+    chatSessions: ChatSession[]
+    loadingChatIds: string[]
+    lastAiApplyUndo: {
+      changeSetId: string
+      chatId: string
+      entryCount: number
+      createdAt: number
+    } | null
+    refreshAiApplyHistory: () => Promise<void>
+  },
+  set: (partial: Record<string, unknown>) => void,
+  undone: WorkspaceChangeSet[]
+): void {
+  const state = get()
+  if (!state.workspaceRoot || undone.length === 0) return
+
+  let openFiles = state.openFiles
+  let activeFilePath = state.activeFilePath
+  for (const changeSet of undone) {
+    const synced = syncOpenFilesAfterUndo(
+      openFiles,
+      activeFilePath,
+      state.workspaceRoot,
+      changeSet
+    )
+    openFiles = synced.openFiles
+    activeFilePath = synced.activeFilePath
+  }
+
+  let sessions = state.chatSessions
+  for (const changeSet of undone) {
+    sessions = markAppliedChangeSetUndoneInSessions(sessions, changeSet.id)
+    const agentRunning = get().loadingChatIds.includes(changeSet.chatId)
+    sessions = appendUndoNoteToSessions(sessions, changeSet, agentRunning)
+  }
+
+  set({
+    openFiles,
+    activeFilePath,
+    chatSessions: sessions,
+    lastAiApplyUndo:
+      state.lastAiApplyUndo &&
+      undone.some((item) => item.id === state.lastAiApplyUndo?.changeSetId)
+        ? null
+        : state.lastAiApplyUndo,
+    lastAiUndoError: null
+  })
+  scheduleChatHistorySave(state.workspaceRoot)
+  void get().refreshAiApplyHistory()
 }
 
 function markAppliedChangeSetUndoneInSessions(
@@ -863,9 +960,11 @@ interface AppState {
   rejectPreviewFile: (filePath: string) => void
   dismissAiApplyUndoBanner: () => void
   undoLastAiApply: () => Promise<WorkspaceChangeSet>
-  undoAiApplyById: (changeSetId: string) => Promise<WorkspaceChangeSet>
+  /** Cascade undo from tip through the given Change Set (newest-first). */
+  undoAiApplyById: (changeSetId: string) => Promise<WorkspaceChangeSet[]>
   undoAiAppliesForChat: (chatId: string) => Promise<WorkspaceChangeSet[]>
   refreshAiApplyHistory: () => Promise<void>
+  focusChatMessage: (chatId: string, messageId: string) => void
   addChatContextRef: (ref: ChatContextRef) => void
   addChatContextRefs: (refs: ChatContextRef[]) => void
   removeChatContextRef: (path: string) => void
@@ -1953,12 +2052,24 @@ export const useAppStore = create<AppState>((set, get) => ({
     )
     const writeContents = appliedWriteContentByPath(state.pendingWorkspacePreview.items)
 
+    const ensured = ensureAssistantMessageForApply(state.chatSessions, chatId)
+    if (ensured.sessions !== state.chatSessions) {
+      set({ chatSessions: ensured.sessions })
+      scheduleChatHistorySave(state.workspaceRoot)
+    }
+
     let changeSet: WorkspaceChangeSet | undefined
     try {
       const result = await window.compass.fs.applyActions(
         state.workspaceRoot,
         state.pendingWorkspacePreview.actions,
-        { undo: { chatId, source: 'preview-all' } }
+        {
+          undo: {
+            chatId,
+            source: 'preview-all',
+            messageId: ensured.messageId
+          }
+        }
       )
       changeSet = result.changeSet
     } catch (error) {
@@ -2051,12 +2162,24 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (actionsToApply.length === 0) return
 
     const chatId = state.pendingWorkspacePreview.chatId
+    const ensured = ensureAssistantMessageForApply(state.chatSessions, chatId)
+    if (ensured.sessions !== state.chatSessions) {
+      set({ chatSessions: ensured.sessions })
+      scheduleChatHistorySave(state.workspaceRoot)
+    }
+
     let changeSet: WorkspaceChangeSet | undefined
     try {
       const result = await window.compass.fs.applyActions(
         state.workspaceRoot,
         actionsToApply,
-        { undo: { chatId, source: 'preview-file' } }
+        {
+          undo: {
+            chatId,
+            source: 'preview-file',
+            messageId: ensured.messageId
+          }
+        }
       )
       changeSet = result.changeSet
     } catch (error) {
@@ -2129,8 +2252,13 @@ export const useAppStore = create<AppState>((set, get) => ({
 
     try {
       const result = await window.compass.fs.undoAiApply(state.workspaceRoot, changeSetId)
-      applyUndoSuccessToStore(get, set, result.changeSet)
-      return result.changeSet
+      if (result.undone.length === 0) {
+        const message = t('fs.undoNothing')
+        set({ lastAiUndoError: message })
+        throw new Error(message)
+      }
+      applyUndoneChangeSetsToStore(get, set, result.undone)
+      return result.undone
     } catch (error) {
       const message = error instanceof Error ? error.message : 'undo failed'
       set({ lastAiUndoError: message })
@@ -2156,51 +2284,23 @@ export const useAppStore = create<AppState>((set, get) => ({
         set({ lastAiUndoError: message })
         throw new Error(message)
       }
-      // Apply open-file sync for each undo in order (already on disk); use last for note stacking.
-      let openFiles = state.openFiles
-      let activeFilePath = state.activeFilePath
-      for (const changeSet of result.undone) {
-        const synced = syncOpenFilesAfterUndo(
-          openFiles,
-          activeFilePath,
-          state.workspaceRoot,
-          changeSet
-        )
-        openFiles = synced.openFiles
-        activeFilePath = synced.activeFilePath
-      }
-
-      let sessions = state.chatSessions
-      for (const changeSet of result.undone) {
-        sessions = markAppliedChangeSetUndoneInSessions(sessions, changeSet.id)
-        const agentRunning = get().loadingChatIds.includes(changeSet.chatId)
-        sessions = appendUndoNoteToSessions(sessions, changeSet, agentRunning)
-      }
-
-      const tipBanner =
-        result.undone.length > 0
-          ? null
-          : state.lastAiApplyUndo
-
-      set({
-        openFiles,
-        activeFilePath,
-        chatSessions: sessions,
-        lastAiApplyUndo:
-          state.lastAiApplyUndo &&
-          result.undone.some((item) => item.id === state.lastAiApplyUndo?.changeSetId)
-            ? null
-            : tipBanner,
-        lastAiUndoError: null
-      })
-      scheduleChatHistorySave(state.workspaceRoot)
-      void get().refreshAiApplyHistory()
+      applyUndoneChangeSetsToStore(get, set, result.undone)
       return result.undone
     } catch (error) {
       const message = error instanceof Error ? error.message : 'undo failed'
       set({ lastAiUndoError: message })
       throw error
     }
+  },
+
+  focusChatMessage: (chatId, messageId) => {
+    get().setActiveChatSession(chatId)
+    if (typeof window === 'undefined') return
+    window.dispatchEvent(
+      new CustomEvent('compass:focus-chat-message', {
+        detail: { chatId, messageId }
+      })
+    )
   },
 
   refreshAiApplyHistory: async () => {

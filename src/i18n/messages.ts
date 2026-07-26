@@ -535,11 +535,17 @@ export const ja = {
   'undo.confirmTitle': 'AIの適用を取り消す',
   'undo.confirmMessage':
     '直近の適用（{count} 件）を元に戻しますか？適用後に手動で編集したファイルがある場合は取り消せません。',
+  'undo.confirmCascadeMessage':
+    'この適用（{count} 件）と、より新しい適用 {newer} 件もまとめて取り消します。適用後に手動で編集したファイルがある場合は取り消せません。続行しますか？',
+  'undo.cascadeHint': 'より新しい適用 {count} 件もまとめて取り消します',
   'undo.failed': '取り消しに失敗しました: {message}',
   'undo.history': '履歴',
   'undo.historyTitle': 'AI適用の履歴',
   'undo.historyEmpty': 'まだ適用履歴がありません',
   'undo.historyEntry': '{count} 件 — {paths}',
+  'undo.jumpToMessage': 'メッセージへ',
+  'undo.saveSummary': '要約を保存',
+  'undo.saveSummaryFailed': '要約の保存に失敗しました: {message}',
   'undo.statusApplied': '適用済み',
   'undo.statusUndone': '取消済み',
   'undo.statusStale': '無効',
@@ -592,6 +598,7 @@ export const ja = {
   'fs.undoNothing': '取り消せる AI の適用がありません',
   'fs.undoNotLatest':
     'より新しい適用があるため取り消せません。直近の適用から取り消してください',
+  'fs.undoNotFound': '取り消せる適用履歴が見つかりません',
   'fs.undoChatBlocked':
     '他のチャットの適用が新しいため、このチャットの適用を取り消せません',
   'fs.undoStale':
@@ -1231,11 +1238,17 @@ export const en: Record<MessageKey, string> = {
   'undo.confirmTitle': 'Undo AI apply',
   'undo.confirmMessage':
     'Undo the last apply ({count} change(s))? If you edited those files after apply, undo will be blocked.',
+  'undo.confirmCascadeMessage':
+    'Undo this apply ({count} change(s)) and {newer} newer apply(ies) as well? If you edited those files after apply, undo will be blocked. Continue?',
+  'undo.cascadeHint': 'Also undoes {count} newer apply(ies)',
   'undo.failed': 'Undo failed: {message}',
   'undo.history': 'History',
   'undo.historyTitle': 'AI apply history',
   'undo.historyEmpty': 'No applies recorded yet',
   'undo.historyEntry': '{count} change(s) — {paths}',
+  'undo.jumpToMessage': 'Go to message',
+  'undo.saveSummary': 'Save summary',
+  'undo.saveSummaryFailed': 'Failed to save summary: {message}',
   'undo.statusApplied': 'Applied',
   'undo.statusUndone': 'Undone',
   'undo.statusStale': 'Stale',
@@ -1281,6 +1294,7 @@ export const en: Record<MessageKey, string> = {
   'fs.importTooLarge': '"{name}" is too large (limit: ~{maxMb} MB)',
   'fs.undoNothing': 'No AI apply available to undo',
   'fs.undoNotLatest': 'A newer apply exists. Undo the latest apply first.',
+  'fs.undoNotFound': 'No matching apply history entry to undo',
   'fs.undoChatBlocked':
     'Cannot undo this chat’s applies because another chat has a newer apply',
   'fs.undoStale': 'Cannot undo because "{path}" changed after apply',

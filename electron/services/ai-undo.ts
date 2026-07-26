@@ -9,9 +9,11 @@ import type {
   WorkspaceChangeSet,
   WorkspaceChangeSetSummary,
   UndoAiApplyResult,
-  UndoChatAppliesResult
+  UndoChatAppliesResult,
+  UndoThroughAppliesResult
 } from '../../src/types'
 import { t } from '../../src/i18n/runtime'
+import { summarizeChangeSetEntries } from '../../src/utils/ai-apply-undo'
 import { normalizeWorkspaceActionPath } from '../../src/utils/workspace-actions'
 import {
   applyWorkspaceActions,
@@ -316,12 +318,14 @@ export function createChangeSetWithId(input: {
   id: string
   workspaceRoot: string
   chatId: string
+  messageId?: string
   source: 'preview-all' | 'preview-file'
   entries: WorkspaceChangeEntry[]
 }): WorkspaceChangeSet {
   return {
     id: input.id,
     chatId: input.chatId,
+    ...(input.messageId ? { messageId: input.messageId } : {}),
     createdAt: Date.now(),
     source: input.source,
     workspaceRoot: input.workspaceRoot,
@@ -467,11 +471,13 @@ function toChangeSetSummary(changeSet: WorkspaceChangeSet): WorkspaceChangeSetSu
   return {
     id: changeSet.id,
     chatId: changeSet.chatId,
+    ...(changeSet.messageId ? { messageId: changeSet.messageId } : {}),
     createdAt: changeSet.createdAt,
     source: changeSet.source,
     entryCount: changeSet.entries.length,
     status: changeSet.status,
-    paths: changeSet.entries.slice(0, 8).map((entry) => entry.relativePath)
+    paths: changeSet.entries.slice(0, 8).map((entry) => entry.relativePath),
+    summary: summarizeChangeSetEntries(changeSet.entries)
   }
 }
 
@@ -484,20 +490,31 @@ export async function listChangeSets(
 }
 
 /**
- * Undo a specific Change Set only when it is the newest applied (LIFO).
+ * Undo from the newest applied Change Set through `changeSetId` (inclusive).
+ * Preserves LIFO disk order — newer applies are undone first.
  */
 export async function undoChangeSet(
   workspaceRoot: string,
   changeSetId: string
-): Promise<UndoAiApplyResult> {
-  const tip = await peekLastAppliedChangeSet(workspaceRoot)
-  if (!tip) {
-    throw new Error(t('fs.undoNothing'))
+): Promise<UndoThroughAppliesResult> {
+  const index = await loadIndex(workspaceRoot)
+  const target = index.changeSets.find((item) => item.id === changeSetId)
+  if (!target || target.status !== 'applied') {
+    throw new Error(t('fs.undoNotFound'))
   }
-  if (tip.id !== changeSetId) {
-    throw new Error(t('fs.undoNotLatest'))
+
+  const undone: WorkspaceChangeSet[] = []
+  while (true) {
+    const tip = await peekLastAppliedChangeSet(workspaceRoot)
+    if (!tip) {
+      throw new Error(t('fs.undoNothing'))
+    }
+    const result = await undoLastChangeSet(workspaceRoot)
+    undone.push(result.changeSet)
+    if (result.changeSet.id === changeSetId) {
+      return { undone }
+    }
   }
-  return undoLastChangeSet(workspaceRoot)
 }
 
 /**
@@ -572,6 +589,7 @@ export async function applyWorkspaceActionsRecordingUndo(
       id: changeSetId,
       workspaceRoot,
       chatId: options.undo.chatId,
+      messageId: options.undo.messageId,
       source: options.undo.source,
       entries
     })

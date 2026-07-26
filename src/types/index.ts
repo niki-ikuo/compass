@@ -449,6 +449,8 @@ export type WorkspaceChangeEntry =
 export interface WorkspaceChangeSet {
   id: string
   chatId: string
+  /** Assistant message that produced the apply (timeline jump). */
+  messageId?: string
   createdAt: number
   source: 'preview-all' | 'preview-file'
   workspaceRoot: string
@@ -461,6 +463,8 @@ export interface ApplyWorkspaceOptions {
   undo?: {
     chatId: string
     source: 'preview-all' | 'preview-file'
+    /** Assistant message id to link in Apply history. */
+    messageId?: string
   }
 }
 
@@ -473,6 +477,11 @@ export interface UndoAiApplyResult {
   changeSet: WorkspaceChangeSet
 }
 
+/** Cascade undo from tip through a target Change Set (newest-first). */
+export interface UndoThroughAppliesResult {
+  undone: WorkspaceChangeSet[]
+}
+
 export interface UndoChatAppliesResult {
   undone: WorkspaceChangeSet[]
   /** none = nothing to undo; blocked_other_chat = a newer apply from another chat is on top */
@@ -482,12 +491,15 @@ export interface UndoChatAppliesResult {
 export interface WorkspaceChangeSetSummary {
   id: string
   chatId: string
+  messageId?: string
   createdAt: number
   source: 'preview-all' | 'preview-file'
   entryCount: number
   status: WorkspaceChangeSetStatus
   /** Short path list for UI (capped). */
   paths: string[]
+  /** Short entry summary for timeline / saved notes. */
+  summary: string
 }
 
 /** Recorded on assistant messages when an Apply succeeds (Phase 2). */
@@ -757,7 +769,7 @@ export interface CompassAPI {
       options?: ApplyWorkspaceOptions
     ) => Promise<WorkspaceActionResult>
     undoLastAiApply: (workspaceRoot: string) => Promise<UndoAiApplyResult>
-    undoAiApply: (workspaceRoot: string, changeSetId: string) => Promise<UndoAiApplyResult>
+    undoAiApply: (workspaceRoot: string, changeSetId: string) => Promise<UndoThroughAppliesResult>
     undoChatAiApplies: (
       workspaceRoot: string,
       chatId: string

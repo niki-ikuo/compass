@@ -123,8 +123,14 @@ export function ChatPanel() {
   const [chatTabDragId, setChatTabDragId] = useState<string | null>(null)
   const [chatTabDropIndex, setChatTabDropIndex] = useState<number | null>(null)
   const [tabContextMenu, setTabContextMenu] = useState<ChatTabContextMenuState | null>(null)
+  const [focusedMessageId, setFocusedMessageId] = useState<string | null>(null)
+  const [pendingFocusMessage, setPendingFocusMessage] = useState<{
+    chatId: string
+    messageId: string
+  } | null>(null)
   const chatTabDragIdRef = useRef<string | null>(null)
   const messagesContainerRef = useRef<HTMLDivElement>(null)
+  const focusFlashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const chatTabsRef = useRef<HTMLDivElement>(null)
   const tabContextMenuRef = useRef<HTMLDivElement>(null)
   const inputComposerRef = useRef<ChatInputComposerHandle>(null)
@@ -935,6 +941,40 @@ export function ChatPanel() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chatComposerSendRequest?.id])
 
+  useEffect(() => {
+    const onFocusMessage = (event: Event) => {
+      const detail = (event as CustomEvent<{ chatId?: string; messageId?: string }>).detail
+      if (!detail?.chatId || !detail.messageId) return
+      setPendingFocusMessage({ chatId: detail.chatId, messageId: detail.messageId })
+    }
+    window.addEventListener('compass:focus-chat-message', onFocusMessage)
+    return () => {
+      window.removeEventListener('compass:focus-chat-message', onFocusMessage)
+      if (focusFlashTimerRef.current) clearTimeout(focusFlashTimerRef.current)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!pendingFocusMessage || pendingFocusMessage.chatId !== activeChatId) return
+    const messageId = pendingFocusMessage.messageId
+    const frame = requestAnimationFrame(() => {
+      const el = messagesContainerRef.current?.querySelector(
+        `[data-message-id="${CSS.escape(messageId)}"]`
+      )
+      if (el instanceof HTMLElement) {
+        el.scrollIntoView({ block: 'center', behavior: 'smooth' })
+      }
+      if (focusFlashTimerRef.current) clearTimeout(focusFlashTimerRef.current)
+      setFocusedMessageId(messageId)
+      setPendingFocusMessage(null)
+      focusFlashTimerRef.current = setTimeout(() => {
+        setFocusedMessageId((current) => (current === messageId ? null : current))
+        focusFlashTimerRef.current = null
+      }, 1200)
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [pendingFocusMessage, activeChatId, chatSessions])
+
   const isChatDrop = (dataTransfer: DataTransfer) =>
     hasChatContextDrag(dataTransfer) ||
     hasChatSelectionDrag(dataTransfer) ||
@@ -1540,7 +1580,11 @@ export function ChatPanel() {
               : null
 
           return (
-            <div key={msg.id} className={`chat-message ${msg.role}`}>
+            <div
+              key={msg.id}
+              data-message-id={msg.id}
+              className={`chat-message ${msg.role}${focusedMessageId === msg.id ? ' focus-flash' : ''}`}
+            >
               <div className="chat-role">
                 <span>{msg.role === 'user' ? t('chat.you') : t('chat.ai')}</span>
                 {requestModeLabel && requestMode ? (

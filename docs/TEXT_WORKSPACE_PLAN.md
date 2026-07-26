@@ -74,11 +74,13 @@ Do not edit binaries in-app. Make them usable as text.
 
 Build on shipped Change Sets ([AI_APPLY_UNDO.md](./AI_APPLY_UNDO.md)).
 
-- [ ] Timeline: when / which chat message / which files
-- [ ] One-click undo from that timeline (not only “last”)
-- [ ] Optional “Save change summary as `.md`”
+- [x] Timeline: when / which chat message / which files
+- [x] One-click undo from that timeline (not only “last”)
+- [x] Optional “Save change summary as `.md`”
 
 **Done:** wrong Apply on a non-git notes folder is fixed in under a minute, no terminal.
+
+**Main touchpoints:** `AiApplyHistoryPanel`, cascade undo in `ai-undo`, `messageId` linking, `.compass/apply-summaries/`.
 
 ---
 

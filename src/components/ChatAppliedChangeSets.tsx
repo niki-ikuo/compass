@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import type { ChatAppliedChangeSet } from '@/types'
 import { useAppStore } from '@/stores/app-store'
 import { buildWorkspaceIndex } from '@/utils/project-index'
+import { countCascadeApplies } from '@/utils/ai-apply-undo'
 import { useI18n, t as tSync } from '@/i18n'
 import { ConfirmDialog } from './ConfirmDialog'
 
@@ -13,32 +14,28 @@ export function ChatAppliedChangeSets({ items }: ChatAppliedChangeSetsProps) {
   const { t } = useI18n()
   const workspaceRoot = useAppStore((s) => s.workspaceRoot)
   const aiApplyHistory = useAppStore((s) => s.aiApplyHistory)
-  const lastAiApplyUndo = useAppStore((s) => s.lastAiApplyUndo)
   const undoAiApplyById = useAppStore((s) => s.undoAiApplyById)
   const refreshAiApplyHistory = useAppStore((s) => s.refreshAiApplyHistory)
   const [confirmId, setConfirmId] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
-  const tipId = useMemo(
-    () =>
-      aiApplyHistory.find((item) => item.status === 'applied')?.id ??
-      lastAiApplyUndo?.changeSetId ??
-      null,
-    [aiApplyHistory, lastAiApplyUndo]
-  )
-
   useEffect(() => {
     void refreshAiApplyHistory()
   }, [refreshAiApplyHistory, items.length])
 
-  if (items.length === 0) return null
+  const confirmItem = useMemo(
+    () => (confirmId ? items.find((item) => item.id === confirmId) : null),
+    [confirmId, items]
+  )
+  const cascadeCount = confirmId ? countCascadeApplies(aiApplyHistory, confirmId) : 0
 
-  const confirmItem = confirmId ? items.find((item) => item.id === confirmId) : null
+  if (items.length === 0) return null
 
   return (
     <div className="chat-applied-changes">
       {items.map((item) => {
-        const canUndo = item.status === 'applied' && tipId === item.id
+        const canUndo = item.status === 'applied'
+        const newerCount = Math.max(0, countCascadeApplies(aiApplyHistory, item.id) - 1)
         return (
           <div key={item.id} className={`chat-applied-change status-${item.status}`}>
             <div className="chat-applied-change-info">
@@ -56,7 +53,9 @@ export function ChatAppliedChangeSets({ items }: ChatAppliedChangeSetsProps) {
                 type="button"
                 className="btn-reject chat-applied-change-undo"
                 disabled={!canUndo || busy}
-                title={canUndo ? undefined : t('undo.notLatestHint')}
+                title={
+                  newerCount > 0 ? t('undo.cascadeHint', { count: newerCount }) : undefined
+                }
                 onClick={() => {
                   void refreshAiApplyHistory()
                   setConfirmId(item.id)
@@ -71,7 +70,14 @@ export function ChatAppliedChangeSets({ items }: ChatAppliedChangeSetsProps) {
       <ConfirmDialog
         open={Boolean(confirmItem)}
         title={t('undo.confirmTitle')}
-        message={t('undo.confirmMessage', { count: confirmItem?.entryCount ?? 1 })}
+        message={
+          cascadeCount > 1
+            ? t('undo.confirmCascadeMessage', {
+                count: confirmItem?.entryCount ?? 1,
+                newer: cascadeCount - 1
+              })
+            : t('undo.confirmMessage', { count: confirmItem?.entryCount ?? 1 })
+        }
         confirmLabel={t('undo.undoApply')}
         cancelLabel={t('common.cancel')}
         danger

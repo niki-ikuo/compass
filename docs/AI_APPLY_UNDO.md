@@ -2,7 +2,7 @@
 
 **English** | [日本語](ja/AI_APPLY_UNDO.md)
 
-Status: **Phase 2 implemented** (message-level Undo, apply history list, stronger Agent undo notes, undo-applies-from-this-chat). Phase 3 remains backlog. Related: [AGENT.md](./AGENT.md) (preview / apply gate), [ARCHITECTURE.md](./ARCHITECTURE.md), [SPEC.md](./SPEC.md).
+Status: **Phase 2 + human-usable Apply timeline implemented** (message-level Undo, apply history timeline, tip→target cascade undo, optional summary `.md` save, stronger Agent undo notes, undo-applies-from-this-chat). Related: [AGENT.md](./AGENT.md) (preview / apply gate), [ARCHITECTURE.md](./ARCHITECTURE.md), [SPEC.md](./SPEC.md), [TEXT_WORKSPACE_PLAN.md](./TEXT_WORKSPACE_PLAN.md).
 
 This document records the post-Apply undo design. Phase 1 shipped the Change Set core; Phase 2 adds discovery and chat-scoped controls.
 
@@ -229,7 +229,7 @@ Agent:
 
 ### Phase 3 — optional / maybe never
 
-- Full project timeline UI
+- ~~Full project timeline UI~~ (shipped: message linking, cascade undo, summary save)
 - git auto-stash integration
 - Same machinery for Template Manager
 - Retention / size settings in Preferences
