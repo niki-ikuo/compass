@@ -156,7 +156,7 @@ function toPersistedOpenEditors(state: {
       })
       continue
     }
-    if (file.viewKind === 'image' || file.viewKind === 'pdf') {
+    if (file.viewKind === 'image' || file.viewKind === 'pdf' || file.viewKind === 'binary') {
       openTabs.push({ path: file.path, viewKind: file.viewKind })
       continue
     }
@@ -744,6 +744,7 @@ interface AppState {
     base64: string,
     options?: { transient?: boolean }
   ) => void
+  openBinaryFile: (path: string, size: number, options?: { transient?: boolean }) => void
   openBrowserTab: (url?: string) => void
   openSettingsTab: () => void
   updateBrowserTab: (
@@ -1121,6 +1122,48 @@ export const useAppStore = create<AppState>((set, get) => ({
     scheduleOpenEditorsSave(get().workspaceRoot)
   },
 
+  openBinaryFile: (path, size, options) => {
+    const transient = options?.transient === true
+    set((state) => {
+      const normalized = normalizePath(path)
+      const existing = state.openFiles.find((f) => normalizePath(f.path) === normalized)
+      if (existing) {
+        if (!transient && existing.isTransient) {
+          return {
+            openFiles: state.openFiles.map((f) =>
+              normalizePath(f.path) === normalized ? { ...f, isTransient: false } : f
+            ),
+            activeFilePath: existing.path
+          }
+        }
+        return { activeFilePath: existing.path }
+      }
+      const binaryFile: OpenFile = {
+        path,
+        content: '',
+        language: 'binary',
+        encoding: 'utf8',
+        isDirty: false,
+        viewKind: 'binary',
+        binarySize: size,
+        ...(transient ? { isTransient: true } : {})
+      }
+      if (transient) {
+        const transientIdx = state.openFiles.findIndex((f) => f.isTransient)
+        if (transientIdx >= 0) {
+          const openFiles = [...state.openFiles]
+          openFiles[transientIdx] = binaryFile
+          return { openFiles, activeFilePath: path }
+        }
+      }
+      return {
+        openFiles: [...state.openFiles, binaryFile],
+        activeFilePath: path
+      }
+    })
+    scheduleOpenEditorsSave(get().workspaceRoot)
+  },
+
   openBrowserTab: (url) => {
     set((state) => {
       const path = createBrowserTabPath()
@@ -1240,7 +1283,13 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   reopenFileWithEncoding: async (path, encoding) => {
     const current = get().openFiles.find((f) => f.path === path)
-    if (current?.viewKind === 'image' || current?.viewKind === 'pdf') return
+    if (
+      current?.viewKind === 'image' ||
+      current?.viewKind === 'pdf' ||
+      current?.viewKind === 'binary'
+    ) {
+      return
+    }
 
     const decoded = await window.compass.fs.readFile(path, encoding)
     set((state) => ({

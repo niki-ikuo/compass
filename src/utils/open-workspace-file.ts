@@ -12,7 +12,7 @@ export type OpenWorkspaceFileOptions = {
   preview?: boolean
 }
 
-/** パス種別に応じてテキスト／画像・PDF／OS 既定アプリで開く */
+/** パス種別に応じてテキスト／画像・PDF／バイナリ拒否／OS 既定アプリで開く */
 export async function openWorkspaceFile(
   path: string,
   options?: OpenWorkspaceFileOptions
@@ -55,6 +55,14 @@ export async function openWorkspaceFile(
     return
   }
 
-  const decoded = await window.compass.fs.readFile(path)
-  store.openFile(path, decoded.content, decoded.encoding, { transient: asPreview })
+  try {
+    const opened = await window.compass.fs.openEditorFile(path)
+    if (opened.kind === 'binary') {
+      store.openBinaryFile(path, opened.size, { transient: asPreview })
+      return
+    }
+    store.openFile(path, opened.content, opened.encoding, { transient: asPreview })
+  } catch (err) {
+    window.alert(err instanceof Error ? err.message : t('editor.openFileFailed'))
+  }
 }

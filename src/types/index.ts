@@ -15,6 +15,11 @@ export interface DecodedFileContent {
   encoding: FileEncoding
 }
 
+/** エディタ開封結果（テキスト or バイナリ拒否） */
+export type EditorOpenResult =
+  | { kind: 'text'; content: string; encoding: FileEncoding }
+  | { kind: 'binary'; size: number }
+
 export interface OpenFile {
   path: string
   content: string
@@ -30,10 +35,12 @@ export interface OpenFile {
    * AI 変更プレビューの isPreview とは別概念。
    */
   isTransient?: boolean
-  /** テキスト以外のタブ表示（画像 / PDF / ブラウザ / 設定） */
-  viewKind?: 'text' | 'image' | 'pdf' | 'browser' | 'settings'
+  /** テキスト以外のタブ表示（画像 / PDF / バイナリ / ブラウザ / 設定） */
+  viewKind?: 'text' | 'image' | 'pdf' | 'binary' | 'browser' | 'settings'
   mediaMimeType?: string
   mediaBase64?: string
+  /** バイナリタブのファイルサイズ（バイト） */
+  binarySize?: number
   /** ブラウザタブの URL */
   browserUrl?: string
   /** ブラウザタブのページタイトル */
@@ -326,7 +333,7 @@ export interface AppSettings {
 }
 
 /** 永続化するエディタタブの種別（設定・プレビューは対象外） */
-export type PersistedEditorViewKind = 'text' | 'image' | 'pdf' | 'browser'
+export type PersistedEditorViewKind = 'text' | 'image' | 'pdf' | 'binary' | 'browser'
 
 /** `.compass/open-editors.json` に保存するタブ1件 */
 export interface PersistedOpenTab {
@@ -668,6 +675,8 @@ export interface CompassAPI {
       options?: { missingOk?: boolean }
     ) => Promise<FileTreeNode[]>
     readFile: (filePath: string, encoding?: FileEncoding) => Promise<DecodedFileContent>
+    /** エディタ開封。バイナリはデコードせず kind で返す */
+    openEditorFile: (filePath: string) => Promise<EditorOpenResult>
     writeFile: (filePath: string, content: string, encoding?: FileEncoding) => Promise<void>
     /** base64 バイナリ書き込み（貼り付け画像・PDF 用） */
     writeBinaryFile: (filePath: string, base64: string) => Promise<void>

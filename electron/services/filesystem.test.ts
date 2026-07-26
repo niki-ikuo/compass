@@ -11,6 +11,7 @@ import {
   importFilesToWorkspace,
   materializeWorkspaceActions,
   movePath,
+  openEditorFile,
   previewWorkspaceActions,
   readDirectory,
   renamePath,
@@ -356,5 +357,46 @@ describe('readDirectory', () => {
     const names = tree.map((node) => node.name).sort()
 
     expect(names).toEqual(['notes.docx', 'sheet.xlsx'])
+  })
+})
+
+describe('openEditorFile', () => {
+  it('opens text files as text', async () => {
+    const root = makeTempRoot('editor-text')
+    tempRoots.push(root)
+    const filePath = join(root, 'notes.md')
+    writeFileSync(filePath, 'hello compass\n', 'utf-8')
+
+    await expect(openEditorFile(filePath)).resolves.toEqual({
+      kind: 'text',
+      content: 'hello compass\n',
+      encoding: 'utf8'
+    })
+  })
+
+  it('rejects known binary extensions without decoding', async () => {
+    const root = makeTempRoot('editor-ext-binary')
+    tempRoots.push(root)
+    const filePath = join(root, 'app.exe')
+    const bytes = Buffer.from([0x4d, 0x5a, 0x00, 0x00, 0x01, 0x02])
+    writeFileSync(filePath, bytes)
+
+    await expect(openEditorFile(filePath)).resolves.toEqual({
+      kind: 'binary',
+      size: bytes.length
+    })
+  })
+
+  it('rejects content with NUL bytes even without a binary extension', async () => {
+    const root = makeTempRoot('editor-nul-binary')
+    tempRoots.push(root)
+    const filePath = join(root, 'mystery.dat')
+    const bytes = Buffer.from([0x00, 0x01, 0x02, 0x03, 0xff])
+    writeFileSync(filePath, bytes)
+
+    await expect(openEditorFile(filePath)).resolves.toEqual({
+      kind: 'binary',
+      size: bytes.length
+    })
   })
 })

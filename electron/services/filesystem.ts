@@ -1,4 +1,15 @@
-import { mkdir, readdir, readFile, rename, rm, stat, writeFile, copyFile, cp } from 'fs/promises'
+import {
+  mkdir,
+  open as fsOpen,
+  readdir,
+  readFile,
+  rename,
+  rm,
+  stat,
+  writeFile,
+  copyFile,
+  cp
+} from 'fs/promises'
 import { existsSync } from 'fs'
 import type { Dirent } from 'fs'
 import { resolve, relative, dirname, join, basename, isAbsolute } from 'path'
@@ -12,7 +23,8 @@ import type {
   ResolvedContextFile,
   ResolvedFolderContext,
   ActionPreviewItem,
-  DecodedFileContent
+  DecodedFileContent,
+  EditorOpenResult
 } from '../../src/types'
 import { t } from '../../src/i18n/runtime'
 import { normalizeWorkspaceActionPath } from '../../src/utils/workspace-actions'
@@ -20,6 +32,11 @@ import { buildUniqueFileName } from '../../src/utils/unique-file-name'
 import { ApplyPatchError, applyUnifiedDiff } from '../../src/utils/apply-patch'
 import { decodeFileBuffer, encodeContent } from './encoding'
 import { getImageMimeType, isImagePath, isPdfPath } from '../../src/utils/media-context'
+import {
+  BINARY_CHECK_BYTES,
+  isBinaryExtensionPath,
+  isProbablyBinaryBytes
+} from '../../src/utils/binary-file'
 import { extractPdfText } from '../../src/utils/pdf-text'
 import { shouldSkipWorkspaceEntry } from './fs-ignore'
 
@@ -149,6 +166,43 @@ export async function readFileContent(
 ): Promise<DecodedFileContent> {
   const buffer = await readFile(filePath)
   return decodeFileBuffer(buffer, encoding)
+}
+
+/**
+ * エディタ開封用。既知バイナリ拡張子または先頭サンプルの NUL でバイナリと判定し、
+ * テキストとしてデコードしない。
+ */
+export async function openEditorFile(filePath: string): Promise<EditorOpenResult> {
+  const info = await stat(filePath)
+  if (!info.isFile()) {
+    throw new Error(t('fs.notAFile', { path: filePath }))
+  }
+
+  if (isBinaryExtensionPath(filePath)) {
+    return { kind: 'binary', size: info.size }
+  }
+
+  if (info.size === 0) {
+    return { kind: 'text', content: '', encoding: 'utf8' }
+  }
+
+  const sampleSize = Math.min(info.size, BINARY_CHECK_BYTES)
+  const handle = await fsOpen(filePath, 'r')
+  let sample: Buffer
+  try {
+    const buf = Buffer.alloc(sampleSize)
+    const { bytesRead } = await handle.read(buf, 0, sampleSize, 0)
+    sample = buf.subarray(0, bytesRead)
+  } finally {
+    await handle.close()
+  }
+
+  if (isProbablyBinaryBytes(sample)) {
+    return { kind: 'binary', size: info.size }
+  }
+
+  const decoded = await readFileContent(filePath)
+  return { kind: 'text', content: decoded.content, encoding: decoded.encoding }
 }
 
 export async function writeFileContent(

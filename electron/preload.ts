@@ -69,6 +69,7 @@ const compassAPI = {
     ): Promise<FileTreeNode[]> => ipcRenderer.invoke('fs:readDir', dirPath, options),
     readFile: (filePath: string, encoding?: FileEncoding): Promise<DecodedFileContent> =>
       ipcRenderer.invoke('fs:readFile', filePath, encoding),
+    openEditorFile: (filePath: string) => ipcRenderer.invoke('fs:openEditorFile', filePath),
     writeFile: (filePath: string, content: string, encoding?: FileEncoding): Promise<void> =>
       ipcRenderer.invoke('fs:writeFile', filePath, content, encoding),
     writeBinaryFile: (filePath: string, base64: string): Promise<void> =>

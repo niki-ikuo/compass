@@ -10,6 +10,7 @@ export function listDirtySavableFiles(openFiles: OpenFile[]): OpenFile[] {
     if (
       file.viewKind === 'image' ||
       file.viewKind === 'pdf' ||
+      file.viewKind === 'binary' ||
       file.viewKind === 'browser' ||
       file.viewKind === 'settings'
     ) {

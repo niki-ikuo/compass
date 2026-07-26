@@ -23,7 +23,8 @@ import {
   copyPathsInto,
   writeBinaryFile,
   writeFileContent,
-  readBinaryFile
+  readBinaryFile,
+  openEditorFile
 } from './services/filesystem'
 import {
   applyWorkspaceActionsRecordingUndo,
@@ -551,6 +552,10 @@ function registerIpcHandlers(): void {
 
   ipcMain.handle('fs:readFile', async (_event, filePath: string, encoding?: FileEncoding) => {
     return readFileContent(filePath, encoding)
+  })
+
+  ipcMain.handle('fs:openEditorFile', async (_event, filePath: string) => {
+    return openEditorFile(filePath)
   })
 
   ipcMain.handle(

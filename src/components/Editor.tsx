@@ -13,9 +13,11 @@ import {
 import { MarkdownPreview } from './MarkdownPreview'
 import { MarkdownOutline } from './MarkdownOutline'
 import { MediaViewer } from './MediaViewer'
+import { BinaryFileViewer } from './BinaryFileViewer'
 import { BrowserViewer } from './BrowserViewer'
 import { SettingsPanel } from './SettingsDialog'
 import { isMediaOpenFile } from '@/utils/media-context'
+import { isBinaryOpenFile } from '@/utils/binary-file'
 import { isBrowserOpenFile, pathToFileUrl } from '@/utils/browser-tab'
 import { isSettingsOpenFile } from '@/utils/settings-tab'
 import { buildWorkspaceIndex } from '@/utils/project-index'
@@ -454,6 +456,17 @@ export function CodeEditor() {
             mimeType={activeFile.mediaMimeType}
             base64={activeFile.mediaBase64}
           />
+        </div>
+      </>
+    )
+  }
+
+  if (isBinaryOpenFile(activeFile)) {
+    return (
+      <>
+        {settingsPane}
+        <div className="editor-container">
+          <BinaryFileViewer path={activeFile.path} size={activeFile.binarySize} />
         </div>
       </>
     )

@@ -28,8 +28,12 @@ async function openPersistedTab(tab: PersistedOpenTab): Promise<string | null> {
   }
 
   try {
-    const decoded = await window.compass.fs.readFile(tab.path)
-    store.openFile(tab.path, decoded.content, decoded.encoding)
+    const opened = await window.compass.fs.openEditorFile(tab.path)
+    if (opened.kind === 'binary') {
+      store.openBinaryFile(tab.path, opened.size)
+      return tab.path
+    }
+    store.openFile(tab.path, opened.content, opened.encoding)
     return tab.path
   } catch {
     return null

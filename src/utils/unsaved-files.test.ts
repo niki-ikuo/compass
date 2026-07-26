@@ -19,6 +19,7 @@ describe('listDirtySavableFiles', () => {
       file({ path: 'b.txt', isDirty: false }),
       file({ path: 'c.txt', isDirty: true, isPreview: true }),
       file({ path: 'd.png', isDirty: true, viewKind: 'image' }),
+      file({ path: 'e.zip', isDirty: true, viewKind: 'binary' }),
       file({ path: 'settings', isDirty: true, viewKind: 'settings' })
     ]
     expect(listDirtySavableFiles(files).map((f) => f.path)).toEqual(['a.txt'])

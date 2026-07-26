@@ -65,6 +65,7 @@ import {
 } from '@/utils/clipboard-media'
 import { join } from '@/utils/path'
 import { isMediaOpenFile } from '@/utils/media-context'
+import { isBinaryOpenFile } from '@/utils/binary-file'
 import { isBrowserOpenFile } from '@/utils/browser-tab'
 import { isSettingsOpenFile } from '@/utils/settings-tab'
 import {
@@ -816,6 +817,7 @@ export function ChatPanel() {
         filePath:
           activeFile &&
           !isMediaOpenFile(activeFile) &&
+          !isBinaryOpenFile(activeFile) &&
           !isBrowserOpenFile(activeFile) &&
           !isSettingsOpenFile(activeFile)
             ? activeFile.path
@@ -823,6 +825,7 @@ export function ChatPanel() {
         fileContent:
           activeFile &&
           !isMediaOpenFile(activeFile) &&
+          !isBinaryOpenFile(activeFile) &&
           !isBrowserOpenFile(activeFile) &&
           !isSettingsOpenFile(activeFile)
             ? activeFile.content

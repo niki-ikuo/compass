@@ -143,6 +143,7 @@ export function App() {
     if (
       activeFile.viewKind === 'image' ||
       activeFile.viewKind === 'pdf' ||
+      activeFile.viewKind === 'binary' ||
       activeFile.viewKind === 'browser' ||
       activeFile.viewKind === 'settings'
     ) {

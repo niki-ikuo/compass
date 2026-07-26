@@ -8,6 +8,7 @@ import { refreshLlmConnection } from '@/utils/llm-connection'
 import type { FileEncoding } from '@/types'
 import { useI18n, type MessageKey } from '@/i18n'
 import { isMediaOpenFile } from '@/utils/media-context'
+import { isBinaryOpenFile } from '@/utils/binary-file'
 
 export function StatusBar() {
   const { t } = useI18n()
@@ -27,6 +28,7 @@ export function StatusBar() {
 
   const activeFile = openFiles.find((f) => f.path === activeFilePath) ?? null
   const isMedia = activeFile ? isMediaOpenFile(activeFile) : false
+  const isBinary = activeFile ? isBinaryOpenFile(activeFile) : false
   const isBrowser = activeFile?.viewKind === 'browser'
   const isSettings = activeFile?.viewKind === 'settings'
   const language = activeFilePath
@@ -34,14 +36,16 @@ export function StatusBar() {
       ? t('settings.title')
       : isBrowser
         ? t('browser.label')
-        : isMedia
-          ? activeFile?.viewKind === 'pdf'
-            ? t('editor.pdfLabel')
-            : t('editor.imageLabel')
-          : getLanguageFromPath(activeFilePath)
+        : isBinary
+          ? t('editor.binaryLabel')
+          : isMedia
+            ? activeFile?.viewKind === 'pdf'
+              ? t('editor.pdfLabel')
+              : t('editor.imageLabel')
+            : getLanguageFromPath(activeFilePath)
     : ''
   const encodingLabel =
-    activeFile && !isMedia && !isBrowser && !isSettings
+    activeFile && !isMedia && !isBinary && !isBrowser && !isSettings
       ? getEncodingLabel(activeFile.encoding)
       : ''
   const provider = getLlmProvider(settings.providerId)
@@ -150,7 +154,7 @@ export function StatusBar() {
             : `Ln ${cursorPosition.line}, Col ${cursorPosition.column}`}
       </span>
       {language && <span className="status-item">{language}</span>}
-      {activeFile && !isMedia && !isBrowser && !isSettings && (
+      {activeFile && !isMedia && !isBinary && !isBrowser && !isSettings && (
         <div className="status-encoding" ref={menuRef}>
           <button
             type="button"
