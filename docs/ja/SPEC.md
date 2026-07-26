@@ -269,6 +269,7 @@ v2.0 出荷済み（ターミナル / .compass 索引 / Ask・Edit・Agent 自�
      └─ v3.0: MCP、プラグイン、非 OpenAI 互換ネイティブ API
 ```
 
+あらゆるローカルテキスト向けの実装順（Cursor 対抗ではない）: [TEXT_WORKSPACE_PLAN.md](./TEXT_WORKSPACE_PLAN.md)。  
 v2.0 Agent Phase 0–4（出荷済み）と後続ロードマップ: [AGENT_PLAN.md](./AGENT_PLAN.md)。  
 ランタイム詳細: [AGENT.md](./AGENT.md)。  
 用途プリセット: [USE_CASE_PRESET.md](./USE_CASE_PRESET.md)。

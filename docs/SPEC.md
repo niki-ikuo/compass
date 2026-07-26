@@ -269,6 +269,7 @@ v2.0 shipped (terminal / .compass index / Ask·Edit·Agent autonomy / multi-LLM 
      └─ v3.0: MCP, plugins, native non–OpenAI APIs
 ```
 
+Build order for all local text (not Cursor parity): [TEXT_WORKSPACE_PLAN.md](./TEXT_WORKSPACE_PLAN.md).  
 v2.0 Agent phases 0–4 (shipped) + later roadmap: [AGENT_PLAN.md](./AGENT_PLAN.md).  
 Runtime details: [AGENT.md](./AGENT.md).  
 Use-case presets: [USE_CASE_PRESET.md](./USE_CASE_PRESET.md).

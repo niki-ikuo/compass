@@ -13,6 +13,7 @@
 | [AGENT.md](./AGENT.md) | Agent ランタイム — ツールループ、承認、IPC、モジュール |
 | [AGENT_PLAN.md](./AGENT_PLAN.md) | v2.0 Agent Phase 0–4（出荷済み）と後続ロードマップ |
 | [AI_APPLY_UNDO.md](./AI_APPLY_UNDO.md) | Apply 後の取り消し — Phase 1–2 実装済み（Phase 3 はバックログ） |
+| [TEXT_WORKSPACE_PLAN.md](./TEXT_WORKSPACE_PLAN.md) | 実装順: テキスト検索 → 文書 → PDF橋渡し → Apply履歴 |
 | [Contributing](../../CONTRIBUTING.ja.md) | コントリビューション案内（英語版: [CONTRIBUTING.md](../../CONTRIBUTING.md)） |
 | [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md) | 行動規範（英語版: [CODE_OF_CONDUCT.md](../../CODE_OF_CONDUCT.md)） |
 
