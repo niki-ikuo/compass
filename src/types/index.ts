@@ -839,6 +839,7 @@ export interface CompassAPI {
     onReplaceInFile: (callback: () => void) => () => void
     onFindInFiles: (callback: () => void) => () => void
     onReplaceInFiles: (callback: () => void) => () => void
+    onShowOutline: (callback: () => void) => () => void
     onOpenHelp: (callback: () => void) => () => void
     onOpenAiHelp: (callback: () => void) => () => void
     setAiHelpVisible: (visible: boolean) => Promise<void>

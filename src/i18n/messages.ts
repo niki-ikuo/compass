@@ -130,7 +130,9 @@ export const ja = {
   'menu.terminalDisabled': 'フォルダを開くとターミナルが利用できます',
   'menu.toggleChat': 'チャットの開閉',
   'menu.toggleMinimap': 'ミニマップ',
-  'menu.toggleOutline': '見出し',
+  'menu.toggleOutline': 'エディタの見出し',
+  'menu.showWorkspaceOutline': 'アウトラインを表示',
+  'menu.showWorkspaceSearch': '検索を表示',
 
   // help
   'help.title': 'ヘルプ',
@@ -837,7 +839,9 @@ export const en: Record<MessageKey, string> = {
   'menu.terminalDisabled': 'Open a folder to use the terminal',
   'menu.toggleChat': 'Toggle Chat',
   'menu.toggleMinimap': 'Minimap',
-  'menu.toggleOutline': 'Outline',
+  'menu.toggleOutline': 'Editor Outline',
+  'menu.showWorkspaceOutline': 'Show Outline',
+  'menu.showWorkspaceSearch': 'Show Search',
 
   'help.title': 'Help',
   'help.searchPlaceholder': 'Search keywords…',

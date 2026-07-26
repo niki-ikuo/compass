@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { getFileName } from '@/utils/language'
 import { useI18n } from '@/i18n'
 import { useAppStore } from '@/stores/app-store'
@@ -25,6 +25,7 @@ export function MediaViewer({ path, viewKind, mimeType, base64 }: MediaViewerPro
   const { t } = useI18n()
   const fileName = getFileName(path)
   const canSummarize = viewKind === 'pdf' && isExtractableDocumentPath(path)
+  const [opening, setOpening] = useState(false)
 
   const objectUrl = useMemo(
     () => base64ToBlobUrl(base64, mimeType),
@@ -51,6 +52,17 @@ export function MediaViewer({ path, viewKind, mimeType, base64 }: MediaViewerPro
     })
   }
 
+  const openWithDefaultApp = async (): Promise<void> => {
+    setOpening(true)
+    try {
+      await window.compass.shell.openPath(path)
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : t('explorer.openWithDefaultAppFailed'))
+    } finally {
+      setOpening(false)
+    }
+  }
+
   return (
     <div className="media-viewer">
       <div className="media-viewer-toolbar">
@@ -60,15 +72,27 @@ export function MediaViewer({ path, viewKind, mimeType, base64 }: MediaViewerPro
         <span className="media-viewer-filename" title={path}>
           {fileName}
         </span>
-        {canSummarize && (
-          <button
-            type="button"
-            className="btn-secondary media-viewer-action"
-            onClick={summarizeToMarkdown}
-          >
-            {t('explorer.summarizeToMarkdown')}
-          </button>
-        )}
+        <div className="media-viewer-actions">
+          {viewKind === 'pdf' && (
+            <button
+              type="button"
+              className="btn-secondary media-viewer-action"
+              disabled={opening}
+              onClick={() => void openWithDefaultApp()}
+            >
+              {t('explorer.openWithDefaultApp')}
+            </button>
+          )}
+          {canSummarize && (
+            <button
+              type="button"
+              className="btn-secondary media-viewer-action"
+              onClick={summarizeToMarkdown}
+            >
+              {t('explorer.summarizeToMarkdown')}
+            </button>
+          )}
+        </div>
       </div>
       <div className={`media-viewer-body${viewKind === 'pdf' ? ' is-pdf' : ''}`}>
         {viewKind === 'image' ? (

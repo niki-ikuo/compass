@@ -342,6 +342,11 @@ const compassAPI = {
       ipcRenderer.on('menu:replace-in-files', handler)
       return () => ipcRenderer.removeListener('menu:replace-in-files', handler)
     },
+    onShowOutline: (callback: () => void): (() => void) => {
+      const handler = (): void => callback()
+      ipcRenderer.on('menu:show-outline', handler)
+      return () => ipcRenderer.removeListener('menu:show-outline', handler)
+    },
     onOpenHelp: (callback: () => void): (() => void) => {
       const handler = (): void => callback()
       ipcRenderer.on('menu:open-help', handler)

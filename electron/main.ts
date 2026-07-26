@@ -323,6 +323,17 @@ function createMenu(): void {
         },
         { type: 'separator' },
         {
+          label: t('menu.showWorkspaceOutline'),
+          accelerator: 'CmdOrCtrl+Shift+O',
+          click: () => mainWindow?.webContents.send('menu:show-outline')
+        },
+        {
+          // Accelerator lives on Edit → Find in Files; View entry is for discoverability.
+          label: t('menu.showWorkspaceSearch'),
+          click: () => mainWindow?.webContents.send('menu:find-in-files')
+        },
+        { type: 'separator' },
+        {
           label: t('menu.terminal'),
           accelerator: 'CmdOrCtrl+`',
           click: () => mainWindow?.webContents.send('menu:toggle-terminal')

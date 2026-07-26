@@ -1540,9 +1540,16 @@ body:has(.monaco-editor .find-widget.visible) .workbench-hover-container .action
   min-width: 0;
 }
 
-.media-viewer-action {
+.media-viewer-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   flex-shrink: 0;
   margin-left: auto;
+}
+
+.media-viewer-action {
+  flex-shrink: 0;
   font-size: 12px;
   padding: 4px 10px;
 }

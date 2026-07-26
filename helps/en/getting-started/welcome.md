@@ -40,10 +40,12 @@ Compass is an **AI workspace** for local folders. It is not a code-only IDE — 
 
 | Area | Role |
 |------|------|
-| Left | Explorer (file tree) / Search tabs |
-| Center | Editor (tabs) |
+| Left | Explorer / Outline (Markdown headings) / Search (meaning or text) |
+| Center | Editor (tabs). PDFs preview in-app; Office opens in the default app |
 | Right | AI chat (Ask / Edit / Agent) |
 | Bottom | Terminal (when shown) |
+
+Use **View → Show Outline** (Ctrl+Shift+O) / **Show Search**, or **Edit → Find in Files** (Ctrl+Shift+F), to open the left sidebar views.
 
 ## Related
 

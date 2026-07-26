@@ -60,7 +60,10 @@ A. Agent requires a workspace. Open a folder first → [Agent](../ai/agent.md)
 A. They are hidden in the tree by design.
 
 **Q. Double-clicking a `.docx` opens Word instead of the editor**  
-A. Intended. Office / OpenDocument files open with the OS default app.
+A. Intended — editing stays in the OS default app. Reading, search, and summarize work in Compass (extracted text is indexed and @-mentionable; Explorer **Summarize to Markdown** writes a `.summary.md` sidecar).
+
+**Q. How are PDFs handled?**  
+A. They preview in-app. Extracted text is indexed and searchable. Use **Summarize to Markdown** or **Open with Default App** from the viewer or Explorer.
 
 ## Related
 

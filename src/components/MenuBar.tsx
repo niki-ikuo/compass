@@ -114,6 +114,7 @@ export function MenuBar({
   const barRef = useRef<HTMLDivElement>(null)
   const workspaceRoot = useAppStore((s) => s.workspaceRoot)
   const openSearchPanel = useAppStore((s) => s.openSearchPanel)
+  const openOutlinePanel = useAppStore((s) => s.openOutlinePanel)
   const openBrowserTab = useAppStore((s) => s.openBrowserTab)
   const llmConnection = useAppStore((s) => s.llmConnection)
   const editorMinimapEnabled = useAppStore((s) => s.settings.editorMinimapEnabled !== false)
@@ -233,6 +234,23 @@ export function MenuBar({
       label: t('menu.toggleOutline'),
       checked: markdownOutlineEnabled,
       action: () => void patchAppSettings({ markdownOutlineEnabled: !markdownOutlineEnabled })
+    },
+    { separator: true, label: '', action: () => {} },
+    {
+      label: t('menu.showWorkspaceOutline'),
+      shortcut: 'Ctrl+Shift+O',
+      action: () => {
+        if (!workspaceRoot) return
+        openOutlinePanel()
+      }
+    },
+    {
+      label: t('menu.showWorkspaceSearch'),
+      shortcut: 'Ctrl+Shift+F',
+      action: () => {
+        if (!workspaceRoot) return
+        openSearchPanel({ replace: false })
+      }
     },
     { separator: true, label: '', action: () => {} },
     { label: t('menu.newBrowserTab'), shortcut: 'Ctrl+Shift+B', action: () => openBrowserTab() },
