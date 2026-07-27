@@ -34,13 +34,13 @@
 - 左サイドバーのエクスプローラー / アウトライン / 検索 / Git タブ（横断見出しジャンプ・ワークスペース内テキスト検索・status/diff/commit）
 - オフラインヘルプ + AIヘルプ（`helps/` + `help:*` IPC）
 - tools 非対応時の Agent UX — プロバイダ別 Agent トグル非表示、Edit への誘導フォールバック — [AGENT_PLAN.md](./AGENT_PLAN.md) §7
-- 最小 Git UI（status / diff / stage / commit。システム `git` を使用。push / PR / GitHub 認証は未対応）
+- 最小 Git UI（status / diff / stage / commit / discard / push / pull / ブランチ切替。システム `git` を使用。PR / GitHub 認証は未対応）
 
 ### 後回し（後続）
 
 - ~~ベクトル検索 / RAG による意味検索~~ → v2.1 実装済み（ハイブリッド検索、`.compass/chunks.json`。既定はニューラルな OpenAI 互換 `/embeddings`、失敗時・オフラインはハッシュへフォールバック）
 - MCP連携
-- ~~Git統合~~ → 最小の status/diff/commit は実装済み（push / PR / GitHub 認証は後続）
+- ~~Git統合~~ → 最小の status/diff/commit/discard/push/pull/ブランチ切替は実装済み（PR / GitHub 認証は後続）
 
 ---
 

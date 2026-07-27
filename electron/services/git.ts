@@ -5,9 +5,14 @@ import { join, relative, resolve } from 'path'
 import { promisify } from 'util'
 import { t } from '../../src/i18n/runtime'
 import type {
+  GitBranchesResult,
+  GitCheckoutResult,
   GitCommitResult,
   GitDiffResult,
   GitDiffSide,
+  GitDiscardResult,
+  GitPullResult,
+  GitPushResult,
   GitStageResult,
   GitStatusEntry,
   GitStatusKind,
@@ -18,9 +23,15 @@ import { resolveInsideWorkspace } from './filesystem'
 const execFileAsync = promisify(execFile)
 
 const GIT_TIMEOUT_MS = 30_000
+const GIT_NETWORK_TIMEOUT_MS = 120_000
 const MAX_DIFF_CHARS = 400_000
 const MAX_COMMIT_MESSAGE_CHARS = 10_000
 const MAX_PATHS = 500
+const MAX_BRANCH_NAME_CHARS = 200
+
+export type GitRunOptions = {
+  timeoutMs?: number
+}
 
 export type GitRunResult = {
   code: number
@@ -31,7 +42,8 @@ export type GitRunResult = {
 /** Test seam — override in unit tests. */
 export type GitRunner = (
   args: string[],
-  cwd: string
+  cwd: string,
+  options?: GitRunOptions
 ) => Promise<GitRunResult>
 
 let gitRunner: GitRunner = defaultGitRunner
@@ -40,11 +52,15 @@ export function setGitRunnerForTests(runner: GitRunner | null): void {
   gitRunner = runner ?? defaultGitRunner
 }
 
-async function defaultGitRunner(args: string[], cwd: string): Promise<GitRunResult> {
+async function defaultGitRunner(
+  args: string[],
+  cwd: string,
+  options?: GitRunOptions
+): Promise<GitRunResult> {
   try {
     const { stdout, stderr } = await execFileAsync('git', args, {
       cwd,
-      timeout: GIT_TIMEOUT_MS,
+      timeout: options?.timeoutMs ?? GIT_TIMEOUT_MS,
       maxBuffer: 8 * 1024 * 1024,
       windowsHide: true,
       encoding: 'utf-8'
@@ -72,8 +88,35 @@ async function defaultGitRunner(args: string[], cwd: string): Promise<GitRunResu
   }
 }
 
-function runGit(args: string[], cwd: string): Promise<GitRunResult> {
-  return gitRunner(args, cwd)
+function runGit(args: string[], cwd: string, options?: GitRunOptions): Promise<GitRunResult> {
+  return gitRunner(args, cwd, options)
+}
+
+function gitErrorMessage(result: GitRunResult, fallback: string): string {
+  return result.stderr.trim() || result.stdout.trim() || fallback
+}
+
+/** Validate a local branch name before passing to git (defense in depth; args are not shell-interpolated). */
+export function assertSafeBranchName(name: string): string {
+  const trimmed = (name ?? '').trim()
+  if (!trimmed) {
+    throw new Error(t('git.invalidBranch'))
+  }
+  if (trimmed.length > MAX_BRANCH_NAME_CHARS) {
+    throw new Error(t('git.invalidBranch'))
+  }
+  if (
+    trimmed.startsWith('-') ||
+    trimmed.includes('..') ||
+    trimmed.includes('@{') ||
+    trimmed.includes('\\') ||
+    trimmed.includes(' ') ||
+    trimmed.includes('\0') ||
+    !/^[A-Za-z0-9._/\-]+$/.test(trimmed)
+  ) {
+    throw new Error(t('git.invalidBranch'))
+  }
+  return trimmed
 }
 
 function normalizeRelPath(path: string): string {
@@ -464,4 +507,155 @@ export async function commitGit(
   } finally {
     await rm(dir, { recursive: true, force: true }).catch(() => undefined)
   }
+}
+
+/**
+ * Discard working-tree changes for paths.
+ * - Untracked: `git clean -f -- path` (deletes the file)
+ * - Tracked: `git restore --worktree -- path` (with reset/checkout fallback)
+ * Does not unstage; staged-only changes are left alone.
+ */
+export async function discardGitPaths(
+  workspaceRoot: string,
+  paths: string[]
+): Promise<GitDiscardResult> {
+  const root = await ensureGitRepo(workspaceRoot)
+  const rels = assertRelativePaths(workspaceRoot, paths)
+
+  const status = await runGit(['status', '--porcelain=v1', '-z', '--', ...rels], root)
+  if (status.code !== 0) {
+    throw new Error(gitErrorMessage(status, t('git.statusFailed')))
+  }
+  const entries = parseGitStatusPorcelain(status.stdout).entries
+  const byPath = new Map(entries.map((e) => [e.path, e]))
+
+  const discarded: string[] = []
+  for (const rel of rels) {
+    const entry = byPath.get(rel)
+    if (!entry) continue
+
+    if (entry.untracked) {
+      const result = await runGit(['clean', '-f', '--', rel], root)
+      if (result.code !== 0) {
+        throw new Error(gitErrorMessage(result, t('git.discardFailed')))
+      }
+      discarded.push(rel)
+      continue
+    }
+
+    if (!entry.unstaged) {
+      // Staged-only — nothing to discard in the working tree
+      continue
+    }
+
+    let result = await runGit(['restore', '--worktree', '--', rel], root)
+    if (result.code !== 0) {
+      result = await runGit(['checkout', '--', rel], root)
+    }
+    if (result.code !== 0) {
+      throw new Error(gitErrorMessage(result, t('git.discardFailed')))
+    }
+    discarded.push(rel)
+  }
+
+  return { paths: discarded }
+}
+
+export async function pushGit(workspaceRoot: string): Promise<GitPushResult> {
+  const root = await ensureGitRepo(workspaceRoot)
+  const net = { timeoutMs: GIT_NETWORK_TIMEOUT_MS }
+
+  const upstream = await runGit(
+    ['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{u}'],
+    root
+  )
+
+  let result: GitRunResult
+  if (upstream.code === 0 && upstream.stdout.trim()) {
+    result = await runGit(['push'], root, net)
+  } else {
+    const remotes = await runGit(['remote'], root)
+    const remoteNames = remotes.stdout
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .filter(Boolean)
+    if (!remoteNames.includes('origin')) {
+      throw new Error(t('git.noRemote'))
+    }
+    result = await runGit(['push', '-u', 'origin', 'HEAD'], root, net)
+  }
+
+  if (result.code !== 0) {
+    throw new Error(gitErrorMessage(result, t('git.pushFailed')))
+  }
+
+  const summary =
+    result.stderr.trim() || result.stdout.trim() || t('git.pushSuccess')
+  return { summary: summary.split('\n')[0] ?? summary }
+}
+
+export async function pullGit(workspaceRoot: string): Promise<GitPullResult> {
+  const root = await ensureGitRepo(workspaceRoot)
+  const result = await runGit(['pull', '--ff-only'], root, {
+    timeoutMs: GIT_NETWORK_TIMEOUT_MS
+  })
+  if (result.code !== 0) {
+    const detail = gitErrorMessage(result, t('git.pullFailed'))
+    // ff-only often fails when a merge/rebase is needed — keep the git message
+    throw new Error(detail)
+  }
+  const summary =
+    result.stdout.trim() || result.stderr.trim() || t('git.pullSuccess')
+  return { summary: summary.split('\n')[0] ?? summary }
+}
+
+export async function listGitBranches(workspaceRoot: string): Promise<GitBranchesResult> {
+  const root = await ensureGitRepo(workspaceRoot)
+
+  const currentResult = await runGit(['branch', '--show-current'], root)
+  const currentName =
+    currentResult.code === 0 ? currentResult.stdout.trim() || null : null
+
+  const listResult = await runGit(
+    ['for-each-ref', '--format=%(refname:short)', 'refs/heads'],
+    root
+  )
+  if (listResult.code !== 0) {
+    throw new Error(gitErrorMessage(listResult, t('git.branchListFailed')))
+  }
+
+  const names = listResult.stdout
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter(Boolean)
+
+  const branches = names.map((name) => ({
+    name,
+    current: currentName !== null && name === currentName
+  }))
+
+  // Detached HEAD: still list branches, none marked current
+  branches.sort((a, b) => {
+    if (a.current !== b.current) return a.current ? -1 : 1
+    return a.name.localeCompare(b.name)
+  })
+
+  return { branches }
+}
+
+export async function checkoutGitBranch(
+  workspaceRoot: string,
+  branch: string
+): Promise<GitCheckoutResult> {
+  const root = await ensureGitRepo(workspaceRoot)
+  const name = assertSafeBranchName(branch)
+
+  let result = await runGit(['switch', '--', name], root)
+  if (result.code !== 0) {
+    result = await runGit(['checkout', '--', name], root)
+  }
+  if (result.code !== 0) {
+    throw new Error(gitErrorMessage(result, t('git.checkoutFailed')))
+  }
+  return { branch: name }
 }

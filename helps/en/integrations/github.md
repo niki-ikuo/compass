@@ -6,6 +6,9 @@ keywords:
   - commit
   - diff
   - status
+  - push
+  - pull
+  - branch
   - Issue
   - PR
   - Repository
@@ -18,7 +21,7 @@ related:
 
 # Git / GitHub
 
-## Git in Compass (status / diff / commit)
+## Git in Compass
 
 Open the **Git** tab in the left sidebar (`Ctrl+Shift+G`), or click the branch name in the status bar.
 
@@ -28,6 +31,9 @@ You can:
 - Open a file’s diff
 - Stage or unstage files
 - Commit with a message
+- Discard working-tree changes (with confirmation; untracked files are deleted)
+- Pull (fast-forward only) / Push
+- Switch local branches
 
 Requires **Git on PATH** (for example Git for Windows) and a folder that is already a Git repository (`git init` or a clone).
 
@@ -35,8 +41,7 @@ This is separate from [AI Apply Undo](../ai/chat.md): Undo restores Compass back
 
 ## Not included yet
 
-- Push / pull / fetch
-- Branch create / switch UI
+- Branch create, stash, merge / rebase, or conflict-resolution UI
 - GitHub auth, Issues, or Pull Requests
 - MCP
 

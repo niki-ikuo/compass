@@ -34,9 +34,14 @@ import {
   undoLastChangeSet
 } from './services/ai-undo'
 import {
+  checkoutGitBranch,
   commitGit,
+  discardGitPaths,
   getGitDiff,
   getGitStatus,
+  listGitBranches,
+  pullGit,
+  pushGit,
   stageGitPaths,
   unstageGitPaths
 } from './services/git'
@@ -974,6 +979,32 @@ function registerIpcHandlers(): void {
       options?: { paths?: string[] }
     ) => {
       return commitGit(workspaceRoot, message, options)
+    }
+  )
+
+  ipcMain.handle(
+    'git:discard',
+    async (_event, workspaceRoot: string, paths: string[]) => {
+      return discardGitPaths(workspaceRoot, paths)
+    }
+  )
+
+  ipcMain.handle('git:push', async (_event, workspaceRoot: string) => {
+    return pushGit(workspaceRoot)
+  })
+
+  ipcMain.handle('git:pull', async (_event, workspaceRoot: string) => {
+    return pullGit(workspaceRoot)
+  })
+
+  ipcMain.handle('git:branches', async (_event, workspaceRoot: string) => {
+    return listGitBranches(workspaceRoot)
+  })
+
+  ipcMain.handle(
+    'git:checkout',
+    async (_event, workspaceRoot: string, branch: string) => {
+      return checkoutGitBranch(workspaceRoot, branch)
     }
   )
 }

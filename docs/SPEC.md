@@ -34,13 +34,13 @@
 - Left sidebar Explorer / Outline / Search / Git tabs (cross-file heading jump + workspace text search + status/diff/commit)
 - Offline help + AI Help (`helps/` + `help:*` IPC)
 - Agent UX when tools unsupported — hide Agent toggle per provider; guided Edit fallback — see [AGENT_PLAN.md](./AGENT_PLAN.md) §7
-- Minimal Git UI (status / diff / stage / commit via system `git`; no push/PR/GitHub auth yet)
+- Minimal Git UI (status / diff / stage / commit / discard / push / pull / branch switch via system `git`; no PR/GitHub auth yet)
 
 ### Deferred (later)
 
 - ~~Vector search / RAG~~ → shipped in v2.1 (hybrid search via `.compass/chunks.json`; default neural OpenAI-compatible `/embeddings`; hash fallback offline / on failure)
 - MCP
-- ~~Git integration~~ → minimal status/diff/commit shipped (push / PR / GitHub auth still later)
+- ~~Git integration~~ → minimal status/diff/commit/discard/push/pull/branch switch shipped (PR / GitHub auth still later)
 
 ---
 

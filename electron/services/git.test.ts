@@ -4,10 +4,16 @@ import { join } from 'path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { setLocale } from '../../src/i18n/runtime'
 import {
+  assertSafeBranchName,
+  checkoutGitBranch,
   commitGit,
+  discardGitPaths,
   getGitDiff,
   getGitStatus,
+  listGitBranches,
   parseGitStatusPorcelain,
+  pullGit,
+  pushGit,
   setGitRunnerForTests,
   stageGitPaths,
   unstageGitPaths,
@@ -251,5 +257,143 @@ describe('getGitDiff untracked', () => {
     expect(diff.patch).toContain('+++ b/notes/new.md')
     expect(diff.patch).toContain('+hello')
     expect(diff.patch).toContain('+world')
+  })
+})
+
+describe('discard / push / pull / branch (mocked)', () => {
+  it('discards tracked worktree changes via restore', async () => {
+    const calls: string[][] = []
+    setGitRunnerForTests(async (args) => {
+      calls.push(args)
+      if (args[0] === 'rev-parse') return { code: 0, stdout: 'true\n', stderr: '' }
+      if (args[0] === 'status') {
+        return { code: 0, stdout: ' M a.md\0', stderr: '' }
+      }
+      if (args[0] === 'restore') return { code: 0, stdout: '', stderr: '' }
+      return { code: 1, stdout: '', stderr: `unmocked ${args.join(' ')}` }
+    })
+    const root = await mkdtemp(join(tmpdir(), 'compass-git-discard-'))
+    await writeFile(join(root, 'a.md'), 'hi\n', 'utf-8')
+    const result = await discardGitPaths(root, ['a.md'])
+    expect(result.paths).toEqual(['a.md'])
+    expect(calls.some((c) => c[0] === 'restore' && c.includes('--worktree'))).toBe(true)
+  })
+
+  it('deletes untracked files via clean -f', async () => {
+    const calls: string[][] = []
+    setGitRunnerForTests(async (args) => {
+      calls.push(args)
+      if (args[0] === 'rev-parse') return { code: 0, stdout: 'true\n', stderr: '' }
+      if (args[0] === 'status') {
+        return { code: 0, stdout: '?? draft.txt\0', stderr: '' }
+      }
+      if (args[0] === 'clean') return { code: 0, stdout: '', stderr: '' }
+      return { code: 1, stdout: '', stderr: `unmocked ${args.join(' ')}` }
+    })
+    const root = await mkdtemp(join(tmpdir(), 'compass-git-clean-'))
+    await writeFile(join(root, 'draft.txt'), 'x\n', 'utf-8')
+    await expect(discardGitPaths(root, ['draft.txt'])).resolves.toEqual({ paths: ['draft.txt'] })
+    expect(calls.some((c) => c[0] === 'clean' && c.includes('-f'))).toBe(true)
+  })
+
+  it('pushes to existing upstream', async () => {
+    const calls: string[][] = []
+    setGitRunnerForTests(async (args) => {
+      calls.push(args)
+      if (args.join(' ') === 'rev-parse --is-inside-work-tree') {
+        return { code: 0, stdout: 'true\n', stderr: '' }
+      }
+      if (args.includes('@{u}')) {
+        return { code: 0, stdout: 'origin/main\n', stderr: '' }
+      }
+      if (args[0] === 'push') {
+        return { code: 0, stdout: '', stderr: 'To github.com:org/repo.git\n' }
+      }
+      return { code: 1, stdout: '', stderr: `unmocked ${args.join(' ')}` }
+    })
+    const result = await pushGit('C:\\work\\repo')
+    expect(result.summary).toContain('github.com')
+    expect(calls.some((c) => c.length === 1 && c[0] === 'push')).toBe(true)
+  })
+
+  it('pushes with -u origin HEAD when no upstream', async () => {
+    const calls: string[][] = []
+    setGitRunnerForTests(async (args) => {
+      calls.push(args)
+      if (args.join(' ') === 'rev-parse --is-inside-work-tree') {
+        return { code: 0, stdout: 'true\n', stderr: '' }
+      }
+      if (args.includes('@{u}')) {
+        return { code: 128, stdout: '', stderr: 'no upstream' }
+      }
+      if (args[0] === 'remote') {
+        return { code: 0, stdout: 'origin\n', stderr: '' }
+      }
+      if (args[0] === 'push') {
+        return { code: 0, stdout: '', stderr: 'branch set up to track\n' }
+      }
+      return { code: 1, stdout: '', stderr: `unmocked ${args.join(' ')}` }
+    })
+    await pushGit('C:\\work\\repo')
+    expect(
+      calls.some((c) => c[0] === 'push' && c.includes('-u') && c.includes('origin'))
+    ).toBe(true)
+  })
+
+  it('pulls with --ff-only', async () => {
+    const calls: string[][] = []
+    setGitRunnerForTests(async (args) => {
+      calls.push(args)
+      if (args[0] === 'rev-parse') return { code: 0, stdout: 'true\n', stderr: '' }
+      if (args[0] === 'pull') {
+        return { code: 0, stdout: 'Already up to date.\n', stderr: '' }
+      }
+      return { code: 1, stdout: '', stderr: `unmocked ${args.join(' ')}` }
+    })
+    const result = await pullGit('C:\\work\\repo')
+    expect(result.summary).toContain('Already up to date')
+    expect(calls.some((c) => c[0] === 'pull' && c.includes('--ff-only'))).toBe(true)
+  })
+
+  it('lists local branches and marks current', async () => {
+    setGitRunnerForTests(async (args) => {
+      if (args[0] === 'rev-parse') return { code: 0, stdout: 'true\n', stderr: '' }
+      if (args.join(' ') === 'branch --show-current') {
+        return { code: 0, stdout: 'main\n', stderr: '' }
+      }
+      if (args[0] === 'for-each-ref') {
+        return { code: 0, stdout: 'feature\nmain\n', stderr: '' }
+      }
+      return { code: 1, stdout: '', stderr: `unmocked ${args.join(' ')}` }
+    })
+    const result = await listGitBranches('C:\\work\\repo')
+    expect(result.branches).toEqual([
+      { name: 'main', current: true },
+      { name: 'feature', current: false }
+    ])
+  })
+
+  it('checks out a branch via switch', async () => {
+    const calls: string[][] = []
+    setGitRunnerForTests(async (args) => {
+      calls.push(args)
+      if (args[0] === 'rev-parse') return { code: 0, stdout: 'true\n', stderr: '' }
+      if (args[0] === 'switch') return { code: 0, stdout: '', stderr: '' }
+      return { code: 1, stdout: '', stderr: `unmocked ${args.join(' ')}` }
+    })
+    await expect(checkoutGitBranch('C:\\work\\repo', 'feature')).resolves.toEqual({
+      branch: 'feature'
+    })
+    expect(calls.some((c) => c[0] === 'switch' && c.includes('feature'))).toBe(true)
+  })
+
+  it('rejects unsafe branch names', async () => {
+    setGitRunnerForTests(async (args) => {
+      if (args[0] === 'rev-parse') return { code: 0, stdout: 'true\n', stderr: '' }
+      return { code: 1, stdout: '', stderr: 'no' }
+    })
+    await expect(checkoutGitBranch('C:\\work\\repo', '-evil')).rejects.toThrow()
+    await expect(checkoutGitBranch('C:\\work\\repo', 'a b')).rejects.toThrow()
+    expect(() => assertSafeBranchName('feat/ok-1')).not.toThrow()
   })
 })

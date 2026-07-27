@@ -741,6 +741,31 @@ export interface GitCommitResult {
   summary: string
 }
 
+export interface GitDiscardResult {
+  paths: string[]
+}
+
+export interface GitPushResult {
+  summary: string
+}
+
+export interface GitPullResult {
+  summary: string
+}
+
+export interface GitBranchInfo {
+  name: string
+  current: boolean
+}
+
+export interface GitBranchesResult {
+  branches: GitBranchInfo[]
+}
+
+export interface GitCheckoutResult {
+  branch: string
+}
+
 export interface WorkspaceOutlineHeading {
   level: number
   text: string
@@ -903,6 +928,11 @@ export interface CompassAPI {
       message: string,
       options?: { paths?: string[] }
     ) => Promise<GitCommitResult>
+    discard: (workspaceRoot: string, paths: string[]) => Promise<GitDiscardResult>
+    push: (workspaceRoot: string) => Promise<GitPushResult>
+    pull: (workspaceRoot: string) => Promise<GitPullResult>
+    branches: (workspaceRoot: string) => Promise<GitBranchesResult>
+    checkout: (workspaceRoot: string, branch: string) => Promise<GitCheckoutResult>
   }
   ai: {
     chat: (request: ChatRequest) => Promise<void>

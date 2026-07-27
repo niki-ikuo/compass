@@ -53,6 +53,11 @@ import type {
   GitDiffSide,
   GitStageResult,
   GitCommitResult,
+  GitDiscardResult,
+  GitPushResult,
+  GitPullResult,
+  GitBranchesResult,
+  GitCheckoutResult,
   UsageSnapshot
 } from '../src/types'
 import { DEFAULT_SETTINGS } from '../src/types'
@@ -165,7 +170,17 @@ const compassAPI = {
       message: string,
       options?: { paths?: string[] }
     ): Promise<GitCommitResult> =>
-      ipcRenderer.invoke('git:commit', workspaceRoot, message, options)
+      ipcRenderer.invoke('git:commit', workspaceRoot, message, options),
+    discard: (workspaceRoot: string, paths: string[]): Promise<GitDiscardResult> =>
+      ipcRenderer.invoke('git:discard', workspaceRoot, paths),
+    push: (workspaceRoot: string): Promise<GitPushResult> =>
+      ipcRenderer.invoke('git:push', workspaceRoot),
+    pull: (workspaceRoot: string): Promise<GitPullResult> =>
+      ipcRenderer.invoke('git:pull', workspaceRoot),
+    branches: (workspaceRoot: string): Promise<GitBranchesResult> =>
+      ipcRenderer.invoke('git:branches', workspaceRoot),
+    checkout: (workspaceRoot: string, branch: string): Promise<GitCheckoutResult> =>
+      ipcRenderer.invoke('git:checkout', workspaceRoot, branch)
   },
   ai: {
     chat: (request: ChatRequest): Promise<void> => ipcRenderer.invoke('ai:chat', request),

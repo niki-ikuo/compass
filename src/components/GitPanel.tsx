@@ -2,7 +2,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAppStore } from '@/stores/app-store'
 import { formatUiPath, UI_PATH_MAX_CHARS, UI_PATH_MAX_CHARS_WIDE } from '@/utils/display-path'
 import { openWorkspaceFile } from '@/utils/open-workspace-file'
-import type { GitDiffResult, GitStatusEntry, GitStatusKind, GitStatusResult } from '@/types'
+import type {
+  GitBranchInfo,
+  GitDiffResult,
+  GitStatusEntry,
+  GitStatusKind,
+  GitStatusResult
+} from '@/types'
 import { useI18n, type MessageKey } from '@/i18n'
 
 function toAbsolutePath(workspaceRoot: string, relativePath: string): string {
@@ -76,6 +82,7 @@ function FileRow({
   onSelect,
   onStage,
   onUnstage,
+  onDiscard,
   onOpen
 }: {
   entry: GitStatusEntry
@@ -83,6 +90,7 @@ function FileRow({
   onSelect: () => void
   onStage?: () => void
   onUnstage?: () => void
+  onDiscard?: () => void
   onOpen: () => void
 }) {
   const { t } = useI18n()
@@ -129,6 +137,16 @@ function FileRow({
             −
           </button>
         )}
+        {onDiscard && (
+          <button
+            type="button"
+            className="git-file-action git-file-action-danger"
+            onClick={onDiscard}
+            title={t('git.discard')}
+          >
+            ×
+          </button>
+        )}
       </div>
     </div>
   )
@@ -140,6 +158,7 @@ export function GitPanel() {
   const leftSidebarView = useAppStore((s) => s.leftSidebarView)
 
   const [status, setStatus] = useState<GitStatusResult | null>(null)
+  const [branches, setBranches] = useState<GitBranchInfo[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [selectedPath, setSelectedPath] = useState<string | null>(null)
@@ -148,13 +167,30 @@ export function GitPanel() {
   const [commitMessage, setCommitMessage] = useState('')
   const [committing, setCommitting] = useState(false)
   const [busyPaths, setBusyPaths] = useState(false)
+  const [remoteBusy, setRemoteBusy] = useState(false)
+  const [branchBusy, setBranchBusy] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
   const refreshToken = useRef(0)
+
+  const refreshBranches = useCallback(async (): Promise<void> => {
+    if (!workspaceRoot) {
+      setBranches([])
+      return
+    }
+    try {
+      const next = await window.compass.git.branches(workspaceRoot)
+      setBranches(next.branches)
+    } catch {
+      // Status panel still works without the branch list
+      setBranches([])
+    }
+  }, [workspaceRoot])
 
   const refresh = useCallback(async (options?: { fetch?: boolean }) => {
     if (!workspaceRoot) {
       setStatus(null)
       setError(null)
+      setBranches([])
       return
     }
     const token = ++refreshToken.current
@@ -164,19 +200,23 @@ export function GitPanel() {
       const next = await window.compass.git.status(workspaceRoot, options)
       if (token !== refreshToken.current) return
       setStatus(next)
-      if (next.error && !next.isRepo) {
+      if (next.error) {
         setError(next.error)
-      } else if (next.error) {
-        setError(next.error)
+      }
+      if (next.isRepo) {
+        await refreshBranches()
+      } else {
+        setBranches([])
       }
     } catch (err) {
       if (token !== refreshToken.current) return
       setError(err instanceof Error ? err.message : String(err))
       setStatus(null)
+      setBranches([])
     } finally {
       if (token === refreshToken.current) setLoading(false)
     }
-  }, [workspaceRoot])
+  }, [workspaceRoot, refreshBranches])
 
   useEffect(() => {
     if (leftSidebarView !== 'git') return
@@ -264,6 +304,41 @@ export function GitPanel() {
     }
   }
 
+  const runDiscard = async (entries: GitStatusEntry[]): Promise<void> => {
+    if (!workspaceRoot || entries.length === 0) return
+
+    const paths = entries.map((e) => e.path)
+    let confirmed = false
+    if (entries.length === 1) {
+      const entry = entries[0]
+      const pathLabel = formatUiPath(entry.path, { maxChars: UI_PATH_MAX_CHARS_WIDE }).label
+      confirmed = window.confirm(
+        entry.untracked
+          ? t('git.discardUntrackedConfirm', { path: pathLabel })
+          : t('git.discardConfirm', { path: pathLabel })
+      )
+    } else {
+      confirmed = window.confirm(t('git.discardAllConfirm', { count: String(entries.length) }))
+    }
+    if (!confirmed) return
+
+    setBusyPaths(true)
+    setError(null)
+    setNotice(null)
+    try {
+      await window.compass.git.discard(workspaceRoot, paths)
+      if (selectedPath && paths.includes(selectedPath)) {
+        setSelectedPath(null)
+        setDiff(null)
+      }
+      await refresh()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setBusyPaths(false)
+    }
+  }
+
   const handleCommit = async (): Promise<void> => {
     if (!workspaceRoot) return
     const message = commitMessage.trim()
@@ -288,6 +363,72 @@ export function GitPanel() {
     }
   }
 
+  const handlePush = async (): Promise<void> => {
+    if (!workspaceRoot) return
+    setRemoteBusy(true)
+    setError(null)
+    setNotice(null)
+    try {
+      const result = await window.compass.git.push(workspaceRoot)
+      setNotice(result.summary || t('git.pushSuccess'))
+      await refresh({ fetch: true })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setRemoteBusy(false)
+    }
+  }
+
+  const handlePull = async (): Promise<void> => {
+    if (!workspaceRoot) return
+    setRemoteBusy(true)
+    setError(null)
+    setNotice(null)
+    try {
+      const result = await window.compass.git.pull(workspaceRoot)
+      setNotice(result.summary || t('git.pullSuccess'))
+      await refresh({ fetch: true })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setRemoteBusy(false)
+    }
+  }
+
+  const handleCheckout = async (branch: string): Promise<void> => {
+    if (!workspaceRoot || !branch) return
+    if (branch === status?.branch) return
+    setBranchBusy(true)
+    setError(null)
+    setNotice(null)
+    try {
+      const result = await window.compass.git.checkout(workspaceRoot, branch)
+      setNotice(t('git.checkoutSuccess', { branch: result.branch }))
+      setDiff(null)
+      setSelectedPath(null)
+      await refresh()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setBranchBusy(false)
+    }
+  }
+
+  const panelBusy = loading || busyPaths || committing || remoteBusy || branchBusy
+  const branchOptions = useMemo(() => {
+    if (branches.length > 0) {
+      const names = new Set(branches.map((b) => b.name))
+      if (status?.branch && status.branch !== 'HEAD' && !names.has(status.branch)) {
+        return [{ name: status.branch, current: true }, ...branches]
+      }
+      return branches
+    }
+    if (status?.branch && status.branch !== 'HEAD') {
+      return [{ name: status.branch, current: true }]
+    }
+    return []
+  }, [branches, status?.branch])
+
   const diffLines = useMemo(() => (diff ? parsePatchLines(diff.patch) : []), [diff])
 
   if (!workspaceRoot) {
@@ -304,7 +445,24 @@ export function GitPanel() {
         <div className="git-branch" title={t('git.branch')}>
           {status?.isRepo ? (
             <>
-              <span className="git-branch-name">{status.branch ?? 'HEAD'}</span>
+              {status.branch === 'HEAD' || branchOptions.length === 0 ? (
+                <span className="git-branch-name">{status.branch ?? 'HEAD'}</span>
+              ) : (
+                <select
+                  className="git-branch-select"
+                  value={status.branch ?? ''}
+                  disabled={panelBusy}
+                  title={t('git.branchSwitch')}
+                  aria-label={t('git.branchSwitch')}
+                  onChange={(e) => void handleCheckout(e.target.value)}
+                >
+                  {branchOptions.map((b) => (
+                    <option key={b.name} value={b.name}>
+                      {b.name}
+                    </option>
+                  ))}
+                </select>
+              )}
               {(status.ahead > 0 || status.behind > 0) && (
                 <span
                   className="git-ahead-behind"
@@ -328,12 +486,37 @@ export function GitPanel() {
           type="button"
           className="git-toolbar-btn"
           onClick={() => void refresh({ fetch: true })}
-          disabled={loading || busyPaths}
+          disabled={panelBusy}
           title={t('git.refreshHint')}
         >
           {t('git.refresh')}
         </button>
       </div>
+
+      {status?.isRepo && (
+        <div className="git-remote-bar">
+          <button
+            type="button"
+            className="git-toolbar-btn"
+            onClick={() => void handlePull()}
+            disabled={panelBusy}
+            title={t('git.pullHint')}
+          >
+            {t('git.pull')}
+            {status.behind > 0 ? ` ↓${status.behind}` : ''}
+          </button>
+          <button
+            type="button"
+            className="git-toolbar-btn"
+            onClick={() => void handlePush()}
+            disabled={panelBusy}
+            title={t('git.pushHint')}
+          >
+            {t('git.push')}
+            {status.ahead > 0 ? ` ↑${status.ahead}` : ''}
+          </button>
+        </div>
+      )}
 
       {loading && !status && <div className="git-empty">{t('git.loading')}</div>}
 
@@ -416,16 +599,28 @@ export function GitPanel() {
                 {t('git.changes')}
                 {changes.length > 0 ? ` · ${changes.length}` : ''}
               </span>
-              {changes.length > 0 && (
-                <button
-                  type="button"
-                  className="git-section-action"
-                  disabled={busyPaths}
-                  onClick={() => void runStage(changes.map((e) => e.path))}
-                >
-                  {t('git.stageAll')}
-                </button>
-              )}
+              <div className="git-section-actions">
+                {changes.length > 0 && (
+                  <>
+                    <button
+                      type="button"
+                      className="git-section-action"
+                      disabled={busyPaths}
+                      onClick={() => void runStage(changes.map((e) => e.path))}
+                    >
+                      {t('git.stageAll')}
+                    </button>
+                    <button
+                      type="button"
+                      className="git-section-action git-section-action-danger"
+                      disabled={busyPaths}
+                      onClick={() => void runDiscard(changes)}
+                    >
+                      {t('git.discardAll')}
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
             {changes.length === 0 && staged.length === 0 ? (
               <div className="git-section-empty">{t('git.empty')}</div>
@@ -437,6 +632,7 @@ export function GitPanel() {
                   selected={selectedPath === entry.path}
                   onSelect={() => void loadDiff(entry.path, false)}
                   onStage={() => void runStage([entry.path])}
+                  onDiscard={() => void runDiscard([entry])}
                   onOpen={() => void openPath(entry.path)}
                 />
               ))

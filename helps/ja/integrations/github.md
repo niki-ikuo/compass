@@ -6,6 +6,9 @@ keywords:
   - コミット
   - 差分
   - status
+  - push
+  - pull
+  - ブランチ
   - Issue
   - PR
   - リポジトリ
@@ -18,7 +21,7 @@ related:
 
 # Git / GitHub
 
-## Compass 内の Git（status / diff / commit）
+## Compass 内の Git
 
 左サイドバーの **Git** タブ（`Ctrl+Shift+G`）、またはステータスバーのブランチ名から開けます。
 
@@ -28,6 +31,9 @@ related:
 - ファイルの差分表示
 - ステージ / ステージ解除
 - メッセージ付きコミット
+- 変更の破棄（確認あり。未追跡は削除）
+- Pull（fast-forward のみ） / Push
+- ローカルブランチの切り替え
 
 **PATH 上の `git`**（例: Git for Windows）と、すでに Git リポジトリになっているフォルダ（`git init` または clone）が必要です。
 
@@ -35,8 +41,7 @@ related:
 
 ## まだないもの
 
-- push / pull / fetch
-- ブランチ作成・切り替え UI
+- ブランチ作成、stash、merge / rebase、conflict 解決 UI
 - GitHub 認証、Issue、Pull Request
 - MCP
 

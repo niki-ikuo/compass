@@ -52,7 +52,7 @@ electron/
     ├── chat-history.ts     # Chat history
     ├── open-editors.ts     # Persist open editor tabs
     ├── workspace-search.ts # Workspace text search
-    ├── git.ts              # Minimal Git status / diff / stage / commit (system git)
+    ├── git.ts              # Minimal Git status / diff / stage / commit / discard / push / pull / branch (system git)
     ├── terminal.ts         # PTY
     ├── help.ts / help-ask.ts  # Offline help + AI Help
     └── encoding.ts         # Character encoding
