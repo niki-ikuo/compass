@@ -932,15 +932,17 @@ export function ChatPanel() {
     const requestId = chatComposerSendRequest.id
     // Strict Mode: setup→cleanup→setup で同一クロージャが二度走るため id で一度だけ処理
     if (processedComposerSendRequestIdRef.current === requestId) return
+    // 送信中／承認待ちだと handleSend が即 return する。先に clear するとリクエストが消えるので待機する
+    if (!activeChatId || isChatLoading) return
     processedComposerSendRequestIdRef.current = requestId
     const { text, mode, preset } = chatComposerSendRequest
     clearChatComposerSendRequest()
     setSendMode(mode)
     if (preset) setSendPreset(preset)
     void handleSend({ text, mode, preset })
-    // handleSend は毎レンダー新しい参照なので request id のみ監視
+    // handleSend は毎レンダー新しい参照なので request id と送信可否のみ監視
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chatComposerSendRequest?.id])
+  }, [chatComposerSendRequest?.id, activeChatId, isChatLoading])
 
   useEffect(() => {
     const onFocusMessage = (event: Event) => {
