@@ -5,6 +5,9 @@ import { useI18n, t as tSync } from '@/i18n'
 import { ConfirmDialog } from './ConfirmDialog'
 import { AiApplyHistoryPanel } from './AiApplyHistoryPanel'
 
+/** Success toast auto-hides; errors stay until dismissed. */
+const AUTO_DISMISS_MS = 7000
+
 async function refreshTree(workspaceRoot: string): Promise<void> {
   const tree = await window.compass.fs.readDir(workspaceRoot)
   useAppStore.getState().setFileTree(tree)
@@ -110,6 +113,30 @@ export function AiApplyUndoBar() {
     if (!workspaceRoot) return
     void refreshAiApplyHistory()
   }, [workspaceRoot, refreshAiApplyHistory])
+
+  // Auto-dismiss success banner; pause while confirm/busy; never while error is shown.
+  useEffect(() => {
+    if (!lastAiApplyUndo || pendingWorkspacePreview || lastAiUndoError) return
+    if (confirmOpen || busy) return
+
+    const changeSetId = lastAiApplyUndo.changeSetId
+    const timer = window.setTimeout(() => {
+      const state = useAppStore.getState()
+      if (state.lastAiUndoError) return
+      if (state.lastAiApplyUndo?.changeSetId !== changeSetId) return
+      dismissAiApplyUndoBanner()
+    }, AUTO_DISMISS_MS)
+
+    return () => window.clearTimeout(timer)
+  }, [
+    lastAiApplyUndo?.changeSetId,
+    lastAiApplyUndo?.createdAt,
+    pendingWorkspacePreview,
+    lastAiUndoError,
+    confirmOpen,
+    busy,
+    dismissAiApplyUndoBanner
+  ])
 
   const confirmDialog = (
     <ConfirmDialog
