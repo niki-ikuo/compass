@@ -52,7 +52,8 @@ import type {
   GitDiffResult,
   GitDiffSide,
   GitStageResult,
-  GitCommitResult
+  GitCommitResult,
+  UsageSnapshot
 } from '../src/types'
 import { DEFAULT_SETTINGS } from '../src/types'
 import { applyColorTheme, parseColorThemeArg } from '../src/utils/color-theme'
@@ -266,6 +267,17 @@ const compassAPI = {
   settings: {
     get: (): Promise<AppSettings> => ipcRenderer.invoke('settings:get'),
     set: (settings: AppSettings): Promise<void> => ipcRenderer.invoke('settings:set', settings)
+  },
+  usage: {
+    get: (): Promise<UsageSnapshot> => ipcRenderer.invoke('usage:get'),
+    reset: (): Promise<UsageSnapshot> => ipcRenderer.invoke('usage:reset'),
+    onUpdated: (callback: (snapshot: UsageSnapshot) => void): (() => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, snapshot: UsageSnapshot): void => {
+        callback(snapshot)
+      }
+      ipcRenderer.on('usage:updated', handler)
+      return () => ipcRenderer.removeListener('usage:updated', handler)
+    }
   },
   workspace: {
     getLast: (): Promise<string | null> => ipcRenderer.invoke('workspace:getLast'),

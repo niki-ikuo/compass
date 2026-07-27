@@ -51,6 +51,7 @@ import {
   addRecentWorkspaceRoot,
   removeRecentWorkspaceRoot
 } from './services/settings'
+import { getUsage, resetUsage } from './services/usage'
 import {
   getWorkspaceSettings,
   setWorkspaceSettings
@@ -712,6 +713,14 @@ function registerIpcHandlers(): void {
   ipcMain.handle('settings:set', async (_event, settings: AppSettings) => {
     await setSettings(settings)
     createMenu()
+  })
+
+  ipcMain.handle('usage:get', async () => {
+    return getUsage()
+  })
+
+  ipcMain.handle('usage:reset', async () => {
+    return resetUsage()
   })
 
   ipcMain.handle('workspace:getLast', async () => {

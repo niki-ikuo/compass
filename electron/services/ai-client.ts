@@ -26,6 +26,7 @@ import {
   truncateToTokenBudget
 } from '../../src/utils/context-budget'
 import { getSettings } from './settings'
+import { recordChatCompletionUsageFireAndForget } from './usage'
 import { ensureProjectIndex, getProjectIndexContext } from './project-indexer'
 import { formatMeaningExcerptsForAi } from './semantic-index'
 import { formatWorkspaceRulesForAi } from './workspace-rules'
@@ -33,6 +34,7 @@ import { resolveChatContext, isInsideWorkspace } from './filesystem'
 import { getLlmProvider, getProviderLabel } from '../../src/utils/llm-providers'
 import { withOpenWebUiChatCompat } from '../../src/utils/open-webui-compat'
 import { jsonStringifyUtf8Safe } from '../../src/utils/utf8-text'
+import { parseChatCompletionUsage } from '../../src/utils/usage-period'
 
 export type { ChatContentPart, ChatImageAttachment, UserMessagePayload }
 export { toApiUserContent }
@@ -569,6 +571,7 @@ export async function completeInline(
         finish_reason?: string
       }>
       usage?: {
+        prompt_tokens?: number
         completion_tokens?: number
         completion_tokens_details?: { reasoning_tokens?: number }
       }
@@ -594,6 +597,7 @@ export async function completeInline(
       raw = choice.message.reasoning_content
     }
 
+    recordChatCompletionUsageFireAndForget(parseChatCompletionUsage(data.usage))
     return { text: sanitizeInlineCompletion(raw) }
   } catch (err) {
     if (isAbortError(err) || signal.aborted) {
@@ -673,7 +677,8 @@ export async function streamChat(
             messages: apiMessages,
             temperature: settings.temperature,
             max_tokens: settings.maxTokens,
-            stream: true
+            stream: true,
+            stream_options: { include_usage: true }
           },
           settings.apiBaseUrl
         )
@@ -695,6 +700,7 @@ export async function streamChat(
     const reader = response.body.getReader()
     const decoder = new TextDecoder()
     let buffer = ''
+    let lastUsage: ReturnType<typeof parseChatCompletionUsage> = null
 
     try {
       while (true) {
@@ -718,11 +724,16 @@ export async function streamChat(
           if (data === '[DONE]') continue
 
           try {
-            const parsed = JSON.parse(data)
+            const parsed = JSON.parse(data) as {
+              choices?: Array<{ delta?: { content?: string } }>
+              usage?: unknown
+            }
             const content = parsed.choices?.[0]?.delta?.content
             if (content) {
               send('ai:chunk', content)
             }
+            const usage = parseChatCompletionUsage(parsed.usage)
+            if (usage) lastUsage = usage
           } catch {
             // skip malformed SSE chunks
           }
@@ -735,6 +746,7 @@ export async function streamChat(
     if (signal.aborted) {
       send('ai:aborted')
     } else {
+      recordChatCompletionUsageFireAndForget(lastUsage)
       send('ai:done')
     }
   } catch (err) {

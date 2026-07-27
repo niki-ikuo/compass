@@ -17,6 +17,7 @@ import {
   isLlmProviderId,
   resolveModelForProvider
 } from '../../src/utils/llm-providers'
+import { normalizeUsageResetDay } from '../../src/utils/usage-period'
 import { isLocaleId, setLocale, type LocaleId } from '../../src/i18n/runtime'
 
 interface StoredSettings {
@@ -45,6 +46,7 @@ interface StoredSettings {
    * v0 / missing → migrate to neural `api` default (old default was `hash`).
    */
   embeddingsSettingsVersion: number
+  usageResetDay: number
   lastWorkspaceRoot: string | null
   recentWorkspaceRoots: string[]
 }
@@ -100,6 +102,10 @@ function resolveEmbeddingsProviderId(value: unknown): '' | LlmProviderId {
 
 function resolveEmbeddingsModel(value: unknown): string {
   return typeof value === 'string' ? value.trim() : DEFAULT_SETTINGS.embeddingsModel
+}
+
+function resolveUsageResetDay(value: unknown): number {
+  return normalizeUsageResetDay(value ?? DEFAULT_SETTINGS.usageResetDay)
 }
 
 function resolveProviderId(value: unknown, apiBaseUrl: string): LlmProviderId {
@@ -184,6 +190,7 @@ async function readStoredSettings(): Promise<StoredSettings> {
         stored.rememberLastUseCasePreset
       ),
       ...resolveEmbeddingsStoredFields(stored),
+      usageResetDay: resolveUsageResetDay(stored.usageResetDay),
       lastWorkspaceRoot: stored.lastWorkspaceRoot ?? null,
       recentWorkspaceRoots:
         stored.recentWorkspaceRoots ??
@@ -211,6 +218,7 @@ async function readStoredSettings(): Promise<StoredSettings> {
       embeddingsProviderId: DEFAULT_SETTINGS.embeddingsProviderId,
       embeddingsModel: DEFAULT_SETTINGS.embeddingsModel,
       embeddingsSettingsVersion: EMBEDDINGS_SETTINGS_VERSION,
+      usageResetDay: DEFAULT_SETTINGS.usageResetDay,
       lastWorkspaceRoot: null,
       recentWorkspaceRoots: []
     }
@@ -292,7 +300,8 @@ function toAppSettings(stored: StoredSettings): AppSettings {
     rememberLastUseCasePreset: stored.rememberLastUseCasePreset,
     embeddingsMode: stored.embeddingsMode,
     embeddingsProviderId: stored.embeddingsProviderId,
-    embeddingsModel: stored.embeddingsModel
+    embeddingsModel: stored.embeddingsModel,
+    usageResetDay: stored.usageResetDay
   }
 }
 
@@ -346,7 +355,8 @@ export async function setSettings(settings: AppSettings): Promise<void> {
     embeddingsMode: resolveEmbeddingsMode(settings.embeddingsMode),
     embeddingsProviderId: resolveEmbeddingsProviderId(settings.embeddingsProviderId),
     embeddingsModel: resolveEmbeddingsModel(settings.embeddingsModel),
-    embeddingsSettingsVersion: EMBEDDINGS_SETTINGS_VERSION
+    embeddingsSettingsVersion: EMBEDDINGS_SETTINGS_VERSION,
+    usageResetDay: resolveUsageResetDay(settings.usageResetDay)
   })
   setLocale(locale)
 }

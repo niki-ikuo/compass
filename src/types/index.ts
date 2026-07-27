@@ -352,6 +352,25 @@ export interface AppSettings {
   embeddingsProviderId: '' | LlmProviderId
   /** Embeddings model id when embeddingsMode is `api` (provider-specific). */
   embeddingsModel: string
+  /**
+   * Day of month (1–28) when usage counters auto-reset.
+   * Period runs from that day to the day before the next month's same day.
+   */
+  usageResetDay: number
+}
+
+/** App-wide LLM usage for the current reset period (BYOK cost awareness). */
+export interface UsageSnapshot {
+  /** Period start YYYY-MM-DD (local) */
+  periodStart: string
+  /** Inclusive period end YYYY-MM-DD (local) */
+  periodEnd: string
+  requestCount: number
+  promptTokens: number
+  completionTokens: number
+  /** Successful calls where API did not return usable usage */
+  usageMissingCount: number
+  updatedAt: string
 }
 
 /** 永続化するエディタタブの種別（設定・プレビューは対象外） */
@@ -907,6 +926,11 @@ export interface CompassAPI {
     get: () => Promise<AppSettings>
     set: (settings: AppSettings) => Promise<void>
   }
+  usage: {
+    get: () => Promise<UsageSnapshot>
+    reset: () => Promise<UsageSnapshot>
+    onUpdated: (callback: (snapshot: UsageSnapshot) => void) => () => void
+  }
   workspace: {
     getLast: () => Promise<string | null>
     getRecent: () => Promise<string[]>
@@ -1045,5 +1069,6 @@ export const DEFAULT_SETTINGS: AppSettings = {
   rememberLastUseCasePreset: true,
   embeddingsMode: 'api',
   embeddingsProviderId: '',
-  embeddingsModel: ''
+  embeddingsModel: '',
+  usageResetDay: 1
 }

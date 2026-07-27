@@ -211,6 +211,20 @@ describe('getSettings / setSettings', () => {
     expect(settings.apiKey).toBe('')
     expect(settings.providerKeys.openai).toBeUndefined()
   })
+
+  it('persists and clamps usageResetDay', async () => {
+    await setSettings({
+      ...DEFAULT_SETTINGS,
+      usageResetDay: 15
+    })
+    await expect(getSettings()).resolves.toMatchObject({ usageResetDay: 15 })
+
+    await setSettings({
+      ...DEFAULT_SETTINGS,
+      usageResetDay: 31
+    })
+    await expect(getSettings()).resolves.toMatchObject({ usageResetDay: 1 })
+  })
 })
 
 describe('recent / last workspace roots', () => {

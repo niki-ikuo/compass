@@ -6,6 +6,7 @@ import type {
   EmbeddingsMode,
   LlmProviderId,
   TerminalShell,
+  UsageSnapshot,
   UseCasePreset
 } from '@/types'
 import { DEFAULT_SETTINGS, normalizeUseCasePreset } from '@/types'
@@ -18,6 +19,11 @@ import {
   getProviderLabel,
   resolveModelForProvider
 } from '@/utils/llm-providers'
+import {
+  MAX_USAGE_RESET_DAY,
+  MIN_USAGE_RESET_DAY,
+  normalizeUsageResetDay
+} from '@/utils/usage-period'
 import { USE_CASE_PRESET_OPTIONS } from '@/utils/use-case-preset'
 import {
   useI18n,
@@ -116,6 +122,8 @@ export function SettingsPanel() {
   const [message, setMessage] = useState('')
   const [shells, setShells] = useState<TerminalShell[]>([])
   const [activeTab, setActiveTab] = useState<SettingsTabId>('appearance')
+  const [usage, setUsage] = useState<UsageSnapshot | null>(null)
+  const [resettingUsage, setResettingUsage] = useState(false)
   const lastSavedThemeRef = useRef(initial.form.colorTheme)
 
   useEffect(() => {
@@ -150,6 +158,26 @@ export function SettingsPanel() {
     }
     // タブを開いた時点の設定だけを取り込む
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+    const load = async (): Promise<void> => {
+      try {
+        const snapshot = await window.compass.usage.get()
+        if (!cancelled) setUsage(snapshot)
+      } catch {
+        if (!cancelled) setUsage(null)
+      }
+    }
+    void load()
+    const unsubscribe = window.compass.usage.onUpdated((snapshot) => {
+      setUsage(snapshot)
+    })
+    return () => {
+      cancelled = true
+      unsubscribe()
+    }
   }, [])
 
   const activeProvider = getLlmProvider(form.providerId)
@@ -204,6 +232,10 @@ export function SettingsPanel() {
 
       void refreshLlmConnection()
 
+      if (openSnapshot.usageResetDay !== toSave.usageResetDay) {
+        void window.compass.usage.get().then(setUsage).catch(() => setUsage(null))
+      }
+
       const embeddingsChanged =
         openSnapshot.embeddingsMode !== toSave.embeddingsMode ||
         openSnapshot.embeddingsProviderId !== toSave.embeddingsProviderId ||
@@ -219,6 +251,19 @@ export function SettingsPanel() {
       setMessage(t('settings.saveFailed'))
     } finally {
       setSaving(false)
+    }
+  }
+
+  const handleResetUsage = async (): Promise<void> => {
+    if (!window.confirm(t('settings.usageResetConfirm'))) return
+    setResettingUsage(true)
+    try {
+      const snapshot = await window.compass.usage.reset()
+      setUsage(snapshot)
+    } catch {
+      // keep previous usage display
+    } finally {
+      setResettingUsage(false)
     }
   }
 
@@ -503,6 +548,67 @@ export function SettingsPanel() {
                   onChange={(e) => setForm({ ...form, maxTokens: parseInt(e.target.value) })}
                 />
               </label>
+            </div>
+
+            <div className="settings-usage-block">
+              <div className="settings-usage-heading">{t('settings.usageSection')}</div>
+              {usage && (
+                <>
+                  <div className="settings-usage-row">
+                    <span>{t('settings.usagePeriod')}</span>
+                    <span>
+                      {t('settings.usagePeriodValue', {
+                        start: usage.periodStart,
+                        end: usage.periodEnd
+                      })}
+                    </span>
+                  </div>
+                  <div className="settings-usage-row">
+                    <span>{t('settings.usageRequests')}</span>
+                    <span>{usage.requestCount}</span>
+                  </div>
+                  <div className="settings-usage-row">
+                    <span>{t('settings.usageTokens')}</span>
+                    <span>
+                      {t('settings.usageTokensDetail', {
+                        prompt: String(usage.promptTokens),
+                        completion: String(usage.completionTokens),
+                        total: String(usage.promptTokens + usage.completionTokens)
+                      })}
+                    </span>
+                  </div>
+                  {usage.usageMissingCount > 0 && (
+                    <div className="field-hint">
+                      {t('settings.usageMissing', { count: String(usage.usageMissingCount) })}
+                    </div>
+                  )}
+                </>
+              )}
+              <label>
+                {t('settings.usageResetDay')}
+                <input
+                  type="number"
+                  min={MIN_USAGE_RESET_DAY}
+                  max={MAX_USAGE_RESET_DAY}
+                  step={1}
+                  value={form.usageResetDay}
+                  onChange={(e) =>
+                    setForm({
+                      ...form,
+                      usageResetDay: normalizeUsageResetDay(parseInt(e.target.value, 10))
+                    })
+                  }
+                />
+                <span className="field-hint">{t('settings.usageResetDayHint')}</span>
+              </label>
+              <button
+                type="button"
+                className="btn-secondary"
+                disabled={resettingUsage || saving}
+                onClick={() => void handleResetUsage()}
+              >
+                {t('settings.usageReset')}
+              </button>
             </div>
 
             <label className="settings-checkbox-label">

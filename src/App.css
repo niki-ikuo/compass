@@ -4083,6 +4083,20 @@ body:has(.monaco-editor .find-widget.visible) .workbench-hover-container .action
   opacity: 0.85;
 }
 
+.status-usage-button {
+  background: transparent;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  padding: 0 4px;
+  border-radius: 3px;
+}
+
+.status-usage-button:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
 .status-embeddings-badge {
   flex-shrink: 1;
   min-width: 0;
@@ -4768,6 +4782,34 @@ body.is-resizing-help * {
 
 .form-row label {
   flex: 1;
+}
+
+.settings-usage-block {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 4px 0 8px;
+  padding: 12px 0 4px;
+  border-top: 1px solid var(--border);
+}
+
+.settings-usage-heading {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.settings-usage-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.settings-usage-row span:last-child {
+  text-align: right;
+  color: var(--text-secondary);
 }
 
 .form-message {

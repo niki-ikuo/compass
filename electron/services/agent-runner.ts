@@ -14,6 +14,7 @@ import { withOpenWebUiChatCompat } from '../../src/utils/open-webui-compat'
 import { jsonStringifyUtf8Safe } from '../../src/utils/utf8-text'
 import { normalizeWorkspaceActions } from '../../src/utils/workspace-actions'
 import { getSettings } from './settings'
+import { recordChatCompletionUsageFireAndForget } from './usage'
 import {
   acquireChatAbortController,
   buildApiHeaders,
@@ -99,6 +100,7 @@ import {
   pruneMessagesToTokenBudget,
   truncateToTokenBudget
 } from '../../src/utils/context-budget'
+import { parseChatCompletionUsage } from '../../src/utils/usage-period'
 
 export { resolveAgentApproval, resolveAgentContinue }
 
@@ -142,6 +144,7 @@ type StreamTurnResult = {
   content: string
   toolCalls: ToolCall[]
   finishReason: string | null
+  usage: ReturnType<typeof parseChatCompletionUsage>
 }
 
 const AGENT_TOOLS = [
@@ -1467,6 +1470,7 @@ async function streamAgentTurn(
   let buffer = ''
   let content = ''
   let finishReason: string | null = null
+  let lastUsage: ReturnType<typeof parseChatCompletionUsage> = null
   const toolCallParts = new Map<number, { id: string; name: string; arguments: string }>()
 
   try {
@@ -1502,7 +1506,11 @@ async function streamAgentTurn(
               }
               finish_reason?: string | null
             }>
+            usage?: unknown
           }
+          const usage = parseChatCompletionUsage(parsed.usage)
+          if (usage) lastUsage = usage
+
           const choice = parsed.choices?.[0]
           if (!choice) continue
 
@@ -1548,7 +1556,7 @@ async function streamAgentTurn(
       }
     }))
 
-  return { content, toolCalls, finishReason }
+  return { content, toolCalls, finishReason, usage: lastUsage }
 }
 
 /**
@@ -1666,6 +1674,7 @@ export async function runAgent(webContents: WebContents, request: ChatRequest): 
           temperature: settings.temperature,
           max_tokens: Math.max(settings.maxTokens, AGENT_OUTPUT_TOKENS_FLOOR),
           stream: true,
+          stream_options: { include_usage: true },
           tools: getAgentTools(request.preset),
           tool_choice: 'auto'
         },
@@ -1689,6 +1698,8 @@ export async function runAgent(webContents: WebContents, request: ChatRequest): 
         send('ai:aborted')
         return
       }
+
+      recordChatCompletionUsageFireAndForget(turnResult.usage)
 
       if (turnResult.toolCalls.length === 0) {
         if (openTodoNudges < MAX_OPEN_TODO_NUDGES) {

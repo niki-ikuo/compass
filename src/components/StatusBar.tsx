@@ -6,7 +6,8 @@ import { buildWorkspaceIndex } from '@/utils/project-index'
 import { formatEmbeddingsStatus } from '@/utils/embeddings-status'
 import { getLlmProvider } from '@/utils/llm-providers'
 import { refreshLlmConnection } from '@/utils/llm-connection'
-import type { FileEncoding } from '@/types'
+import { formatTokenCount } from '@/utils/usage-period'
+import type { FileEncoding, UsageSnapshot } from '@/types'
 import { useI18n, type MessageKey } from '@/i18n'
 import { isMediaOpenFile } from '@/utils/media-context'
 import { isBinaryOpenFile } from '@/utils/binary-file'
@@ -25,11 +26,13 @@ export function StatusBar() {
   const reopenFileWithEncoding = useAppStore((s) => s.reopenFileWithEncoding)
   const setFileEncoding = useAppStore((s) => s.setFileEncoding)
   const openGitPanel = useAppStore((s) => s.openGitPanel)
+  const openSettingsTab = useAppStore((s) => s.openSettingsTab)
 
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
   const [gitBranch, setGitBranch] = useState<string | null>(null)
   const [gitChangeCount, setGitChangeCount] = useState(0)
+  const [usage, setUsage] = useState<UsageSnapshot | null>(null)
 
   const activeFile = openFiles.find((f) => f.path === activeFilePath) ?? null
   const isMedia = activeFile ? isMediaOpenFile(activeFile) : false
@@ -102,6 +105,31 @@ export function StatusBar() {
       window.removeEventListener('focus', onFocus)
     }
   }, [workspaceRoot])
+
+  useEffect(() => {
+    let cancelled = false
+    const load = async (): Promise<void> => {
+      try {
+        const snapshot = await window.compass.usage.get()
+        if (!cancelled) setUsage(snapshot)
+      } catch {
+        if (!cancelled) setUsage(null)
+      }
+    }
+    void load()
+    const unsubscribe = window.compass.usage.onUpdated((snapshot) => {
+      setUsage(snapshot)
+    })
+    const onFocus = (): void => {
+      void load()
+    }
+    window.addEventListener('focus', onFocus)
+    return () => {
+      cancelled = true
+      unsubscribe()
+      window.removeEventListener('focus', onFocus)
+    }
+  }, [settings.usageResetDay])
 
   const connectionStatus = (): { label: string; hint: string } => {
     switch (llmConnection.status) {
@@ -201,6 +229,21 @@ export function StatusBar() {
 
   const indexLabel = indexStatusLabel()
   const llmStatus = connectionStatus()
+  const usageTotalTokens = usage ? usage.promptTokens + usage.completionTokens : 0
+  const usageLabel = usage
+    ? t('status.usage', {
+        requests: String(usage.requestCount),
+        tokens: formatTokenCount(usageTotalTokens)
+      })
+    : ''
+  const usageTitle = usage
+    ? [
+        t('status.usageHint', { start: usage.periodStart, end: usage.periodEnd }),
+        usage.usageMissingCount > 0 ? t('status.usageMissingHint') : ''
+      ]
+        .filter(Boolean)
+        .join('\n')
+    : ''
 
   return (
     <div className="status-bar">
@@ -295,6 +338,16 @@ export function StatusBar() {
           title={`${embeddingsLabels.detail}\n${t('status.rebuildIndex')}`}
         >
           {embeddingsLabels.short}
+        </button>
+      )}
+      {usageLabel && (
+        <button
+          type="button"
+          className="status-item status-usage-button"
+          onClick={() => openSettingsTab()}
+          title={usageTitle}
+        >
+          {usageLabel}
         </button>
       )}
       <span
