@@ -141,7 +141,7 @@ export function GitPanel() {
   const [notice, setNotice] = useState<string | null>(null)
   const refreshToken = useRef(0)
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (options?: { fetch?: boolean }) => {
     if (!workspaceRoot) {
       setStatus(null)
       setError(null)
@@ -151,7 +151,7 @@ export function GitPanel() {
     setLoading(true)
     setError(null)
     try {
-      const next = await window.compass.git.status(workspaceRoot)
+      const next = await window.compass.git.status(workspaceRoot, options)
       if (token !== refreshToken.current) return
       setStatus(next)
       if (next.error && !next.isRepo) {
@@ -296,7 +296,13 @@ export function GitPanel() {
             <>
               <span className="git-branch-name">{status.branch ?? 'HEAD'}</span>
               {(status.ahead > 0 || status.behind > 0) && (
-                <span className="git-ahead-behind">
+                <span
+                  className="git-ahead-behind"
+                  title={t('git.aheadBehindHint', {
+                    ahead: String(status.ahead),
+                    behind: String(status.behind)
+                  })}
+                >
                   {t('git.aheadBehind', {
                     ahead: String(status.ahead),
                     behind: String(status.behind)
@@ -311,9 +317,9 @@ export function GitPanel() {
         <button
           type="button"
           className="git-toolbar-btn"
-          onClick={() => void refresh()}
+          onClick={() => void refresh({ fetch: true })}
           disabled={loading || busyPaths}
-          title={t('git.refresh')}
+          title={t('git.refreshHint')}
         >
           {t('git.refresh')}
         </button>

@@ -125,6 +125,47 @@ describe('getGitStatus', () => {
     expect(status.branch).toBe('main')
     expect(status.entries).toHaveLength(1)
   })
+
+  it('fetches remote-tracking refs when fetch option is set', async () => {
+    const calls: string[][] = []
+    setGitRunnerForTests(async (args) => {
+      calls.push(args)
+      if (args[0] === 'rev-parse') {
+        return { code: 0, stdout: 'true\n', stderr: '' }
+      }
+      if (args[0] === 'fetch') {
+        return { code: 0, stdout: '', stderr: '' }
+      }
+      if (args[0] === 'status') {
+        return {
+          code: 0,
+          stdout: '## main...origin/main [ahead 1, behind 1]\0',
+          stderr: ''
+        }
+      }
+      return { code: 1, stdout: '', stderr: `unmocked ${args.join(' ')}` }
+    })
+    const status = await getGitStatus('C:\\work\\repo', { fetch: true })
+    expect(calls.some((c) => c[0] === 'fetch' && c.includes('--prune'))).toBe(true)
+    expect(status.ahead).toBe(1)
+    expect(status.behind).toBe(1)
+  })
+
+  it('skips fetch by default', async () => {
+    const calls: string[][] = []
+    setGitRunnerForTests(async (args) => {
+      calls.push(args)
+      if (args[0] === 'rev-parse') {
+        return { code: 0, stdout: 'true\n', stderr: '' }
+      }
+      if (args[0] === 'status') {
+        return { code: 0, stdout: '## main...origin/main\0', stderr: '' }
+      }
+      return { code: 1, stdout: '', stderr: `unmocked ${args.join(' ')}` }
+    })
+    await getGitStatus('C:\\work\\repo')
+    expect(calls.some((c) => c[0] === 'fetch')).toBe(false)
+  })
 })
 
 describe('stage / unstage / commit (mocked)', () => {

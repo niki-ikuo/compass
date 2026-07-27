@@ -937,9 +937,12 @@ function registerIpcHandlers(): void {
     setAllTerminalsCwd(cwd)
   })
 
-  ipcMain.handle('git:status', async (_event, workspaceRoot: string) => {
-    return getGitStatus(workspaceRoot)
-  })
+  ipcMain.handle(
+    'git:status',
+    async (_event, workspaceRoot: string, options?: { fetch?: boolean }) => {
+      return getGitStatus(workspaceRoot, options)
+    }
+  )
 
   ipcMain.handle(
     'git:diff',

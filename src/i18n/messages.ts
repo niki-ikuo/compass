@@ -213,6 +213,7 @@ export const ja = {
   // git
   'git.noWorkspace': 'フォルダを開くと Git を表示します',
   'git.refresh': '更新',
+  'git.refreshHint': 'リモートを取得して状態を更新（push / pull はしません）',
   'git.loading': '状態を取得中…',
   'git.notFound': 'Git が PATH 上に見つかりません。Git for Windows などをインストールしてください',
   'git.notRepo': 'このフォルダは Git リポジトリではありません',
@@ -231,6 +232,8 @@ export const ja = {
   'git.timeout': 'Git コマンドがタイムアウトしました',
   'git.branch': 'ブランチ',
   'git.aheadBehind': '↑{ahead} ↓{behind}',
+  'git.aheadBehindHint':
+    '未同期: ローカルが {ahead} コミット先行、リモートが {behind} コミット先行。消すにはターミナルで pull / push が必要です',
   'git.staged': 'ステージ済み',
   'git.changes': '変更',
   'git.untracked': '未追跡',
@@ -1052,6 +1055,7 @@ export const en: Record<MessageKey, string> = {
 
   'git.noWorkspace': 'Open a folder to use Git',
   'git.refresh': 'Refresh',
+  'git.refreshHint': 'Fetch remote and refresh status (does not push or pull)',
   'git.loading': 'Loading status…',
   'git.notFound': 'Git was not found on PATH. Install Git for Windows or similar',
   'git.notRepo': 'This folder is not a Git repository',
@@ -1070,6 +1074,8 @@ export const en: Record<MessageKey, string> = {
   'git.timeout': 'Git command timed out',
   'git.branch': 'Branch',
   'git.aheadBehind': '↑{ahead} ↓{behind}',
+  'git.aheadBehindHint':
+    'Out of sync: local is {ahead} commit(s) ahead, remote is {behind} commit(s) ahead. Pull / push in a terminal to clear',
   'git.staged': 'Staged',
   'git.changes': 'Changes',
   'git.untracked': 'Untracked',

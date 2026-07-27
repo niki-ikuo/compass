@@ -243,7 +243,15 @@ function assertRelativePaths(workspaceRoot: string, paths: string[]): string[] {
   return normalized
 }
 
-export async function getGitStatus(workspaceRoot: string): Promise<GitStatusResult> {
+export type GitStatusOptions = {
+  /** When true, run `git fetch --prune` before status so ahead/behind match the remote. */
+  fetch?: boolean
+}
+
+export async function getGitStatus(
+  workspaceRoot: string,
+  options?: GitStatusOptions
+): Promise<GitStatusResult> {
   const root = resolve(workspaceRoot)
   try {
     const probe = await runGit(['rev-parse', '--is-inside-work-tree'], root)
@@ -256,6 +264,16 @@ export async function getGitStatus(workspaceRoot: string): Promise<GitStatusResu
         ahead: 0,
         behind: 0,
         entries: []
+      }
+    }
+
+    // Refresh remote-tracking refs so ↑/↓ counts are not stuck on a stale origin/*.
+    // Failures (offline, auth, timeout) are ignored — local status still proceeds.
+    if (options?.fetch) {
+      try {
+        await runGit(['fetch', '--prune', '--quiet'], root)
+      } catch {
+        // keep going with local refs
       }
     }
 

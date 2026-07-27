@@ -147,8 +147,10 @@ const compassAPI = {
     ): Promise<WorkspaceReplaceResult> => ipcRenderer.invoke('fs:replace', workspaceRoot, options)
   },
   git: {
-    status: (workspaceRoot: string): Promise<GitStatusResult> =>
-      ipcRenderer.invoke('git:status', workspaceRoot),
+    status: (
+      workspaceRoot: string,
+      options?: { fetch?: boolean }
+    ): Promise<GitStatusResult> => ipcRenderer.invoke('git:status', workspaceRoot, options),
     diff: (
       workspaceRoot: string,
       path: string,

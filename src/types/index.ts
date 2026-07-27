@@ -887,7 +887,10 @@ export interface CompassAPI {
     listAiApplies: (workspaceRoot: string) => Promise<WorkspaceChangeSetSummary[]>
   }
   git: {
-    status: (workspaceRoot: string) => Promise<GitStatusResult>
+    status: (
+      workspaceRoot: string,
+      options?: { fetch?: boolean }
+    ) => Promise<GitStatusResult>
     diff: (
       workspaceRoot: string,
       path: string,
