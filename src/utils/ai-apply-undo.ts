@@ -5,6 +5,7 @@ import type {
   WorkspaceChangeSetSummary
 } from '@/types'
 import { t } from '@/i18n/runtime'
+import { truncateMiddlePath } from '@/utils/display-path'
 
 export function summarizeChangeSetEntries(
   entries: WorkspaceChangeEntry[],
@@ -12,7 +13,7 @@ export function summarizeChangeSetEntries(
 ): string {
   const parts = entries
     .slice(0, limit)
-    .map((entry) => `${entry.type} ${entry.relativePath}`)
+    .map((entry) => `${entry.type} ${truncateMiddlePath(entry.relativePath, 36)}`)
   if (entries.length > limit) {
     parts.push(`+${entries.length - limit}`)
   }

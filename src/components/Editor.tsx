@@ -4,7 +4,7 @@ import { KeyCode, KeyMod, type editor } from 'monaco-editor'
 import type { Monaco } from '@monaco-editor/react'
 import { useAppStore } from '@/stores/app-store'
 import { isMarkdownFile } from '@/utils/language'
-import { toWorkspaceRelativePath } from '@/utils/workspace-actions'
+import { formatUiPath, UI_PATH_MAX_CHARS_WIDE } from '@/utils/display-path'
 import { getColorTheme } from '@/utils/color-theme'
 import {
   cancelPendingInlineCompletion,
@@ -482,10 +482,21 @@ export function CodeEditor() {
             <span className="editor-diff-badge">
               {activeFile.isNewPreview ? t('editor.newFilePreview') : t('editor.changePreview')}
             </span>
-            <span className="editor-diff-filename" title={activeFile.path}>
-              {workspaceRoot
-                ? toWorkspaceRelativePath(workspaceRoot, activeFile.path)
-                : activeFile.path.replace(/\\/g, '/')}
+            <span
+              className="editor-diff-filename"
+              title={
+                formatUiPath(activeFile.path, {
+                  workspaceRoot,
+                  maxChars: 10_000
+                }).title
+              }
+            >
+              {
+                formatUiPath(activeFile.path, {
+                  workspaceRoot,
+                  maxChars: UI_PATH_MAX_CHARS_WIDE
+                }).label
+              }
             </span>
             <span className="editor-diff-hint">{t('editor.diffHint')}</span>
           </div>

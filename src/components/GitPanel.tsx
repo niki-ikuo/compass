@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAppStore } from '@/stores/app-store'
+import { formatUiPath, UI_PATH_MAX_CHARS, UI_PATH_MAX_CHARS_WIDE } from '@/utils/display-path'
 import { openWorkspaceFile } from '@/utils/open-workspace-file'
 import type { GitDiffResult, GitStatusEntry, GitStatusKind, GitStatusResult } from '@/types'
 import { useI18n, type MessageKey } from '@/i18n'
@@ -85,7 +86,16 @@ function FileRow({
   onOpen: () => void
 }) {
   const { t } = useI18n()
-  const label = entry.originalPath ? `${entry.originalPath} → ${entry.path}` : entry.path
+  const pathDisplay = entry.originalPath
+    ? (() => {
+        const from = formatUiPath(entry.originalPath, { maxChars: UI_PATH_MAX_CHARS })
+        const to = formatUiPath(entry.path, { maxChars: UI_PATH_MAX_CHARS })
+        return {
+          label: `${from.label} → ${to.label}`,
+          title: `${from.title} → ${to.title}`
+        }
+      })()
+    : formatUiPath(entry.path, { maxChars: UI_PATH_MAX_CHARS })
 
   return (
     <div className={`git-file-row${selected ? ' selected' : ''}`}>
@@ -94,13 +104,13 @@ function FileRow({
         className="git-file-main"
         onClick={onSelect}
         onDoubleClick={onOpen}
-        title={t(kindLabelKey(entry.kind))}
+        title={`${t(kindLabelKey(entry.kind))}: ${pathDisplay.title}`}
       >
         <span className={`git-file-badge git-kind-${entry.kind}`} aria-hidden>
           {kindBadge(entry.kind)}
         </span>
-        <span className="git-file-path" title={label}>
-          {label}
+        <span className="git-file-path" title={pathDisplay.title}>
+          {pathDisplay.label}
         </span>
       </button>
       <div className="git-file-actions">
@@ -434,9 +444,18 @@ export function GitPanel() {
           </div>
 
           <div className="git-diff">
-            <div className="git-diff-header">
+            <div
+              className="git-diff-header"
+              title={
+                selectedPath
+                  ? formatUiPath(selectedPath, { maxChars: 10_000 }).title
+                  : undefined
+              }
+            >
               {selectedPath
-                ? t('git.diffTitle', { path: selectedPath })
+                ? t('git.diffTitle', {
+                    path: formatUiPath(selectedPath, { maxChars: UI_PATH_MAX_CHARS_WIDE }).label
+                  })
                 : t('git.showDiff')}
               {diff && (
                 <span className="git-diff-side">

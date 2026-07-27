@@ -8,6 +8,7 @@ import {
   buildApplySummaryMarkdown,
   countCascadeApplies
 } from '@/utils/ai-apply-undo'
+import { formatUiPathList } from '@/utils/display-path'
 import { useI18n, t as tSync } from '@/i18n'
 import { ConfirmDialog } from './ConfirmDialog'
 import { CloseIcon } from './icons/ToolbarIcons'
@@ -168,10 +169,15 @@ export function AiApplyHistoryPanel({ open, onClose }: AiApplyHistoryPanelProps)
                             {preview}
                           </div>
                         ) : null}
-                        <div className="ai-apply-history-paths">
+                        <div
+                          className="ai-apply-history-paths"
+                          title={formatUiPathList(item.paths, { maxItems: 20, maxChars: 10_000 }).title}
+                        >
                           {t('undo.historyEntry', {
                             count: item.entryCount,
-                            paths: item.paths.join(', ') || '—'
+                            paths:
+                              formatUiPathList(item.paths, { maxItems: 4, maxChars: 32 }).label ||
+                              '—'
                           })}
                         </div>
                       </div>

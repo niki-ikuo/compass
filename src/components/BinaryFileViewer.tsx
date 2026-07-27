@@ -1,7 +1,9 @@
 import { useState } from 'react'
 import { getFileName } from '@/utils/language'
 import { formatByteSize } from '@/utils/binary-file'
+import { formatUiPath } from '@/utils/display-path'
 import { useI18n } from '@/i18n'
+import { useAppStore } from '@/stores/app-store'
 
 interface BinaryFileViewerProps {
   path: string
@@ -10,8 +12,10 @@ interface BinaryFileViewerProps {
 
 export function BinaryFileViewer({ path, size }: BinaryFileViewerProps) {
   const { t } = useI18n()
+  const workspaceRoot = useAppStore((s) => s.workspaceRoot)
   const [opening, setOpening] = useState(false)
   const fileName = getFileName(path)
+  const pathTitle = formatUiPath(path, { workspaceRoot, maxChars: 10_000 }).title
   const sizeLabel =
     typeof size === 'number' && Number.isFinite(size) ? formatByteSize(size) : null
 
@@ -30,7 +34,7 @@ export function BinaryFileViewer({ path, size }: BinaryFileViewerProps) {
     <div className="binary-file-viewer">
       <div className="binary-file-viewer-toolbar">
         <span className="binary-file-viewer-label">{t('editor.binaryLabel')}</span>
-        <span className="binary-file-viewer-filename" title={path}>
+        <span className="binary-file-viewer-filename" title={pathTitle}>
           {fileName}
         </span>
       </div>

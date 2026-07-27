@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { ActionPreviewItem, WorkspaceAction } from '@/types'
 import { computeLineDiff } from '@/utils/code-blocks'
 import { getApplyErrorTone } from '@/utils/apply-error'
+import { formatUiPath, UI_PATH_MAX_CHARS_WIDE } from '@/utils/display-path'
 import { isMarkdownFile } from '@/utils/language'
 import { DocumentDiffContent } from './DocumentDiffContent'
 import { useI18n, t } from '@/i18n'
@@ -16,6 +17,10 @@ interface WorkspaceActionPreviewProps {
   onAskAgentFix?: () => void
 }
 
+function previewPathDisplay(relativePath: string): { label: string; title: string } {
+  return formatUiPath(relativePath, { maxChars: UI_PATH_MAX_CHARS_WIDE })
+}
+
 function ActionItemPreview({
   item,
   onSelect
@@ -28,13 +33,14 @@ function ActionItemPreview({
 
   if (item.type === 'mkdir') {
     const meta = item.alreadyExists ? t('preview.folderExisting') : t('preview.folderNew')
+    const pathDisplay = previewPathDisplay(item.relativePath)
     return (
       <div className="action-preview-item mkdir">
         <div className="action-preview-header">
           <span className="action-preview-icon">📁</span>
           <div className="action-preview-info">
-            <span className="action-preview-path" title={item.relativePath}>
-              {item.relativePath}
+            <span className="action-preview-path" title={pathDisplay.title}>
+              {pathDisplay.label}
             </span>
             <span className="action-preview-meta">{meta}</span>
           </div>
@@ -51,14 +57,15 @@ function ActionItemPreview({
       : item.type === 'deleteDir'
         ? t('preview.deleteDir')
         : t('preview.deleteFile')
+    const pathDisplay = previewPathDisplay(item.relativePath)
 
     return (
       <div className="action-preview-item delete">
         <div className="action-preview-header">
           <span className="action-preview-icon">{item.type === 'deleteDir' ? '📁' : '📄'}</span>
           <div className="action-preview-info">
-            <span className="action-preview-path" title={item.relativePath}>
-              {item.relativePath}
+            <span className="action-preview-path" title={pathDisplay.title}>
+              {pathDisplay.label}
             </span>
             <span className="action-preview-meta">{meta}</span>
           </div>
@@ -76,6 +83,7 @@ function ActionItemPreview({
     : isMarkdown
       ? t('preview.fileUpdateDocument')
       : t('preview.fileUpdate')
+  const pathDisplay = previewPathDisplay(item.relativePath)
 
   return (
     <div className={`action-preview-item write${isMarkdown ? ' document' : ''}`}>
@@ -90,8 +98,8 @@ function ActionItemPreview({
         <span className="action-preview-chevron">{expanded ? '▼' : '▶'}</span>
         <span className="action-preview-icon">📄</span>
         <div className="action-preview-info">
-          <span className="action-preview-path" title={item.relativePath}>
-            {item.relativePath}
+          <span className="action-preview-path" title={pathDisplay.title}>
+            {pathDisplay.label}
           </span>
           <span className="action-preview-meta">{meta}</span>
         </div>

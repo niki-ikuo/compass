@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useAppStore } from '@/stores/app-store'
 import { getFileName, getLanguageFromPath } from '@/utils/language'
+import { formatUiPath } from '@/utils/display-path'
 import { FILE_ENCODINGS, getEncodingLabel } from '@/utils/file-encoding'
 import { buildWorkspaceIndex } from '@/utils/project-index'
 import { formatEmbeddingsStatus } from '@/utils/embeddings-status'
@@ -258,7 +259,14 @@ export function StatusBar() {
           {gitChangeCount > 0 ? ` · ${gitChangeCount}` : ''}
         </button>
       )}
-      <span className="status-item">
+      <span
+        className="status-item"
+        title={
+          activeFilePath
+            ? formatUiPath(activeFilePath, { workspaceRoot, maxChars: 10_000 }).title
+            : undefined
+        }
+      >
         {activeFilePath ? getFileName(activeFilePath) : t('status.noFile')}
       </span>
       <span className="status-item">

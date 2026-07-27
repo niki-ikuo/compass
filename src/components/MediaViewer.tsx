@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { getFileName } from '@/utils/language'
+import { formatUiPath } from '@/utils/display-path'
 import { useI18n } from '@/i18n'
 import { useAppStore } from '@/stores/app-store'
 import { isExtractableDocumentPath } from '@/utils/extractable-document'
@@ -23,7 +24,9 @@ interface MediaViewerProps {
 
 export function MediaViewer({ path, viewKind, mimeType, base64 }: MediaViewerProps) {
   const { t } = useI18n()
+  const workspaceRoot = useAppStore((s) => s.workspaceRoot)
   const fileName = getFileName(path)
+  const pathTitle = formatUiPath(path, { workspaceRoot, maxChars: 10_000 }).title
   const canSummarize = viewKind === 'pdf' && isExtractableDocumentPath(path)
   const [opening, setOpening] = useState(false)
 
@@ -69,7 +72,7 @@ export function MediaViewer({ path, viewKind, mimeType, base64 }: MediaViewerPro
         <span className="media-viewer-label">
           {viewKind === 'pdf' ? t('editor.pdfLabel') : t('editor.imageLabel')}
         </span>
-        <span className="media-viewer-filename" title={path}>
+        <span className="media-viewer-filename" title={pathTitle}>
           {fileName}
         </span>
         <div className="media-viewer-actions">

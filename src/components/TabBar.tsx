@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useAppStore } from '@/stores/app-store'
 import { getFileName } from '@/utils/language'
+import { formatUiPath } from '@/utils/display-path'
 import { isBrowserOpenFile } from '@/utils/browser-tab'
 import { isSettingsOpenFile } from '@/utils/settings-tab'
 import {
@@ -58,6 +59,7 @@ export function TabBar() {
   const { t } = useI18n()
   const openFiles = useAppStore((s) => s.openFiles)
   const activeFilePath = useAppStore((s) => s.activeFilePath)
+  const workspaceRoot = useAppStore((s) => s.workspaceRoot)
   const setActiveFile = useAppStore((s) => s.setActiveFile)
   const closeFiles = useAppStore((s) => s.closeFiles)
   const reorderOpenFile = useAppStore((s) => s.reorderOpenFile)
@@ -283,7 +285,7 @@ export function TabBar() {
                   ? file.browserUrl
                   : isSettingsOpenFile(file)
                     ? t('settings.title')
-                    : file.path
+                    : formatUiPath(file.path, { workspaceRoot, maxChars: 10_000 }).title
               }
             >
               {file.isPreview && <span className="tab-preview-badge">P</span>}

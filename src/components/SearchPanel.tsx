@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAppStore } from '@/stores/app-store'
-import { toWorkspaceRelativePath } from '@/utils/workspace-actions'
+import { formatUiPath, UI_PATH_MAX_CHARS } from '@/utils/display-path'
 import { buildWorkspaceIndex } from '@/utils/project-index'
 import { formatEmbeddingsStatus } from '@/utils/embeddings-status'
 import { openWorkspaceFile } from '@/utils/open-workspace-file'
@@ -80,12 +80,15 @@ function FileResultGroup({
   onToggle: () => void
   onOpenMatch: (path: string, match: WorkspaceSearchMatch) => void
 }) {
+  const pathDisplay = formatUiPath(file.relativePath || file.path, {
+    maxChars: UI_PATH_MAX_CHARS
+  })
   return (
     <div className="search-file-group">
       <button type="button" className="search-file-header" onClick={onToggle}>
         <span className="search-file-chevron">{expanded ? '▾' : '▸'}</span>
-        <span className="search-file-name" title={file.path}>
-          {file.relativePath}
+        <span className="search-file-name" title={pathDisplay.title}>
+          {pathDisplay.label}
         </span>
         <span className="search-file-count">{file.matches.length}</span>
       </button>
@@ -176,8 +179,19 @@ export function SearchPanel() {
   const scopeLabel = useMemo(() => {
     if (!workspaceRoot) return t('search.workspace')
     if (!searchRootPath) return t('search.entireWorkspace')
-    return toWorkspaceRelativePath(workspaceRoot, searchRootPath) || searchRootPath
+    return formatUiPath(searchRootPath, {
+      workspaceRoot,
+      maxChars: UI_PATH_MAX_CHARS
+    }).label
   }, [workspaceRoot, searchRootPath, t])
+
+  const scopeTitle = useMemo(() => {
+    if (!workspaceRoot || !searchRootPath) return undefined
+    return formatUiPath(searchRootPath, {
+      workspaceRoot,
+      maxChars: 10_000
+    }).title
+  }, [workspaceRoot, searchRootPath])
 
   const runSearch = useCallback(async () => {
     if (!workspaceRoot) return
@@ -517,7 +531,7 @@ export function SearchPanel() {
 
         <div className="search-scope">
           <span className="search-scope-label">{t('search.scopeLabel')}</span>
-          <span className="search-scope-value" title={searchRootPath ?? workspaceRoot}>
+          <span className="search-scope-value" title={scopeTitle ?? searchRootPath ?? workspaceRoot ?? undefined}>
             {scopeLabel}
           </span>
           {searchRootPath && (

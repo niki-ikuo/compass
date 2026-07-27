@@ -3432,8 +3432,9 @@ body:has(.monaco-editor .find-widget.visible) .workbench-hover-container .action
 .ai-apply-history-paths {
   font-size: 12px;
   color: var(--text-primary);
-  overflow-wrap: anywhere;
-  word-break: break-word;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .ai-apply-history-actions {
