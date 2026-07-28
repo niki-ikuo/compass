@@ -4324,7 +4324,7 @@ body:has(.monaco-editor .find-widget.visible) .workbench-hover-container .action
   padding: 8px 10px;
   border: 1px solid var(--border);
   border-radius: 6px;
-  background: var(--bg-secondary);
+  background: var(--bg-primary);
   color: var(--text-primary);
   font-size: 13px;
   font-family: inherit;
