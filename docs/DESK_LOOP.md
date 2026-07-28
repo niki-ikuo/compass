@@ -1,11 +1,11 @@
-# Clip — S-tier five features specification
+# Clip — S-tier four features specification
 
 **English** | [日本語](ja/DESK_LOOP.md)
 
-Status: **Phase 1 implemented** (Capture / Clip / Outbox presets / Ship check Stage A + copy / manual Digest). Stage B, tray, etc. still later. Related: [SPEC.md](./SPEC.md), [ARCHITECTURE.md](./ARCHITECTURE.md), [TEXT_WORKSPACE_PLAN.md](./TEXT_WORKSPACE_PLAN.md), [AI_APPLY_UNDO.md](./AI_APPLY_UNDO.md), [USE_CASE_PRESET.md](./USE_CASE_PRESET.md).
+Status: **Phase 1 implemented** (Capture / Clip / Outbox presets / Ship check Stage A + copy). Stage B, tray, etc. still later. Related: [SPEC.md](./SPEC.md), [ARCHITECTURE.md](./ARCHITECTURE.md), [TEXT_WORKSPACE_PLAN.md](./TEXT_WORKSPACE_PLAN.md), [AI_APPLY_UNDO.md](./AI_APPLY_UNDO.md), [USE_CASE_PRESET.md](./USE_CASE_PRESET.md).
 
-Feature set that moves Compass from “an editor that writes and fixes” to a **workbench: capture → organize → check → ship → resume**.  
-The five features are not separate products. They are **five stops on one path**.
+Feature set that moves Compass from “an editor that writes and fixes” to a **workbench: capture → organize → check → ship**.  
+The four features are not separate products. They are **four stops on one path**.
 
 ---
 
@@ -13,12 +13,12 @@ The five features are not separate products. They are **five stops on one path**
 
 | Question | Answer |
 |----------|--------|
-| What do we build? | Capture hotkey / Clip / Outbox factory / Ship check / Weekly digest |
-| One experience? | External text → inbox → outbox draft → ship check → copy → digest |
+| What do we build? | Capture hotkey / Clip / Outbox factory / Ship check |
+| One experience? | External text → inbox → outbox draft → ship check → copy |
 | Write path? | Prefer existing preview → Apply (do not add silent writes) |
 | Cloud sync? | **No.** Local `.compass/` conventions only |
 | MCP / real send? | Out of scope (later) |
-| Two-week ship? | Phase 1 in §12. This doc is the full Phase 1–2 spec |
+| Two-week ship? | Phase 1 in §11. This doc is the full Phase 1–2 spec |
 
 ---
 
@@ -27,10 +27,9 @@ The five features are not separate products. They are **five stops on one path**
 ### 1.1 Goals
 
 1. **One intake** — drop text from Word / mail / browser into Compass  
-2. **One desk** — see inbox / outbox / change in one place  
+2. **One desk** — see inbox / outbox in one place  
 3. **Typed exits** — mail, minutes, report, chat drafts follow the same path  
 4. **Stop before shipping** — secrets, TBD, glossary issues before copy  
-5. **Kill resume cost** — one page for “what changed this week”
 
 ### 1.2 Non-goals (whole spec)
 
@@ -41,6 +40,7 @@ The five features are not separate products. They are **five stops on one path**
 - Meeting transcription  
 - Full workspace backup/restore product  
 - Dropping Apply approval for broader agent autonomy  
+- Weekly digest (resume-cost summary generation). Explicitly out of scope (removed)  
 
 ---
 
@@ -57,9 +57,7 @@ The five features are not separate products. They are **five stops on one path**
         ↓ ship check + copy
 [Clipboard] + status: ready (auto on successful copy)
         ↓ anytime
-[Desk] mark inbox done / list outbox / build digest
-        ↓
-[.compass/digests/YYYY-MM-DD.md]
+[Desk] mark inbox done / list outbox
 ```
 
 **Demo script (product DoD):**
@@ -69,7 +67,6 @@ The five features are not separate products. They are **five stops on one path**
 3. “Mail draft” creates an outbox file (with Apply)  
 4. Ship check flags TBD; body can be copied  
 5. Desk can mark inbox done and show outbox  
-6. One digest file can be generated  
 
 Target: **under ~3 minutes** for a practiced user.
 
@@ -86,7 +83,6 @@ Under the existing workspace `.compass/`:
   inbox/
     done/
   outbox/
-  digests/
   templates/             # existing; may add outbox presets
   rules.md
   glossary.md            # optional
@@ -94,7 +90,7 @@ Under the existing workspace `.compass/`:
     settings.json        # optional desk-local settings
 ```
 
-Create missing dirs on workspace open or on first use of any desk feature.
+Create missing dirs on workspace open or on first use of capture / clip / outbox.
 
 ### 3.2 Frontmatter
 
@@ -102,7 +98,6 @@ Create missing dirs on workspace open or on first use of any desk feature.
 |------|----------|-----------------|
 | `inbox` | `.compass/inbox/` | `capturedAt` (ISO8601), `source` |
 | `outbox` | `.compass/outbox/` | `preset`, `status`, `createdAt` |
-| `digest` | `.compass/digests/` | `periodStart`, `periodEnd`, `createdAt` |
 
 Invalid/missing frontmatter must not crash; show as unknown in lists; open body as normal Markdown.
 
@@ -110,7 +105,7 @@ Invalid/missing frontmatter must not crash; show as unknown in lists; open body 
 
 | Path | Keyword / semantic search | Auto AI context |
 |------|---------------------------|-----------------|
-| `inbox/`, `outbox/`, `digests/` | **Include** | Normal (size caps) |
+| `inbox/`, `outbox/` | **Include** | Normal (size caps) |
 | `inbox/done/` | Include | OK |
 | `ai-undo/`, index JSON, chat-history, etc. | Existing excludes | Exclude |
 
@@ -216,7 +211,7 @@ Renderer must not touch `clipboard` / `globalShortcut` directly.
 | | |
 |--|--|
 | ID | `desk.workbench` |
-| Goal | One screen for inbox / outbox / digests |
+| Goal | One screen for inbox / outbox |
 | Priority | S |
 
 ### 5.2 Stories
@@ -227,17 +222,16 @@ Renderer must not touch `clipboard` / `globalShortcut` directly.
 ### 5.3 Requirements
 
 1. Add a **Clip** tab/view in the left sidebar. Keep it list-like, not a dashboard.  
-2. Exactly **three sections** initially:
+2. Exactly **two sections** initially:
 
 | Section | Source | Row fields | Actions |
 |---------|--------|------------|---------|
 | Inbox | `.compass/inbox/*.md` (not `done/`) | name, `capturedAt`, 40-char snippet | Open / **Draft…** / Done / Delete |
 | Outbox | `.compass/outbox/*.md` | name, `preset`, `status`, subject or first heading | Open / Ship check & copy |
-| Changes | Latest digest + generate CTA | date, first heading | Open / Create digest |
 
 3. Cap **20** rows each (newest first); link to open folder for the rest.  
 4. **Done:** `fs.move` to `.compass/inbox/done/` (suffix on name clash).  
-5. Empty states: one-line help each.  
+5. Empty states: one-line help each (capture hotkey, how to create a draft).  
 6. No workspace → placeholder only.  
 7. Refresh on focus if no watcher (Phase 1 OK).
 
@@ -252,7 +246,6 @@ Renderer must not touch `clipboard` / `globalShortcut` directly.
 |---------|------|
 | `desk:listInbox` | inbox rows |
 | `desk:listOutbox` | outbox rows |
-| `desk:listDigests` | newest first |
 | `desk:markInboxDone` | move to done |
 | `desk:deleteInbox` | permanently delete inbox file (not `done/`) |
 | `desk:ensureDirs` | create convention dirs |
@@ -261,7 +254,7 @@ Parse frontmatter in Main (`desk-frontmatter.ts`).
 
 ### 5.6 Acceptance
 
-- [ ] Three sections; click opens file  
+- [ ] Two sections; click opens file  
 - [ ] Done removes from inbox and appears under `done/`  
 - [ ] Empty state suggests next action  
 - [ ] Outbox row can start ship check (§7)  
@@ -453,59 +446,7 @@ type ShipFinding = {
 
 ---
 
-## 8. Feature 5 — Weekly digest
-
-### 8.1 Summary
-
-| | |
-|--|--|
-| ID | `desk.digest` |
-| Goal | One page to resume a messy folder |
-| Priority | S |
-
-### 8.2 Stories
-
-- As a user without Git, I still want a week summary.  
-- As a user, I want file path citations.
-
-### 8.3 Requirements
-
-1. Launch from Desk **Create digest** or command palette.  
-2. Default window: last **7 days** (local TZ).  
-3. Collect (Main):
-   - Text files with `mtime` in range  
-   - Honor ignores; exclude binaries; under `.compass/` only allowlist: `inbox/`, `inbox/done/`, `outbox/`, `digests/`, `rules.md`, `glossary.md`, `templates/`  
-   - Caps: **80 files**, ~**1.5MB** total read; newest first; note truncation in digest  
-4. Optional: `git log --since=7.days` when available; ignore failures.  
-5. Generate via **propose → preview → Apply** to `.compass/digests/YYYY-MM-DD.md` (same-day rerun may overwrite).  
-6. Fixed sections: Decisions / Open questions / Next actions / Main files touched.  
-7. If nothing changed: **do not create a file**; UI message only.
-
-### 8.4 IPC
-
-| Channel | Role |
-|---------|------|
-| `desk:collectDigestContext` | file list + excerpts + optional git summary |
-| Generation | Existing `ai:chat` Edit path or `desk:requestDigest` that builds chat |
-
-Dedicated chat id (e.g. `desk-digest`) allowed so history stays clean; Apply still uses workspace change sets.
-
-### 8.5 Acceptance
-
-- [ ] Edited md within 7 days → digest file after Apply  
-- [ ] No file when no changes  
-- [ ] `ai-undo` / index JSON not in source set  
-- [ ] Desk Changes opens latest digest  
-
-### 8.6 Non-goals
-
-- Cron auto-run (Phase 2: light reminder OK)  
-- Digest-vs-digest diff UI  
-- Email blast  
-
----
-
-## 9. Shared types (draft)
+## 8. Shared types (draft)
 
 ```ts
 type DeskWorkspaceSettings = {
@@ -536,15 +477,6 @@ type OutboxDocMeta = {
   updatedAt?: string
 }
 
-type DigestDocMeta = {
-  kind: 'digest'
-  periodStart: string
-  periodEnd: string
-  createdAt: string
-  filesConsidered?: number
-  truncated?: boolean
-}
-
 type ShipFinding = {
   id: string
   severity: 'error' | 'warning' | 'info'
@@ -558,7 +490,7 @@ Place formally under `src/types` at implementation time.
 
 ---
 
-## 10. Architecture placement
+## 9. Architecture placement
 
 ```
 electron/services/
@@ -566,7 +498,6 @@ electron/services/
   desk-frontmatter.ts
   desk-capture.ts
   desk-ship-check.ts
-  desk-digest-collect.ts
 electron/main.ts          # globalShortcut + IPC
 electron/preload.ts       # window.compass.desk.*
 
@@ -582,7 +513,7 @@ FS / shortcut / clipboard writes: **Main only**. AI writes ride existing preview
 
 ---
 
-## 11. Security / privacy
+## 10. Security / privacy
 
 1. Captured text stays local unless the user puts it in AI chat.  
 2. Stage B sends body to LLM only on explicit ship check.  
@@ -591,19 +522,18 @@ FS / shortcut / clipboard writes: **Main only**. AI writes ride existing preview
 
 ---
 
-## 12. Phasing
+## 11. Phasing
 
 ### Phase 1 (two-week minimum)
 
-Required: Capture / Desk lists / four outbox presets / Ship check Stage A + copy / manual Digest.  
-Cuttable: Stage B, hotkey recorder UI (fixed default OK), git extras, tray, generic md ship check.
+Required: Capture / Desk lists / four outbox presets / Ship check Stage A + copy.  
+Cuttable: Stage B, hotkey recorder UI (fixed default OK), tray, generic md ship check.
 
 ### Phase 2
 
 - Findings → fix proposal (preview)  
 - Tray + offline capture queue  
 - outbox → `.eml` or better mailto  
-- Digest reminder  
 - Inbox bulk “draftize” wizard  
 
 ### Phase 3 (beyond this spec)
@@ -614,18 +544,18 @@ Cuttable: Stage B, hotkey recorder UI (fixed default OK), git extras, tray, gene
 
 ---
 
-## 13. Docs to update at implementation
+## 12. Docs to update at implementation
 
 | Artifact | Content |
 |----------|---------|
 | `helps/en/getting-started/desk-loop.md` | User path |
 | `helps/ja/...` | Japanese |
 | [SPEC.md](./SPEC.md) | One-line feature list entry |
-| [ARCHITECTURE.md](./ARCHITECTURE.md) | dirs + `desk:*` IPC |
+| [ARCHITECTURE.md](./ARCHITECTURE.md) | `.compass/inbox|outbox` + `desk:*` IPC |
 
 ---
 
-## 14. Testing
+## 13. Testing
 
 | Area | Tests |
 |------|-------|
@@ -633,14 +563,13 @@ Cuttable: Stage B, hotkey recorder UI (fixed default OK), git extras, tray, gene
 | Stage A rules | unit |
 | Outbox copy formatting | unit |
 | Capture name collision | unit |
-| Digest collect excludes | unit |
 | Desk listing | component or service |
 
 E2E gate for Phase 1 = manual demo script checklist.
 
 ---
 
-## 15. Traceability
+## 14. Traceability
 
 | Feature | Section | Phase 1 required |
 |---------|---------|------------------|
@@ -648,19 +577,17 @@ E2E gate for Phase 1 = manual demo script checklist.
 | 2 Desk | §5 | Yes |
 | 3 Outbox factory | §6 | Yes |
 | 4 Ship check | §7 | Stage A + copy |
-| 5 Digest | §8 | Manual generate |
 
 ---
 
-## 16. Open questions
+## 15. Open questions
 
 | # | Question | Recommended default |
 |---|----------|---------------------|
 | Q1 | Default accelerator | `Ctrl+Alt+I` |
 | Q2 | Auto `status: ready` after copy? | **Yes** (draft→ready; keep archived) |
-| Q3 | Same-day digest rerun | Overwrite proposal |
-| Q4 | Desk as left tab vs command-only | Left tab |
-| Q5 | Draft gen via Edit vs Agent | Edit-equivalent single proposal (works without tools) |
+| Q3 | Desk as left tab vs command-only | Left tab |
+| Q4 | Draft gen via Edit vs Agent | Edit-equivalent single proposal (works without tools) |
 
 ---
 
@@ -668,4 +595,5 @@ E2E gate for Phase 1 = manual demo script checklist.
 
 | Date | Notes |
 |------|-------|
+| 2026-07-28 | Removed weekly digest from scope; restructured as S-tier four features |
 | 2026-07-28 | Initial combined S-tier five-feature spec |

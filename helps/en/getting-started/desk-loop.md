@@ -6,7 +6,6 @@ keywords:
   - outbox
   - hotkey
   - ship check
-  - digest
   - clipboard
 category: getting-started
 related:
@@ -26,7 +25,6 @@ Capture text from other apps, draft outbound notes, and check them before you pa
 3. Open Clip → **Create draft…** (mail / minutes / report / chat) and Apply the AI preview
 4. In Outbox, use **Check & copy**, then paste into your mailer
 5. When finished, **Done** (archive / hide from list) or **Delete**
-6. Optionally **Create digest** for the last 7 days
 
 ## Settings
 

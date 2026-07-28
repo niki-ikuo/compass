@@ -1,11 +1,11 @@
-# クリップ（Clip）— S級5機能 仕様
+# クリップ（Clip）— S級4機能 仕様
 
 [English](../DESK_LOOP.md) | **日本語**
 
-状態: **Phase 1 実装済み**（Capture / Clip / Outbox 4プリセット / Ship Check Stage A + コピー / Digest 手動生成）。Stage B・トレイ常駐などは未着手。関連: [SPEC.md](./SPEC.md)、[ARCHITECTURE.md](./ARCHITECTURE.md)、[TEXT_WORKSPACE_PLAN.md](./TEXT_WORKSPACE_PLAN.md)、[AI_APPLY_UNDO.md](./AI_APPLY_UNDO.md)、[USE_CASE_PRESET.md](./USE_CASE_PRESET.md)。
+状態: **Phase 1 実装済み**（Capture / Clip / Outbox 4プリセット / Ship Check Stage A + コピー）。Stage B・トレイ常駐などは未着手。関連: [SPEC.md](./SPEC.md)、[ARCHITECTURE.md](./ARCHITECTURE.md)、[TEXT_WORKSPACE_PLAN.md](./TEXT_WORKSPACE_PLAN.md)、[AI_APPLY_UNDO.md](./AI_APPLY_UNDO.md)、[USE_CASE_PRESET.md](./USE_CASE_PRESET.md)。
 
-Compass を「書いて直すエディタ」から **「取って → 整理して → 検品して → 出して → 再開できる作業台」** に引き上げるための機能セット。  
-5機能は別製品ではない。**1本の導線の5駅**として設計・実装する。
+Compass を「書いて直すエディタ」から **「取って → 整理して → 検品して → 出す作業台」** に引き上げるための機能セット。  
+4機能は別製品ではない。**1本の導線の4駅**として設計・実装する。
 
 ---
 
@@ -13,12 +13,12 @@ Compass を「書いて直すエディタ」から **「取って → 整理し�
 
 | 問い | 答え |
 |------|------|
-| 何を作るか？ | 取込ホットキー / クリップ / 下書き工場 / 検品ゲート / 週次ダイジェスト |
-| 一本の体験は？ | 外部テキスト → inbox → 下書き(outbox) → 検品 → コピー → 再開(digest) |
+| 何を作るか？ | 取込ホットキー / クリップ / 下書き工場 / 検品ゲート |
+| 一本の体験は？ | 外部テキスト → inbox → 下書き(outbox) → 検品 → コピー |
 | 書き込み経路は？ | 原則既存の preview → Apply（自動黙殺書き込みを増やさない） |
 | クラウド同期は？ | **作らない**。ローカル `.compass/` 規約のみ |
 | MCP・メーラー送信は？ | 本仕様の範囲外（後続） |
-| 2週間で出すなら？ | §12 の Phase 1。本ドキュメントは Phase 1〜2 の完全仕様 |
+| 2週間で出すなら？ | §11 の Phase 1。本ドキュメントは Phase 1〜2 の完全仕様 |
 
 ---
 
@@ -27,10 +27,9 @@ Compass を「書いて直すエディタ」から **「取って → 整理し�
 ### 1.1 目的
 
 1. **入口を一つにする** — Word / メーラー / ブラウザ等からテキストを Compass に落とせる
-2. **机を一つにする** — inbox / outbox / 変化が一覧できる
+2. **机を一つにする** — inbox / outbox が一覧できる
 3. **出口を型にする** — メール・議事録・報告・チャット投稿の下書きが同じ手順で残る
 4. **出す前に止める** — 秘密情報・未確定・用語ゆれをコピー前に見せる
-5. **再開コストを消す** — 「この1週間で何が変わったか」を1枚で取り戻す
 
 ### 1.2 非目的（本仕様全体）
 
@@ -41,6 +40,7 @@ Compass を「書いて直すエディタ」から **「取って → 整理し�
 - 音声会議の文字起こし
 - ワークスペース全体のバックアップ＆リストア製品化
 - Cursor 互換の Agent 自動化拡大（承認ゲートは維持）
+- 週次ダイジェスト（再開コスト削減のための要約生成）。本仕様の範囲外（削除済み）
 
 ---
 
@@ -57,9 +57,7 @@ Compass を「書いて直すエディタ」から **「取って → 整理し�
         ↓ 検品してコピー
 [クリップボード] ＋ status: ready（コピー成功で自動更新）
         ↓ 随時
-[クリップ] inbox 処理済み / outbox 一覧 / ダイジェスト生成
-        ↓
-[.compass/digests/YYYY-MM-DD.md]
+[クリップ] inbox 処理済み / outbox 一覧
 ```
 
 **受け入れのデモ脚本（製品 DoD）:**
@@ -69,7 +67,6 @@ Compass を「書いて直すエディタ」から **「取って → 整理し�
 3. 「メール下書き」で outbox にファイルができる（Apply 承認あり）  
 4. 検品が TBD 等を指摘し、本文をコピーできる  
 5. クリップで inbox を処理済みにでき、outbox が見える  
-6. ダイジェスト1枚が生成できる  
 
 所要の目安: 熟練ユーザーで **3分以内**。
 
@@ -86,7 +83,6 @@ Compass を「書いて直すエディタ」から **「取って → 整理し�
   inbox/                 # 取込された生テキスト
     done/                # 処理済み（削除せず移動）
   outbox/                # 外向け下書き
-  digests/               # 週次（または都度）ダイジェスト
   templates/             # 既存。出口プリセット雛形を追加可
   rules.md               # 既存
   glossary.md            # 既存（任意）
@@ -94,7 +90,7 @@ Compass を「書いて直すエディタ」から **「取って → 整理し�
     settings.json        # ホットキー以外の机ローカル設定
 ```
 
-初回: ワークスペースオープン時、またはクリップ／取込／下書き／ダイジェストのいずれかの初回利用時に不足ディレクトリを作成する。
+初回: ワークスペースオープン時、またはクリップ／取込／下書きのいずれかの初回利用時に不足ディレクトリを作成する。
 
 ### 3.2 Frontmatter 共通
 
@@ -104,7 +100,6 @@ Compass を「書いて直すエディタ」から **「取って → 整理し�
 |------|------|----------------|
 | `inbox` | `.compass/inbox/` | `capturedAt`（ISO8601）, `source` |
 | `outbox` | `.compass/outbox/` | `preset`, `status`, `createdAt` |
-| `digest` | `.compass/digests/` | `periodStart`, `periodEnd`, `createdAt` |
 
 パーサは既存 Markdown frontmatter 慣習に合わせる。不正・欠落時は一覧では「不明」扱いし、本文は通常 Markdown として開く（クラッシュしない）。
 
@@ -112,7 +107,7 @@ Compass を「書いて直すエディタ」から **「取って → 整理し�
 
 | パス | キーワード/意味検索 | AI 自動文脈 |
 |------|---------------------|-------------|
-| `inbox/`, `outbox/`, `digests/` | **含める** | 通常どおり（サイズ上限遵守） |
+| `inbox/`, `outbox/` | **含める** | 通常どおり（サイズ上限遵守） |
 | `inbox/done/` | 含める（低優先でも可） | 含めてよい |
 | `ai-undo/`, 索引 JSON, chat-history 等 | 既存どおり除外 | 除外 |
 
@@ -220,7 +215,7 @@ Renderer は直接 `clipboard` / `globalShortcut` を触らない（既存セキ
 | 項目 | 内容 |
 |------|------|
 | ID | `desk.workbench` |
-| 目的 | inbox / outbox / digest を一画面で見渡し、処理する |
+| 目的 | inbox / outbox を一画面で見渡し、処理する |
 | 優先度 | S（司令塔） |
 
 ### 5.2 ユーザーストーリー
@@ -231,17 +226,16 @@ Renderer は直接 `clipboard` / `globalShortcut` を触らない（既存セキ
 ### 5.3 機能要件
 
 1. 左サイドバーに **クリップ** タブ（またはビュー）を追加する。アイコンは既存トーンに合わせ、ダッシュボード化しすぎない。  
-2. 画面構成は **3セクションのみ**（初期）:
+2. 画面構成は **2セクションのみ**（初期）:
 
 | セクション | データ源 | 行に出す情報 | 操作 |
 |------------|----------|--------------|------|
 | Inbox | `.compass/inbox/*.md`（`done/` 除外） | ファイル名、`capturedAt`、本文先頭40字 | 開く / **下書き…** / 処理済み / 削除 |
 | Outbox | `.compass/outbox/*.md` | ファイル名、`preset`、`status`、`subject` or 先頭見出し | 開く / 検品してコピー |
-| 変化 | `.compass/digests/` 最新1件＋生成導線 | 日付、先頭見出し | 開く / ダイジェストを作る |
 
 3. 一覧上限: 各 **20件**（新しい順）。「フォルダをエクスプローラーで開く」リンクで全件へ。  
 4. **処理済み:** ファイルを `.compass/inbox/done/` へ `fs.move`（同名時は后缀）。Undo は通常のファイル操作／必要なら AI Undo 対象外（手動 move）。  
-5. 空状態: 各セクションに1行ヘルプ（取込ホットキー、下書きの作り方、ダイジェスト）。  
+5. 空状態: 各セクションに1行ヘルプ（取込ホットキー、下書きの作り方）。  
 6. ワークスペース未オープン時はプレースホルダのみ。  
 7. ファイル監視: 既存 watcher があれば inbox/outbox 変更で一覧更新。無ければフォーカス時リフレッシュで可（Phase 1）。
 
@@ -257,7 +251,6 @@ Renderer は直接 `clipboard` / `globalShortcut` を触らない（既存セキ
 |----------|------|
 | `desk:listInbox` | `{ path, capturedAt, snippet, relativePath }[]` |
 | `desk:listOutbox` | `{ path, preset, status, subject, snippet, relativePath }[]` |
-| `desk:listDigests` | 新しい順、既定 limit=5（UI は1件表示でも可） |
 | `desk:markInboxDone` | inbox → done へ move |
 | `desk:deleteInbox` | inbox ファイルを完全削除（`done/` は対象外） |
 | `desk:ensureDirs` | 規約ディレクトリ作成 |
@@ -266,7 +259,7 @@ Frontmatter パースは Main 側ユーティリティに集約（`desk-frontmat
 
 ### 5.6 受け入れ基準
 
-- [ ] 3セクションが表示され、クリックでファイルが開く  
+- [ ] 2セクションが表示され、クリックでファイルが開く  
 - [ ] 処理済みで inbox から消え、`done/` に存在する  
 - [ ] 空状態でも次の行動が分かる  
 - [ ] outbox 行から検品（§7）を起動できる  
@@ -473,79 +466,7 @@ type ShipFinding = {
 
 ---
 
-## 8. 機能⑤ 週次ダイジェスト（Digest）
-
-### 8.1 概要
-
-| 項目 | 内容 |
-|------|------|
-| ID | `desk.digest` |
-| 目的 | フォルダ再開時の「先週何だったっけ」を1枚に圧縮 |
-| 優先度 | S（リテンション） |
-
-### 8.2 ユーザーストーリー
-
-- 利用者として、Git を使っていなくても、この1週間触った内容の要約が欲しい。  
-- 利用者として、要約の根拠ファイルパスが付いていてほしい。
-
-### 8.3 機能要件
-
-1. 起動: クリップの **ダイジェストを作る**、またはコマンドパレット。  
-2. 期間: 既定 **直近7日**（ローカルタイムゾーン）。  
-3. 候補収集（Main）:
-   - ワークスペース内テキストファイルで `mtime` が期間内  
-   - 除外: 既存 ignore、バイナリ、`.compass/` のうち **許可リスト以外**  
-   - `.compass` 許可: `inbox/`, `inbox/done/`, `outbox/`, `digests/`（自分以外の過去 digest は文脈に入れてもよいが、出力対象パスは新規）, `rules.md`, `glossary.md`, `templates/`  
-   - 上限: **最大80ファイル**、合計読取 **約1.5MB**（超過分は新しい順で打ち切り、打ち切りを digest に注記）  
-4. 任意: `git log --since=7.days --pretty=...` と短 diff 統計（git 利用可能時のみ。失敗は無視）。  
-5. 生成は **proposeActions → プレビュー → Apply**。出力パス: `.compass/digests/YYYY-MM-DD.md`（同日再実行は上書き提案でよい）。  
-6. 本文構成（プロンプトで固定）:
-
-```markdown
----
-kind: digest
-periodStart: …
-periodEnd: …
-createdAt: …
-filesConsidered: N
-truncated: false
----
-
-# 期間ダイジェスト（YYYY-MM-DD 〜 YYYY-MM-DD）
-
-## 決定事項
-## 未解決
-## 次のアクション
-## 主な変更ファイル
-```
-
-各項目に可能ならパス引用。変化ゼロのときは **ファイルを作らず** UI メッセージ「この期間の変化は見つかりませんでした」。
-
-### 8.4 IPC
-
-| チャネル | 内容 |
-|----------|------|
-| `desk:collectDigestContext` | 期間 → ファイル一覧＋抜粋＋任意 git 要約（LLM に渡す素材） |
-| （生成本体） | 既存 `ai:chat` Edit 経路、または専用 `desk:requestDigest` が内部で chat を組む |
-
-専用チャット ID（例: `desk-digest`）を使い、履歴を汚さない選択も可。その場合も Apply はワークスペース Change Set に載せる。
-
-### 8.5 受け入れ基準
-
-- [ ] 7日以内に編集した md があるとき、Apply 後に digests へ1ファイル  
-- [ ] 変化ゼロで不要ファイルを作らない  
-- [ ] `.compass/ai-undo` や索引 JSON を素材に含めない  
-- [ ] クリップ「変化」から最新 digest を開ける  
-
-### 8.6 非目的（本機能）
-
-- スケジュール自動実行（Phase 2: 週1リマインダ程度は可）  
-- ダイジェスト同士の差分 UI  
-- メール自動配信  
-
----
-
-## 9. 型（共有ドラフト）
+## 8. 型（共有ドラフト）
 
 ```ts
 /** .compass/desk/settings.json */
@@ -577,15 +498,6 @@ type OutboxDocMeta = {
   updatedAt?: string
 }
 
-type DigestDocMeta = {
-  kind: 'digest'
-  periodStart: string
-  periodEnd: string
-  createdAt: string
-  filesConsidered?: number
-  truncated?: boolean
-}
-
 type ShipFinding = {
   id: string
   severity: 'error' | 'warning' | 'info'
@@ -599,7 +511,7 @@ type ShipFinding = {
 
 ---
 
-## 10. アーキテクチャ配置
+## 9. アーキテクチャ配置
 
 ```
 electron/services/
@@ -607,12 +519,11 @@ electron/services/
   desk-frontmatter.ts   # 読み書き・一覧用パース
   desk-capture.ts       # クリップボード保存
   desk-ship-check.ts    # Stage A 規則
-  desk-digest-collect.ts
 electron/main.ts        # globalShortcut + IPC 登録
 electron/preload.ts     # window.compass.desk.*
 
 src/components/
-  DeskPanel.tsx         # クリップ3セクション
+  DeskPanel.tsx         # クリップ2セクション
   ShipCheckPanel.tsx    # 検品結果
 src/utils/
   outbox-copy.ts        # ペイロード整形（Main 寄せでも可）
@@ -625,7 +536,7 @@ AI 書き込みは既存 `previewActions` / `applyActions` / AI Undo に載せ�
 
 ---
 
-## 11. セキュリティ / プライバシー
+## 10. セキュリティ / プライバシー
 
 1. ホットキー取込内容はローカルディスクのみ。外部送信しない（ユーザーが AI チャットに載せる場合を除く）。  
 2. 検品 Stage B はユーザーが明示実行したときのみ LLM へ本文を送る。  
@@ -634,19 +545,18 @@ AI 書き込みは既存 `previewActions` / `applyActions` / AI Undo に載せ�
 
 ---
 
-## 12. フェーズ分割
+## 11. フェーズ分割
 
 ### Phase 1（2週間・出荷最小）
 
-必須: Capture / Desk 一覧 / Outbox 4プリセット / Ship Check Stage A + コピー / Digest 手動生成。  
-切り捨て可: Stage B、ホットキー変更 UI（既定キーのみでも可）、git 付加、トレイ常駐、汎用 md 検品。
+必須: Capture / Desk 一覧 / Outbox 4プリセット / Ship Check Stage A + コピー。  
+切り捨て可: Stage B、ホットキー変更 UI（既定キーのみでも可）、トレイ常駐、汎用 md 検品。
 
 ### Phase 2
 
 - 検品の指摘 → 修正提案（preview）  
 - トレイ常駐＋未起動時の取込キュー  
 - outbox → `.eml` 生成または mailto の改善  
-- digest の定期リマインダ  
 - inbox 一括「下書き化」ウィザード  
 
 ### Phase 3（本仕様外への接続）
@@ -657,18 +567,18 @@ AI 書き込みは既存 `previewActions` / `applyActions` / AI Undo に載せ�
 
 ---
 
-## 13. ヘルプ / ドキュメント更新（実装時）
+## 12. ヘルプ / ドキュメント更新（実装時）
 
 | 成果物 | 内容 |
 |--------|------|
 | `helps/ja/getting-started/desk-loop.md`（新規） | 利用者向け一本道 |
 | `helps/en/...` | 英語版 |
 | [SPEC.md](./SPEC.md) | 機能一覧にクリップループを1行追加 |
-| [ARCHITECTURE.md](./ARCHITECTURE.md) | `.compass/inbox|outbox|digests` と `desk:*` IPC |
+| [ARCHITECTURE.md](./ARCHITECTURE.md) | `.compass/inbox|outbox` と `desk:*` IPC |
 
 ---
 
-## 14. テスト方針
+## 13. テスト方針
 
 | 領域 | テスト |
 |------|--------|
@@ -676,14 +586,13 @@ AI 書き込みは既存 `previewActions` / `applyActions` / AI Undo に載せ�
 | Stage A 規則 | 単体（TBD、密钥、空本文、mail subject） |
 | outbox コピー整形 | 単体（mail の Subject 行、frontmatter 除去） |
 | capture ファイル名衝突 | 単体 |
-| digest 収集の除外 | 単体（ai-undo 等が入らない） |
 | クリップ一覧 | コンポーネント or サービス結合 |
 
 E2E はデモ脚本の手動チェックリストを Phase 1 のリリースゲートとする。
 
 ---
 
-## 15. 機能別要件トレース
+## 14. 機能別要件トレース
 
 | 機能 | 章 | Phase 1 必須 |
 |------|----|--------------|
@@ -691,19 +600,17 @@ E2E はデモ脚本の手動チェックリストを Phase 1 のリリースゲ�
 | ② クリップ | §5 | はい |
 | ③ 下書き工場 | §6 | はい |
 | ④ 検品ゲート | §7 | Stage A + コピー |
-| ⑤ ダイジェスト | §8 | 手動生成 |
 
 ---
 
-## 16. オープン質問（実装前に決める）
+## 15. オープン質問（実装前に決める）
 
 | # | 質問 | 推奨デフォルト |
 |---|------|----------------|
 | Q1 | ホットキー既定の最終決定 | `Ctrl+Alt+I` |
 | Q2 | コピー後に `status: ready` を自動更新するか | **する**（draft→ready。archived は維持） |
-| Q3 | digest 同日再実行 | 上書き提案 |
-| Q4 | クリップを左タブにするかコマンドのみか | 左タブ（発見性優先） |
-| Q5 | 下書き生成を Edit 固定か Agent 可か | Edit 相当の単発提案（tools 不要モデルでも動く） |
+| Q3 | クリップを左タブにするかコマンドのみか | 左タブ（発見性優先） |
+| Q4 | 下書き生成を Edit 固定か Agent 可か | Edit 相当の単発提案（tools 不要モデルでも動く） |
 
 ---
 
@@ -711,4 +618,5 @@ E2E はデモ脚本の手動チェックリストを Phase 1 のリリースゲ�
 
 | 日付 | 内容 |
 |------|------|
+| 2026-07-28 | 週次ダイジェストを範囲外として削除。S級4機能に再構成 |
 | 2026-07-28 | 初版。S級5機能の統合仕様 |
