@@ -238,9 +238,21 @@ export const ja = {
   'desk.shipTitle': '提出前チェック',
   'desk.shipCopy': '本文をコピー',
   'desk.shipCopyAnyway': 'それでもコピー',
+  'desk.shipCopyAnywayConfirm':
+    '指摘が残っています。このまま本文をクリップボードにコピーしますか？',
   'desk.shipCopied': 'クリップボードにコピーしました',
   'desk.shipNoFindings': '問題は見つかりませんでした',
   'desk.ship.close': '閉じる',
+  'desk.ship.severity.error': 'エラー',
+  'desk.ship.severity.warning': '警告',
+  'desk.ship.severity.info': '情報',
+  'desk.ship.finding.emptyBody': '本文が空です',
+  'desk.ship.finding.mailMissingSubject': 'メールの件名が空です',
+  'desk.ship.finding.tbd': '未解決のマーカー: {token}',
+  'desk.ship.finding.secret': '秘密情報の可能性があります（{kind}）',
+  'desk.ship.finding.glossary': '用語集: 「{alias}」より「{preferred}」を使ってください',
+  'desk.openFolder': 'フォルダをエクスプローラーで開く',
+  'desk.listTruncated': '最新 {limit} 件のみ表示しています。',
   'desk.capture.noWorkspace':
 
     '先に Compass でフォルダを開いてから、もう一度ホットキーを押してください。',
@@ -252,6 +264,8 @@ export const ja = {
   'desk.capture.notifyFailTitle': '取り込みできません',
   'desk.capture.notifyOk': 'クリップの「取り込み」に保存しました。',
   'desk.capture.hotkeyFailed': 'ホットキーを登録できませんでした: {accelerator}',
+  'desk.capture.hotkeyInvalid':
+    'ショートカットの形式が正しくありません: {accelerator}（例: CommandOrControl+Alt+I）',
   'desk.inbox.notInbox': 'inbox のファイルではありません',
   'desk.ship.copyFailed': 'コピーに失敗しました',
   'desk.status.draft': '下書き',
@@ -265,6 +279,12 @@ export const ja = {
   'settings.deskCaptureOpenTarget': '取込後の動作',
   'settings.deskCaptureOpenFile': 'ファイルを開く',
   'settings.deskCaptureOpenDesk': 'クリップを開く',
+  'settings.deskCaptureHotkeyOk': 'ホットキーは登録済みです（{accelerator}）',
+  'settings.deskCaptureHotkeyDisabled': 'ホットキーはオフです',
+  'settings.deskCaptureHotkeyFailed':
+    'ホットキーを登録できませんでした（{accelerator}）。他のアプリと競合していないか確認してください。',
+  'settings.deskCaptureHotkeyInvalid':
+    'ショートカットの形式が正しくありません（{accelerator}）。例: CommandOrControl+Alt+I',
   'desk.draftPrompt.intro':
     'compass-actions の writeFile で、新しい outbox 下書きをちょうど1つだけ `{path}` に作成してください。',
   'desk.draftPrompt.sourceWithFile':
@@ -1179,9 +1199,21 @@ export const en: Record<MessageKey, string> = {
   'desk.shipTitle': 'Pre-ship check',
   'desk.shipCopy': 'Copy body',
   'desk.shipCopyAnyway': 'Copy anyway',
+  'desk.shipCopyAnywayConfirm':
+    'Findings remain. Copy the body to the clipboard anyway?',
   'desk.shipCopied': 'Copied to clipboard',
   'desk.shipNoFindings': 'No issues found',
   'desk.ship.close': 'Close',
+  'desk.ship.severity.error': 'Error',
+  'desk.ship.severity.warning': 'Warning',
+  'desk.ship.severity.info': 'Info',
+  'desk.ship.finding.emptyBody': 'Body is empty',
+  'desk.ship.finding.mailMissingSubject': 'Mail subject is empty',
+  'desk.ship.finding.tbd': 'Unresolved marker: {token}',
+  'desk.ship.finding.secret': 'Possible secret ({kind})',
+  'desk.ship.finding.glossary': 'Glossary: prefer "{preferred}" over "{alias}"',
+  'desk.openFolder': 'Open folder in Explorer',
+  'desk.listTruncated': 'Showing the latest {limit} items only.',
   'desk.capture.noWorkspace':
     'Open a folder in Compass, then press the hotkey again.',
   'desk.capture.empty':
@@ -1192,6 +1224,8 @@ export const en: Record<MessageKey, string> = {
   'desk.capture.notifyFailTitle': 'Could not capture',
   'desk.capture.notifyOk': 'Saved to Clip Inbox.',
   'desk.capture.hotkeyFailed': 'Could not register hotkey: {accelerator}',
+  'desk.capture.hotkeyInvalid':
+    'Invalid shortcut format: {accelerator} (example: CommandOrControl+Alt+I)',
   'desk.inbox.notInbox': 'Not an inbox file',
   'desk.ship.copyFailed': 'Copy failed',
   'desk.status.draft': 'draft',
@@ -1205,6 +1239,12 @@ export const en: Record<MessageKey, string> = {
   'settings.deskCaptureOpenTarget': 'After capture',
   'settings.deskCaptureOpenFile': 'Open file',
   'settings.deskCaptureOpenDesk': 'Open Clip',
+  'settings.deskCaptureHotkeyOk': 'Hotkey registered ({accelerator})',
+  'settings.deskCaptureHotkeyDisabled': 'Hotkey is off',
+  'settings.deskCaptureHotkeyFailed':
+    'Could not register hotkey ({accelerator}). Check for conflicts with other apps.',
+  'settings.deskCaptureHotkeyInvalid':
+    'Invalid shortcut format ({accelerator}). Example: CommandOrControl+Alt+I',
   'desk.draftPrompt.intro':
     'Create exactly one new outbox draft at `{path}` using a compass-actions writeFile.',
   'desk.draftPrompt.sourceWithFile':

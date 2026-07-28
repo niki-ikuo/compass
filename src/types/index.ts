@@ -354,9 +354,23 @@ export type ShipFindingSeverity = 'error' | 'warning' | 'info'
 export type ShipFinding = {
   id: string
   severity: ShipFindingSeverity
+  /** English fallback / LLM freeform text */
   message: string
+  /** i18n key for UI (rule findings). Renderer translates with locale. */
+  messageKey?: string
+  messageParams?: Record<string, string>
   source: 'rule' | 'llm'
   excerpt?: string
+}
+
+export type DeskCaptureHotkeyStatus = {
+  ok: boolean
+  accelerator: string
+  enabled: boolean
+  /** Localized message from main (optional; UI prefers reason). */
+  error?: string
+  /** Machine-readable failure cause for i18n in the renderer. */
+  reason?: 'conflict' | 'invalid'
 }
 
 export type DeskShipCheckResult = {
@@ -1037,6 +1051,7 @@ export interface CompassAPI {
       | { ok: true; payload: string; content: string; markedReady: boolean }
       | { ok: false; message: string }
     >
+    getCaptureHotkeyStatus: () => Promise<DeskCaptureHotkeyStatus>
     onCaptureResult: (callback: (result: DeskCaptureResult) => void) => () => void
   }
   ai: {

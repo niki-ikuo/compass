@@ -402,7 +402,7 @@ No LLM; target &lt; 1s.
 ### 7.5 Results UI
 
 - Panel: **Pre-ship check**  
-- Actions: **Copy body** / **Copy anyway** (confirm if errors) / **Close**  
+- Actions: **Copy body** (when no error/warning) / **Copy anyway** (confirm when error or warning remains) / **Close**  
 
 ### 7.6 Copy payload
 

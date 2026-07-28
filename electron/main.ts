@@ -53,6 +53,7 @@ import {
 } from './services/desk-capture'
 import { ensureDeskDirs } from './services/desk-dirs'
 import {
+  getDeskCaptureHotkeyStatus,
   refreshDeskCaptureHotkey,
   unregisterDeskCaptureHotkey
 } from './services/desk-hotkey'
@@ -817,6 +818,10 @@ function registerIpcHandlers(): void {
 
   ipcMain.handle('desk:copyOutboxPayload', async (_event, absolutePath: string) => {
     return copyOutboxPayload(absolutePath)
+  })
+
+  ipcMain.handle('desk:getCaptureHotkeyStatus', () => {
+    return getDeskCaptureHotkeyStatus()
   })
 
   ipcMain.handle('usage:get', async () => {

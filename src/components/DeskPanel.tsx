@@ -1,16 +1,21 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAppStore } from '@/stores/app-store'
 import { openWorkspaceFile } from '@/utils/open-workspace-file'
 import { buildOutboxDraftRequest } from '@/utils/desk-presets'
 import { getOutboxPresets } from '@/utils/desk-frontmatter'
 import { getFileName } from '@/utils/language'
+import { useDialogA11y } from '@/hooks/use-dialog-a11y'
+import { ConfirmDialog } from '@/components/ConfirmDialog'
 import type {
   DeskInboxItem,
   DeskOutboxItem,
   OutboxPresetId,
-  ShipFinding
+  ShipFinding,
+  ShipFindingSeverity
 } from '@/types'
 import { useI18n, type MessageKey } from '@/i18n'
+
+const DESK_LIST_LIMIT = 20
 
 function statusLabelKey(status: string): MessageKey {
   if (status === 'ready') return 'desk.status.ready'
@@ -22,6 +27,12 @@ function presetLabelKey(preset: OutboxPresetId): MessageKey {
   return `desk.preset.${preset}` as MessageKey
 }
 
+function severityLabelKey(severity: ShipFindingSeverity): MessageKey {
+  if (severity === 'error') return 'desk.ship.severity.error'
+  if (severity === 'warning') return 'desk.ship.severity.warning'
+  return 'desk.ship.severity.info'
+}
+
 function sourceBaseName(sourcePath: string): string {
   const norm = sourcePath.replace(/\\/g, '/')
   const parts = norm.split('/')
@@ -30,6 +41,11 @@ function sourceBaseName(sourcePath: string): string {
 
 function normKey(path: string): string {
   return path.replace(/\\/g, '/').replace(/^\.\//, '').toLowerCase()
+}
+
+function joinWorkspacePath(root: string, ...parts: string[]): string {
+  const sep = root.includes('\\') ? '\\' : '/'
+  return [root.replace(/[/\\]+$/, ''), ...parts].join(sep)
 }
 
 /** Keys that identify an inbox file as the source of an outbox draft. */
@@ -54,6 +70,16 @@ function inboxHasOutboxDraft(item: DeskInboxItem, sourceKeys: Set<string>): bool
   return false
 }
 
+function formatShipFindingMessage(
+  finding: ShipFinding,
+  t: (key: MessageKey, params?: Record<string, string | number>) => string
+): string {
+  if (finding.messageKey) {
+    return t(finding.messageKey as MessageKey, finding.messageParams)
+  }
+  return finding.message
+}
+
 export function DeskPanel() {
   const { t, locale } = useI18n()
   const workspaceRoot = useAppStore((s) => s.workspaceRoot)
@@ -64,6 +90,8 @@ export function DeskPanel() {
 
   const [inbox, setInbox] = useState<DeskInboxItem[]>([])
   const [outbox, setOutbox] = useState<DeskOutboxItem[]>([])
+  const [inboxHasMore, setInboxHasMore] = useState(false)
+  const [outboxHasMore, setOutboxHasMore] = useState(false)
   /** Active + archived outbox, used only to mark inbox rows that already have a draft. */
   const [outboxForSourceMatch, setOutboxForSourceMatch] = useState<DeskOutboxItem[]>([])
   const [message, setMessage] = useState('')
@@ -74,23 +102,48 @@ export function DeskPanel() {
   const [shipPath, setShipPath] = useState<string | null>(null)
   const [shipFindings, setShipFindings] = useState<ShipFinding[]>([])
   const [shipBusy, setShipBusy] = useState(false)
+  const [copyAnywayConfirmOpen, setCopyAnywayConfirmOpen] = useState(false)
+
+  const draftModalRef = useRef<HTMLDivElement>(null)
+  const shipModalRef = useRef<HTMLDivElement>(null)
+
+  const closeDraftModal = useCallback(() => {
+    setDraftOpen(false)
+  }, [])
+
+  const closeShipModal = useCallback(() => {
+    setCopyAnywayConfirmOpen(false)
+    setShipPath(null)
+    setShipFindings([])
+  }, [])
+
+  useDialogA11y(draftOpen && Boolean(draftSourcePath), closeDraftModal, draftModalRef)
+  useDialogA11y(
+    Boolean(shipPath) && !copyAnywayConfirmOpen,
+    closeShipModal,
+    shipModalRef
+  )
 
   const refresh = useCallback(async () => {
     if (!workspaceRoot) {
       setInbox([])
       setOutbox([])
       setOutboxForSourceMatch([])
+      setInboxHasMore(false)
+      setOutboxHasMore(false)
       return
     }
     try {
       await window.compass.desk.ensureDirs(workspaceRoot)
-      const [nextInbox, nextOutbox, nextOutboxAll] = await Promise.all([
-        window.compass.desk.listInbox(workspaceRoot),
-        window.compass.desk.listOutbox(workspaceRoot),
+      const [nextInboxRaw, nextOutboxRaw, nextOutboxAll] = await Promise.all([
+        window.compass.desk.listInbox(workspaceRoot, DESK_LIST_LIMIT + 1),
+        window.compass.desk.listOutbox(workspaceRoot, DESK_LIST_LIMIT + 1),
         window.compass.desk.listOutbox(workspaceRoot, 200, true)
       ])
-      setInbox(nextInbox)
-      setOutbox(nextOutbox)
+      setInboxHasMore(nextInboxRaw.length > DESK_LIST_LIMIT)
+      setOutboxHasMore(nextOutboxRaw.length > DESK_LIST_LIMIT)
+      setInbox(nextInboxRaw.slice(0, DESK_LIST_LIMIT))
+      setOutbox(nextOutboxRaw.slice(0, DESK_LIST_LIMIT))
       setOutboxForSourceMatch(nextOutboxAll)
     } catch (error) {
       setMessage(error instanceof Error ? error.message : String(error))
@@ -120,6 +173,15 @@ export function DeskPanel() {
       void refresh()
     })
   }, [refresh])
+
+  const openDeskFolder = async (subdir: 'inbox' | 'outbox') => {
+    if (!workspaceRoot) return
+    try {
+      await window.compass.shell.openPath(joinWorkspacePath(workspaceRoot, '.compass', subdir))
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : String(error))
+    }
+  }
 
   const closeOpenDeskFile = (absolutePath: string) => {
     const norm = absolutePath.replace(/\\/g, '/').toLowerCase()
@@ -193,8 +255,7 @@ export function DeskPanel() {
       return
     }
     if (shipPath === item.absolutePath) {
-      setShipPath(null)
-      setShipFindings([])
+      closeShipModal()
     }
     closeOpenDeskFile(item.absolutePath)
     setOutbox((prev) => prev.filter((row) => row.absolutePath !== item.absolutePath))
@@ -206,8 +267,7 @@ export function DeskPanel() {
     const ok = window.confirm(t('desk.archiveAllConfirm'))
     if (!ok) return
     if (shipPath) {
-      setShipPath(null)
-      setShipFindings([])
+      closeShipModal()
     }
     for (const item of outbox) {
       closeOpenDeskFile(item.absolutePath)
@@ -234,8 +294,7 @@ export function DeskPanel() {
     // Close editor first so Windows can unlink an open file.
     closeOpenDeskFile(item.absolutePath)
     if (shipPath === item.absolutePath) {
-      setShipPath(null)
-      setShipFindings([])
+      closeShipModal()
     }
     // Let the editor release the file handle before unlink.
     await new Promise((r) => setTimeout(r, 50))
@@ -292,8 +351,20 @@ export function DeskPanel() {
 
   const copyShip = async (anyway: boolean) => {
     if (!shipPath) return
-    const hasError = shipFindings.some((f) => f.severity === 'error')
-    if (hasError && !anyway) return
+    const needsConfirm = shipFindings.some(
+      (f) => f.severity === 'error' || f.severity === 'warning'
+    )
+    if (needsConfirm && !anyway) return
+    if (anyway) {
+      setCopyAnywayConfirmOpen(true)
+      return
+    }
+    await performCopyShip()
+  }
+
+  const performCopyShip = async () => {
+    if (!shipPath) return
+    setCopyAnywayConfirmOpen(false)
     const result = await window.compass.desk.copyOutboxPayload(shipPath)
     if (!result.ok) {
       setMessage(result.message)
@@ -311,8 +382,7 @@ export function DeskPanel() {
       }
     }
     setMessage(t('desk.shipCopied'))
-    setShipPath(null)
-    setShipFindings([])
+    closeShipModal()
     void refresh()
   }
 
@@ -325,7 +395,9 @@ export function DeskPanel() {
   }
 
   const presets = getOutboxPresets()
-  const shipHasError = shipFindings.some((f) => f.severity === 'error')
+  const shipNeedsConfirm = shipFindings.some(
+    (f) => f.severity === 'error' || f.severity === 'warning'
+  )
 
   return (
     <div className="desk-panel">
@@ -348,56 +420,70 @@ export function DeskPanel() {
         {inbox.length === 0 ? (
           <p className="desk-empty">{t('desk.inboxEmpty')}</p>
         ) : (
-          <ul className="desk-list">
-            {inbox.map((item) => {
-              const hasOutbox = inboxHasOutboxDraft(item, outboxSourceKeys)
-              return (
-              <li
-                key={item.absolutePath}
-                className={`desk-row${hasOutbox ? ' has-outbox' : ''}`}
-              >
+          <>
+            <ul className="desk-list">
+              {inbox.map((item) => {
+                const hasOutbox = inboxHasOutboxDraft(item, outboxSourceKeys)
+                return (
+                  <li
+                    key={item.absolutePath}
+                    className={`desk-row${hasOutbox ? ' has-outbox' : ''}`}
+                  >
+                    <button
+                      type="button"
+                      className="desk-row-main"
+                      onClick={() => void openWorkspaceFile(item.absolutePath)}
+                      title={item.relativePath}
+                    >
+                      <span className="desk-row-name">
+                        {item.fileName}
+                        {hasOutbox ? (
+                          <span className="desk-badge">{t('desk.hasOutbox')}</span>
+                        ) : null}
+                      </span>
+                      <span className="desk-row-meta">{item.snippet || item.capturedAt}</span>
+                    </button>
+                    <div className="desk-row-actions">
+                      <button
+                        type="button"
+                        className="desk-btn compact primary"
+                        onClick={() => openDraftModal(item.absolutePath)}
+                        title={t('desk.createDraft')}
+                      >
+                        {t('desk.createDraftShort')}
+                      </button>
+                      <button
+                        type="button"
+                        className="desk-btn compact"
+                        onClick={() => void handleMarkDone(item)}
+                      >
+                        {t('desk.markDone')}
+                      </button>
+                      <button
+                        type="button"
+                        className="desk-btn compact danger"
+                        onClick={() => void handleDeleteInbox(item)}
+                      >
+                        {t('desk.delete')}
+                      </button>
+                    </div>
+                  </li>
+                )
+              })}
+            </ul>
+            {inboxHasMore ? (
+              <div className="desk-list-footer">
+                <p className="desk-list-truncated">{t('desk.listTruncated', { limit: DESK_LIST_LIMIT })}</p>
                 <button
                   type="button"
-                  className="desk-row-main"
-                  onClick={() => void openWorkspaceFile(item.absolutePath)}
-                  title={item.relativePath}
+                  className="desk-link-btn"
+                  onClick={() => void openDeskFolder('inbox')}
                 >
-                  <span className="desk-row-name">
-                    {item.fileName}
-                    {hasOutbox ? (
-                      <span className="desk-badge">{t('desk.hasOutbox')}</span>
-                    ) : null}
-                  </span>
-                  <span className="desk-row-meta">{item.snippet || item.capturedAt}</span>
+                  {t('desk.openFolder')}
                 </button>
-                <div className="desk-row-actions">
-                  <button
-                    type="button"
-                    className="desk-btn compact primary"
-                    onClick={() => openDraftModal(item.absolutePath)}
-                    title={t('desk.createDraft')}
-                  >
-                    {t('desk.createDraftShort')}
-                  </button>
-                  <button
-                    type="button"
-                    className="desk-btn compact"
-                    onClick={() => void handleMarkDone(item)}
-                  >
-                    {t('desk.markDone')}
-                  </button>
-                  <button
-                    type="button"
-                    className="desk-btn compact danger"
-                    onClick={() => void handleDeleteInbox(item)}
-                  >
-                    {t('desk.delete')}
-                  </button>
-                </div>
-              </li>
-              )
-            })}
-          </ul>
+              </div>
+            ) : null}
+          </>
         )}
       </section>
 
@@ -418,74 +504,102 @@ export function DeskPanel() {
         {outbox.length === 0 ? (
           <p className="desk-empty">{t('desk.outboxEmpty')}</p>
         ) : (
-          <ul className="desk-list">
-            {outbox.map((item) => {
-              const copied = item.status === 'ready'
-              return (
-              <li
-                key={item.absolutePath}
-                className={`desk-row${copied ? ' has-copied' : ''}`}
-              >
+          <>
+            <ul className="desk-list">
+              {outbox.map((item) => {
+                const copied = item.status === 'ready'
+                return (
+                  <li
+                    key={item.absolutePath}
+                    className={`desk-row${copied ? ' has-copied' : ''}`}
+                  >
+                    <button
+                      type="button"
+                      className="desk-row-main"
+                      onClick={() => void openWorkspaceFile(item.absolutePath)}
+                      title={item.relativePath}
+                    >
+                      <span className="desk-row-name">
+                        {t(presetLabelKey(item.preset))}
+                        {copied ? (
+                          <span className="desk-badge">{t('desk.copied')}</span>
+                        ) : (
+                          <span className="desk-row-status">
+                            · {t(statusLabelKey(item.status))}
+                          </span>
+                        )}
+                      </span>
+                      <span className="desk-row-meta">
+                        {item.subject || item.snippet || item.fileName}
+                      </span>
+                      {item.sourcePath ? (
+                        <span className="desk-row-meta desk-row-source" title={item.sourcePath}>
+                          {t('desk.fromSource', { name: sourceBaseName(item.sourcePath) })}
+                        </span>
+                      ) : null}
+                    </button>
+                    <div className="desk-row-actions">
+                      <button
+                        type="button"
+                        className="desk-btn compact"
+                        onClick={() => void runShipCheck(item.absolutePath)}
+                        disabled={shipBusy}
+                      >
+                        {t('desk.shipCheck')}
+                      </button>
+                      <button
+                        type="button"
+                        className="desk-btn compact"
+                        onClick={() => void handleArchiveOutbox(item)}
+                        title={t('desk.status.archived')}
+                      >
+                        {t('desk.archive')}
+                      </button>
+                      <button
+                        type="button"
+                        className="desk-btn compact danger"
+                        onClick={() => void handleDeleteOutbox(item)}
+                      >
+                        {t('desk.delete')}
+                      </button>
+                    </div>
+                  </li>
+                )
+              })}
+            </ul>
+            {outboxHasMore ? (
+              <div className="desk-list-footer">
+                <p className="desk-list-truncated">{t('desk.listTruncated', { limit: DESK_LIST_LIMIT })}</p>
                 <button
                   type="button"
-                  className="desk-row-main"
-                  onClick={() => void openWorkspaceFile(item.absolutePath)}
-                  title={item.relativePath}
+                  className="desk-link-btn"
+                  onClick={() => void openDeskFolder('outbox')}
                 >
-                  <span className="desk-row-name">
-                    {t(presetLabelKey(item.preset))}
-                    {copied ? (
-                      <span className="desk-badge">{t('desk.copied')}</span>
-                    ) : (
-                      <span className="desk-row-status">
-                        · {t(statusLabelKey(item.status))}
-                      </span>
-                    )}
-                  </span>
-                  <span className="desk-row-meta">
-                    {item.subject || item.snippet || item.fileName}
-                  </span>
-                  {item.sourcePath ? (
-                    <span className="desk-row-meta desk-row-source" title={item.sourcePath}>
-                      {t('desk.fromSource', { name: sourceBaseName(item.sourcePath) })}
-                    </span>
-                  ) : null}
+                  {t('desk.openFolder')}
                 </button>
-                <div className="desk-row-actions">
-                  <button
-                    type="button"
-                    className="desk-btn compact"
-                    onClick={() => void runShipCheck(item.absolutePath)}
-                    disabled={shipBusy}
-                  >
-                    {t('desk.shipCheck')}
-                  </button>
-                  <button
-                    type="button"
-                    className="desk-btn compact"
-                    onClick={() => void handleArchiveOutbox(item)}
-                    title={t('desk.status.archived')}
-                  >
-                    {t('desk.archive')}
-                  </button>
-                  <button
-                    type="button"
-                    className="desk-btn compact danger"
-                    onClick={() => void handleDeleteOutbox(item)}
-                  >
-                    {t('desk.delete')}
-                  </button>
-                </div>
-              </li>
-              )
-            })}
-          </ul>
+              </div>
+            ) : null}
+          </>
         )}
       </section>
 
       {draftOpen && draftSourcePath ? (
-        <div className="desk-modal" role="dialog" aria-label={t('desk.draftTitle')}>
-          <div className="desk-modal-body">
+        <div
+          className="desk-modal"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) closeDraftModal()
+          }}
+        >
+          <div
+            ref={draftModalRef}
+            className="desk-modal-body"
+            role="dialog"
+            aria-modal="true"
+            aria-label={t('desk.draftTitle')}
+            tabIndex={-1}
+            onMouseDown={(event) => event.stopPropagation()}
+          >
             <h3>{t('desk.draftTitle')}</h3>
             <p className="desk-draft-source-line">
               {t('desk.fromSource', { name: getFileName(draftSourcePath) })}
@@ -506,7 +620,7 @@ export function DeskPanel() {
               ))}
             </div>
             <div className="desk-modal-actions">
-              <button type="button" className="desk-btn" onClick={() => setDraftOpen(false)}>
+              <button type="button" className="desk-btn" onClick={closeDraftModal}>
                 {t('common.cancel')}
               </button>
               <button type="button" className="desk-btn primary" onClick={handleCreateDraft}>
@@ -518,8 +632,23 @@ export function DeskPanel() {
       ) : null}
 
       {shipPath ? (
-        <div className="desk-modal" role="dialog" aria-label={t('desk.shipTitle')}>
-          <div className="desk-modal-body">
+        <div
+          className="desk-modal"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (copyAnywayConfirmOpen) return
+            if (event.target === event.currentTarget) closeShipModal()
+          }}
+        >
+          <div
+            ref={shipModalRef}
+            className="desk-modal-body"
+            role="dialog"
+            aria-modal="true"
+            aria-label={t('desk.shipTitle')}
+            tabIndex={-1}
+            onMouseDown={(event) => event.stopPropagation()}
+          >
             <h3>{t('desk.shipTitle')}</h3>
             {shipFindings.length === 0 ? (
               <p className="desk-empty">{t('desk.shipNoFindings')}</p>
@@ -527,24 +656,18 @@ export function DeskPanel() {
               <ul className="desk-findings">
                 {shipFindings.map((f, i) => (
                   <li key={`${f.id}-${i}`} className={`desk-finding is-${f.severity}`}>
-                    <strong>{f.severity}</strong> {f.message}
+                    <strong>{t(severityLabelKey(f.severity))}</strong>{' '}
+                    {formatShipFindingMessage(f, t)}
                     {f.excerpt ? <span className="desk-finding-excerpt">{f.excerpt}</span> : null}
                   </li>
                 ))}
               </ul>
             )}
             <div className="desk-modal-actions">
-              <button
-                type="button"
-                className="desk-btn"
-                onClick={() => {
-                  setShipPath(null)
-                  setShipFindings([])
-                }}
-              >
+              <button type="button" className="desk-btn" onClick={closeShipModal}>
                 {t('desk.ship.close')}
               </button>
-              {shipHasError ? (
+              {shipNeedsConfirm ? (
                 <button type="button" className="desk-btn" onClick={() => void copyShip(true)}>
                   {t('desk.shipCopyAnyway')}
                 </button>
@@ -553,7 +676,7 @@ export function DeskPanel() {
                 type="button"
                 className="desk-btn primary"
                 onClick={() => void copyShip(false)}
-                disabled={shipHasError}
+                disabled={shipNeedsConfirm}
               >
                 {t('desk.shipCopy')}
               </button>
@@ -561,6 +684,17 @@ export function DeskPanel() {
           </div>
         </div>
       ) : null}
+
+      <ConfirmDialog
+        open={copyAnywayConfirmOpen}
+        title={t('desk.shipCopyAnyway')}
+        message={t('desk.shipCopyAnywayConfirm')}
+        confirmLabel={t('desk.shipCopyAnyway')}
+        cancelLabel={t('common.cancel')}
+        danger
+        onConfirm={() => void performCopyShip()}
+        onCancel={() => setCopyAnywayConfirmOpen(false)}
+      />
     </div>
   )
 }

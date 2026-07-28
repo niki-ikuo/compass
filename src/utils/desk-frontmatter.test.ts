@@ -66,6 +66,9 @@ Please fix TBD before send.
     expect(ids).toContain('tbd_markers')
     expect(ids).toContain('mail_missing_subject')
     expect(ids).not.toContain('status_not_ready')
+    const tbd = result.findings.find((f) => f.id === 'tbd_markers')
+    expect(tbd?.messageKey).toBe('desk.ship.finding.tbd')
+    expect(tbd?.messageParams?.token).toBe('TBD')
   })
 
   it('does not warn only because status is still draft', () => {

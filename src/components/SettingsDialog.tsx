@@ -3,6 +3,7 @@ import { useAppStore } from '@/stores/app-store'
 import type {
   AppSettings,
   ColorThemeId,
+  DeskCaptureHotkeyStatus,
   EmbeddingsMode,
   LlmProviderId,
   TerminalShell,
@@ -130,7 +131,30 @@ export function SettingsPanel() {
   const [activeTab, setActiveTab] = useState<SettingsTabId>('appearance')
   const [usage, setUsage] = useState<UsageSnapshot | null>(null)
   const [resettingUsage, setResettingUsage] = useState(false)
+  const [deskHotkeyStatus, setDeskHotkeyStatus] = useState<DeskCaptureHotkeyStatus | null>(null)
   const lastSavedThemeRef = useRef(initial.form.colorTheme)
+
+  const refreshDeskHotkeyStatus = async (): Promise<DeskCaptureHotkeyStatus | null> => {
+    try {
+      const status = await window.compass.desk.getCaptureHotkeyStatus()
+      setDeskHotkeyStatus(status)
+      return status
+    } catch {
+      setDeskHotkeyStatus(null)
+      return null
+    }
+  }
+
+  const formatDeskHotkeyStatusMessage = (status: DeskCaptureHotkeyStatus): string => {
+    if (!status.enabled) return t('settings.deskCaptureHotkeyDisabled')
+    if (status.ok) {
+      return t('settings.deskCaptureHotkeyOk', { accelerator: status.accelerator })
+    }
+    if (status.reason === 'invalid') {
+      return t('settings.deskCaptureHotkeyInvalid', { accelerator: status.accelerator })
+    }
+    return t('settings.deskCaptureHotkeyFailed', { accelerator: status.accelerator })
+  }
 
   useEffect(() => {
     const snapshot = buildSettingsSnapshot(
@@ -198,6 +222,11 @@ export function SettingsPanel() {
     ? form.defaultShellId
     : shellOptions[0].id
 
+  useEffect(() => {
+    if (activeTab !== 'desk') return
+    void refreshDeskHotkeyStatus()
+  }, [activeTab])
+
   const previewColorTheme = (colorTheme: ColorThemeId) => {
     setForm((prev) => ({ ...prev, colorTheme }))
     setSettings({ ...useAppStore.getState().settings, colorTheme })
@@ -247,9 +276,13 @@ export function SettingsPanel() {
         openSnapshot.embeddingsProviderId !== toSave.embeddingsProviderId ||
         openSnapshot.embeddingsModel !== toSave.embeddingsModel
 
+      const hotkeyStatus = await refreshDeskHotkeyStatus()
+
       if (workspaceRoot && embeddingsChanged) {
         void window.compass.index.build(workspaceRoot)
         setMessage(t('settings.embeddingsRebuildQueued'))
+      } else if (hotkeyStatus && !hotkeyStatus.ok && hotkeyStatus.enabled) {
+        setMessage(formatDeskHotkeyStatusMessage(hotkeyStatus))
       } else {
         setMessage(t('settings.saved'))
       }
@@ -742,6 +775,20 @@ export function SettingsPanel() {
                 disabled={!form.deskCaptureEnabled}
               />
             </label>
+            {deskHotkeyStatus ? (
+              <p
+                className={`settings-connection-status settings-hotkey-status${
+                  !deskHotkeyStatus.enabled
+                    ? ''
+                    : deskHotkeyStatus.ok
+                      ? ' status-connected'
+                      : ' status-error'
+                }`}
+                role={deskHotkeyStatus.ok || !deskHotkeyStatus.enabled ? undefined : 'alert'}
+              >
+                {formatDeskHotkeyStatusMessage(deskHotkeyStatus)}
+              </p>
+            ) : null}
             <label>
               {t('settings.deskCaptureOpenTarget')}
               <select

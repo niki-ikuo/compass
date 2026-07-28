@@ -9,7 +9,11 @@ export type ShipFindingSeverity = 'error' | 'warning' | 'info'
 export type ShipFinding = {
   id: string
   severity: ShipFindingSeverity
+  /** English fallback / LLM freeform text */
   message: string
+  /** i18n key for UI (rule findings). Renderer translates with locale. */
+  messageKey?: string
+  messageParams?: Record<string, string>
   source: 'rule' | 'llm'
   excerpt?: string
 }
@@ -55,6 +59,7 @@ export function runShipCheckStageA(
       id: 'empty_body',
       severity: 'error',
       message: 'body is empty',
+      messageKey: 'desk.ship.finding.emptyBody',
       source: 'rule'
     })
   }
@@ -64,6 +69,7 @@ export function runShipCheckStageA(
       id: 'mail_missing_subject',
       severity: 'warning',
       message: 'mail subject is empty',
+      messageKey: 'desk.ship.finding.mailMissingSubject',
       source: 'rule'
     })
   }
@@ -79,6 +85,8 @@ export function runShipCheckStageA(
       id: 'tbd_markers',
       severity: 'warning',
       message: `unresolved marker: ${token}`,
+      messageKey: 'desk.ship.finding.tbd',
+      messageParams: { token },
       source: 'rule',
       excerpt: excerptAround(scanText, tbdMatch.index, token.length)
     })
@@ -94,6 +102,8 @@ export function runShipCheckStageA(
       id: 'secret_pattern',
       severity: 'error',
       message: `possible secret (${id})`,
+      messageKey: 'desk.ship.finding.secret',
+      messageParams: { kind: id },
       source: 'rule',
       excerpt: excerptAround(scanText, m.index, Math.min(m[0].length, 24))
     })
@@ -115,6 +125,8 @@ export function runShipCheckStageA(
             id: 'glossary_mismatch',
             severity: 'warning',
             message: `glossary: prefer "${preferred}" over "${alias}"`,
+            messageKey: 'desk.ship.finding.glossary',
+            messageParams: { preferred, alias },
             source: 'rule',
             excerpt: alias
           })

@@ -4730,6 +4730,14 @@ body.is-resizing-help * {
   color: var(--danger, #c62828);
 }
 
+.settings-hotkey-status {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: unset;
+  line-height: 1.4;
+  margin: 0 0 8px;
+}
+
 .settings-connection-status.status-checking {
   color: var(--text-secondary);
 }
@@ -6102,6 +6110,34 @@ body.is-resizing-terminal iframe {
 
 .desk-row-source {
   opacity: 0.9;
+}
+
+.desk-list-footer {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.desk-list-truncated {
+  margin: 0;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.desk-link-btn {
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--accent, #3b6ea5);
+  font-size: 12px;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.desk-link-btn:hover {
+  opacity: 0.85;
 }
 
 .desk-modal {
