@@ -1,5 +1,5 @@
-import { access, rename, writeFile } from 'fs/promises'
-import { join } from 'path'
+import { access, readdir, rename, rm, writeFile } from 'fs/promises'
+import { isAbsolute, join, relative, resolve, sep } from 'path'
 import { clipboard } from 'electron'
 import { serializeInboxDocument } from '../../src/utils/desk-frontmatter'
 import { ensureDeskDirs, inboxDir } from './desk-dirs'
@@ -122,6 +122,71 @@ export async function markInboxDone(
     }
     await rename(absolutePath, dest)
     return { ok: true, absolutePath: dest }
+  } catch (error) {
+    return {
+      ok: false,
+      message: error instanceof Error ? error.message : String(error)
+    }
+  }
+}
+
+/** Move every active inbox *.md into done/ (not files already under done/). */
+export async function markAllInboxDone(
+  workspaceRoot: string
+): Promise<{ ok: true; moved: number } | { ok: false; message: string }> {
+  try {
+    await ensureDeskDirs(workspaceRoot)
+    const dir = inboxDir(workspaceRoot)
+    let names: string[] = []
+    try {
+      const entries = await readdir(dir, { withFileTypes: true })
+      names = entries
+        .filter((e) => e.isFile() && e.name.toLowerCase().endsWith('.md'))
+        .map((e) => e.name)
+    } catch {
+      names = []
+    }
+    let moved = 0
+    for (const name of names) {
+      const absolutePath = join(dir, name)
+      const result = await markInboxDone(workspaceRoot, absolutePath)
+      if (result.ok) moved += 1
+    }
+    return { ok: true, moved }
+  } catch (error) {
+    return {
+      ok: false,
+      message: error instanceof Error ? error.message : String(error)
+    }
+  }
+}
+
+function isUnderInboxActive(workspaceRoot: string, absolutePath: string): boolean {
+  const root = resolve(inboxDir(workspaceRoot))
+  const target = resolve(absolutePath)
+  const rel = relative(root, target)
+  if (!rel || isAbsolute(rel)) return false
+  if (rel === '..' || rel.startsWith(`..${sep}`) || rel.startsWith('../')) return false
+  // Reject done/ and any nested path under done
+  const norm = rel.replace(/\\/g, '/')
+  if (norm === 'done' || norm.startsWith('done/')) return false
+  // Only direct children of inbox (no nested folders beyond a single file)
+  if (norm.includes('/')) return false
+  return true
+}
+
+/** Permanently delete an active inbox capture (not done/). */
+export async function deleteInboxItem(
+  workspaceRoot: string,
+  absolutePath: string
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  try {
+    await ensureDeskDirs(workspaceRoot)
+    if (!isUnderInboxActive(workspaceRoot, absolutePath)) {
+      return { ok: false, message: t('desk.inbox.notInbox') }
+    }
+    await rm(absolutePath, { force: true })
+    return { ok: true }
   } catch (error) {
     return {
       ok: false,

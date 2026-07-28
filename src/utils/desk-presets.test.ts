@@ -1,8 +1,17 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import { setLocale } from '@/i18n/runtime'
-import { buildDigestRequest, buildOutboxDraftRequest } from './desk-presets'
+import {
+  buildOutboxDraftRequest,
+  clearReservedOutboxPathsForTests,
+  outboxRelativePath,
+  outboxStamp
+} from './desk-presets'
 
 describe('desk-presets localization', () => {
+  afterEach(() => {
+    clearReservedOutboxPathsForTests()
+  })
+
   it('builds Japanese draft prompts when locale is ja', () => {
     setLocale('ja')
     const request = buildOutboxDraftRequest(null, 'C:/ws', 'mail', 'ja')
@@ -17,17 +26,37 @@ describe('desk-presets localization', () => {
     expect(request.text).toContain('Create exactly one new outbox draft')
     expect(request.text).not.toContain('ちょうど1つだけ')
   })
+})
 
-  it('builds Japanese digest prompts when locale is ja', () => {
-    setLocale('ja')
-    const request = buildDigestRequest(
-      '.compass/digests/2026-07-28.md',
-      'ctx',
-      '2026-07-21',
-      '2026-07-28',
-      'ja'
+describe('outboxRelativePath uniqueness', () => {
+  afterEach(() => {
+    clearReservedOutboxPathsForTests()
+  })
+
+  it('uses second precision in the stamp', () => {
+    const now = new Date(2026, 6, 28, 11, 17, 5)
+    expect(outboxStamp(now)).toBe('20260728-111705')
+    expect(outboxRelativePath('mail', [], now)).toBe('.compass/outbox/mail-20260728-111705.md')
+  })
+
+  it('suffixes -2, -3 when the same second is allocated again', () => {
+    const now = new Date(2026, 6, 28, 11, 17, 5)
+    expect(outboxRelativePath('mail', [], now)).toBe('.compass/outbox/mail-20260728-111705.md')
+    expect(outboxRelativePath('mail', [], now)).toBe('.compass/outbox/mail-20260728-111705-2.md')
+    expect(outboxRelativePath('mail', [], now)).toBe('.compass/outbox/mail-20260728-111705-3.md')
+  })
+
+  it('avoids basenames already on disk', () => {
+    const now = new Date(2026, 6, 28, 11, 17, 5)
+    const path = outboxRelativePath('mail', ['mail-20260728-111705.md'], now)
+    expect(path).toBe('.compass/outbox/mail-20260728-111705-2.md')
+  })
+
+  it('keeps different presets independent for the same stamp', () => {
+    const now = new Date(2026, 6, 28, 11, 17, 5)
+    expect(outboxRelativePath('mail', [], now)).toBe('.compass/outbox/mail-20260728-111705.md')
+    expect(outboxRelativePath('minutes', [], now)).toBe(
+      '.compass/outbox/minutes-20260728-111705.md'
     )
-    expect(request.text).toContain('ダイジェスト')
-    expect(request.text).toContain('決定事項')
   })
 })

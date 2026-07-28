@@ -1,4 +1,4 @@
-/** Desk Loop frontmatter parse / serialize (inbox / outbox / digest). */
+/** Desk Loop frontmatter parse / serialize (inbox / outbox). */
 
 export type DeskInboxSource = 'clipboard' | 'import' | 'unknown'
 
@@ -25,16 +25,7 @@ export type OutboxDocMeta = {
   updatedAt?: string
 }
 
-export type DigestDocMeta = {
-  kind: 'digest'
-  periodStart: string
-  periodEnd: string
-  createdAt: string
-  filesConsidered?: number
-  truncated?: boolean
-}
-
-export type DeskDocMeta = InboxDocMeta | OutboxDocMeta | DigestDocMeta
+export type DeskDocMeta = InboxDocMeta | OutboxDocMeta
 
 const OUTBOX_PRESETS: OutboxPreset[] = ['mail', 'minutes', 'report', 'chat']
 const OUTBOX_STATUSES: OutboxStatus[] = ['draft', 'ready', 'archived']
@@ -56,18 +47,6 @@ function unquoteYamlScalar(raw: string): string {
     return value.slice(1, -1).replace(/\\"/g, '"').replace(/\\\\/g, '\\')
   }
   return value
-}
-
-function parseBool(value: string): boolean | undefined {
-  const v = value.trim().toLowerCase()
-  if (v === 'true' || v === 'yes') return true
-  if (v === 'false' || v === 'no') return false
-  return undefined
-}
-
-function parseIntField(value: string): number | undefined {
-  const n = Number.parseInt(value.trim(), 10)
-  return Number.isFinite(n) ? n : undefined
 }
 
 /** Split `---` frontmatter from Markdown body. */
@@ -145,23 +124,6 @@ export function parseDeskFrontmatter(raw: string): {
         sourcePath: fields.sourcePath,
         createdAt: fields.createdAt || '',
         updatedAt: fields.updatedAt
-      },
-      body,
-      fields
-    }
-  }
-
-  if (kind === 'digest') {
-    return {
-      meta: {
-        kind: 'digest',
-        periodStart: fields.periodStart || '',
-        periodEnd: fields.periodEnd || '',
-        createdAt: fields.createdAt || '',
-        filesConsidered: fields.filesConsidered
-          ? parseIntField(fields.filesConsidered)
-          : undefined,
-        truncated: fields.truncated ? parseBool(fields.truncated) : undefined
       },
       body,
       fields

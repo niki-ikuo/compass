@@ -5961,14 +5961,6 @@ body.is-resizing-terminal iframe {
   padding-bottom: 12px;
 }
 
-.desk-toolbar {
-  display: flex;
-  gap: 6px;
-  padding: 6px 8px;
-  border-bottom: 1px solid var(--border);
-  flex-shrink: 0;
-}
-
 .desk-btn {
   height: 24px;
   padding: 0 8px;
@@ -6010,8 +6002,16 @@ body.is-resizing-terminal iframe {
   border-bottom: 1px solid var(--border);
 }
 
+.desk-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
 .desk-section-title {
-  margin: 0 0 6px;
+  margin: 0;
   font-size: 11px;
   font-weight: 600;
   color: var(--text-secondary);
@@ -6055,11 +6055,40 @@ body.is-resizing-terminal iframe {
 }
 
 .desk-row-name {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 6px;
   font-weight: 600;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  min-width: 0;
+}
+
+.desk-row-name .desk-badge {
+  flex-shrink: 0;
+  font-weight: 500;
+  font-size: 10px;
+  padding: 0 5px;
+  height: 16px;
+  line-height: 16px;
+  border-radius: 3px;
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+}
+
+.desk-row.has-outbox .desk-row-main {
+  opacity: 0.78;
+}
+
+.desk-row.has-copied .desk-row-main {
+  opacity: 0.78;
+}
+
+.desk-row.has-copied .desk-badge {
+  border-color: var(--accent, var(--border));
+  color: var(--accent, var(--text-secondary));
 }
 
 .desk-row-meta {
@@ -6069,6 +6098,10 @@ body.is-resizing-terminal iframe {
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 11px;
+}
+
+.desk-row-source {
+  opacity: 0.9;
 }
 
 .desk-modal {
@@ -6097,17 +6130,55 @@ body.is-resizing-terminal iframe {
   font-size: 14px;
 }
 
+.desk-modal-subtitle {
+  margin: 0 0 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.desk-draft-source-line {
+  margin: 0 0 12px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
 .desk-preset-list {
   display: flex;
   flex-direction: column;
   gap: 6px;
   margin-bottom: 12px;
+  max-height: 180px;
+  overflow-y: auto;
 }
 
 .desk-preset-option {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 8px;
+}
+
+.desk-preset-option input {
+  margin-top: 2px;
+}
+
+.desk-source-option-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.desk-source-option-name {
+  word-break: break-all;
+}
+
+.desk-source-option-meta {
+  font-size: 11px;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .desk-modal-actions {

@@ -65,7 +65,22 @@ Please fix TBD before send.
     const ids = result.findings.map((f) => f.id)
     expect(ids).toContain('tbd_markers')
     expect(ids).toContain('mail_missing_subject')
-    expect(ids).toContain('status_not_ready')
+    expect(ids).not.toContain('status_not_ready')
+  })
+
+  it('does not warn only because status is still draft', () => {
+    const raw = `---
+kind: outbox
+preset: chat
+status: draft
+createdAt: 2026-07-28T00:00:00.000Z
+---
+
+Short post ready to paste.
+`
+    const result = runShipCheckStageA(raw)
+    expect(result.findings.map((f) => f.id)).not.toContain('status_not_ready')
+    expect(result.findings.filter((f) => f.severity === 'error')).toHaveLength(0)
   })
 
   it('flags secret-like tokens as errors', () => {

@@ -55,7 +55,7 @@ The five features are not separate products. They are **five stops on one path**
         ↓
 [.compass/outbox/*.md] status: draft
         ↓ ship check + copy
-[Clipboard] + optional status: ready
+[Clipboard] + status: ready (auto on successful copy)
         ↓ anytime
 [Desk] mark inbox done / list outbox / build digest
         ↓
@@ -231,7 +231,7 @@ Renderer must not touch `clipboard` / `globalShortcut` directly.
 
 | Section | Source | Row fields | Actions |
 |---------|--------|------------|---------|
-| Inbox | `.compass/inbox/*.md` (not `done/`) | name, `capturedAt`, 40-char snippet | Open / Done |
+| Inbox | `.compass/inbox/*.md` (not `done/`) | name, `capturedAt`, 40-char snippet | Open / **Draft…** / Done / Delete |
 | Outbox | `.compass/outbox/*.md` | name, `preset`, `status`, subject or first heading | Open / Ship check & copy |
 | Changes | Latest digest + generate CTA | date, first heading | Open / Create digest |
 
@@ -254,6 +254,7 @@ Renderer must not touch `clipboard` / `globalShortcut` directly.
 | `desk:listOutbox` | outbox rows |
 | `desk:listDigests` | newest first |
 | `desk:markInboxDone` | move to done |
+| `desk:deleteInbox` | permanently delete inbox file (not `done/`) |
 | `desk:ensureDirs` | create convention dirs |
 
 Parse frontmatter in Main (`desk-frontmatter.ts`).
@@ -292,10 +293,10 @@ Parse frontmatter in Main (`desk-frontmatter.ts`).
 
 | preset | Label (en) | Example filename | Body shape |
 |--------|------------|------------------|------------|
-| `mail` | Mail | `mail-YYYYMMDD-HHMM.md` | `to` / `subject` + body |
-| `minutes` | Minutes | `minutes-YYYYMMDD-HHMM.md` | Decisions / TODOs / Share |
-| `report` | Report | `report-YYYYMMDD-HHMM.md` | Background / Status / Proposal |
-| `chat` | Chat post | `chat-YYYYMMDD-HHMM.md` | Short / bullets OK |
+| `mail` | Mail | `mail-YYYYMMDD-HHMMSS.md` (suffix `-2`, `-3`… on collision) | `to` / `subject` + body |
+| `minutes` | Minutes | `minutes-YYYYMMDD-HHMMSS.md` (same) | Decisions / TODOs / Share |
+| `report` | Report | `report-YYYYMMDD-HHMMSS.md` (same) | Background / Status / Proposal |
+| `chat` | Chat post | `chat-YYYYMMDD-HHMMSS.md` (same) | Short / bullets OK |
 
 No preset CRUD UI in Phase 1. Template body overrides via existing `.compass/templates/` allowed; IDs stay fixed.
 
@@ -319,7 +320,7 @@ Body…
 | status | Meaning |
 |--------|---------|
 | `draft` | Fresh / editing |
-| `ready` | Checked or user-marked shippable |
+| `ready` | Copied via ship check (shipped / ready to send) |
 | `archived` | Hidden from default Desk list; file kept |
 
 ### 6.5 Launch UI
@@ -391,7 +392,6 @@ input (+ frontmatter)
 
 | Rule ID | Check | Severity |
 |---------|-------|----------|
-| `status_not_ready` | `status` ≠ `ready` | warning |
 | `tbd_markers` | `TODO` / `TBD` / `要確認` / `FIXME` / `xxx` | warning |
 | `secret_pattern` | api key / Bearer / `sk-`-like / long tokens | error |
 | `glossary_mismatch` | light glossary violations when file exists | warning |
@@ -418,7 +418,7 @@ No LLM; target &lt; 1s.
 | `mail` | Optional `To:`, `Subject:`, blank line, body (no frontmatter) |
 | other | Markdown body without frontmatter |
 
-After successful copy, optionally ask to set `status: ready` (default: ask, do not auto-write without confirm).
+After successful copy: set `status` to **`ready` automatically** (do not change `archived`). Ship check focuses on content (TBD, secrets, etc.); status is the “shipped” label.
 
 ### 7.7 IPC
 
@@ -657,7 +657,7 @@ E2E gate for Phase 1 = manual demo script checklist.
 | # | Question | Recommended default |
 |---|----------|---------------------|
 | Q1 | Default accelerator | `Ctrl+Alt+I` |
-| Q2 | Auto `status: ready` after copy? | Ask; default no silent update |
+| Q2 | Auto `status: ready` after copy? | **Yes** (draft→ready; keep archived) |
 | Q3 | Same-day digest rerun | Overwrite proposal |
 | Q4 | Desk as left tab vs command-only | Left tab |
 | Q5 | Draft gen via Edit vs Agent | Edit-equivalent single proposal (works without tools) |

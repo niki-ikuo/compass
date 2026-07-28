@@ -35,7 +35,9 @@ export function stripCompassActionsBlocks(content: string): string {
 export function stripAllCompassActionsContent(content: string): string {
   let result = stripCompassActionsBlocks(content)
   // Streaming / aborted replies may leave an unclosed fence without balanced JSON.
-  result = result.replace(/```\s*compass-actions\b[\s\S]*$/i, '').trim()
+  // Do not treat inline mentions like ```compass-actions``` as an open fence
+  // (that would wipe the rest of the user/assistant text).
+  result = result.replace(/```\s*compass-actions\b(?!\s*```)[\s\S]*$/i, '').trim()
   return result
 }
 

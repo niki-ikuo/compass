@@ -6,6 +6,7 @@ import {
   runShipCheckStageA,
   type ShipCheckResult
 } from '../../src/utils/desk-ship-check'
+import { markOutboxReadyAfterCopy } from './desk-outbox'
 import { t } from '../../src/i18n/runtime'
 
 export async function runDeskShipCheck(absolutePath: string): Promise<ShipCheckResult> {
@@ -24,12 +25,21 @@ export async function runDeskShipCheck(absolutePath: string): Promise<ShipCheckR
 
 export async function copyOutboxPayload(
   absolutePath: string
-): Promise<{ ok: true; payload: string } | { ok: false; message: string }> {
+): Promise<
+  | { ok: true; payload: string; content: string; markedReady: boolean }
+  | { ok: false; message: string }
+> {
   try {
     const raw = await readFile(absolutePath, 'utf-8')
     const payload = formatOutboxCopyPayload(raw)
     clipboard.writeText(payload)
-    return { ok: true, payload }
+    const marked = await markOutboxReadyAfterCopy(absolutePath)
+    return {
+      ok: true,
+      payload,
+      content: marked.content,
+      markedReady: marked.changed
+    }
   } catch (error) {
     return {
       ok: false,

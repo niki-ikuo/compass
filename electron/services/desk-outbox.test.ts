@@ -4,7 +4,7 @@ import { tmpdir } from 'os'
 import { afterEach, describe, expect, it } from 'vitest'
 import { rmSync } from 'fs'
 import { serializeOutboxDocument, parseDeskFrontmatter } from '../../src/utils/desk-frontmatter'
-import { archiveOutboxItem, deleteDigestItem, deleteOutboxItem } from './desk-outbox'
+import { archiveOutboxItem, archiveAllOutboxItems, deleteOutboxItem, markOutboxReadyAfterCopy } from './desk-outbox'
 
 function tempRoot(name: string): string {
   return join(
@@ -57,6 +57,118 @@ describe('desk-outbox', () => {
     }
   })
 
+  it('archives all non-archived outbox files', async () => {
+    const root = tempRoot('archive-all')
+    roots.push(root)
+    const outbox = join(root, '.compass', 'outbox')
+    await mkdir(outbox, { recursive: true })
+    await writeFile(
+      join(outbox, 'a.md'),
+      serializeOutboxDocument(
+        {
+          kind: 'outbox',
+          preset: 'mail',
+          status: 'draft',
+          subject: 'A',
+          createdAt: '2026-07-28T00:00:00.000Z'
+        },
+        'a\n'
+      ),
+      'utf-8'
+    )
+    await writeFile(
+      join(outbox, 'b.md'),
+      serializeOutboxDocument(
+        {
+          kind: 'outbox',
+          preset: 'chat',
+          status: 'ready',
+          createdAt: '2026-07-28T00:00:00.000Z'
+        },
+        'b\n'
+      ),
+      'utf-8'
+    )
+    await writeFile(
+      join(outbox, 'c.md'),
+      serializeOutboxDocument(
+        {
+          kind: 'outbox',
+          preset: 'mail',
+          status: 'archived',
+          subject: 'C',
+          createdAt: '2026-07-28T00:00:00.000Z'
+        },
+        'c\n'
+      ),
+      'utf-8'
+    )
+
+    const result = await archiveAllOutboxItems(root)
+    expect(result.ok).toBe(true)
+    if (result.ok) expect(result.archived).toBe(2)
+
+    for (const name of ['a.md', 'b.md', 'c.md']) {
+      const parsed = parseDeskFrontmatter(await readFile(join(outbox, name), 'utf-8'))
+      expect(parsed.meta?.kind).toBe('outbox')
+      if (parsed.meta?.kind === 'outbox') {
+        expect(parsed.meta.status).toBe('archived')
+      }
+    }
+  })
+
+  it('marks draft outbox ready after copy without touching archived', async () => {
+    const root = tempRoot('ready')
+    roots.push(root)
+    const outbox = join(root, '.compass', 'outbox')
+    await mkdir(outbox, { recursive: true })
+    const draftPath = join(outbox, 'mail-draft.md')
+    await writeFile(
+      draftPath,
+      serializeOutboxDocument(
+        {
+          kind: 'outbox',
+          preset: 'mail',
+          status: 'draft',
+          subject: 'Hi',
+          createdAt: '2026-07-28T00:00:00.000Z'
+        },
+        'body\n'
+      ),
+      'utf-8'
+    )
+
+    const marked = await markOutboxReadyAfterCopy(draftPath)
+    expect(marked.changed).toBe(true)
+    const draftParsed = parseDeskFrontmatter(marked.content)
+    expect(draftParsed.meta?.kind).toBe('outbox')
+    if (draftParsed.meta?.kind === 'outbox') {
+      expect(draftParsed.meta.status).toBe('ready')
+    }
+
+    const archivedPath = join(outbox, 'mail-archived.md')
+    await writeFile(
+      archivedPath,
+      serializeOutboxDocument(
+        {
+          kind: 'outbox',
+          preset: 'mail',
+          status: 'archived',
+          subject: 'Old',
+          createdAt: '2026-07-28T00:00:00.000Z'
+        },
+        'body\n'
+      ),
+      'utf-8'
+    )
+    const skipped = await markOutboxReadyAfterCopy(archivedPath)
+    expect(skipped.changed).toBe(false)
+    const archivedParsed = parseDeskFrontmatter(skipped.content)
+    if (archivedParsed.meta?.kind === 'outbox') {
+      expect(archivedParsed.meta.status).toBe('archived')
+    }
+  })
+
   it('deletes outbox files and rejects paths outside outbox', async () => {
     const root = tempRoot('delete')
     roots.push(root)
@@ -75,33 +187,4 @@ describe('desk-outbox', () => {
     await expect(readFile(path, 'utf-8')).rejects.toThrow()
   })
 
-  it('deletes digest files and rejects paths outside digests', async () => {
-    const root = tempRoot('digest-del')
-    roots.push(root)
-    const digests = join(root, '.compass', 'digests')
-    await mkdir(digests, { recursive: true })
-    const path = join(digests, '2026-07-28.md')
-    await writeFile(path, 'digest\n', 'utf-8')
-
-    const outside = join(root, '.compass', 'outbox', 'mail.md')
-    await mkdir(join(root, '.compass', 'outbox'), { recursive: true })
-    await writeFile(outside, 'keep\n', 'utf-8')
-    expect((await deleteDigestItem(root, outside)).ok).toBe(false)
-
-    const deleted = await deleteDigestItem(root, path)
-    expect(deleted.ok).toBe(true)
-    await expect(readFile(path, 'utf-8')).rejects.toThrow()
-  })
-
-  it('accepts digest paths with forward slashes', async () => {
-    const root = tempRoot('digest-slash')
-    roots.push(root)
-    const digests = join(root, '.compass', 'digests')
-    await mkdir(digests, { recursive: true })
-    const path = join(digests, '2026-07-28.md')
-    await writeFile(path, 'digest\n', 'utf-8')
-    const slashPath = path.replace(/\\/g, '/')
-    const deleted = await deleteDigestItem(root, slashPath)
-    expect(deleted.ok).toBe(true)
-  })
 })

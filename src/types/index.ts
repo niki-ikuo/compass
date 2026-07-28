@@ -328,16 +328,8 @@ export type DeskOutboxItem = {
   preset: OutboxPresetId
   status: OutboxStatusId
   subject: string
-  snippet: string
-  mtimeMs: number
-}
-
-export type DeskDigestItem = {
-  absolutePath: string
-  relativePath: string
-  fileName: string
-  periodStart: string
-  periodEnd: string
+  /** Workspace-relative path of the inbox/source file, when known. */
+  sourcePath: string
   snippet: string
   mtimeMs: number
 }
@@ -371,16 +363,6 @@ export type DeskShipCheckResult = {
   findings: ShipFinding[]
   body: string
   preset: OutboxPresetId | null
-}
-
-export type DeskDigestCollectResult = {
-  periodStart: string
-  periodEnd: string
-  digestRelativePath: string
-  filesConsidered: number
-  truncated: boolean
-  contextBlock: string
-  empty: boolean
 }
 
 export interface AppSettings {
@@ -1026,28 +1008,35 @@ export interface CompassAPI {
       limit?: number,
       includeArchived?: boolean
     ) => Promise<DeskOutboxItem[]>
-    listDigests: (workspaceRoot: string, limit?: number) => Promise<DeskDigestItem[]>
     markInboxDone: (
       workspaceRoot: string,
       absolutePath: string
     ) => Promise<{ ok: true; absolutePath: string } | { ok: false; message: string }>
+    markAllInboxDone: (
+      workspaceRoot: string
+    ) => Promise<{ ok: true; moved: number } | { ok: false; message: string }>
+    deleteInbox: (
+      workspaceRoot: string,
+      absolutePath: string
+    ) => Promise<{ ok: true } | { ok: false; message: string }>
     archiveOutbox: (
       workspaceRoot: string,
       absolutePath: string
     ) => Promise<{ ok: true; absolutePath: string } | { ok: false; message: string }>
+    archiveAllOutbox: (
+      workspaceRoot: string
+    ) => Promise<{ ok: true; archived: number } | { ok: false; message: string }>
     deleteOutbox: (
-      workspaceRoot: string,
-      absolutePath: string
-    ) => Promise<{ ok: true } | { ok: false; message: string }>
-    deleteDigest: (
       workspaceRoot: string,
       absolutePath: string
     ) => Promise<{ ok: true } | { ok: false; message: string }>
     runShipCheck: (absolutePath: string) => Promise<DeskShipCheckResult>
     copyOutboxPayload: (
       absolutePath: string
-    ) => Promise<{ ok: true; payload: string } | { ok: false; message: string }>
-    collectDigestContext: (workspaceRoot: string) => Promise<DeskDigestCollectResult>
+    ) => Promise<
+      | { ok: true; payload: string; content: string; markedReady: boolean }
+      | { ok: false; message: string }
+    >
     onCaptureResult: (callback: (result: DeskCaptureResult) => void) => () => void
   }
   ai: {

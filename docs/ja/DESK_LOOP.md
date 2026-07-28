@@ -55,7 +55,7 @@ Compass を「書いて直すエディタ」から **「取って → 整理し�
         ↓
 [.compass/outbox/*.md] status: draft
         ↓ 検品してコピー
-[クリップボード] ＋ status: ready（任意更新）
+[クリップボード] ＋ status: ready（コピー成功で自動更新）
         ↓ 随時
 [クリップ] inbox 処理済み / outbox 一覧 / ダイジェスト生成
         ↓
@@ -235,7 +235,7 @@ Renderer は直接 `clipboard` / `globalShortcut` を触らない（既存セキ
 
 | セクション | データ源 | 行に出す情報 | 操作 |
 |------------|----------|--------------|------|
-| Inbox | `.compass/inbox/*.md`（`done/` 除外） | ファイル名、`capturedAt`、本文先頭40字 | 開く / 処理済み |
+| Inbox | `.compass/inbox/*.md`（`done/` 除外） | ファイル名、`capturedAt`、本文先頭40字 | 開く / **下書き…** / 処理済み / 削除 |
 | Outbox | `.compass/outbox/*.md` | ファイル名、`preset`、`status`、`subject` or 先頭見出し | 開く / 検品してコピー |
 | 変化 | `.compass/digests/` 最新1件＋生成導線 | 日付、先頭見出し | 開く / ダイジェストを作る |
 
@@ -259,6 +259,7 @@ Renderer は直接 `clipboard` / `globalShortcut` を触らない（既存セキ
 | `desk:listOutbox` | `{ path, preset, status, subject, snippet, relativePath }[]` |
 | `desk:listDigests` | 新しい順、既定 limit=5（UI は1件表示でも可） |
 | `desk:markInboxDone` | inbox → done へ move |
+| `desk:deleteInbox` | inbox ファイルを完全削除（`done/` は対象外） |
 | `desk:ensureDirs` | 規約ディレクトリ作成 |
 
 Frontmatter パースは Main 側ユーティリティに集約（`desk-frontmatter.ts` 想定）。
@@ -297,10 +298,10 @@ Frontmatter パースは Main 側ユーティリティに集約（`desk-frontmat
 
 | preset | ラベル（ja） | 出力ファイル名例 | 本文構成 |
 |--------|--------------|------------------|----------|
-| `mail` | メール | `mail-YYYYMMDD-HHMM.md` | frontmatter `to`/`subject` + 本文 |
-| `minutes` | 議事録 | `minutes-YYYYMMDD-HHMM.md` | 決定 / TODO / 共有事項 |
-| `report` | 報告 | `report-YYYYMMDD-HHMM.md` | 背景 / 現状 / 提案 |
-| `chat` | チャット投稿 | `chat-YYYYMMDD-HHMM.md` | 短文・箇条書き可 |
+| `mail` | メール | `mail-YYYYMMDD-HHMMSS.md`（衝突時 `-2`, `-3`…） | frontmatter `to`/`subject` + 本文 |
+| `minutes` | 議事録 | `minutes-YYYYMMDD-HHMMSS.md`（同上） | 決定 / TODO / 共有事項 |
+| `report` | 報告 | `report-YYYYMMDD-HHMMSS.md`（同上） | 背景 / 現状 / 提案 |
+| `chat` | チャット投稿 | `chat-YYYYMMDD-HHMMSS.md`（同上） | 短文・箇条書き可 |
 
 プリセットの追加 UI は Phase 1 では作らない。テンプレ上書きは `.compass/templates/` の既存仕組みで **中身の雛形のみ** 変更可（ID は上記固定）。
 
@@ -324,7 +325,7 @@ updatedAt: 2026-07-28T09:05:00+09:00
 | status | 意味 |
 |--------|------|
 | `draft` | 作成直後〜編集中 |
-| `ready` | 検品通過 or ユーザーが提出可と判断 |
+| `ready` | 検品コピー済み（外に出した／提出可） |
 | `archived` | クリップの既定一覧から隠す（ファイルは残す） |
 
 ### 6.5 起動 UI
@@ -407,7 +408,6 @@ frontmatter: `label`, `fileName` パターン, `order`。AI へのヒントを�
 
 | ルール ID | 内容 | 重大度 |
 |-----------|------|--------|
-| `status_not_ready` | `status` が `ready` 以外 | warning |
 | `tbd_markers` | `TODO` / `TBD` / `要確認` / `FIXME` / `xxx`（単語境界配慮） | warning |
 | `secret_pattern` | `api[_-]?key`, `secret`, `Bearer `, `sk-` 風、長い Base64/Hex | error |
 | `glossary_mismatch` | `.compass/glossary.md` があるとき、禁止語・推奨語の簡易違反（既存 document verify と共有可能な粒度） | warning |
@@ -438,7 +438,7 @@ Stage A は LLM 不要。1秒以内を目標。
 | `mail` | 1行目 `Subject: {subject}`、空行、本文（frontmatter 除外）。`to` があれば先頭に `To: {to}` |
 | その他 | frontmatter を除いた Markdown 本文 |
 
-コピー成功後（オプション、設定既定 **ON**）: `status` を `ready` に更新するかを尋ねる。自動更新しないモードも可。
+コピー成功後: `status` を **`ready` に自動更新**する（`archived` は変更しない）。検品は中身（TBD・秘密情報など）を見、status は「出した」ラベルとして使う。
 
 ### 7.7 IPC
 
@@ -700,7 +700,7 @@ E2E はデモ脚本の手動チェックリストを Phase 1 のリリースゲ�
 | # | 質問 | 推奨デフォルト |
 |---|------|----------------|
 | Q1 | ホットキー既定の最終決定 | `Ctrl+Alt+I` |
-| Q2 | コピー後に `status: ready` を自動更新するか | 尋ねる（既定は更新しない） |
+| Q2 | コピー後に `status: ready` を自動更新するか | **する**（draft→ready。archived は維持） |
 | Q3 | digest 同日再実行 | 上書き提案 |
 | Q4 | クリップを左タブにするかコマンドのみか | 左タブ（発見性優先） |
 | Q5 | 下書き生成を Edit 固定か Agent 可か | Edit 相当の単発提案（tools 不要モデルでも動く） |

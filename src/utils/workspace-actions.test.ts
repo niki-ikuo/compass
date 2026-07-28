@@ -63,6 +63,17 @@ describe('findCompassActionsBlocks / nested fences', () => {
     expect(stripAllCompassActionsContent(content)).toBe('作成します。')
   })
 
+  it('does not wipe text that only mentions ```compass-actions``` inline', () => {
+    const content =
+      '```compass-actions``` の writeFile で、新しい outbox 下書きをちょうど1つだけ作成してください。'
+    expect(stripAllCompassActionsContent(content)).toBe(content)
+  })
+
+  it('still strips an unclosed streaming compass-actions fence', () => {
+    const content = '作成中です。\n\n```compass-actions\n{"actions":[{"type":"mkdir","path":"a"}]'
+    expect(stripAllCompassActionsContent(content)).toBe('作成中です。')
+  })
+
   it('still parses simple fenced actions without nested fences', () => {
     const content = `\`\`\`compass-actions
 {"actions":[{"type":"mkdir","path":"データ"}]}

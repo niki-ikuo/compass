@@ -1,11 +1,11 @@
-import { readFile, rm, writeFile } from 'fs/promises'
-import { isAbsolute, relative, resolve, sep } from 'path'
+import { readdir, readFile, rm, writeFile } from 'fs/promises'
+import { isAbsolute, join, relative, resolve, sep } from 'path'
 import {
   parseDeskFrontmatter,
   serializeOutboxDocument,
   type OutboxDocMeta
 } from '../../src/utils/desk-frontmatter'
-import { digestsDir, ensureDeskDirs, outboxDir } from './desk-dirs'
+import { ensureDeskDirs, outboxDir } from './desk-dirs'
 import { t } from '../../src/i18n/runtime'
 
 function isUnderDir(dir: string, absolutePath: string): boolean {
@@ -21,10 +21,6 @@ function isUnderDir(dir: string, absolutePath: string): boolean {
 
 function isUnderOutbox(workspaceRoot: string, absolutePath: string): boolean {
   return isUnderDir(outboxDir(workspaceRoot), absolutePath)
-}
-
-function isUnderDigests(workspaceRoot: string, absolutePath: string): boolean {
-  return isUnderDir(digestsDir(workspaceRoot), absolutePath)
 }
 
 export async function archiveOutboxItem(
@@ -61,17 +57,32 @@ export async function archiveOutboxItem(
   }
 }
 
-export async function deleteOutboxItem(
-  workspaceRoot: string,
-  absolutePath: string
-): Promise<{ ok: true } | { ok: false; message: string }> {
+/** Archive every non-archived outbox *.md (status → archived). */
+export async function archiveAllOutboxItems(
+  workspaceRoot: string
+): Promise<{ ok: true; archived: number } | { ok: false; message: string }> {
   try {
     await ensureDeskDirs(workspaceRoot)
-    if (!isUnderOutbox(workspaceRoot, absolutePath)) {
-      return { ok: false, message: t('desk.outbox.notOutbox') }
+    const dir = outboxDir(workspaceRoot)
+    let names: string[] = []
+    try {
+      const entries = await readdir(dir, { withFileTypes: true })
+      names = entries
+        .filter((e) => e.isFile() && e.name.toLowerCase().endsWith('.md'))
+        .map((e) => e.name)
+    } catch {
+      names = []
     }
-    await rm(absolutePath, { force: true })
-    return { ok: true }
+    let archived = 0
+    for (const name of names) {
+      const absolutePath = join(dir, name)
+      const raw = await readFile(absolutePath, 'utf-8')
+      const { meta } = parseDeskFrontmatter(raw)
+      if (meta?.kind === 'outbox' && meta.status === 'archived') continue
+      const result = await archiveOutboxItem(workspaceRoot, absolutePath)
+      if (result.ok) archived += 1
+    }
+    return { ok: true, archived }
   } catch (error) {
     return {
       ok: false,
@@ -80,14 +91,39 @@ export async function deleteOutboxItem(
   }
 }
 
-export async function deleteDigestItem(
+/**
+ * After a successful ship-copy: draft → ready.
+ * Leaves archived alone. Returns the file contents written (or existing if unchanged).
+ */
+export async function markOutboxReadyAfterCopy(
+  absolutePath: string
+): Promise<{ content: string; changed: boolean }> {
+  const raw = await readFile(absolutePath, 'utf-8')
+  const { meta, body } = parseDeskFrontmatter(raw)
+  if (meta?.kind !== 'outbox') {
+    return { content: raw, changed: false }
+  }
+  if (meta.status === 'ready' || meta.status === 'archived') {
+    return { content: raw, changed: false }
+  }
+  const nextMeta: OutboxDocMeta = {
+    ...meta,
+    status: 'ready',
+    updatedAt: new Date().toISOString()
+  }
+  const content = serializeOutboxDocument(nextMeta, body)
+  await writeFile(absolutePath, content, 'utf-8')
+  return { content, changed: true }
+}
+
+export async function deleteOutboxItem(
   workspaceRoot: string,
   absolutePath: string
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   try {
     await ensureDeskDirs(workspaceRoot)
-    if (!isUnderDigests(workspaceRoot, absolutePath)) {
-      return { ok: false, message: t('desk.digest.notDigest') }
+    if (!isUnderOutbox(workspaceRoot, absolutePath)) {
+      return { ok: false, message: t('desk.outbox.notOutbox') }
     }
     await rm(absolutePath, { force: true })
     return { ok: true }

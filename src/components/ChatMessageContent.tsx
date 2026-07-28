@@ -14,6 +14,8 @@ interface ChatMessageContentProps {
   isStreaming?: boolean
   /** When true, skip the bare "…" placeholder (e.g. Agent already shows a status line). */
   hideStreamingPlaceholder?: boolean
+  /** Strip compass-actions blocks from display (assistant only; keep user prompts intact). */
+  stripActions?: boolean
 }
 
 function CodeAccordion({
@@ -79,7 +81,8 @@ function CodeAccordion({
 export function ChatMessageContent({
   content,
   isStreaming,
-  hideStreamingPlaceholder
+  hideStreamingPlaceholder,
+  stripActions = true
 }: ChatMessageContentProps) {
   const { t } = useI18n()
 
@@ -92,7 +95,7 @@ export function ChatMessageContent({
     )
   }
 
-  const sanitized = stripAllCompassActionsContent(content)
+  const sanitized = stripActions ? stripAllCompassActionsContent(content) : content
 
   const { complete, streamingCode } = isStreaming
     ? splitStreamingContent(sanitized)

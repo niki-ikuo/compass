@@ -841,6 +841,10 @@ interface AppState {
     mode: ChatMode
     preset?: UseCasePreset
   } | null
+  /** Monotonic id source; survives clear so the same id is never reused. */
+  chatComposerSendSeq: number
+  /** Monotonic id source for insert requests (same reason as send). */
+  chatComposerInsertSeq: number
   panelLayout: { fileTreeWidthRatio: number; chatWidthRatio: number; terminalHeight: number }
 
   setWorkspaceRoot: (root: string | null) => void
@@ -1064,6 +1068,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   aiApplyHistory: [],
   chatComposerInsertRequest: null,
   chatComposerSendRequest: null,
+  chatComposerSendSeq: 0,
+  chatComposerInsertSeq: 0,
   panelLayout: {
     fileTreeWidthRatio: initialPanelLayout.fileTreeWidthRatio,
     chatWidthRatio: initialPanelLayout.chatWidthRatio,
@@ -2451,12 +2457,14 @@ export const useAppStore = create<AppState>((set, get) => ({
                   ? state.activeChatId
                   : openSessions[openSessions.length - 1].id
             }
+      const id = state.chatComposerInsertSeq + 1
       return {
         showChat: true,
         chatSessions: ensured.sessions,
         activeChatId: ensured.activeChatId,
+        chatComposerInsertSeq: id,
         chatComposerInsertRequest: {
-          id: (state.chatComposerInsertRequest?.id ?? 0) + 1,
+          id,
           mentions,
           selection
         }
@@ -2499,12 +2507,14 @@ export const useAppStore = create<AppState>((set, get) => ({
         })
       }
 
+      const id = state.chatComposerSendSeq + 1
       return {
         showChat: true,
         chatSessions: sessions,
         activeChatId,
+        chatComposerSendSeq: id,
         chatComposerSendRequest: {
-          id: (state.chatComposerSendRequest?.id ?? 0) + 1,
+          id,
           text,
           mode: request.mode,
           preset: request.preset

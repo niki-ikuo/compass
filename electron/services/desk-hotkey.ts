@@ -33,14 +33,14 @@ export async function runDeskCaptureFromHotkey(
   const win = getMainWindow()
 
   if (!result.ok) {
-    notify(t('desk.capture.notifyTitle'), result.message)
+    notify(t('desk.capture.notifyFailTitle'), result.message)
     if (win && !win.isDestroyed()) {
       win.webContents.send('desk:captureResult', result)
     }
     return
   }
 
-  notify(t('desk.capture.notifyTitle'), t('desk.capture.notifyOk'))
+  notify(t('desk.capture.notifyOkTitle'), t('desk.capture.notifyOk'))
   if (win && !win.isDestroyed()) {
     if (win.isMinimized()) win.restore()
     win.show()

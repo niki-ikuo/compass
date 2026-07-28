@@ -51,9 +51,7 @@ import type {
   DeskCaptureResult,
   DeskInboxItem,
   DeskOutboxItem,
-  DeskDigestItem,
   DeskShipCheckResult,
-  DeskDigestCollectResult,
   GitStatusResult,
   GitDiffResult,
   GitDiffSide,
@@ -201,36 +199,42 @@ const compassAPI = {
       includeArchived?: boolean
     ): Promise<DeskOutboxItem[]> =>
       ipcRenderer.invoke('desk:listOutbox', workspaceRoot, limit, includeArchived),
-    listDigests: (workspaceRoot: string, limit?: number): Promise<DeskDigestItem[]> =>
-      ipcRenderer.invoke('desk:listDigests', workspaceRoot, limit),
     markInboxDone: (
       workspaceRoot: string,
       absolutePath: string
     ): Promise<{ ok: true; absolutePath: string } | { ok: false; message: string }> =>
       ipcRenderer.invoke('desk:markInboxDone', workspaceRoot, absolutePath),
+    markAllInboxDone: (
+      workspaceRoot: string
+    ): Promise<{ ok: true; moved: number } | { ok: false; message: string }> =>
+      ipcRenderer.invoke('desk:markAllInboxDone', workspaceRoot),
+    deleteInbox: (
+      workspaceRoot: string,
+      absolutePath: string
+    ): Promise<{ ok: true } | { ok: false; message: string }> =>
+      ipcRenderer.invoke('desk:deleteInbox', workspaceRoot, absolutePath),
     archiveOutbox: (
       workspaceRoot: string,
       absolutePath: string
     ): Promise<{ ok: true; absolutePath: string } | { ok: false; message: string }> =>
       ipcRenderer.invoke('desk:archiveOutbox', workspaceRoot, absolutePath),
+    archiveAllOutbox: (
+      workspaceRoot: string
+    ): Promise<{ ok: true; archived: number } | { ok: false; message: string }> =>
+      ipcRenderer.invoke('desk:archiveAllOutbox', workspaceRoot),
     deleteOutbox: (
       workspaceRoot: string,
       absolutePath: string
     ): Promise<{ ok: true } | { ok: false; message: string }> =>
       ipcRenderer.invoke('desk:deleteOutbox', workspaceRoot, absolutePath),
-    deleteDigest: (
-      workspaceRoot: string,
-      absolutePath: string
-    ): Promise<{ ok: true } | { ok: false; message: string }> =>
-      ipcRenderer.invoke('desk:deleteDigest', workspaceRoot, absolutePath),
     runShipCheck: (absolutePath: string): Promise<DeskShipCheckResult> =>
       ipcRenderer.invoke('desk:runShipCheck', absolutePath),
     copyOutboxPayload: (
       absolutePath: string
-    ): Promise<{ ok: true; payload: string } | { ok: false; message: string }> =>
-      ipcRenderer.invoke('desk:copyOutboxPayload', absolutePath),
-    collectDigestContext: (workspaceRoot: string): Promise<DeskDigestCollectResult> =>
-      ipcRenderer.invoke('desk:collectDigestContext', workspaceRoot),
+    ): Promise<
+      | { ok: true; payload: string; content: string; markedReady: boolean }
+      | { ok: false; message: string }
+    > => ipcRenderer.invoke('desk:copyOutboxPayload', absolutePath),
     onCaptureResult: (callback: (result: DeskCaptureResult) => void): (() => void) => {
       const handler = (_event: Electron.IpcRendererEvent, result: DeskCaptureResult): void => {
         callback(result)

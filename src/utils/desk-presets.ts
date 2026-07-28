@@ -12,14 +12,56 @@ export type DeskDraftRequest = {
   contextRefs: ChatContextRef[]
 }
 
-function stamp(): string {
-  const d = new Date()
-  const p = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}`
+/** Paths allocated for in-flight draft prompts (file may not exist until Apply). */
+const reservedOutboxBasenames = new Set<string>()
+
+function pad(n: number): string {
+  return String(n).padStart(2, '0')
 }
 
-export function outboxRelativePath(preset: OutboxPreset): string {
-  return `.compass/outbox/${preset}-${stamp()}.md`
+/** Local stamp: YYYYMMDD-HHMMSS (same grain as inbox capture). */
+export function outboxStamp(d = new Date()): string {
+  return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`
+}
+
+function toBasename(nameOrPath: string): string {
+  return nameOrPath.replace(/^.*[\\/]/, '')
+}
+
+/**
+ * Allocate a unique outbox relative path.
+ * Uses second precision; on collision appends `-2`, `-3`, … (inbox style).
+ * Also reserves the name in-memory so consecutive “Create draft” before Apply
+ * does not reuse the same path.
+ */
+export function outboxRelativePath(
+  preset: OutboxPreset,
+  occupiedBasenames: Iterable<string> = [],
+  now = new Date()
+): string {
+  const stamp = outboxStamp(now)
+  const taken = new Set<string>()
+  for (const name of occupiedBasenames) {
+    const base = toBasename(name)
+    if (base) taken.add(base)
+  }
+  for (const name of reservedOutboxBasenames) {
+    taken.add(name)
+  }
+
+  let basename = `${preset}-${stamp}.md`
+  let i = 2
+  while (taken.has(basename)) {
+    basename = `${preset}-${stamp}-${i}.md`
+    i += 1
+  }
+  reservedOutboxBasenames.add(basename)
+  return `.compass/outbox/${basename}`
+}
+
+/** Vitest helper — do not use in product code. */
+export function clearReservedOutboxPathsForTests(): void {
+  reservedOutboxBasenames.clear()
 }
 
 export function outboxPresetLabelKey(preset: OutboxPreset): string {
@@ -41,9 +83,10 @@ export function buildOutboxDraftRequest(
   absoluteSourcePath: string | null,
   workspaceRoot: string | null,
   preset: OutboxPreset,
-  locale?: LocaleId
+  locale?: LocaleId,
+  occupiedBasenames: Iterable<string> = []
 ): DeskDraftRequest {
-  const outPath = outboxRelativePath(preset)
+  const outPath = outboxRelativePath(preset, occupiedBasenames)
   const contextRefs: ChatContextRef[] = []
   let mention = ''
   if (absoluteSourcePath) {
@@ -72,31 +115,5 @@ export function buildOutboxDraftRequest(
     mode: 'edit',
     preset: 'document',
     contextRefs
-  }
-}
-
-export function buildDigestRequest(
-  digestRelativePath: string,
-  contextBlock: string,
-  periodStart: string,
-  periodEnd: string,
-  locale?: LocaleId
-): DeskDraftRequest {
-  const text = [
-    t('desk.digestPrompt.intro', { path: digestRelativePath }, locale),
-    t('desk.digestPrompt.period', { start: periodStart, end: periodEnd }, locale),
-    t('desk.digestPrompt.frontmatter', undefined, locale),
-    t('desk.digestPrompt.sections', undefined, locale),
-    t('desk.digestPrompt.footer', undefined, locale),
-    '',
-    t('desk.digestPrompt.contextHeader', undefined, locale),
-    contextBlock
-  ].join('\n')
-
-  return {
-    text,
-    mode: 'edit',
-    preset: 'document',
-    contextRefs: []
   }
 }

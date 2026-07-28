@@ -47,16 +47,17 @@ import {
 } from './services/git'
 import {
   captureClipboardToInbox,
-  markInboxDone
+  markInboxDone,
+  markAllInboxDone,
+  deleteInboxItem
 } from './services/desk-capture'
 import { ensureDeskDirs } from './services/desk-dirs'
-import { collectDigestContext } from './services/desk-digest-collect'
 import {
   refreshDeskCaptureHotkey,
   unregisterDeskCaptureHotkey
 } from './services/desk-hotkey'
-import { listDeskDigests, listDeskInbox, listDeskOutbox } from './services/desk-list'
-import { archiveOutboxItem, deleteDigestItem, deleteOutboxItem } from './services/desk-outbox'
+import { listDeskInbox, listDeskOutbox } from './services/desk-list'
+import { archiveOutboxItem, archiveAllOutboxItems, deleteOutboxItem } from './services/desk-outbox'
 import { copyOutboxPayload, runDeskShipCheck } from './services/desk-ship-check'
 import { cancelChat, cancelInlineCompletion, completeInline, streamChat } from './services/ai-client'
 import { runAgent, resolveAgentApproval, resolveAgentContinue } from './services/agent-runner'
@@ -121,6 +122,11 @@ let allowWindowClose = false
 /** クローズ確認ダイアログ／レンダラ応答の処理中（二重ダイアログ防止） */
 let closeRequestInFlight = false
 let closeRequestResetTimer: ReturnType<typeof setTimeout> | null = null
+
+// Windows トーストの送信元を electron.app.Electron ではなく Compass にする
+if (process.platform === 'win32') {
+  app.setAppUserModelId('com.compass.editor')
+}
 
 function resetCloseRequestState(): void {
   closeRequestInFlight = false
@@ -765,16 +771,20 @@ function registerIpcHandlers(): void {
   )
 
   ipcMain.handle(
-    'desk:listDigests',
-    async (_event, workspaceRoot: string, limit?: number) => {
-      return listDeskDigests(workspaceRoot, limit)
-    }
-  )
-
-  ipcMain.handle(
     'desk:markInboxDone',
     async (_event, workspaceRoot: string, absolutePath: string) => {
       return markInboxDone(workspaceRoot, absolutePath)
+    }
+  )
+
+  ipcMain.handle('desk:markAllInboxDone', async (_event, workspaceRoot: string) => {
+    return markAllInboxDone(workspaceRoot)
+  })
+
+  ipcMain.handle(
+    'desk:deleteInbox',
+    async (_event, workspaceRoot: string, absolutePath: string) => {
+      return deleteInboxItem(workspaceRoot, absolutePath)
     }
   )
 
@@ -785,17 +795,14 @@ function registerIpcHandlers(): void {
     }
   )
 
+  ipcMain.handle('desk:archiveAllOutbox', async (_event, workspaceRoot: string) => {
+    return archiveAllOutboxItems(workspaceRoot)
+  })
+
   ipcMain.handle(
     'desk:deleteOutbox',
     async (_event, workspaceRoot: string, absolutePath: string) => {
       return deleteOutboxItem(workspaceRoot, absolutePath)
-    }
-  )
-
-  ipcMain.handle(
-    'desk:deleteDigest',
-    async (_event, workspaceRoot: string, absolutePath: string) => {
-      return deleteDigestItem(workspaceRoot, absolutePath)
     }
   )
 
@@ -810,10 +817,6 @@ function registerIpcHandlers(): void {
 
   ipcMain.handle('desk:copyOutboxPayload', async (_event, absolutePath: string) => {
     return copyOutboxPayload(absolutePath)
-  })
-
-  ipcMain.handle('desk:collectDigestContext', async (_event, workspaceRoot: string) => {
-    return collectDigestContext(workspaceRoot)
   })
 
   ipcMain.handle('usage:get', async () => {

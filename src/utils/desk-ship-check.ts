@@ -49,15 +49,6 @@ export function runShipCheckStageA(
   const findings: ShipFinding[] = []
   const scanText = `${outboxMeta?.subject ?? ''}\n${outboxMeta?.to ?? ''}\n${body}`
 
-  if (outboxMeta && outboxMeta.status !== 'ready') {
-    findings.push({
-      id: 'status_not_ready',
-      severity: 'warning',
-      message: `status is "${outboxMeta.status}" (not ready)`,
-      source: 'rule'
-    })
-  }
-
   const bodyTrim = body.replace(/\s+/g, ' ').trim()
   if (!bodyTrim) {
     findings.push({

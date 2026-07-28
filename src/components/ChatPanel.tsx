@@ -1629,6 +1629,7 @@ export function ChatPanel() {
                   content={msg.content}
                   isStreaming={isStreaming}
                   hideStreamingPlaceholder={Boolean(agentStreamStatus)}
+                  stripActions={msg.role === 'assistant'}
                 />
                 {msg.role === 'assistant' &&
                 msg.appliedChangeSets &&

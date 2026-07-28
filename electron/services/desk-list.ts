@@ -1,7 +1,7 @@
 import { readdir, readFile, stat } from 'fs/promises'
 import { join } from 'path'
 import { parseDeskFrontmatter, type OutboxPreset, type OutboxStatus } from '../../src/utils/desk-frontmatter'
-import { digestsDir, ensureDeskDirs, inboxDir, outboxDir } from './desk-dirs'
+import { ensureDeskDirs, inboxDir, outboxDir } from './desk-dirs'
 
 export type DeskInboxItem = {
   absolutePath: string
@@ -19,16 +19,7 @@ export type DeskOutboxItem = {
   preset: OutboxPreset
   status: OutboxStatus
   subject: string
-  snippet: string
-  mtimeMs: number
-}
-
-export type DeskDigestItem = {
-  absolutePath: string
-  relativePath: string
-  fileName: string
-  periodStart: string
-  periodEnd: string
+  sourcePath: string
   snippet: string
   mtimeMs: number
 }
@@ -110,37 +101,8 @@ export async function listDeskOutbox(
         preset: meta?.kind === 'outbox' ? meta.preset : 'mail',
         status,
         subject: meta?.kind === 'outbox' ? meta.subject ?? '' : '',
+        sourcePath: meta?.kind === 'outbox' ? meta.sourcePath?.trim() ?? '' : '',
         snippet: snippetFrom(body),
-        mtimeMs: st.mtimeMs
-      })
-    } catch {
-      // skip
-    }
-  }
-  items.sort((a, b) => b.mtimeMs - a.mtimeMs)
-  return items.slice(0, limit)
-}
-
-export async function listDeskDigests(
-  workspaceRoot: string,
-  limit = 5
-): Promise<DeskDigestItem[]> {
-  await ensureDeskDirs(workspaceRoot)
-  const files = await listMarkdownFiles(digestsDir(workspaceRoot))
-  const items: DeskDigestItem[] = []
-  for (const absolutePath of files) {
-    try {
-      const raw = await readFile(absolutePath, 'utf-8')
-      const st = await stat(absolutePath)
-      const { meta, body } = parseDeskFrontmatter(raw)
-      const fileName = absolutePath.split(/[/\\]/).pop() || ''
-      items.push({
-        absolutePath,
-        relativePath: toRelative(workspaceRoot, absolutePath),
-        fileName,
-        periodStart: meta?.kind === 'digest' ? meta.periodStart : '',
-        periodEnd: meta?.kind === 'digest' ? meta.periodEnd : '',
-        snippet: snippetFrom(body, 48),
         mtimeMs: st.mtimeMs
       })
     } catch {

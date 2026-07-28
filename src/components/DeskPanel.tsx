@@ -1,10 +1,10 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useAppStore } from '@/stores/app-store'
 import { openWorkspaceFile } from '@/utils/open-workspace-file'
-import { buildDigestRequest, buildOutboxDraftRequest } from '@/utils/desk-presets'
+import { buildOutboxDraftRequest } from '@/utils/desk-presets'
 import { getOutboxPresets } from '@/utils/desk-frontmatter'
+import { getFileName } from '@/utils/language'
 import type {
-  DeskDigestItem,
   DeskInboxItem,
   DeskOutboxItem,
   OutboxPresetId,
@@ -22,22 +22,55 @@ function presetLabelKey(preset: OutboxPresetId): MessageKey {
   return `desk.preset.${preset}` as MessageKey
 }
 
+function sourceBaseName(sourcePath: string): string {
+  const norm = sourcePath.replace(/\\/g, '/')
+  const parts = norm.split('/')
+  return parts[parts.length - 1] || sourcePath
+}
+
+function normKey(path: string): string {
+  return path.replace(/\\/g, '/').replace(/^\.\//, '').toLowerCase()
+}
+
+/** Keys that identify an inbox file as the source of an outbox draft. */
+function collectOutboxSourceKeys(items: DeskOutboxItem[]): Set<string> {
+  const keys = new Set<string>()
+  for (const item of items) {
+    const raw = item.sourcePath?.trim()
+    if (!raw) continue
+    const key = normKey(raw)
+    keys.add(key)
+    const base = sourceBaseName(raw)
+    if (base) keys.add(normKey(base))
+  }
+  return keys
+}
+
+function inboxHasOutboxDraft(item: DeskInboxItem, sourceKeys: Set<string>): boolean {
+  if (sourceKeys.size === 0) return false
+  if (sourceKeys.has(normKey(item.relativePath))) return true
+  if (sourceKeys.has(normKey(item.absolutePath))) return true
+  if (sourceKeys.has(normKey(item.fileName))) return true
+  return false
+}
+
 export function DeskPanel() {
   const { t, locale } = useI18n()
   const workspaceRoot = useAppStore((s) => s.workspaceRoot)
   const leftSidebarView = useAppStore((s) => s.leftSidebarView)
-  const activeFilePath = useAppStore((s) => s.activeFilePath)
   const lastAiApplyUndo = useAppStore((s) => s.lastAiApplyUndo)
   const requestChatComposerSend = useAppStore((s) => s.requestChatComposerSend)
   const setShowChat = useAppStore((s) => s.setShowChat)
 
   const [inbox, setInbox] = useState<DeskInboxItem[]>([])
   const [outbox, setOutbox] = useState<DeskOutboxItem[]>([])
-  const [digests, setDigests] = useState<DeskDigestItem[]>([])
-  const [loading, setLoading] = useState(false)
+  /** Active + archived outbox, used only to mark inbox rows that already have a draft. */
+  const [outboxForSourceMatch, setOutboxForSourceMatch] = useState<DeskOutboxItem[]>([])
   const [message, setMessage] = useState('')
   const [draftOpen, setDraftOpen] = useState(false)
   const [draftPreset, setDraftPreset] = useState<OutboxPresetId>('mail')
+  /** null = no source file selected yet. */
+  const [draftSourcePath, setDraftSourcePath] = useState<string | null>(null)
   const [shipPath, setShipPath] = useState<string | null>(null)
   const [shipFindings, setShipFindings] = useState<ShipFinding[]>([])
   const [shipBusy, setShipBusy] = useState(false)
@@ -46,33 +79,35 @@ export function DeskPanel() {
     if (!workspaceRoot) {
       setInbox([])
       setOutbox([])
-      setDigests([])
+      setOutboxForSourceMatch([])
       return
     }
-    setLoading(true)
     try {
       await window.compass.desk.ensureDirs(workspaceRoot)
-      const [nextInbox, nextOutbox, nextDigests] = await Promise.all([
+      const [nextInbox, nextOutbox, nextOutboxAll] = await Promise.all([
         window.compass.desk.listInbox(workspaceRoot),
         window.compass.desk.listOutbox(workspaceRoot),
-        window.compass.desk.listDigests(workspaceRoot)
+        window.compass.desk.listOutbox(workspaceRoot, 200, true)
       ])
       setInbox(nextInbox)
       setOutbox(nextOutbox)
-      setDigests(nextDigests)
+      setOutboxForSourceMatch(nextOutboxAll)
     } catch (error) {
       setMessage(error instanceof Error ? error.message : String(error))
-    } finally {
-      setLoading(false)
     }
   }, [workspaceRoot])
+
+  const outboxSourceKeys = useMemo(
+    () => collectOutboxSourceKeys(outboxForSourceMatch),
+    [outboxForSourceMatch]
+  )
 
   useEffect(() => {
     if (leftSidebarView !== 'desk') return
     void refresh()
   }, [leftSidebarView, refresh, workspaceRoot])
 
-  // After AI Apply (draft / digest write), reload lists while Desk is visible.
+  // After AI Apply (draft write), reload lists while Desk is visible.
   useEffect(() => {
     if (leftSidebarView !== 'desk' || !lastAiApplyUndo) return
     void refresh()
@@ -108,6 +143,48 @@ export function DeskPanel() {
     await refresh()
   }
 
+  const handleMarkAllInboxDone = async () => {
+    if (!workspaceRoot || inbox.length === 0) return
+    const ok = window.confirm(t('desk.markAllDoneConfirm'))
+    if (!ok) return
+    const paths = inbox.map((item) => item.absolutePath)
+    for (const path of paths) {
+      closeOpenDeskFile(path)
+    }
+    await new Promise((r) => setTimeout(r, 50))
+    try {
+      const result = await window.compass.desk.markAllInboxDone(workspaceRoot)
+      if (!result.ok) {
+        setMessage(result.message)
+        return
+      }
+      setInbox([])
+      setMessage('')
+      await refresh()
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : String(error))
+    }
+  }
+
+  const handleDeleteInbox = async (item: DeskInboxItem) => {
+    if (!workspaceRoot) return
+    const ok = window.confirm(t('desk.deleteInboxConfirm', { name: item.fileName }))
+    if (!ok) return
+    closeOpenDeskFile(item.absolutePath)
+    await new Promise((r) => setTimeout(r, 50))
+    try {
+      const result = await window.compass.desk.deleteInbox(workspaceRoot, item.absolutePath)
+      if (!result.ok) {
+        setMessage(result.message)
+        return
+      }
+      setInbox((prev) => prev.filter((row) => row.absolutePath !== item.absolutePath))
+      await refresh()
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : String(error))
+    }
+  }
+
   const handleArchiveOutbox = async (item: DeskOutboxItem) => {
     if (!workspaceRoot) return
     const result = await window.compass.desk.archiveOutbox(workspaceRoot, item.absolutePath)
@@ -122,6 +199,32 @@ export function DeskPanel() {
     closeOpenDeskFile(item.absolutePath)
     setOutbox((prev) => prev.filter((row) => row.absolutePath !== item.absolutePath))
     await refresh()
+  }
+
+  const handleArchiveAllOutbox = async () => {
+    if (!workspaceRoot || outbox.length === 0) return
+    const ok = window.confirm(t('desk.archiveAllConfirm'))
+    if (!ok) return
+    if (shipPath) {
+      setShipPath(null)
+      setShipFindings([])
+    }
+    for (const item of outbox) {
+      closeOpenDeskFile(item.absolutePath)
+    }
+    await new Promise((r) => setTimeout(r, 50))
+    try {
+      const result = await window.compass.desk.archiveAllOutbox(workspaceRoot)
+      if (!result.ok) {
+        setMessage(result.message)
+        return
+      }
+      setOutbox([])
+      setMessage('')
+      await refresh()
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : String(error))
+    }
   }
 
   const handleDeleteOutbox = async (item: DeskOutboxItem) => {
@@ -149,29 +252,23 @@ export function DeskPanel() {
     }
   }
 
-  const handleDeleteDigest = async (item: DeskDigestItem) => {
-    if (!workspaceRoot) return
-    const ok = window.confirm(t('desk.deleteDigestConfirm', { name: item.fileName }))
-    if (!ok) return
-    // Close editor first so Windows can unlink an open file.
-    closeOpenDeskFile(item.absolutePath)
-    await new Promise((r) => setTimeout(r, 50))
-    try {
-      const result = await window.compass.desk.deleteDigest(workspaceRoot, item.absolutePath)
-      if (!result.ok) {
-        setMessage(result.message)
-        return
-      }
-      setDigests((prev) => prev.filter((row) => row.absolutePath !== item.absolutePath))
-      await refresh()
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : String(error))
-    }
+  const openDraftModal = (sourceAbsolutePath: string) => {
+    setDraftSourcePath(sourceAbsolutePath)
+    setMessage('')
+    setDraftOpen(true)
   }
 
   const handleCreateDraft = () => {
-    if (!workspaceRoot) return
-    const request = buildOutboxDraftRequest(activeFilePath, workspaceRoot, draftPreset, locale)
+    if (!workspaceRoot || !draftSourcePath) return
+    // Pass existing outbox names; in-memory reservation covers same-second creates before Apply.
+    const occupied = outbox.map((item) => item.fileName)
+    const request = buildOutboxDraftRequest(
+      draftSourcePath,
+      workspaceRoot,
+      draftPreset,
+      locale,
+      occupied
+    )
     setShowChat(true)
     requestChatComposerSend(request)
     setDraftOpen(false)
@@ -202,38 +299,21 @@ export function DeskPanel() {
       setMessage(result.message)
       return
     }
+    if (result.markedReady) {
+      const store = useAppStore.getState()
+      const norm = shipPath.replace(/\\/g, '/').toLowerCase()
+      const open = store.openFiles.find(
+        (f) => f.path.replace(/\\/g, '/').toLowerCase() === norm
+      )
+      if (open) {
+        store.updateFileContent(open.path, result.content)
+        store.markFileSaved(open.path)
+      }
+    }
     setMessage(t('desk.shipCopied'))
     setShipPath(null)
     setShipFindings([])
     void refresh()
-  }
-
-  const handleDigest = async () => {
-    if (!workspaceRoot) return
-    setMessage(t('desk.digestStarting'))
-    try {
-      const collected = await window.compass.desk.collectDigestContext(workspaceRoot)
-      if (collected.empty) {
-        setMessage(t('desk.digestEmptyPeriod'))
-        return
-      }
-      const note = collected.truncated
-        ? `\n(Note: truncated. filesConsidered=${collected.filesConsidered})`
-        : `\n(filesConsidered=${collected.filesConsidered})`
-      const request = buildDigestRequest(
-        collected.digestRelativePath,
-        collected.contextBlock + note,
-        collected.periodStart,
-        collected.periodEnd,
-        locale
-      )
-      setShowChat(true)
-      requestChatComposerSend(request)
-      setMessage('')
-      void refresh()
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : String(error))
-    }
   }
 
   if (!workspaceRoot) {
@@ -249,55 +329,33 @@ export function DeskPanel() {
 
   return (
     <div className="desk-panel">
-      <div className="desk-toolbar">
-        <button type="button" className="desk-btn" onClick={() => void refresh()} disabled={loading}>
-          {t('desk.refresh')}
-        </button>
-        <button type="button" className="desk-btn primary" onClick={() => setDraftOpen(true)}>
-          {t('desk.createDraft')}
-        </button>
-      </div>
-
       {message ? <p className="desk-message">{message}</p> : null}
 
       <section className="desk-section">
-        <h3 className="desk-section-title">{t('desk.inbox')}</h3>
+        <div className="desk-section-header">
+          <h3 className="desk-section-title">{t('desk.inbox')}</h3>
+          {inbox.length > 0 ? (
+            <button
+              type="button"
+              className="desk-btn compact"
+              onClick={() => void handleMarkAllInboxDone()}
+              title={t('desk.markAllDone')}
+            >
+              {t('desk.markAllDone')}
+            </button>
+          ) : null}
+        </div>
         {inbox.length === 0 ? (
           <p className="desk-empty">{t('desk.inboxEmpty')}</p>
         ) : (
           <ul className="desk-list">
-            {inbox.map((item) => (
-              <li key={item.absolutePath} className="desk-row">
-                <button
-                  type="button"
-                  className="desk-row-main"
-                  onClick={() => void openWorkspaceFile(item.absolutePath)}
-                  title={item.relativePath}
-                >
-                  <span className="desk-row-name">{item.fileName}</span>
-                  <span className="desk-row-meta">{item.snippet || item.capturedAt}</span>
-                </button>
-                <button
-                  type="button"
-                  className="desk-btn compact"
-                  onClick={() => void handleMarkDone(item)}
-                >
-                  {t('desk.markDone')}
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-
-      <section className="desk-section">
-        <h3 className="desk-section-title">{t('desk.outbox')}</h3>
-        {outbox.length === 0 ? (
-          <p className="desk-empty">{t('desk.outboxEmpty')}</p>
-        ) : (
-          <ul className="desk-list">
-            {outbox.map((item) => (
-              <li key={item.absolutePath} className="desk-row">
+            {inbox.map((item) => {
+              const hasOutbox = inboxHasOutboxDraft(item, outboxSourceKeys)
+              return (
+              <li
+                key={item.absolutePath}
+                className={`desk-row${hasOutbox ? ' has-outbox' : ''}`}
+              >
                 <button
                   type="button"
                   className="desk-row-main"
@@ -305,11 +363,93 @@ export function DeskPanel() {
                   title={item.relativePath}
                 >
                   <span className="desk-row-name">
-                    {t(presetLabelKey(item.preset))} · {t(statusLabelKey(item.status))}
+                    {item.fileName}
+                    {hasOutbox ? (
+                      <span className="desk-badge">{t('desk.hasOutbox')}</span>
+                    ) : null}
+                  </span>
+                  <span className="desk-row-meta">{item.snippet || item.capturedAt}</span>
+                </button>
+                <div className="desk-row-actions">
+                  <button
+                    type="button"
+                    className="desk-btn compact primary"
+                    onClick={() => openDraftModal(item.absolutePath)}
+                    title={t('desk.createDraft')}
+                  >
+                    {t('desk.createDraftShort')}
+                  </button>
+                  <button
+                    type="button"
+                    className="desk-btn compact"
+                    onClick={() => void handleMarkDone(item)}
+                  >
+                    {t('desk.markDone')}
+                  </button>
+                  <button
+                    type="button"
+                    className="desk-btn compact danger"
+                    onClick={() => void handleDeleteInbox(item)}
+                  >
+                    {t('desk.delete')}
+                  </button>
+                </div>
+              </li>
+              )
+            })}
+          </ul>
+        )}
+      </section>
+
+      <section className="desk-section">
+        <div className="desk-section-header">
+          <h3 className="desk-section-title">{t('desk.outbox')}</h3>
+          {outbox.length > 0 ? (
+            <button
+              type="button"
+              className="desk-btn compact"
+              onClick={() => void handleArchiveAllOutbox()}
+              title={t('desk.archiveAll')}
+            >
+              {t('desk.archiveAll')}
+            </button>
+          ) : null}
+        </div>
+        {outbox.length === 0 ? (
+          <p className="desk-empty">{t('desk.outboxEmpty')}</p>
+        ) : (
+          <ul className="desk-list">
+            {outbox.map((item) => {
+              const copied = item.status === 'ready'
+              return (
+              <li
+                key={item.absolutePath}
+                className={`desk-row${copied ? ' has-copied' : ''}`}
+              >
+                <button
+                  type="button"
+                  className="desk-row-main"
+                  onClick={() => void openWorkspaceFile(item.absolutePath)}
+                  title={item.relativePath}
+                >
+                  <span className="desk-row-name">
+                    {t(presetLabelKey(item.preset))}
+                    {copied ? (
+                      <span className="desk-badge">{t('desk.copied')}</span>
+                    ) : (
+                      <span className="desk-row-status">
+                        · {t(statusLabelKey(item.status))}
+                      </span>
+                    )}
                   </span>
                   <span className="desk-row-meta">
                     {item.subject || item.snippet || item.fileName}
                   </span>
+                  {item.sourcePath ? (
+                    <span className="desk-row-meta desk-row-source" title={item.sourcePath}>
+                      {t('desk.fromSource', { name: sourceBaseName(item.sourcePath) })}
+                    </span>
+                  ) : null}
                 </button>
                 <div className="desk-row-actions">
                   <button
@@ -337,54 +477,22 @@ export function DeskPanel() {
                   </button>
                 </div>
               </li>
-            ))}
+              )
+            })}
           </ul>
         )}
       </section>
 
-      <section className="desk-section">
-        <h3 className="desk-section-title">{t('desk.digest')}</h3>
-        <button type="button" className="desk-btn" onClick={() => void handleDigest()}>
-          {t('desk.createDigest')}
-        </button>
-        {digests.length === 0 ? (
-          <p className="desk-empty">{t('desk.digestEmpty')}</p>
-        ) : (
-          <ul className="desk-list">
-            {digests.map((item) => (
-              <li key={item.absolutePath} className="desk-row">
-                <button
-                  type="button"
-                  className="desk-row-main"
-                  onClick={() => void openWorkspaceFile(item.absolutePath)}
-                >
-                  <span className="desk-row-name">{item.fileName}</span>
-                  <span className="desk-row-meta">
-                    {item.periodStart && item.periodEnd
-                      ? `${item.periodStart} → ${item.periodEnd}`
-                      : item.snippet}
-                  </span>
-                </button>
-                <div className="desk-row-actions">
-                  <button
-                    type="button"
-                    className="desk-btn compact danger"
-                    onClick={() => void handleDeleteDigest(item)}
-                  >
-                    {t('desk.delete')}
-                  </button>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-
-      {draftOpen ? (
+      {draftOpen && draftSourcePath ? (
         <div className="desk-modal" role="dialog" aria-label={t('desk.draftTitle')}>
           <div className="desk-modal-body">
             <h3>{t('desk.draftTitle')}</h3>
-            <div className="desk-preset-list">
+            <p className="desk-draft-source-line">
+              {t('desk.fromSource', { name: getFileName(draftSourcePath) })}
+            </p>
+
+            <h4 className="desk-modal-subtitle">{t('desk.draftPreset')}</h4>
+            <div className="desk-preset-list" role="radiogroup" aria-label={t('desk.draftPreset')}>
               {presets.map((preset) => (
                 <label key={preset} className="desk-preset-option">
                   <input
