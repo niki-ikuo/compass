@@ -340,34 +340,28 @@ function getTextAfterCaret(editor: HTMLElement): string {
   return range.toString().replace(/\u00a0/g, ' ')
 }
 
-function insertNodesAtCaret(editor: HTMLElement, nodes: Node[]) {
-  const selection = window.getSelection()
-  editor.focus()
+function escapeHtmlAttr(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+}
 
-  if (!selection) return
+function escapeHtmlText(value: string): string {
+  return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+}
 
-  let range: Range
-  if (selection.rangeCount > 0 && editor.contains(selection.anchorNode)) {
-    range = selection.getRangeAt(0)
-  } else {
-    range = document.createRange()
-    range.selectNodeContents(editor)
-    range.collapse(false)
-  }
-
-  range.deleteContents()
-
-  const fragment = document.createDocumentFragment()
-  for (const node of nodes) fragment.appendChild(node)
-  const last = fragment.lastChild
-  range.insertNode(fragment)
-
-  if (last) {
-    range.setStartAfter(last)
-    range.collapse(true)
-    selection.removeAllRanges()
-    selection.addRange(range)
-  }
+/** insertHTML でカプセルを入れ、ネイティブ undo に載せる */
+function mentionCapsuleHtml(inner: string, kind: ChatMentionKind): string {
+  const token = `@[${inner}]`
+  return (
+    `<span class="chat-path-capsule kind-${kind}" contenteditable="false"` +
+    ` data-mention="${escapeHtmlAttr(token)}" title="${escapeHtmlAttr(inner)}">` +
+    `<span class="chat-path-capsule-icon" aria-hidden="true">${mentionIcon(kind)}</span>` +
+    `<span class="chat-path-capsule-label">${escapeHtmlText(inner)}</span>` +
+    `</span>`
+  )
 }
 
 export const ChatInputComposer = forwardRef<ChatInputComposerHandle, ChatInputComposerProps>(
@@ -450,13 +444,14 @@ export const ChatInputComposer = forwardRef<ChatInputComposerHandle, ChatInputCo
         const needsSpaceBefore = before.length > 0 && !/\s$/.test(before)
         const needsSpaceAfter = after.length > 0 && !/^\s/.test(after)
 
-        const nodes: Node[] = []
-        if (needsSpaceBefore) nodes.push(document.createTextNode(' '))
-        nodes.push(createMentionElement(parsed.inner, parsed.kind))
-        // contenteditable=false の直後にキャレットを置けるよう、末尾に空白を確保
-        nodes.push(document.createTextNode(needsSpaceAfter ? ' ' : '\u00a0'))
+        // Range.insertNode だと undo に載らないため insertHTML を使う
+        const html =
+          (needsSpaceBefore ? ' ' : '') +
+          mentionCapsuleHtml(parsed.inner, parsed.kind) +
+          // contenteditable=false の直後にキャレットを置けるよう、末尾に空白を確保
+          (needsSpaceAfter ? ' ' : '\u00a0')
 
-        insertNodesAtCaret(editor, nodes)
+        document.execCommand('insertHTML', false, html)
         syncValue(serializeEditor(editor))
       }
     }))
@@ -548,17 +543,16 @@ export const ChatInputComposer = forwardRef<ChatInputComposerHandle, ChatInputCo
           const editor = editorRef.current
           if (!editor) return
 
-          // insertText は改行ごとに DOM を増やすため使わない。
-          // pre-wrap + 単一 TextNode（必要なら capsule）へ直接描画する。
-          const { before, after } = serializeEditorSplitAtSelection(editor)
-          const next = before + text + after
-          const caretOffset = before.length + text.length
-
-          renderValueToEditor(editor, next)
-          setCaretAtSerializedOffset(editor, caretOffset)
-
-          // 大きい貼り付けは先に描画し、親/ローカルの React 更新は次フレームへ
+          // 巨大貼り付けだけ replaceChildren 高速パス（ネイティブ undo は消える）。
+          // 通常サイズは insertText で Chromium の undo 履歴を維持する。
           if (exceedsCapsuleBudget(text)) {
+            const { before, after } = serializeEditorSplitAtSelection(editor)
+            const next = before + text + after
+            const caretOffset = before.length + text.length
+
+            renderValueToEditor(editor, next)
+            setCaretAtSerializedOffset(editor, caretOffset)
+
             valueRef.current = next
             requestAnimationFrame(() => {
               syncValue(next)
@@ -566,7 +560,19 @@ export const ChatInputComposer = forwardRef<ChatInputComposerHandle, ChatInputCo
             return
           }
 
-          syncValue(next)
+          document.execCommand('insertText', false, text)
+
+          // 貼り付け文に @[...] があるときだけカプセル化（DOM 全書き換えで undo は消える）
+          if (hasStructuredMention(text)) {
+            const { before } = serializeEditorSplitAtSelection(editor)
+            const next = serializeEditor(editor)
+            renderValueToEditor(editor, next)
+            setCaretAtSerializedOffset(editor, before.length)
+            syncValue(next)
+            return
+          }
+
+          syncValue(serializeEditor(editor))
         }}
       />
     )
