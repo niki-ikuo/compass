@@ -1,6 +1,6 @@
 {
   "name": "compass",
-  "version": "2.5.2",
+  "version": "2.5.3",
   "description": "AI workspace for Windows — local folders, text, and AI",
   "license": "MIT",
   "main": "./out/main/index.js",
