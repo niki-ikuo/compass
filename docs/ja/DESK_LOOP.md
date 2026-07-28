@@ -4,7 +4,7 @@
 
 状態: **Phase 1 実装済み**（Capture / Clip / Outbox 4プリセット / Ship Check Stage A + コピー）。Stage B・トレイ常駐などは未着手。関連: [SPEC.md](./SPEC.md)、[ARCHITECTURE.md](./ARCHITECTURE.md)、[TEXT_WORKSPACE_PLAN.md](./TEXT_WORKSPACE_PLAN.md)、[AI_APPLY_UNDO.md](./AI_APPLY_UNDO.md)、[USE_CASE_PRESET.md](./USE_CASE_PRESET.md)。
 
-**受け入れ消化（2026-07-28）:** 各章チェックリストを単体テスト＋UI静的確認で通過。製品 DoD デモ脚本の手動スモークは残タスク（ホットキー前面化の実機確認）。
+**受け入れ消化（2026-07-28）:** 各章チェックリストを単体テスト＋UI静的確認で通過。製品 DoD デモ脚本（取込→下書き→検品→済）は実機スモーク済み。
 
 Compass を「書いて直すエディタ」から **「取って → 整理して → 検品して → 出す作業台」** に引き上げるための機能セット。  
 4機能は別製品ではない。**1本の導線の4駅**として設計・実装する。
@@ -197,7 +197,7 @@ Renderer は直接 `clipboard` / `globalShortcut` を触らない（既存セキ
 
 ### 4.7 受け入れ基準
 
-- [x] メモ帳でコピー → ホットキー → inbox に md ができ、前面で開く — *capture 成功書き込み＋hotkey 登録を単体で確認。前面化は `desk-hotkey.ts` 静的確認（実機スモーク推奨）*
+- [x] メモ帳でコピー → ホットキー → inbox に md ができ、前面で開く — 単体＋実機スモーク済み
 - [x] ワークスペース無しで安全に失敗する — `captureClipboardToInbox(null)`
 - [x] 空クリップボードでファイルを作らない — `captureClipboardToInbox` empty
 - [x] 設定でホットキー無効にすると発火しない — `runDeskCaptureFromHotkey` / `refreshDeskCaptureHotkey`
@@ -620,6 +620,8 @@ E2E はデモ脚本の手動チェックリストを Phase 1 のリリースゲ�
 
 | 日付 | 内容 |
 |------|------|
+| 2026-07-28 | SPEC / ARCHITECTURE にクリップ（`desk:*` / inbox·outbox）を追記 |
+| 2026-07-28 | 製品 DoD 実機スモーク済みを記録 |
 | 2026-07-28 | 受け入れチェック消化（単体＋静的確認）。`markInboxDone` パス検証を `deleteInbox` と統一。capture/hotkey/list テスト追加 |
 | 2026-07-28 | 週次ダイジェストを範囲外として削除。S級4機能に再構成 |
 | 2026-07-28 | 初版。S級5機能の統合仕様 |

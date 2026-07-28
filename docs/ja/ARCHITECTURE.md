@@ -55,15 +55,17 @@ electron/
     ├── git.ts              # 最小 Git（status / diff / stage / commit。システム git）
     ├── terminal.ts         # PTY
     ├── help.ts / help-ask.ts  # オフラインヘルプ + AI ヘルプ
+    ├── desk-capture.ts / desk-hotkey.ts / desk-list.ts
+    ├── desk-outbox.ts / desk-ship-check.ts / desk-dirs.ts  # クリップ（取込・一覧・検品）
     └── encoding.ts         # 文字コード
 
 src/
 ├── App.tsx                 # ルート UI・ワークスペース起動
 ├── utils/agent-plan.ts     # Agent plan 共有（todos/checkpoint）。main は agent-plan.ts から再エクスポート
 ├── components/AgentPlanPanel.tsx  # チャット計画チェックリスト
-├── components/             # 画面コンポーネント（LeftSidebar、SearchPanel、GitPanel、Help* など）
+├── components/             # 画面コンポーネント（LeftSidebar、DeskPanel、SearchPanel、GitPanel、Help* など）
 ├── stores/app-store.ts     # Zustand ストア
-├── utils/                  # プレビュー・索引・エンコーディング等
+├── utils/                  # プレビュー・索引・エンコーディング・desk-* 等
 └── types/                  # 共有型定義
 ```
 
@@ -82,6 +84,7 @@ Renderer からは `window.compass.*` を呼び出します。実装の正は `e
 | `chat:*` | チャット履歴の読み書き |
 | `terminal:*` | PTY の生成・入出力・リサイズ・終了 |
 | `help:*` | オフラインヘルプの一覧 / 取得 / 検索、AI ヘルプの質問 / キャンセル |
+| `desk:*` | クリップ取込・inbox/outbox 一覧・検品コピー（詳細: [DESK_LOOP.md](./DESK_LOOP.md)） |
 | `shell:*` / `menu:*` | アプリ操作・メニューイベント（外部アプリで開く、OS エクスプローラーで表示 など） |
 
 ## データフロー（AI チャット）
@@ -116,6 +119,8 @@ Renderer からは `window.compass.*` を呼び出します。実装の正は `e
 | `templates/` | 任意の文書テンプレート |
 | `rules.md` | 人が編集するワークスペースルール（Ask / Edit / Agent に自動添付） |
 | `glossary.md` | 任意の用語集（文書 verify + AI コンテキスト） |
+| `inbox/` | クリップ取込（生テキスト）。処理済みは `inbox/done/` |
+| `outbox/` | クリップ下書き（mail / minutes / report / chat）。詳細: [DESK_LOOP.md](./DESK_LOOP.md) |
 
 チャット時に構造索引の関連部分と、ハイブリッド検索の Related workspace excerpts、および `.compass/rules.md`（と任意の glossary）をコンテキストへ載せる。埋め込みは既定で OpenAI 互換 `/embeddings`（埋め込み専用に Ollama も可）。失敗時やキー未設定時はローカルハッシュへフォールバック。Ask/Agent の回答自体はオンライン LLM を使う。
 

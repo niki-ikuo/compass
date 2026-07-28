@@ -31,7 +31,8 @@
 - 用途プリセット（`general` / `document` / `data` / `code`）— Ask / Edit / Agent とは別軸 — [USE_CASE_PRESET.md](./USE_CASE_PRESET.md)
 - インライン補完（ゴーストテキスト / Tab で確定。設定で ON/OFF）
 - 文書テンプレート（内蔵 Markdown 雛形、ワークスペース `.compass/templates/`）
-- 左サイドバーのエクスプローラー / アウトライン / 検索 / Git タブ（横断見出しジャンプ・ワークスペース内テキスト検索・status/diff/commit）
+- 左サイドバーのエクスプローラー / アウトライン / 検索 / Git / **クリップ** タブ（横断見出しジャンプ・ワークスペース内テキスト検索・status/diff/commit・取込 inbox / 下書き outbox）
+- クリップ（Clip）— ホットキー取込 → inbox / outbox → 検品コピー。詳細は [DESK_LOOP.md](./DESK_LOOP.md)
 - オフラインヘルプ + AIヘルプ（`helps/` + `help:*` IPC）
 - tools 非対応時の Agent UX — プロバイダ別 Agent トグル非表示、Edit への誘導フォールバック — [AGENT_PLAN.md](./AGENT_PLAN.md) §7
 - 最小 Git UI（status / diff / stage / commit / discard / push / pull / ブランチ切替。システム `git` を使用。PR / GitHub 認証は未対応）
@@ -53,11 +54,11 @@
 │ エクスプ │  タブ: plan.md  notes.md      │               │
 │ / アウトラ │───────────────────────────────│   AI チャット  │
 │ イン / 検索│                               │               │
-│ / Git    │                               │               │
-│  📁 docs │   Monaco Editor               │  ┌──────────┐ │
-│   📄 plan│   (シンタックスハイライト)     │  │会話履歴  │ │
-│   📄 data│                               │  └──────────┘ │
-│          │                               │  [入力欄]     │
+│ / Git /   │                               │               │
+│ クリップ  │   Monaco Editor               │  ┌──────────┐ │
+│  📁 docs │   (シンタックスハイライト)     │  │会話履歴  │ │
+│   📄 plan│                               │  └──────────┘ │
+│   📄 data│                               │  [入力欄]     │
 │          │                               │  [送信]       │
 ├──────────┴───────────────────────────────┴───────────────┤
 │  ステータスバー: 行/列 | 言語 | 接続状態                    │
@@ -68,7 +69,7 @@
 |------|------|
 | ウィンドウサイズ | デフォルト 1280×800、リサイズ可能 |
 | レイアウト | 3ペイン（左サイドバー 20% / エディタ 50% / チャット 30%）、パネル折りたたみ可 |
-| 左サイドバー | エクスプローラー / アウトライン（全 Markdown 見出し）/ 検索 / Git（status·diff·commit）タブ |
+| 左サイドバー | エクスプローラー / アウトライン（全 Markdown 見出し）/ 検索 / Git（status·diff·commit）/ クリップ（inbox·outbox）タブ |
 
 ---
 
@@ -202,6 +203,7 @@ Tauri 2.0 + React + Monaco（バイナリサイズは小さいが、Windows周�
 | `fs:openFolder` | Renderer → Main | フォルダ選択ダイアログ |
 | `ai:chat` | Renderer → Main | ストリーミングチャット |
 | `settings:get/set` | Renderer → Main | 設定読み書き |
+| `desk:*` | Renderer → Main | クリップ取込・一覧・検品コピー（詳細は [DESK_LOOP.md](./DESK_LOOP.md)） |
 
 ---
 

@@ -55,15 +55,17 @@ electron/
     ├── git.ts              # Minimal Git status / diff / stage / commit / discard / push / pull / branch (system git)
     ├── terminal.ts         # PTY
     ├── help.ts / help-ask.ts  # Offline help + AI Help
+    ├── desk-capture.ts / desk-hotkey.ts / desk-list.ts
+    ├── desk-outbox.ts / desk-ship-check.ts / desk-dirs.ts  # Clip (capture / list / ship-check)
     └── encoding.ts         # Character encoding
 
 src/
 ├── App.tsx                 # Root UI / workspace bootstrap
 ├── utils/agent-plan.ts     # Shared Agent plan (todos/checkpoint); main re-exports via agent-plan.ts
 ├── components/AgentPlanPanel.tsx  # Chat plan checklist
-├── components/             # UI components (incl. LeftSidebar, SearchPanel, GitPanel, Help*)
+├── components/             # UI components (incl. LeftSidebar, DeskPanel, SearchPanel, GitPanel, Help*)
 ├── stores/app-store.ts     # Zustand store
-├── utils/                  # Preview, index helpers, encoding, etc.
+├── utils/                  # Preview, index helpers, encoding, desk-*, etc.
 └── types/                  # Shared types
 ```
 
@@ -82,6 +84,7 @@ The renderer calls `window.compass.*`. The source of truth is `electron/preload.
 | `chat:*` | Chat history read/write |
 | `terminal:*` | PTY create, I/O, resize, exit |
 | `help:*` | Offline help list / get / search; AI Help ask / cancel |
+| `desk:*` | Clip capture / inbox·outbox list / ship-check copy (see [DESK_LOOP.md](./DESK_LOOP.md)) |
 | `shell:*` / `menu:*` | App actions / menu events (open external, reveal in OS explorer, …) |
 
 ## Data flow (AI chat)
@@ -116,6 +119,8 @@ Indexing policy is **include text / exclude binary** (not an extension allowlist
 | `templates/` | Optional document templates |
 | `rules.md` | Human-editable workspace rules (auto-attached to Ask / Edit / Agent) |
 | `glossary.md` | Optional glossary (document verify + AI context) |
+| `inbox/` | Clip captures (raw text). Done items under `inbox/done/` |
+| `outbox/` | Clip drafts (mail / minutes / report / chat). Details: [DESK_LOOP.md](./DESK_LOOP.md) |
 
 Relevant structure-index slices, hybrid-search Related workspace excerpts, and `.compass/rules.md` (plus optional glossary) are added to chat context. Embeddings default to OpenAI-compatible `/embeddings` (optional separate Ollama provider); falls back to local hash on failure or when credentials/model are unavailable. Ask/Agent answers still use the online LLM.
 

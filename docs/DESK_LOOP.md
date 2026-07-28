@@ -4,7 +4,7 @@
 
 Status: **Phase 1 implemented** (Capture / Clip / Outbox presets / Ship check Stage A + copy). Stage B, tray, etc. still later. Related: [SPEC.md](./SPEC.md), [ARCHITECTURE.md](./ARCHITECTURE.md), [TEXT_WORKSPACE_PLAN.md](./TEXT_WORKSPACE_PLAN.md), [AI_APPLY_UNDO.md](./AI_APPLY_UNDO.md), [USE_CASE_PRESET.md](./USE_CASE_PRESET.md).
 
-**Acceptance digested (2026-07-28):** Per-section checklists passed via unit tests + UI static review. Remaining: manual smoke of hotkey focus/open (product DoD demo).
+**Acceptance digested (2026-07-28):** Per-section checklists passed via unit tests + UI static review. Product DoD demo script (capture → draft → ship → done) smoked on a real build.
 
 Feature set that moves Compass from “an editor that writes and fixes” to a **workbench: capture → organize → check → ship**.  
 The four features are not separate products. They are **four stops on one path**.
@@ -193,7 +193,7 @@ Renderer must not touch `clipboard` / `globalShortcut` directly.
 
 ### 4.7 Acceptance
 
-- [x] Notepad copy → hotkey → inbox md opens focused — *capture write + hotkey register unit-tested; focus path reviewed in `desk-hotkey.ts` (manual smoke recommended)*
+- [x] Notepad copy → hotkey → inbox md opens focused — unit-tested + manual smoke done
 - [x] No workspace fails safely — `captureClipboardToInbox(null)`
 - [x] Empty clipboard creates no file — `captureClipboardToInbox` empty
 - [x] Disabled hotkey does not fire — `runDeskCaptureFromHotkey` / `refreshDeskCaptureHotkey`
@@ -597,6 +597,8 @@ E2E gate for Phase 1 = manual demo script checklist.
 
 | Date | Notes |
 |------|-------|
+| 2026-07-28 | Documented Clip in SPEC / ARCHITECTURE (`desk:*`, inbox·outbox) |
+| 2026-07-28 | Recorded product DoD manual smoke as done |
 | 2026-07-28 | Digested acceptance checklists (unit + static). Unified `markInboxDone` path checks with `deleteInbox`. Added capture/hotkey/list tests |
 | 2026-07-28 | Removed weekly digest from scope; restructured as S-tier four features |
 | 2026-07-28 | Initial combined S-tier five-feature spec |

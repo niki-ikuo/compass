@@ -31,7 +31,8 @@
 - Use-case presets (`general` / `document` / `data` / `code`) — orthogonal to Ask / Edit / Agent; see [USE_CASE_PRESET.md](./USE_CASE_PRESET.md)
 - Inline completions (ghost text / Tab accept; toggle in Settings)
 - Doc templates (built-in Markdown presets; workspace `.compass/templates/`)
-- Left sidebar Explorer / Outline / Search / Git tabs (cross-file heading jump + workspace text search + status/diff/commit)
+- Left sidebar Explorer / Outline / Search / Git / **Clip** tabs (cross-file heading jump + workspace text search + status/diff/commit + inbox/outbox)
+- Clip — hotkey capture → inbox / outbox → ship-check copy. Details: [DESK_LOOP.md](./DESK_LOOP.md)
 - Offline help + AI Help (`helps/` + `help:*` IPC)
 - Agent UX when tools unsupported — hide Agent toggle per provider; guided Edit fallback — see [AGENT_PLAN.md](./AGENT_PLAN.md) §7
 - Minimal Git UI (status / diff / stage / commit / discard / push / pull / branch switch via system `git`; no PR/GitHub auth yet)
@@ -53,11 +54,11 @@
 │ Explorer │  Tabs: plan.md  notes.md      │               │
 │ / Outline│───────────────────────────────│   AI chat     │
 │ / Search │                               │               │
-│ / Git    │                               │               │
-│  📁 docs │   Monaco Editor               │  ┌──────────┐ │
-│   📄 plan│   (syntax highlighting)       │  │ history  │ │
-│   📄 data│                               │  └──────────┘ │
-│          │                               │  [input]      │
+│ / Git /  │                               │               │
+│ Clip     │   Monaco Editor               │  ┌──────────┐ │
+│  📁 docs │   (syntax highlighting)       │  │ history  │ │
+│   📄 plan│                               │  └──────────┘ │
+│   📄 data│                               │  [input]      │
 │          │                               │  [send]       │
 ├──────────┴───────────────────────────────┴───────────────┤
 │  Status bar: line/col | language | connection            │
@@ -68,7 +69,7 @@
 |------|------|
 | Window size | Default 1280×800, resizable |
 | Layout | 3 panes (left sidebar 20% / editor 50% / chat 30%), panels collapsible |
-| Left sidebar | Explorer / Outline (all Markdown headings) / Search / Git (status·diff·commit) tabs |
+| Left sidebar | Explorer / Outline (all Markdown headings) / Search / Git (status·diff·commit) / Clip (inbox·outbox) tabs |
 
 ---
 
@@ -202,6 +203,7 @@ Tauri 2.0 + React + Monaco (smaller binary; more Windows friction)
 | `fs:openFolder` | Renderer → Main | Folder dialog |
 | `ai:chat` | Renderer → Main | Streaming chat |
 | `settings:get/set` | Renderer → Main | Settings R/W |
+| `desk:*` | Renderer → Main | Clip capture / list / ship-check copy (see [DESK_LOOP.md](./DESK_LOOP.md)) |
 
 ---
 
