@@ -27,7 +27,8 @@ function captureStamp(d = new Date()): string {
   return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`
 }
 
-async function uniqueInboxPath(dir: string, stamp: string): Promise<string> {
+/** Resolve a free inbox path for stamp; on collision appends `-2`, `-3`, … */
+export async function uniqueInboxPath(dir: string, stamp: string): Promise<string> {
   let candidate = join(dir, `${stamp}.md`)
   let i = 2
   for (;;) {
@@ -93,15 +94,27 @@ export async function captureClipboardToInbox(
   }
 }
 
+function isUnderInboxActive(workspaceRoot: string, absolutePath: string): boolean {
+  const root = resolve(inboxDir(workspaceRoot))
+  const target = resolve(absolutePath)
+  const rel = relative(root, target)
+  if (!rel || isAbsolute(rel)) return false
+  if (rel === '..' || rel.startsWith(`..${sep}`) || rel.startsWith('../')) return false
+  // Reject done/ and any nested path under done
+  const norm = rel.replace(/\\/g, '/')
+  if (norm === 'done' || norm.startsWith('done/')) return false
+  // Only direct children of inbox (no nested folders beyond a single file)
+  if (norm.includes('/')) return false
+  return true
+}
+
 export async function markInboxDone(
   workspaceRoot: string,
   absolutePath: string
 ): Promise<{ ok: true; absolutePath: string } | { ok: false; message: string }> {
   try {
     await ensureDeskDirs(workspaceRoot)
-    const normalized = absolutePath.replace(/\\/g, '/')
-    const inboxPrefix = inboxDir(workspaceRoot).replace(/\\/g, '/')
-    if (!normalized.startsWith(inboxPrefix) || normalized.includes('/done/')) {
+    if (!isUnderInboxActive(workspaceRoot, absolutePath)) {
       return { ok: false, message: t('desk.inbox.notInbox') }
     }
     const base = absolutePath.split(/[/\\]/).pop() || 'item.md'
@@ -159,20 +172,6 @@ export async function markAllInboxDone(
       message: error instanceof Error ? error.message : String(error)
     }
   }
-}
-
-function isUnderInboxActive(workspaceRoot: string, absolutePath: string): boolean {
-  const root = resolve(inboxDir(workspaceRoot))
-  const target = resolve(absolutePath)
-  const rel = relative(root, target)
-  if (!rel || isAbsolute(rel)) return false
-  if (rel === '..' || rel.startsWith(`..${sep}`) || rel.startsWith('../')) return false
-  // Reject done/ and any nested path under done
-  const norm = rel.replace(/\\/g, '/')
-  if (norm === 'done' || norm.startsWith('done/')) return false
-  // Only direct children of inbox (no nested folders beyond a single file)
-  if (norm.includes('/')) return false
-  return true
 }
 
 /** Permanently delete an active inbox capture (not done/). */

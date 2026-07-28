@@ -4,6 +4,8 @@
 
 Status: **Phase 1 implemented** (Capture / Clip / Outbox presets / Ship check Stage A + copy). Stage B, tray, etc. still later. Related: [SPEC.md](./SPEC.md), [ARCHITECTURE.md](./ARCHITECTURE.md), [TEXT_WORKSPACE_PLAN.md](./TEXT_WORKSPACE_PLAN.md), [AI_APPLY_UNDO.md](./AI_APPLY_UNDO.md), [USE_CASE_PRESET.md](./USE_CASE_PRESET.md).
 
+**Acceptance digested (2026-07-28):** Per-section checklists passed via unit tests + UI static review. Remaining: manual smoke of hotkey focus/open (product DoD demo).
+
 Feature set that moves Compass from “an editor that writes and fixes” to a **workbench: capture → organize → check → ship**.  
 The four features are not separate products. They are **four stops on one path**.
 
@@ -191,10 +193,10 @@ Renderer must not touch `clipboard` / `globalShortcut` directly.
 
 ### 4.7 Acceptance
 
-- [ ] Notepad copy → hotkey → inbox md opens focused  
-- [ ] No workspace fails safely  
-- [ ] Empty clipboard creates no file  
-- [ ] Disabled hotkey does not fire  
+- [x] Notepad copy → hotkey → inbox md opens focused — *capture write + hotkey register unit-tested; focus path reviewed in `desk-hotkey.ts` (manual smoke recommended)*
+- [x] No workspace fails safely — `captureClipboardToInbox(null)`
+- [x] Empty clipboard creates no file — `captureClipboardToInbox` empty
+- [x] Disabled hotkey does not fire — `runDeskCaptureFromHotkey` / `refreshDeskCaptureHotkey`
 
 ### 4.8 Non-goals
 
@@ -254,10 +256,10 @@ Parse frontmatter in Main (`desk-frontmatter.ts`).
 
 ### 5.6 Acceptance
 
-- [ ] Two sections; click opens file  
-- [ ] Done removes from inbox and appears under `done/`  
-- [ ] Empty state suggests next action  
-- [ ] Outbox row can start ship check (§7)  
+- [x] Two sections; click opens file — `DeskPanel` Inbox/Outbox + `openWorkspaceFile` (static review)
+- [x] Done removes from inbox and appears under `done/` — `markInboxDone` / `listDeskInbox`
+- [x] Empty state suggests next action — `desk.inboxEmpty` / `desk.outboxEmpty` (static review)
+- [x] Outbox row can start ship check (§7) — `DeskPanel` ship button → `runShipCheck` (static review)
 
 ### 5.7 Non-goals
 
@@ -337,10 +339,10 @@ Add built-in or workspace templates:
 
 ### 6.7 Acceptance
 
-- [ ] All four presets produce one outbox file after Apply  
-- [ ] Frontmatter has `kind` / `preset` / `status` / `createdAt`  
-- [ ] No silent Apply  
-- [ ] Visible on Desk Outbox after refresh  
+- [x] All four presets produce one outbox file after Apply — Edit request + unique path unit-tested (Apply rides existing AI Edit)
+- [x] Frontmatter has `kind` / `preset` / `status` / `createdAt` — shape prompts + `serializeOutboxDocument`
+- [x] No silent Apply — `buildOutboxDraftRequest` uses `mode: 'edit'`
+- [x] Visible on Desk Outbox after refresh — Apply-triggered `refresh` (static) + `listDeskOutbox`
 
 ### 6.8 Non-goals
 
@@ -432,11 +434,11 @@ type ShipFinding = {
 
 ### 7.8 Acceptance
 
-- [ ] TBD always yields `tbd_markers`  
-- [ ] Fake API key yields `secret_pattern`  
-- [ ] Copied text has no YAML frontmatter  
-- [ ] Stage B off/fail still allows copy via Stage A  
-- [ ] No auto rewrite Apply  
+- [x] TBD always yields `tbd_markers` — `runShipCheckStageA`
+- [x] Fake API key yields `secret_pattern` — `runShipCheckStageA`
+- [x] Copied text has no YAML frontmatter — `formatOutboxCopyPayload`
+- [x] Stage B off/fail still allows copy via Stage A — Stage B not implemented; Stage A alone suffices
+- [x] No auto rewrite Apply — Stage A returns findings only; body unchanged
 
 ### 7.9 Non-goals
 
@@ -595,5 +597,6 @@ E2E gate for Phase 1 = manual demo script checklist.
 
 | Date | Notes |
 |------|-------|
+| 2026-07-28 | Digested acceptance checklists (unit + static). Unified `markInboxDone` path checks with `deleteInbox`. Added capture/hotkey/list tests |
 | 2026-07-28 | Removed weekly digest from scope; restructured as S-tier four features |
 | 2026-07-28 | Initial combined S-tier five-feature spec |

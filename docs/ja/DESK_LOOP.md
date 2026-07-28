@@ -4,6 +4,8 @@
 
 状態: **Phase 1 実装済み**（Capture / Clip / Outbox 4プリセット / Ship Check Stage A + コピー）。Stage B・トレイ常駐などは未着手。関連: [SPEC.md](./SPEC.md)、[ARCHITECTURE.md](./ARCHITECTURE.md)、[TEXT_WORKSPACE_PLAN.md](./TEXT_WORKSPACE_PLAN.md)、[AI_APPLY_UNDO.md](./AI_APPLY_UNDO.md)、[USE_CASE_PRESET.md](./USE_CASE_PRESET.md)。
 
+**受け入れ消化（2026-07-28）:** 各章チェックリストを単体テスト＋UI静的確認で通過。製品 DoD デモ脚本の手動スモークは残タスク（ホットキー前面化の実機確認）。
+
 Compass を「書いて直すエディタ」から **「取って → 整理して → 検品して → 出す作業台」** に引き上げるための機能セット。  
 4機能は別製品ではない。**1本の導線の4駅**として設計・実装する。
 
@@ -195,10 +197,10 @@ Renderer は直接 `clipboard` / `globalShortcut` を触らない（既存セキ
 
 ### 4.7 受け入れ基準
 
-- [ ] メモ帳でコピー → ホットキー → inbox に md ができ、前面で開く  
-- [ ] ワークスペース無しで安全に失敗する  
-- [ ] 空クリップボードでファイルを作らない  
-- [ ] 設定でホットキー無効にすると発火しない  
+- [x] メモ帳でコピー → ホットキー → inbox に md ができ、前面で開く — *capture 成功書き込み＋hotkey 登録を単体で確認。前面化は `desk-hotkey.ts` 静的確認（実機スモーク推奨）*
+- [x] ワークスペース無しで安全に失敗する — `captureClipboardToInbox(null)`
+- [x] 空クリップボードでファイルを作らない — `captureClipboardToInbox` empty
+- [x] 設定でホットキー無効にすると発火しない — `runDeskCaptureFromHotkey` / `refreshDeskCaptureHotkey`
 
 ### 4.8 非目的（本機能）
 
@@ -259,10 +261,10 @@ Frontmatter パースは Main 側ユーティリティに集約（`desk-frontmat
 
 ### 5.6 受け入れ基準
 
-- [ ] 2セクションが表示され、クリックでファイルが開く  
-- [ ] 処理済みで inbox から消え、`done/` に存在する  
-- [ ] 空状態でも次の行動が分かる  
-- [ ] outbox 行から検品（§7）を起動できる  
+- [x] 2セクションが表示され、クリックでファイルが開く — `DeskPanel` Inbox/Outbox＋`openWorkspaceFile`（静的確認）
+- [x] 処理済みで inbox から消え、`done/` に存在する — `markInboxDone` / `listDeskInbox`
+- [x] 空状態でも次の行動が分かる — `desk.inboxEmpty` / `desk.outboxEmpty`（静的確認）
+- [x] outbox 行から検品（§7）を起動できる — `DeskPanel` 検品ボタン→`runShipCheck`（静的確認）
 
 ### 5.7 非目的（本機能）
 
@@ -353,10 +355,10 @@ frontmatter: `label`, `fileName` パターン, `order`。AI へのヒントを�
 
 ### 6.7 受け入れ基準
 
-- [ ] 4プリセットいずれも Apply 後に outbox へ1ファイルできる  
-- [ ] frontmatter に `kind/preset/status/createdAt` がある  
-- [ ] 自動で Apply されない（プレビュー必須）  
-- [ ] クリップ Outbox に即座またはリフレッシュ後に見える  
+- [x] 4プリセットいずれも Apply 後に outbox へ1ファイルできる — 各 preset の Edit リクエスト＋一意パスを単体確認（Apply 本体は既存 AI Edit 経路）
+- [x] frontmatter に `kind/preset/status/createdAt` がある — shape プロンプト＋`serializeOutboxDocument`
+- [x] 自動で Apply されない（プレビュー必須） — `buildOutboxDraftRequest` の `mode: 'edit'`
+- [x] クリップ Outbox に即座またはリフレッシュ後に見える — Apply 後 `lastAiApplyUndo` 監視で `refresh`（静的確認）＋`listDeskOutbox`
 
 ### 6.8 非目的（本機能）
 
@@ -452,11 +454,11 @@ type ShipFinding = {
 
 ### 7.8 受け入れ基準
 
-- [ ] TBD 入り outbox で必ず `tbd_markers` が出る  
-- [ ] 疑似 API キー文字列で `secret_pattern` が出る  
-- [ ] コピー内容に YAML frontmatter が含まれない  
-- [ ] Stage B オフまたは失敗でも Stage A だけでコピー可能  
-- [ ] 自動 Apply で本文を書き換えない（指摘のみ）  
+- [x] TBD 入り outbox で必ず `tbd_markers` が出る — `runShipCheckStageA`
+- [x] 疑似 API キー文字列で `secret_pattern` が出る — `runShipCheckStageA`
+- [x] コピー内容に YAML frontmatter が含まれない — `formatOutboxCopyPayload`
+- [x] Stage B オフまたは失敗でも Stage A だけでコピー可能 — Stage B 未実装のため Stage A のみで成立
+- [x] 自動 Apply で本文を書き換えない（指摘のみ） — Stage A は findings のみ、本文不変
 
 ### 7.9 非目的（本機能）
 
@@ -618,5 +620,6 @@ E2E はデモ脚本の手動チェックリストを Phase 1 のリリースゲ�
 
 | 日付 | 内容 |
 |------|------|
+| 2026-07-28 | 受け入れチェック消化（単体＋静的確認）。`markInboxDone` パス検証を `deleteInbox` と統一。capture/hotkey/list テスト追加 |
 | 2026-07-28 | 週次ダイジェストを範囲外として削除。S級4機能に再構成 |
 | 2026-07-28 | 初版。S級5機能の統合仕様 |

@@ -118,4 +118,23 @@ Bearer sk-abcdefghijklmnopqrstuvwxyz123456
     expect(payload).toContain('Hello there')
     expect(payload).not.toContain('kind: outbox')
   })
+
+  it('Stage A only reports findings and never rewrites the document body', () => {
+    const raw = serializeOutboxDocument(
+      {
+        kind: 'outbox',
+        preset: 'chat',
+        status: 'draft',
+        createdAt: '2026-07-28T00:00:00.000Z'
+      },
+      'Ship with TBD later.\n'
+    )
+    const result = runShipCheckStageA(raw)
+    expect(result.findings.some((f) => f.id === 'tbd_markers')).toBe(true)
+    expect(result.body.trim()).toBe('Ship with TBD later.')
+    const payload = formatOutboxCopyPayload(raw)
+    expect(payload.trim()).toBe('Ship with TBD later.')
+    expect(payload).not.toContain('---')
+    expect(payload).not.toContain('kind: outbox')
+  })
 })

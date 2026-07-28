@@ -26,6 +26,22 @@ describe('desk-presets localization', () => {
     expect(request.text).toContain('Create exactly one new outbox draft')
     expect(request.text).not.toContain('ちょうど1つだけ')
   })
+
+  it('builds Edit-mode requests for all four presets with unique outbox paths', () => {
+    setLocale('en')
+    const presets = ['mail', 'minutes', 'report', 'chat'] as const
+    const paths = new Set<string>()
+    for (const preset of presets) {
+      const request = buildOutboxDraftRequest(null, 'C:/ws', preset, 'en')
+      expect(request.mode).toBe('edit')
+      expect(request.text).toContain(`.compass/outbox/${preset}-`)
+      expect(request.text).toMatch(/kind:\s*outbox|preset:\s*|status:\s*draft|createdAt/i)
+      const match = request.text.match(/\.compass\/outbox\/[^\s`]+\.md/)
+      expect(match).toBeTruthy()
+      if (match) paths.add(match[0])
+    }
+    expect(paths.size).toBe(4)
+  })
 })
 
 describe('outboxRelativePath uniqueness', () => {
