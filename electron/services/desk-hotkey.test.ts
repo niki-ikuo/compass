@@ -8,8 +8,8 @@ const getLastWorkspaceRoot = vi.fn()
 
 vi.mock('electron', () => ({
   globalShortcut: {
-    register: (...args: unknown[]) => register(...args),
-    unregister: (...args: unknown[]) => unregister(...args)
+    register: (...args: unknown[]) => register.apply(null, args as never),
+    unregister: (...args: unknown[]) => unregister.apply(null, args as never)
   },
   BrowserWindow: class {},
   Notification: Object.assign(
@@ -21,12 +21,14 @@ vi.mock('electron', () => ({
 }))
 
 vi.mock('./desk-capture', () => ({
-  captureClipboardToInbox: (...args: unknown[]) => captureClipboardToInbox(...args)
+  captureClipboardToInbox: (...args: unknown[]) =>
+    captureClipboardToInbox.apply(null, args as never)
 }))
 
 vi.mock('./settings', () => ({
-  getSettings: (...args: unknown[]) => getSettings(...args),
-  getLastWorkspaceRoot: (...args: unknown[]) => getLastWorkspaceRoot(...args)
+  getSettings: (...args: unknown[]) => getSettings.apply(null, args as never),
+  getLastWorkspaceRoot: (...args: unknown[]) =>
+    getLastWorkspaceRoot.apply(null, args as never)
 }))
 
 import {

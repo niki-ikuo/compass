@@ -144,7 +144,7 @@ const gotSingleInstanceLock = app.requestSingleInstanceLock()
 if (!gotSingleInstanceLock) {
   app.quit()
 } else {
-  app.on('got-second-instance', () => {
+  app.on('second-instance', () => {
     if (!mainWindow || mainWindow.isDestroyed()) {
       if (app.isReady()) {
         void createWindow()
