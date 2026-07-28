@@ -139,6 +139,22 @@ if (process.platform === 'win32') {
   app.setAppUserModelId('com.compass.editor')
 }
 
+// 設定・.compass・ホットキー・トレイはプロセス共有前提。複数起動は許可しない。
+const gotSingleInstanceLock = app.requestSingleInstanceLock()
+if (!gotSingleInstanceLock) {
+  app.quit()
+} else {
+  app.on('got-second-instance', () => {
+    if (!mainWindow || mainWindow.isDestroyed()) {
+      if (app.isReady()) {
+        void createWindow()
+      }
+      return
+    }
+    showMainWindowFromTray(() => mainWindow)
+  })
+}
+
 function resetCloseRequestState(): void {
   closeRequestInFlight = false
   if (closeRequestResetTimer) {
@@ -1174,32 +1190,34 @@ function registerIpcHandlers(): void {
   )
 }
 
-app.whenReady().then(async () => {
-  await getSettings()
-  await syncDeskTrayEnabledFromSettings()
-  applyPackagedContentSecurityPolicy()
-  registerIpcHandlers()
-  await createWindow()
-  createMenu()
-  await refreshTrayAndHotkey()
+if (gotSingleInstanceLock) {
+  app.whenReady().then(async () => {
+    await getSettings()
+    await syncDeskTrayEnabledFromSettings()
+    applyPackagedContentSecurityPolicy()
+    registerIpcHandlers()
+    await createWindow()
+    createMenu()
+    await refreshTrayAndHotkey()
 
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-      void createWindow()
-      return
-    }
-    showMainWindowFromTray(() => mainWindow)
+    app.on('activate', () => {
+      if (BrowserWindow.getAllWindows().length === 0) {
+        void createWindow()
+        return
+      }
+      showMainWindowFromTray(() => mainWindow)
+    })
   })
-})
 
-app.on('before-quit', () => {
-  isAppQuitting = true
-})
+  app.on('before-quit', () => {
+    isAppQuitting = true
+  })
 
-app.on('window-all-closed', () => {
-  stopIndexWatcher()
-  killAllTerminals()
-  unregisterDeskCaptureHotkey()
-  destroyDeskTray()
-  if (process.platform !== 'darwin') app.quit()
-})
+  app.on('window-all-closed', () => {
+    stopIndexWatcher()
+    killAllTerminals()
+    unregisterDeskCaptureHotkey()
+    destroyDeskTray()
+    if (process.platform !== 'darwin') app.quit()
+  })
+}
