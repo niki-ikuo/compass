@@ -57,6 +57,12 @@ import {
   refreshDeskCaptureHotkey,
   unregisterDeskCaptureHotkey
 } from './services/desk-hotkey'
+import {
+  destroyDeskTray,
+  refreshDeskTray,
+  shouldHideToTray,
+  showMainWindowFromTray
+} from './services/desk-tray'
 import { listDeskInbox, listDeskOutbox } from './services/desk-list'
 import { archiveOutboxItem, archiveAllOutboxItems, deleteOutboxItem } from './services/desk-outbox'
 import { copyOutboxPayload, runDeskShipCheck } from './services/desk-ship-check'
@@ -120,6 +126,10 @@ let mainWindow: BrowserWindow | null = null
 let aiHelpMenuVisible = false
 /** 未保存確認を経たうえでウィンドウを閉じる許可 */
 let allowWindowClose = false
+/** File → Quit / tray Quit / before-quit — hide-to-tray を抑止 */
+let isAppQuitting = false
+/** 最新のトレイ設定（close ハンドラで同期 getSettings を避ける） */
+let deskTrayEnabled = false
 /** クローズ確認ダイアログ／レンダラ応答の処理中（二重ダイアログ防止） */
 let closeRequestInFlight = false
 let closeRequestResetTimer: ReturnType<typeof setTimeout> | null = null
@@ -134,6 +144,45 @@ function resetCloseRequestState(): void {
   if (closeRequestResetTimer) {
     clearTimeout(closeRequestResetTimer)
     closeRequestResetTimer = null
+  }
+}
+
+async function syncDeskTrayEnabledFromSettings(): Promise<void> {
+  const settings = await getSettings()
+  deskTrayEnabled = settings.deskTrayEnabled === true
+}
+
+function beginQuitFlow(): void {
+  isAppQuitting = true
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    app.quit()
+    return
+  }
+  if (!mainWindow.isVisible()) {
+    showMainWindowFromTray(() => mainWindow)
+  }
+  if (allowWindowClose) {
+    mainWindow.close()
+    return
+  }
+  if (!mainWindow.webContents || mainWindow.webContents.isLoadingMainFrame()) {
+    allowWindowClose = true
+    mainWindow.close()
+    return
+  }
+  requestRendererCloseConfirm()
+}
+
+async function refreshTrayAndHotkey(): Promise<void> {
+  await syncDeskTrayEnabledFromSettings()
+  await refreshDeskCaptureHotkey(() => mainWindow)
+  await refreshDeskTray(appIcon, {
+    getMainWindow: () => mainWindow,
+    requestQuit: () => beginQuitFlow()
+  })
+  // Turning tray off while hidden: bring the window back so the next close can quit.
+  if (!deskTrayEnabled && mainWindow && !mainWindow.isDestroyed() && !mainWindow.isVisible()) {
+    showMainWindowFromTray(() => mainWindow)
   }
 }
 
@@ -237,6 +286,17 @@ async function createWindow(): Promise<void> {
   }
 
   mainWindow.on('close', (event) => {
+    if (
+      shouldHideToTray({
+        deskTrayEnabled,
+        isAppQuitting,
+        allowWindowClose
+      })
+    ) {
+      event.preventDefault()
+      mainWindow?.hide()
+      return
+    }
     if (allowWindowClose) return
     event.preventDefault()
     if (!mainWindow?.webContents || mainWindow.webContents.isLoadingMainFrame()) {
@@ -281,7 +341,11 @@ function createMenu(): void {
           click: () => mainWindow?.webContents.send('menu:settings')
         },
         { type: 'separator' },
-        { role: 'quit', label: t('menu.quit') }
+        {
+          label: t('menu.quit'),
+          accelerator: 'CmdOrCtrl+Q',
+          click: () => beginQuitFlow()
+        }
       ]
     },
     {
@@ -430,16 +494,12 @@ type ViewAction = 'reload' | 'toggleDevTools' | 'resetZoom' | 'zoomIn' | 'zoomOu
 
 function registerIpcHandlers(): void {
   ipcMain.handle('shell:quit', () => {
-    // app.quit() 直呼びではなく close フロー（未保存確認）を通す
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.close()
-      return
-    }
-    app.quit()
+    beginQuitFlow()
   })
 
   ipcMain.handle('app:allow-close', () => {
     resetCloseRequestState()
+    isAppQuitting = true
     allowWindowClose = true
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.close()
@@ -448,6 +508,7 @@ function registerIpcHandlers(): void {
 
   ipcMain.handle('app:cancel-close', () => {
     resetCloseRequestState()
+    isAppQuitting = false
   })
 
   ipcMain.handle('dialog:unsavedQuit', async (_event, count: number) => {
@@ -743,7 +804,7 @@ function registerIpcHandlers(): void {
   ipcMain.handle('settings:set', async (_event, settings: AppSettings) => {
     await setSettings(settings)
     createMenu()
-    await refreshDeskCaptureHotkey(() => mainWindow)
+    await refreshTrayAndHotkey()
   })
 
   ipcMain.handle('desk:ensureDirs', async (_event, workspaceRoot: string) => {
@@ -1115,20 +1176,30 @@ function registerIpcHandlers(): void {
 
 app.whenReady().then(async () => {
   await getSettings()
+  await syncDeskTrayEnabledFromSettings()
   applyPackagedContentSecurityPolicy()
   registerIpcHandlers()
   await createWindow()
   createMenu()
-  await refreshDeskCaptureHotkey(() => mainWindow)
+  await refreshTrayAndHotkey()
 
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) void createWindow()
+    if (BrowserWindow.getAllWindows().length === 0) {
+      void createWindow()
+      return
+    }
+    showMainWindowFromTray(() => mainWindow)
   })
+})
+
+app.on('before-quit', () => {
+  isAppQuitting = true
 })
 
 app.on('window-all-closed', () => {
   stopIndexWatcher()
   killAllTerminals()
   unregisterDeskCaptureHotkey()
+  destroyDeskTray()
   if (process.platform !== 'darwin') app.quit()
 })

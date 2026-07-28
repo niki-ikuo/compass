@@ -436,6 +436,11 @@ export interface AppSettings {
   deskCaptureAccelerator: string
   /** After capture: open the file or switch to Desk tab */
   deskCaptureOpenTarget: DeskCaptureOpenTarget
+  /**
+   * When true, closing the window hides to the tray and keeps capture hotkey alive.
+   * Quit from tray / File → Quit still runs the unsaved confirm flow.
+   */
+  deskTrayEnabled: boolean
 }
 
 /** App-wide LLM usage for the current reset period (BYOK cost awareness). */
@@ -1227,5 +1232,6 @@ export const DEFAULT_SETTINGS: AppSettings = {
   usageResetDay: 1,
   deskCaptureEnabled: true,
   deskCaptureAccelerator: 'CommandOrControl+Alt+I',
-  deskCaptureOpenTarget: 'file'
+  deskCaptureOpenTarget: 'file',
+  deskTrayEnabled: false
 }

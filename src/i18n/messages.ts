@@ -279,6 +279,11 @@ export const ja = {
   'settings.deskCaptureOpenTarget': '取込後の動作',
   'settings.deskCaptureOpenFile': 'ファイルを開く',
   'settings.deskCaptureOpenDesk': 'クリップを開く',
+  'settings.deskTray': '閉じたらトレイに常駐',
+  'settings.deskTrayHint':
+    'ウィンドウを閉じても取込ホットキーを維持します。終了はトレイまたは「ファイル → 終了」から',
+  'desk.tray.show': 'Compass を開く',
+  'desk.tray.quit': 'Compass を終了',
   'settings.deskCaptureHotkeyOk': 'ホットキーは登録済みです（{accelerator}）',
   'settings.deskCaptureHotkeyDisabled': 'ホットキーはオフです',
   'settings.deskCaptureHotkeyFailed':
@@ -1239,6 +1244,11 @@ export const en: Record<MessageKey, string> = {
   'settings.deskCaptureOpenTarget': 'After capture',
   'settings.deskCaptureOpenFile': 'Open file',
   'settings.deskCaptureOpenDesk': 'Open Clip',
+  'settings.deskTray': 'Keep running in the tray when closed',
+  'settings.deskTrayHint':
+    'Keeps the capture hotkey alive after closing the window. Quit from the tray or File → Quit',
+  'desk.tray.show': 'Open Compass',
+  'desk.tray.quit': 'Quit Compass',
   'settings.deskCaptureHotkeyOk': 'Hotkey registered ({accelerator})',
   'settings.deskCaptureHotkeyDisabled': 'Hotkey is off',
   'settings.deskCaptureHotkeyFailed':

@@ -2,7 +2,7 @@
 
 **English** | [日本語](ja/DESK_LOOP.md)
 
-Status: **Phase 1 implemented** (Capture / Clip / Outbox presets / Ship check Stage A + copy). Stage B, tray, etc. still later. Related: [SPEC.md](./SPEC.md), [ARCHITECTURE.md](./ARCHITECTURE.md), [TEXT_WORKSPACE_PLAN.md](./TEXT_WORKSPACE_PLAN.md), [AI_APPLY_UNDO.md](./AI_APPLY_UNDO.md), [USE_CASE_PRESET.md](./USE_CASE_PRESET.md).
+Status: **Phase 1 implemented** (Capture / Clip / Outbox presets / Ship check Stage A + copy). **Tray residency (keep capture after close) is shipped as an opt-in setting.** Stage B and login-item capture queue still later. Related: [SPEC.md](./SPEC.md), [ARCHITECTURE.md](./ARCHITECTURE.md), [TEXT_WORKSPACE_PLAN.md](./TEXT_WORKSPACE_PLAN.md), [AI_APPLY_UNDO.md](./AI_APPLY_UNDO.md), [USE_CASE_PRESET.md](./USE_CASE_PRESET.md).
 
 **Acceptance digested (2026-07-28):** Per-section checklists passed via unit tests + UI static review. Product DoD demo script (capture → draft → ship → done) smoked on a real build.
 
@@ -200,7 +200,7 @@ Renderer must not touch `clipboard` / `globalShortcut` directly.
 
 ### 4.8 Non-goals
 
-- Always-on helper when app is quit (Phase 2: tray)  
+- Always-on helper when app is fully quit (login item + capture queue still later; close-to-tray residency is an opt-in setting)  
 - Win32 direct selection APIs  
 - Browser extension / Share target  
 
@@ -529,12 +529,13 @@ FS / shortcut / clipboard writes: **Main only**. AI writes ride existing preview
 ### Phase 1 (two-week minimum)
 
 Required: Capture / Desk lists / four outbox presets / Ship check Stage A + copy.  
-Cuttable: Stage B, hotkey recorder UI (fixed default OK), tray, generic md ship check.
+Cuttable: Stage B, hotkey recorder UI (fixed default OK), login-item capture queue, generic md ship check.  
+Also shipped: **tray residency** (close → hide, keep capture hotkey; opt-in setting).
 
 ### Phase 2
 
 - Findings → fix proposal (preview)  
-- Tray + offline capture queue  
+- Login item + offline capture queue  
 - outbox → `.eml` or better mailto  
 - Inbox bulk “draftize” wizard  
 
@@ -597,6 +598,7 @@ E2E gate for Phase 1 = manual demo script checklist.
 
 | Date | Notes |
 |------|-------|
+| 2026-07-28 | Added opt-in tray residency (keep capture hotkey after close) |
 | 2026-07-28 | Documented Clip in SPEC / ARCHITECTURE (`desk:*`, inbox·outbox) |
 | 2026-07-28 | Recorded product DoD manual smoke as done |
 | 2026-07-28 | Digested acceptance checklists (unit + static). Unified `markInboxDone` path checks with `deleteInbox`. Added capture/hotkey/list tests |

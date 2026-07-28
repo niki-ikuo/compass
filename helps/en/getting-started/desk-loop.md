@@ -28,4 +28,4 @@ Capture text from other apps, draft outbound notes, and check them before you pa
 
 ## Settings
 
-Settings → **Clip** controls the hotkey and what opens after capture.
+Settings → **Clip** controls the hotkey, what opens after capture, and **Keep running in the tray when closed**. With tray on, closing the window keeps the capture hotkey alive. Fully quit from the tray menu or **File → Quit**.

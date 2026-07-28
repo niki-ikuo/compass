@@ -51,6 +51,7 @@ interface StoredSettings {
   deskCaptureEnabled: boolean
   deskCaptureAccelerator: string
   deskCaptureOpenTarget: DeskCaptureOpenTarget
+  deskTrayEnabled: boolean
   lastWorkspaceRoot: string | null
   recentWorkspaceRoots: string[]
 }
@@ -132,6 +133,10 @@ function resolveDeskCaptureAccelerator(value: unknown): string {
 
 function resolveDeskCaptureOpenTarget(value: unknown): DeskCaptureOpenTarget {
   return value === 'desk' || value === 'file' ? value : DEFAULT_SETTINGS.deskCaptureOpenTarget
+}
+
+function resolveDeskTrayEnabled(value: unknown): boolean {
+  return typeof value === 'boolean' ? value : DEFAULT_SETTINGS.deskTrayEnabled
 }
 
 function resolveProviderId(value: unknown, apiBaseUrl: string): LlmProviderId {
@@ -220,6 +225,7 @@ async function readStoredSettings(): Promise<StoredSettings> {
       deskCaptureEnabled: resolveDeskCaptureEnabled(stored.deskCaptureEnabled),
       deskCaptureAccelerator: resolveDeskCaptureAccelerator(stored.deskCaptureAccelerator),
       deskCaptureOpenTarget: resolveDeskCaptureOpenTarget(stored.deskCaptureOpenTarget),
+      deskTrayEnabled: resolveDeskTrayEnabled(stored.deskTrayEnabled),
       lastWorkspaceRoot: stored.lastWorkspaceRoot ?? null,
       recentWorkspaceRoots:
         stored.recentWorkspaceRoots ??
@@ -251,6 +257,7 @@ async function readStoredSettings(): Promise<StoredSettings> {
       deskCaptureEnabled: DEFAULT_SETTINGS.deskCaptureEnabled,
       deskCaptureAccelerator: DEFAULT_SETTINGS.deskCaptureAccelerator,
       deskCaptureOpenTarget: DEFAULT_SETTINGS.deskCaptureOpenTarget,
+      deskTrayEnabled: DEFAULT_SETTINGS.deskTrayEnabled,
       lastWorkspaceRoot: null,
       recentWorkspaceRoots: []
     }
@@ -336,7 +343,8 @@ function toAppSettings(stored: StoredSettings): AppSettings {
     usageResetDay: stored.usageResetDay,
     deskCaptureEnabled: stored.deskCaptureEnabled,
     deskCaptureAccelerator: stored.deskCaptureAccelerator,
-    deskCaptureOpenTarget: stored.deskCaptureOpenTarget
+    deskCaptureOpenTarget: stored.deskCaptureOpenTarget,
+    deskTrayEnabled: stored.deskTrayEnabled
   }
 }
 
@@ -394,7 +402,8 @@ export async function setSettings(settings: AppSettings): Promise<void> {
     usageResetDay: resolveUsageResetDay(settings.usageResetDay),
     deskCaptureEnabled: resolveDeskCaptureEnabled(settings.deskCaptureEnabled),
     deskCaptureAccelerator: resolveDeskCaptureAccelerator(settings.deskCaptureAccelerator),
-    deskCaptureOpenTarget: resolveDeskCaptureOpenTarget(settings.deskCaptureOpenTarget)
+    deskCaptureOpenTarget: resolveDeskCaptureOpenTarget(settings.deskCaptureOpenTarget),
+    deskTrayEnabled: resolveDeskTrayEnabled(settings.deskTrayEnabled)
   })
   setLocale(locale)
 }

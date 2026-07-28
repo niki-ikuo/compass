@@ -56,7 +56,7 @@ electron/
     ├── terminal.ts         # PTY
     ├── help.ts / help-ask.ts  # Offline help + AI Help
     ├── desk-capture.ts / desk-hotkey.ts / desk-list.ts
-    ├── desk-outbox.ts / desk-ship-check.ts / desk-dirs.ts  # Clip (capture / list / ship-check)
+    ├── desk-outbox.ts / desk-ship-check.ts / desk-dirs.ts / desk-tray.ts  # Clip (capture / list / ship-check / tray)
     └── encoding.ts         # Character encoding
 
 src/

@@ -2,7 +2,7 @@
 
 [English](../DESK_LOOP.md) | **日本語**
 
-状態: **Phase 1 実装済み**（Capture / Clip / Outbox 4プリセット / Ship Check Stage A + コピー）。Stage B・トレイ常駐などは未着手。関連: [SPEC.md](./SPEC.md)、[ARCHITECTURE.md](./ARCHITECTURE.md)、[TEXT_WORKSPACE_PLAN.md](./TEXT_WORKSPACE_PLAN.md)、[AI_APPLY_UNDO.md](./AI_APPLY_UNDO.md)、[USE_CASE_PRESET.md](./USE_CASE_PRESET.md)。
+状態: **Phase 1 実装済み**（Capture / Clip / Outbox 4プリセット / Ship Check Stage A + コピー）。**トレイ常駐（閉じても取込維持）は設定オプトインで実装済み**。Stage B・ログイン起動キューなどは未着手。関連: [SPEC.md](./SPEC.md)、[ARCHITECTURE.md](./ARCHITECTURE.md)、[TEXT_WORKSPACE_PLAN.md](./TEXT_WORKSPACE_PLAN.md)、[AI_APPLY_UNDO.md](./AI_APPLY_UNDO.md)、[USE_CASE_PRESET.md](./USE_CASE_PRESET.md)。
 
 **受け入れ消化（2026-07-28）:** 各章チェックリストを単体テスト＋UI静的確認で通過。製品 DoD デモ脚本（取込→下書き→検品→済）は実機スモーク済み。
 
@@ -204,7 +204,7 @@ Renderer は直接 `clipboard` / `globalShortcut` を触らない（既存セキ
 
 ### 4.8 非目的（本機能）
 
-- アプリ未起動時の常駐フック専用プロセス（Phase 2 候補: トレイ常駐）  
+- アプリ未起動時の常駐フック専用プロセス（ログイン起動＋取込キューは後続。閉じたあとのトレイ常駐は設定で可）  
 - 選択テキストの Win32 直接取得（クリップボード経由で足りる）  
 - ブラウザ拡張 / 「共有」ターゲット  
 
@@ -552,12 +552,13 @@ AI 書き込みは既存 `previewActions` / `applyActions` / AI Undo に載せ�
 ### Phase 1（2週間・出荷最小）
 
 必須: Capture / Desk 一覧 / Outbox 4プリセット / Ship Check Stage A + コピー。  
-切り捨て可: Stage B、ホットキー変更 UI（既定キーのみでも可）、トレイ常駐、汎用 md 検品。
+切り捨て可: Stage B、ホットキー変更 UI（既定キーのみでも可）、ログイン起動キュー、汎用 md 検品。  
+追加実装: **トレイ常駐（閉じる→hide、取込ホットキー維持。設定オプトイン）**。
 
 ### Phase 2
 
 - 検品の指摘 → 修正提案（preview）  
-- トレイ常駐＋未起動時の取込キュー  
+- ログイン起動＋未起動時の取込キュー  
 - outbox → `.eml` 生成または mailto の改善  
 - inbox 一括「下書き化」ウィザード  
 
@@ -620,6 +621,7 @@ E2E はデモ脚本の手動チェックリストを Phase 1 のリリースゲ�
 
 | 日付 | 内容 |
 |------|------|
+| 2026-07-28 | トレイ常駐（閉じても取込ホットキー維持、設定オプトイン）を追加 |
 | 2026-07-28 | SPEC / ARCHITECTURE にクリップ（`desk:*` / inbox·outbox）を追記 |
 | 2026-07-28 | 製品 DoD 実機スモーク済みを記録 |
 | 2026-07-28 | 受け入れチェック消化（単体＋静的確認）。`markInboxDone` パス検証を `deleteInbox` と統一。capture/hotkey/list テスト追加 |

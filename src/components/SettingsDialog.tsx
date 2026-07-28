@@ -97,7 +97,8 @@ function buildSettingsSnapshot(
     deskCaptureAccelerator:
       settings.deskCaptureAccelerator || DEFAULT_SETTINGS.deskCaptureAccelerator,
     deskCaptureOpenTarget:
-      settings.deskCaptureOpenTarget === 'desk' ? 'desk' : 'file'
+      settings.deskCaptureOpenTarget === 'desk' ? 'desk' : 'file',
+    deskTrayEnabled: settings.deskTrayEnabled === true
   }
   return {
     form,
@@ -789,6 +790,17 @@ export function SettingsPanel() {
                 {formatDeskHotkeyStatusMessage(deskHotkeyStatus)}
               </p>
             ) : null}
+            <label className="settings-checkbox-label">
+              <input
+                type="checkbox"
+                checked={form.deskTrayEnabled}
+                onChange={(e) => setForm({ ...form, deskTrayEnabled: e.target.checked })}
+              />
+              <span>
+                {t('settings.deskTray')}
+                <span className="field-hint">{t('settings.deskTrayHint')}</span>
+              </span>
+            </label>
             <label>
               {t('settings.deskCaptureOpenTarget')}
               <select
