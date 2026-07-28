@@ -3,7 +3,9 @@ import { useAppStore } from '@/stores/app-store'
 import { getFileName } from '@/utils/language'
 import { formatUiPath } from '@/utils/display-path'
 import { isBrowserOpenFile } from '@/utils/browser-tab'
+import { isCompareOpenFile } from '@/utils/compare-tab'
 import { isSettingsOpenFile } from '@/utils/settings-tab'
+import { isComparablePath, openCompareFiles } from '@/utils/open-compare-files'
 import {
   CHAT_CONTEXT_DRAG_MIME,
   serializeChatContextRefs,
@@ -31,14 +33,20 @@ interface TabContextMenuState {
 }
 
 function canDragTabToChat(file: OpenFile): boolean {
-  return !isBrowserOpenFile(file) && !isSettingsOpenFile(file)
+  return !isBrowserOpenFile(file) && !isSettingsOpenFile(file) && !isCompareOpenFile(file)
 }
 
 function tabLabel(
   file: OpenFile,
-  labels: { browser: string; settings: string }
+  labels: { browser: string; settings: string; compare: (left: string, right: string) => string }
 ): string {
   if (isSettingsOpenFile(file)) return labels.settings
+  if (isCompareOpenFile(file)) {
+    return labels.compare(
+      getFileName(file.compareLeftPath ?? ''),
+      getFileName(file.compareRightPath ?? '')
+    )
+  }
   if (isBrowserOpenFile(file)) {
     const title = file.browserTitle?.trim()
     if (title) return title
@@ -184,6 +192,26 @@ export function TabBar() {
       isDataResultNotePath(contextMenuFile.path) &&
       parseDataResultFrontmatter(contextMenuFile.content).meta
   )
+  const canCompareWith = Boolean(
+    contextMenuFile &&
+      !contextMenuFile.isPreview &&
+      (contextMenuFile.viewKind === undefined || contextMenuFile.viewKind === 'text') &&
+      isComparablePath(contextMenuFile.path)
+  )
+
+  const compareWithFromTab = async () => {
+    if (!contextMenuFile) return
+    const leftPath = contextMenuFile.path
+    closeContextMenu()
+    try {
+      const picked = await window.compass.fs.pickFiles()
+      const rightPath = picked?.[0]
+      if (!rightPath) return
+      await openCompareFiles(leftPath, rightPath)
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : t('explorer.compareFailed'))
+    }
+  }
 
   return (
     <div
@@ -220,7 +248,7 @@ export function TabBar() {
         return (
           <div
             key={file.path}
-            className={`tab${file.path === activeFilePath ? ' active' : ''}${file.isPreview ? ' preview-tab' : ''}${file.isTransient ? ' transient-tab' : ''}${isBrowserOpenFile(file) ? ' browser-tab' : ''}${isSettingsOpenFile(file) ? ' settings-tab-item' : ''} draggable${dragPath === file.path ? ' tab-dragging' : ''}${showDropBefore ? ' tab-drop-before' : ''}`}
+            className={`tab${file.path === activeFilePath ? ' active' : ''}${file.isPreview ? ' preview-tab' : ''}${file.isTransient ? ' transient-tab' : ''}${isBrowserOpenFile(file) ? ' browser-tab' : ''}${isSettingsOpenFile(file) ? ' settings-tab-item' : ''}${isCompareOpenFile(file) ? ' compare-tab' : ''} draggable${dragPath === file.path ? ' tab-dragging' : ''}${showDropBefore ? ' tab-drop-before' : ''}`}
             draggable
             onClick={() => setActiveFile(file.path)}
             onDoubleClick={() => {
@@ -285,14 +313,17 @@ export function TabBar() {
                   ? file.browserUrl
                   : isSettingsOpenFile(file)
                     ? t('settings.title')
-                    : formatUiPath(file.path, { workspaceRoot, maxChars: 10_000 }).title
+                    : isCompareOpenFile(file)
+                      ? `${file.compareLeftPath ?? ''} ↔ ${file.compareRightPath ?? ''}`
+                      : formatUiPath(file.path, { workspaceRoot, maxChars: 10_000 }).title
               }
             >
               {file.isPreview && <span className="tab-preview-badge">P</span>}
               {file.isDirty && !file.isPreview && <span className="dirty-dot">●</span>}
               {tabLabel(file, {
                 browser: t('browser.newTab'),
-                settings: t('settings.title')
+                settings: t('settings.title'),
+                compare: (left, right) => t('editor.compareTab', { left, right })
               })}
             </span>
             <button
@@ -329,6 +360,11 @@ export function TabBar() {
           {canRerunDataQuery && (
             <button type="button" onClick={rerunDataQueryFromTab}>
               {t('explorer.rerunDataQuery')}
+            </button>
+          )}
+          {canCompareWith && (
+            <button type="button" onClick={() => void compareWithFromTab()}>
+              {t('explorer.compareWith')}
             </button>
           )}
           <button

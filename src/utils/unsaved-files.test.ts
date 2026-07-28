@@ -24,6 +24,23 @@ describe('listDirtySavableFiles', () => {
     ]
     expect(listDirtySavableFiles(files).map((f) => f.path)).toEqual(['a.txt'])
   })
+
+  it('expands dirty compare sides into real file paths', () => {
+    const files = [
+      file({
+        path: 'compass-compare://1',
+        viewKind: 'compare',
+        isDirty: true,
+        compareLeftPath: 'left.md',
+        compareRightPath: 'right.md',
+        compareLeftContent: 'L',
+        compareRightContent: 'R',
+        compareLeftDirty: true,
+        compareRightDirty: false
+      })
+    ]
+    expect(listDirtySavableFiles(files).map((f) => f.path)).toEqual(['left.md'])
+  })
 })
 
 describe('prepareCloseFiles', () => {

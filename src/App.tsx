@@ -154,6 +154,26 @@ export function App() {
       return
     }
 
+    if (activeFile.viewKind === 'compare') {
+      if (activeFile.compareLeftDirty && activeFile.compareLeftPath) {
+        await window.compass.fs.writeFile(
+          activeFile.compareLeftPath,
+          activeFile.compareLeftContent ?? '',
+          activeFile.compareLeftEncoding ?? 'utf8'
+        )
+        markFileSaved(activeFile.compareLeftPath)
+      }
+      if (activeFile.compareRightDirty && activeFile.compareRightPath) {
+        await window.compass.fs.writeFile(
+          activeFile.compareRightPath,
+          activeFile.compareRightContent ?? activeFile.content,
+          activeFile.compareRightEncoding ?? activeFile.encoding
+        )
+        markFileSaved(activeFile.compareRightPath)
+      }
+      return
+    }
+
     await window.compass.fs.writeFile(activeFile.path, activeFile.content, activeFile.encoding)
     markFileSaved(activeFile.path)
   }, [getActiveFile, markFileSaved])

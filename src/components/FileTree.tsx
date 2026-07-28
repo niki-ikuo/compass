@@ -38,6 +38,7 @@ import {
 } from './icons/ToolbarIcons'
 import { FileTreeNodeIcon } from './icons/FileTypeIcons'
 import { openWorkspaceFile } from '@/utils/open-workspace-file'
+import { isComparablePath, openCompareFiles } from '@/utils/open-compare-files'
 import { isHtmlFilePath, pathToFileUrl } from '@/utils/browser-tab'
 import { isExtractableDocumentPath } from '@/utils/extractable-document'
 import { buildSummarizeToMarkdownRequest } from '@/utils/summarize-to-markdown'
@@ -2015,6 +2016,20 @@ export function FileTree() {
       !contextMenu.node.isDirectory &&
       isHtmlFilePath(contextMenu.node.path)
   )
+  const selectedComparableFiles = visibleNodes.filter(
+    (n) =>
+      selectedPaths.has(normalizeNodePath(n.path)) &&
+      !n.isDirectory &&
+      !n.isPreview &&
+      isComparablePath(n.path)
+  )
+  const canCompareSelected = selectedComparableFiles.length === 2
+  const canCompareWith = Boolean(
+    contextMenu?.node &&
+      !contextMenu.node.isPreview &&
+      !contextMenu.node.isDirectory &&
+      isComparablePath(contextMenu.node.path)
+  )
   const canSearchInFolder = Boolean(
     contextMenu?.node && contextMenu.node.isDirectory && !contextMenu.node.isPreview
   )
@@ -2025,7 +2040,12 @@ export function FileTree() {
     canAskAboutData ||
     canSaveDataResult ||
     canRerunDataQuery
-  const hasOpenActions = canOpenInTabBrowser || canOpenWithDefaultApp || canShowInOsExplorer
+  const hasOpenActions =
+    canOpenInTabBrowser ||
+    canOpenWithDefaultApp ||
+    canShowInOsExplorer ||
+    canCompareSelected ||
+    canCompareWith
   const hasMutateActions = canRename || canDelete
   const isRootDropTarget = dropTargetPath === normalizeNodePath(workspaceRoot)
 
@@ -2220,6 +2240,41 @@ export function FileTree() {
                 </button>
               )}
               {hasOpenActions && hasContextActions && <div className="context-menu-separator" />}
+              {canCompareSelected && (
+                <button
+                  onMouseEnter={closeCreateSubmenu}
+                  onClick={() => {
+                    setContextMenu(null)
+                    void openCompareFiles(
+                      selectedComparableFiles[0].path,
+                      selectedComparableFiles[1].path
+                    )
+                  }}
+                >
+                  {t('explorer.compareSelected')}
+                </button>
+              )}
+              {canCompareWith && !canCompareSelected && (
+                <button
+                  onMouseEnter={closeCreateSubmenu}
+                  onClick={() => {
+                    const leftPath = contextMenu.node!.path
+                    setContextMenu(null)
+                    void (async () => {
+                      try {
+                        const picked = await window.compass.fs.pickFiles()
+                        const rightPath = picked?.[0]
+                        if (!rightPath) return
+                        await openCompareFiles(leftPath, rightPath)
+                      } catch (err) {
+                        setError(getErrorMessage(err, t('explorer.compareFailed')))
+                      }
+                    })()
+                  }}
+                >
+                  {t('explorer.compareWith')}
+                </button>
+              )}
               {canOpenInTabBrowser && (
                 <button
                   onMouseEnter={closeCreateSubmenu}

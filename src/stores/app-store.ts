@@ -45,6 +45,11 @@ import {
   toPersistedPanelLayout
 } from '@/utils/panel-layout'
 import { createBrowserTabPath, normalizeBrowserUrl } from '@/utils/browser-tab'
+import {
+  createCompareTabPath,
+  isCompareOpenFile,
+  pathsEqualIgnoreCase
+} from '@/utils/compare-tab'
 import { SETTINGS_TAB_PATH } from '@/utils/settings-tab'
 import { moveItemByDropIndex, reorderOpenSessionsById } from '@/utils/tab-reorder'
 import { t, isDefaultChatTitle } from '@/i18n'
@@ -151,6 +156,7 @@ function toPersistedOpenEditors(state: {
   const openTabs: PersistedOpenTab[] = []
   for (const file of state.openFiles) {
     if (file.isPreview || file.isTransient || file.viewKind === 'settings') continue
+    if (file.viewKind === 'compare') continue
     if (file.viewKind === 'browser') {
       openTabs.push({
         path: file.path,
@@ -869,6 +875,22 @@ interface AppState {
   openBinaryFile: (path: string, size: number, options?: { transient?: boolean }) => void
   openBrowserTab: (url?: string) => void
   openSettingsTab: () => void
+  openCompareTab: (input: {
+    leftPath: string
+    rightPath: string
+    leftContent: string
+    rightContent: string
+    leftEncoding?: FileEncoding
+    rightEncoding?: FileEncoding
+    leftDirty?: boolean
+    rightDirty?: boolean
+  }) => void
+  updateCompareSideContent: (
+    comparePath: string,
+    side: 'left' | 'right',
+    content: string
+  ) => void
+  swapCompareSides: (comparePath: string) => void
   updateBrowserTab: (
     path: string,
     patch: { browserUrl?: string; browserTitle?: string }
@@ -1353,6 +1375,108 @@ export const useAppStore = create<AppState>((set, get) => ({
       }
     }),
 
+  openCompareTab: (input) => {
+    set((state) => {
+      const existing = state.openFiles.find(
+        (f) =>
+          isCompareOpenFile(f) &&
+          f.compareLeftPath &&
+          f.compareRightPath &&
+          pathsEqualIgnoreCase(f.compareLeftPath, input.leftPath) &&
+          pathsEqualIgnoreCase(f.compareRightPath, input.rightPath)
+      )
+      if (existing) {
+        return { activeFilePath: existing.path }
+      }
+
+      const leftDirty = input.leftDirty === true
+      const rightDirty = input.rightDirty === true
+      const path = createCompareTabPath()
+      const tab: OpenFile = {
+        path,
+        content: input.rightContent,
+        language: getLanguageFromPath(input.rightPath),
+        encoding: input.rightEncoding ?? 'utf8',
+        isDirty: leftDirty || rightDirty,
+        viewKind: 'compare',
+        compareLeftPath: input.leftPath,
+        compareRightPath: input.rightPath,
+        compareLeftContent: input.leftContent,
+        compareRightContent: input.rightContent,
+        compareLeftEncoding: input.leftEncoding ?? 'utf8',
+        compareRightEncoding: input.rightEncoding ?? 'utf8',
+        compareLeftDirty: leftDirty,
+        compareRightDirty: rightDirty
+      }
+      return {
+        openFiles: [...state.openFiles, tab],
+        activeFilePath: path
+      }
+    })
+  },
+
+  updateCompareSideContent: (comparePath, side, content) =>
+    set((state) => {
+      const compare = state.openFiles.find((f) => f.path === comparePath)
+      if (!compare || !isCompareOpenFile(compare)) return state
+
+      const realPath =
+        side === 'left' ? compare.compareLeftPath : compare.compareRightPath
+      if (!realPath) return state
+
+      return {
+        openFiles: state.openFiles.map((f) => {
+          if (f.path === comparePath) {
+            if (side === 'left') {
+              return {
+                ...f,
+                compareLeftContent: content,
+                compareLeftDirty: true,
+                isDirty: true
+              }
+            }
+            return {
+              ...f,
+              content,
+              compareRightContent: content,
+              compareRightDirty: true,
+              isDirty: true
+            }
+          }
+          if (
+            !f.isPreview &&
+            (f.viewKind === undefined || f.viewKind === 'text') &&
+            pathsEqualIgnoreCase(f.path, realPath)
+          ) {
+            return { ...f, content, isDirty: true, isTransient: false }
+          }
+          return f
+        })
+      }
+    }),
+
+  swapCompareSides: (comparePath) =>
+    set((state) => ({
+      openFiles: state.openFiles.map((f) => {
+        if (f.path !== comparePath || !isCompareOpenFile(f)) return f
+        return {
+          ...f,
+          content: f.compareLeftContent ?? '',
+          language: getLanguageFromPath(f.compareLeftPath ?? f.path),
+          encoding: f.compareLeftEncoding ?? 'utf8',
+          compareLeftPath: f.compareRightPath,
+          compareRightPath: f.compareLeftPath,
+          compareLeftContent: f.compareRightContent ?? f.content,
+          compareRightContent: f.compareLeftContent ?? '',
+          compareLeftEncoding: f.compareRightEncoding ?? f.encoding,
+          compareRightEncoding: f.compareLeftEncoding ?? 'utf8',
+          compareLeftDirty: f.compareRightDirty,
+          compareRightDirty: f.compareLeftDirty,
+          isDirty: !!(f.compareLeftDirty || f.compareRightDirty)
+        }
+      })
+    })),
+
   updateBrowserTab: (path, patch) => {
     set((state) => ({
       openFiles: state.openFiles.map((f) =>
@@ -1412,11 +1536,31 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   updateFileContent: (path, content) =>
     set((state) => ({
-      openFiles: state.openFiles.map((f) =>
-        f.path === path
-          ? { ...f, content, isDirty: true, isTransient: false }
-          : f
-      )
+      openFiles: state.openFiles.map((f) => {
+        if (f.path === path) {
+          return { ...f, content, isDirty: true, isTransient: false }
+        }
+        if (isCompareOpenFile(f)) {
+          if (f.compareLeftPath && pathsEqualIgnoreCase(f.compareLeftPath, path)) {
+            return {
+              ...f,
+              compareLeftContent: content,
+              compareLeftDirty: true,
+              isDirty: true
+            }
+          }
+          if (f.compareRightPath && pathsEqualIgnoreCase(f.compareRightPath, path)) {
+            return {
+              ...f,
+              content,
+              compareRightContent: content,
+              compareRightDirty: true,
+              isDirty: true
+            }
+          }
+        }
+        return f
+      })
     })),
 
   setFileEncoding: (path, encoding) =>
@@ -1433,7 +1577,10 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (
       current?.viewKind === 'image' ||
       current?.viewKind === 'pdf' ||
-      current?.viewKind === 'binary'
+      current?.viewKind === 'binary' ||
+      current?.viewKind === 'compare' ||
+      current?.viewKind === 'browser' ||
+      current?.viewKind === 'settings'
     ) {
       return
     }
@@ -1459,7 +1606,27 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   markFileSaved: (path) =>
     set((state) => ({
-      openFiles: state.openFiles.map((f) => (f.path === path ? { ...f, isDirty: false } : f))
+      openFiles: state.openFiles.map((f) => {
+        if (f.path === path) {
+          return { ...f, isDirty: false }
+        }
+        if (isCompareOpenFile(f)) {
+          let next = f
+          if (f.compareLeftPath && pathsEqualIgnoreCase(f.compareLeftPath, path)) {
+            next = { ...next, compareLeftDirty: false }
+          }
+          if (f.compareRightPath && pathsEqualIgnoreCase(f.compareRightPath, path)) {
+            next = { ...next, compareRightDirty: false }
+          }
+          if (next !== f) {
+            return {
+              ...next,
+              isDirty: !!(next.compareLeftDirty || next.compareRightDirty)
+            }
+          }
+        }
+        return f
+      })
     })),
 
   syncOpenFileContents: (files) =>
@@ -1471,6 +1638,35 @@ export const useAppStore = create<AppState>((set, get) => ({
       return {
         openFiles: state.openFiles.map((f) => {
           if (f.isPreview) return f
+          if (isCompareOpenFile(f)) {
+            let next = f
+            const leftKey = f.compareLeftPath?.replace(/\\/g, '/').toLowerCase()
+            const rightKey = f.compareRightPath?.replace(/\\/g, '/').toLowerCase()
+            if (leftKey && byPath.has(leftKey)) {
+              const content = byPath.get(leftKey)!
+              next = {
+                ...next,
+                compareLeftContent: content,
+                compareLeftDirty: false
+              }
+            }
+            if (rightKey && byPath.has(rightKey)) {
+              const content = byPath.get(rightKey)!
+              next = {
+                ...next,
+                content,
+                compareRightContent: content,
+                compareRightDirty: false
+              }
+            }
+            if (next !== f) {
+              return {
+                ...next,
+                isDirty: !!(next.compareLeftDirty || next.compareRightDirty)
+              }
+            }
+            return f
+          }
           const content = byPath.get(f.path.replace(/\\/g, '/').toLowerCase())
           if (content === undefined) return f
           return { ...f, content, isDirty: false }
@@ -1493,6 +1689,17 @@ export const useAppStore = create<AppState>((set, get) => ({
 
       return {
         openFiles: state.openFiles.map((f) => {
+          if (isCompareOpenFile(f)) {
+            const left = f.compareLeftPath ? remapPath(f.compareLeftPath) : f.compareLeftPath
+            const right = f.compareRightPath ? remapPath(f.compareRightPath) : f.compareRightPath
+            if (left === f.compareLeftPath && right === f.compareRightPath) return f
+            return {
+              ...f,
+              compareLeftPath: left,
+              compareRightPath: right,
+              language: getLanguageFromPath(right ?? f.path)
+            }
+          }
           const updatedPath = remapPath(f.path)
           if (updatedPath === f.path) return f
           return { ...f, path: updatedPath, language: getLanguageFromPath(updatedPath) }
@@ -1507,13 +1714,26 @@ export const useAppStore = create<AppState>((set, get) => ({
     set((state) => {
       const normalized = targetPath.replace(/\\/g, '/')
       const filtered = state.openFiles.filter((f) => {
+        if (isCompareOpenFile(f)) {
+          const left = f.compareLeftPath?.replace(/\\/g, '/') ?? ''
+          const right = f.compareRightPath?.replace(/\\/g, '/') ?? ''
+          if (
+            left === normalized ||
+            left.startsWith(`${normalized}/`) ||
+            right === normalized ||
+            right.startsWith(`${normalized}/`)
+          ) {
+            return false
+          }
+          return true
+        }
         const path = f.path.replace(/\\/g, '/')
         return path !== normalized && !path.startsWith(`${normalized}/`)
       })
       let activeFilePath = state.activeFilePath
       if (activeFilePath) {
-        const active = activeFilePath.replace(/\\/g, '/')
-        if (active === normalized || active.startsWith(`${normalized}/`)) {
+        const stillOpen = filtered.some((f) => f.path === activeFilePath)
+        if (!stillOpen) {
           activeFilePath = filtered.length > 0 ? filtered[filtered.length - 1].path : null
         }
       }

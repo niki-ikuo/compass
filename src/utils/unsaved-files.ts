@@ -1,12 +1,58 @@
 import type { OpenFile } from '@/types'
 import { getFileName } from '@/utils/language'
+import { isCompareOpenFile } from '@/utils/compare-tab'
 
 export type UnsavedChoice = 'save' | 'discard' | 'cancel'
 
+/** 比較タブの dirty な左右を、実ファイル相当の OpenFile に展開する */
+export function expandDirtySavableSides(file: OpenFile): OpenFile[] {
+  if (!isCompareOpenFile(file)) {
+    return [file]
+  }
+
+  const sides: OpenFile[] = []
+  if (file.compareLeftDirty && file.compareLeftPath) {
+    sides.push({
+      path: file.compareLeftPath,
+      content: file.compareLeftContent ?? '',
+      language: 'plaintext',
+      encoding: file.compareLeftEncoding ?? 'utf8',
+      isDirty: true,
+      viewKind: 'text'
+    })
+  }
+  if (file.compareRightDirty && file.compareRightPath) {
+    sides.push({
+      path: file.compareRightPath,
+      content: file.compareRightContent ?? file.content,
+      language: 'plaintext',
+      encoding: file.compareRightEncoding ?? file.encoding,
+      isDirty: true,
+      viewKind: 'text'
+    })
+  }
+  return sides
+}
+
 /** 終了時に保存対象になる dirty ファイル（プレビュー・非テキストタブは除外） */
 export function listDirtySavableFiles(openFiles: OpenFile[]): OpenFile[] {
-  return openFiles.filter((file) => {
-    if (!file.isDirty || file.isPreview) return false
+  const result: OpenFile[] = []
+  const seen = new Set<string>()
+
+  for (const file of openFiles) {
+    if (file.isPreview) continue
+
+    if (isCompareOpenFile(file)) {
+      for (const side of expandDirtySavableSides(file)) {
+        const key = side.path.replace(/\\/g, '/').toLowerCase()
+        if (seen.has(key)) continue
+        seen.add(key)
+        result.push(side)
+      }
+      continue
+    }
+
+    if (!file.isDirty) continue
     if (
       file.viewKind === 'image' ||
       file.viewKind === 'pdf' ||
@@ -14,10 +60,16 @@ export function listDirtySavableFiles(openFiles: OpenFile[]): OpenFile[] {
       file.viewKind === 'browser' ||
       file.viewKind === 'settings'
     ) {
-      return false
+      continue
     }
-    return true
-  })
+
+    const key = file.path.replace(/\\/g, '/').toLowerCase()
+    if (seen.has(key)) continue
+    seen.add(key)
+    result.push(file)
+  }
+
+  return result
 }
 
 export async function saveDirtyFiles(

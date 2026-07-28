@@ -19,7 +19,9 @@ import { SettingsPanel } from './SettingsDialog'
 import { isMediaOpenFile } from '@/utils/media-context'
 import { isBinaryOpenFile } from '@/utils/binary-file'
 import { isBrowserOpenFile, pathToFileUrl } from '@/utils/browser-tab'
+import { isCompareOpenFile } from '@/utils/compare-tab'
 import { isSettingsOpenFile } from '@/utils/settings-tab'
+import { CompareViewer } from './CompareViewer'
 import { buildWorkspaceIndex } from '@/utils/project-index'
 import {
   buildSelectionDragPayload,
@@ -436,6 +438,15 @@ export function CodeEditor() {
             initialUrl={activeFile.browserUrl || 'about:blank'}
           />
         </div>
+      </>
+    )
+  }
+
+  if (isCompareOpenFile(activeFile)) {
+    return (
+      <>
+        {settingsPane}
+        <CompareViewer file={activeFile} />
       </>
     )
   }

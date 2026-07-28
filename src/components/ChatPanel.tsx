@@ -67,6 +67,7 @@ import { join } from '@/utils/path'
 import { isMediaOpenFile } from '@/utils/media-context'
 import { isBinaryOpenFile } from '@/utils/binary-file'
 import { isBrowserOpenFile } from '@/utils/browser-tab'
+import { isCompareOpenFile } from '@/utils/compare-tab'
 import { isSettingsOpenFile } from '@/utils/settings-tab'
 import {
   CHAT_TAB_REORDER_MIME,
@@ -838,7 +839,8 @@ export function ChatPanel() {
           !isMediaOpenFile(activeFile) &&
           !isBinaryOpenFile(activeFile) &&
           !isBrowserOpenFile(activeFile) &&
-          !isSettingsOpenFile(activeFile)
+          !isSettingsOpenFile(activeFile) &&
+          !isCompareOpenFile(activeFile)
             ? activeFile.path
             : undefined,
         fileContent:
@@ -846,7 +848,8 @@ export function ChatPanel() {
           !isMediaOpenFile(activeFile) &&
           !isBinaryOpenFile(activeFile) &&
           !isBrowserOpenFile(activeFile) &&
-          !isSettingsOpenFile(activeFile)
+          !isSettingsOpenFile(activeFile) &&
+          !isCompareOpenFile(activeFile)
             ? activeFile.content
             : undefined,
         selections: selectionsForRequest.length > 0 ? selectionsForRequest : undefined,
@@ -1132,6 +1135,8 @@ export function ChatPanel() {
 
   const handleApplyCode = () => {
     if (!pendingCode || !activeFilePath) return
+    const activeFile = getActiveFile()
+    if (!activeFile || isCompareOpenFile(activeFile)) return
     updateFileContent(activeFilePath, pendingCode.code)
     setPendingCode(null)
   }
@@ -1139,7 +1144,7 @@ export function ChatPanel() {
   const handleInsert = () => {
     if (!pendingCode || !activeFilePath) return
     const activeFile = getActiveFile()
-    if (!activeFile) return
+    if (!activeFile || isCompareOpenFile(activeFile)) return
     const newContent = activeFile.content + '\n' + pendingCode.code
     updateFileContent(activeFilePath, newContent)
     setPendingCode(null)
@@ -1733,7 +1738,7 @@ export function ChatPanel() {
         </div>
       )}
 
-      {isAskSendMode && pendingCode && activeFile && (
+      {isAskSendMode && pendingCode && activeFile && !isCompareOpenFile(activeFile) && (
         <DiffPreview
           oldText={activeFile.content}
           newText={pendingCode.code}
@@ -1747,7 +1752,7 @@ export function ChatPanel() {
         />
       )}
 
-      {isAskSendMode && pendingCode && activeFile && (
+      {isAskSendMode && pendingCode && activeFile && !isCompareOpenFile(activeFile) && (
         <div className="apply-options">
           <button className="btn-secondary" onClick={handleInsert}>
             {t('chat.insertAtCursor')}

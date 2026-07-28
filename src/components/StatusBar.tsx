@@ -40,21 +40,24 @@ export function StatusBar() {
   const isBinary = activeFile ? isBinaryOpenFile(activeFile) : false
   const isBrowser = activeFile?.viewKind === 'browser'
   const isSettings = activeFile?.viewKind === 'settings'
+  const isCompare = activeFile?.viewKind === 'compare'
   const language = activeFilePath
     ? isSettings
       ? t('settings.title')
       : isBrowser
         ? t('browser.label')
-        : isBinary
-          ? t('editor.binaryLabel')
-          : isMedia
-            ? activeFile?.viewKind === 'pdf'
-              ? t('editor.pdfLabel')
-              : t('editor.imageLabel')
-            : getLanguageFromPath(activeFilePath)
+        : isCompare
+          ? t('editor.compareBadge')
+          : isBinary
+            ? t('editor.binaryLabel')
+            : isMedia
+              ? activeFile?.viewKind === 'pdf'
+                ? t('editor.pdfLabel')
+                : t('editor.imageLabel')
+              : getLanguageFromPath(activeFilePath)
     : ''
   const encodingLabel =
-    activeFile && !isMedia && !isBinary && !isBrowser && !isSettings
+    activeFile && !isMedia && !isBinary && !isBrowser && !isSettings && !isCompare
       ? getEncodingLabel(activeFile.encoding)
       : ''
   const provider = getLlmProvider(settings.providerId)
@@ -262,12 +265,21 @@ export function StatusBar() {
       <span
         className="status-item"
         title={
-          activeFilePath
-            ? formatUiPath(activeFilePath, { workspaceRoot, maxChars: 10_000 }).title
-            : undefined
+          isCompare
+            ? `${activeFile?.compareLeftPath ?? ''} ↔ ${activeFile?.compareRightPath ?? ''}`
+            : activeFilePath
+              ? formatUiPath(activeFilePath, { workspaceRoot, maxChars: 10_000 }).title
+              : undefined
         }
       >
-        {activeFilePath ? getFileName(activeFilePath) : t('status.noFile')}
+        {isCompare
+          ? t('editor.compareTab', {
+              left: getFileName(activeFile?.compareLeftPath ?? ''),
+              right: getFileName(activeFile?.compareRightPath ?? '')
+            })
+          : activeFilePath
+            ? getFileName(activeFilePath)
+            : t('status.noFile')}
       </span>
       <span className="status-item">
         {isBrowser
@@ -276,10 +288,12 @@ export function StatusBar() {
             : t('browser.newTab')
           : isSettings
             ? t('settings.title')
-            : `Ln ${cursorPosition.line}, Col ${cursorPosition.column}`}
+            : isCompare
+              ? t('editor.compareBadge')
+              : `Ln ${cursorPosition.line}, Col ${cursorPosition.column}`}
       </span>
       {language && <span className="status-item">{language}</span>}
-      {activeFile && !isMedia && !isBinary && !isBrowser && !isSettings && (
+      {activeFile && !isMedia && !isBinary && !isBrowser && !isSettings && !isCompare && (
         <div className="status-encoding" ref={menuRef}>
           <button
             type="button"

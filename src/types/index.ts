@@ -35,8 +35,8 @@ export interface OpenFile {
    * AI 変更プレビューの isPreview とは別概念。
    */
   isTransient?: boolean
-  /** テキスト以外のタブ表示（画像 / PDF / バイナリ / ブラウザ / 設定） */
-  viewKind?: 'text' | 'image' | 'pdf' | 'binary' | 'browser' | 'settings'
+  /** テキスト以外のタブ表示（画像 / PDF / バイナリ / ブラウザ / 設定 / 比較） */
+  viewKind?: 'text' | 'image' | 'pdf' | 'binary' | 'browser' | 'settings' | 'compare'
   mediaMimeType?: string
   mediaBase64?: string
   /** バイナリタブのファイルサイズ（バイト） */
@@ -45,6 +45,18 @@ export interface OpenFile {
   browserUrl?: string
   /** ブラウザタブのページタイトル */
   browserTitle?: string
+  /** 比較タブ: 左ファイルパス */
+  compareLeftPath?: string
+  /** 比較タブ: 右ファイルパス */
+  compareRightPath?: string
+  /** 比較タブ: 左バッファ */
+  compareLeftContent?: string
+  /** 比較タブ: 右バッファ（content と同期してもよい） */
+  compareRightContent?: string
+  compareLeftEncoding?: FileEncoding
+  compareRightEncoding?: FileEncoding
+  compareLeftDirty?: boolean
+  compareRightDirty?: boolean
 }
 
 export interface FileTreeNode {
