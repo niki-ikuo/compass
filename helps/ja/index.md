@@ -18,6 +18,7 @@ category: index
 - [インストール](getting-started/install.md)
 - [AIプロバイダー設定](getting-started/ai-provider.md)
 - [プロジェクトを開く](getting-started/open-project.md)
+- [クリップ](getting-started/desk-loop.md)
 - [ワークスペースを検索](getting-started/search.md)
 
 ---

@@ -120,6 +120,7 @@ export function MenuBar({
   const openSearchPanel = useAppStore((s) => s.openSearchPanel)
   const openOutlinePanel = useAppStore((s) => s.openOutlinePanel)
   const openGitPanel = useAppStore((s) => s.openGitPanel)
+  const openDeskPanel = useAppStore((s) => s.openDeskPanel)
   const openBrowserTab = useAppStore((s) => s.openBrowserTab)
   const llmConnection = useAppStore((s) => s.llmConnection)
   const editorMinimapEnabled = useAppStore((s) => s.settings.editorMinimapEnabled !== false)
@@ -278,6 +279,14 @@ export function MenuBar({
       action: () => {
         if (!workspaceRoot) return
         openGitPanel()
+      }
+    },
+    {
+      label: t('menu.showDesk'),
+      shortcut: 'Ctrl+Shift+D',
+      action: () => {
+        if (!workspaceRoot) return
+        openDeskPanel()
       }
     },
     { separator: true, label: '', action: () => {} },

@@ -45,6 +45,19 @@ import {
   stageGitPaths,
   unstageGitPaths
 } from './services/git'
+import {
+  captureClipboardToInbox,
+  markInboxDone
+} from './services/desk-capture'
+import { ensureDeskDirs } from './services/desk-dirs'
+import { collectDigestContext } from './services/desk-digest-collect'
+import {
+  refreshDeskCaptureHotkey,
+  unregisterDeskCaptureHotkey
+} from './services/desk-hotkey'
+import { listDeskDigests, listDeskInbox, listDeskOutbox } from './services/desk-list'
+import { archiveOutboxItem, deleteDigestItem, deleteOutboxItem } from './services/desk-outbox'
+import { copyOutboxPayload, runDeskShipCheck } from './services/desk-ship-check'
 import { cancelChat, cancelInlineCompletion, completeInline, streamChat } from './services/ai-client'
 import { runAgent, resolveAgentApproval, resolveAgentContinue } from './services/agent-runner'
 import {
@@ -349,6 +362,11 @@ function createMenu(): void {
           label: t('menu.showGit'),
           accelerator: 'CmdOrCtrl+Shift+G',
           click: () => mainWindow?.webContents.send('menu:show-git')
+        },
+        {
+          label: t('menu.showDesk'),
+          accelerator: 'CmdOrCtrl+Shift+D',
+          click: () => mainWindow?.webContents.send('menu:show-desk')
         },
         { type: 'separator' },
         {
@@ -718,6 +736,84 @@ function registerIpcHandlers(): void {
   ipcMain.handle('settings:set', async (_event, settings: AppSettings) => {
     await setSettings(settings)
     createMenu()
+    await refreshDeskCaptureHotkey(() => mainWindow)
+  })
+
+  ipcMain.handle('desk:ensureDirs', async (_event, workspaceRoot: string) => {
+    await ensureDeskDirs(workspaceRoot)
+  })
+
+  ipcMain.handle(
+    'desk:captureClipboard',
+    async (_event, workspaceRoot: string | null) => {
+      return captureClipboardToInbox(workspaceRoot)
+    }
+  )
+
+  ipcMain.handle(
+    'desk:listInbox',
+    async (_event, workspaceRoot: string, limit?: number) => {
+      return listDeskInbox(workspaceRoot, limit)
+    }
+  )
+
+  ipcMain.handle(
+    'desk:listOutbox',
+    async (_event, workspaceRoot: string, limit?: number, includeArchived?: boolean) => {
+      return listDeskOutbox(workspaceRoot, limit, includeArchived)
+    }
+  )
+
+  ipcMain.handle(
+    'desk:listDigests',
+    async (_event, workspaceRoot: string, limit?: number) => {
+      return listDeskDigests(workspaceRoot, limit)
+    }
+  )
+
+  ipcMain.handle(
+    'desk:markInboxDone',
+    async (_event, workspaceRoot: string, absolutePath: string) => {
+      return markInboxDone(workspaceRoot, absolutePath)
+    }
+  )
+
+  ipcMain.handle(
+    'desk:archiveOutbox',
+    async (_event, workspaceRoot: string, absolutePath: string) => {
+      return archiveOutboxItem(workspaceRoot, absolutePath)
+    }
+  )
+
+  ipcMain.handle(
+    'desk:deleteOutbox',
+    async (_event, workspaceRoot: string, absolutePath: string) => {
+      return deleteOutboxItem(workspaceRoot, absolutePath)
+    }
+  )
+
+  ipcMain.handle(
+    'desk:deleteDigest',
+    async (_event, workspaceRoot: string, absolutePath: string) => {
+      return deleteDigestItem(workspaceRoot, absolutePath)
+    }
+  )
+
+  ipcMain.handle('desk:runShipCheck', async (_event, absolutePath: string) => {
+    const result = await runDeskShipCheck(absolutePath)
+    return {
+      findings: result.findings,
+      body: result.body,
+      preset: result.preset
+    }
+  })
+
+  ipcMain.handle('desk:copyOutboxPayload', async (_event, absolutePath: string) => {
+    return copyOutboxPayload(absolutePath)
+  })
+
+  ipcMain.handle('desk:collectDigestContext', async (_event, workspaceRoot: string) => {
+    return collectDigestContext(workspaceRoot)
   })
 
   ipcMain.handle('usage:get', async () => {
@@ -1015,6 +1111,7 @@ app.whenReady().then(async () => {
   registerIpcHandlers()
   await createWindow()
   createMenu()
+  await refreshDeskCaptureHotkey(() => mainWindow)
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) void createWindow()
@@ -1024,5 +1121,6 @@ app.whenReady().then(async () => {
 app.on('window-all-closed', () => {
   stopIndexWatcher()
   killAllTerminals()
+  unregisterDeskCaptureHotkey()
   if (process.platform !== 'darwin') app.quit()
 })

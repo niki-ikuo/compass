@@ -1,8 +1,8 @@
-# Desk Loop — S-tier five features specification
+# Clip — S-tier five features specification
 
 **English** | [日本語](ja/DESK_LOOP.md)
 
-Status: **Specification (not implemented)**. Related: [SPEC.md](./SPEC.md), [ARCHITECTURE.md](./ARCHITECTURE.md), [TEXT_WORKSPACE_PLAN.md](./TEXT_WORKSPACE_PLAN.md), [AI_APPLY_UNDO.md](./AI_APPLY_UNDO.md), [USE_CASE_PRESET.md](./USE_CASE_PRESET.md).
+Status: **Phase 1 implemented** (Capture / Clip / Outbox presets / Ship check Stage A + copy / manual Digest). Stage B, tray, etc. still later. Related: [SPEC.md](./SPEC.md), [ARCHITECTURE.md](./ARCHITECTURE.md), [TEXT_WORKSPACE_PLAN.md](./TEXT_WORKSPACE_PLAN.md), [AI_APPLY_UNDO.md](./AI_APPLY_UNDO.md), [USE_CASE_PRESET.md](./USE_CASE_PRESET.md).
 
 Feature set that moves Compass from “an editor that writes and fixes” to a **workbench: capture → organize → check → ship → resume**.  
 The five features are not separate products. They are **five stops on one path**.
@@ -13,7 +13,7 @@ The five features are not separate products. They are **five stops on one path**
 
 | Question | Answer |
 |----------|--------|
-| What do we build? | Capture hotkey / Desk / Outbox factory / Ship check / Weekly digest |
+| What do we build? | Capture hotkey / Clip / Outbox factory / Ship check / Weekly digest |
 | One experience? | External text → inbox → outbox draft → ship check → copy → digest |
 | Write path? | Prefer existing preview → Apply (do not add silent writes) |
 | Cloud sync? | **No.** Local `.compass/` conventions only |
@@ -146,7 +146,7 @@ All UI strings via `src/i18n/messages.ts` (ja + en together).
 ### 4.3 Requirements
 
 1. While Compass is running, register an OS global shortcut.  
-2. Default: `Ctrl+Shift+Alt+V` (Windows). Configurable / disableable in settings.  
+2. Default: `Ctrl+Alt+I` (Windows). Configurable / disableable in settings.  
 3. On fire:
    1. `clipboard.readText()`  
    2. Empty/whitespace → notify, stop  
@@ -165,14 +165,14 @@ source: clipboard
 {clipboard text}
 ```
 
-   7. Focus window; open the file (or open Desk — setting; default open file).  
+   7. Focus window; open the file (or Open Clip — setting; default open file).  
 4. Image/file hotkey capture **out of scope** (point users at existing paste).  
 5. Unregister on quit.  
 6. On register failure (conflict), show error in settings and ask for another key.
 
 ### 4.4 UI
 
-- Settings → Desk: accelerator recorder, enable flag, after-capture action  
+- Settings → Clip: accelerator recorder, enable flag, after-capture action  
 - Toast/OS notify on success/failure  
 - Explorer shows `.compass/inbox` normally  
 
@@ -209,7 +209,7 @@ Renderer must not touch `clipboard` / `globalShortcut` directly.
 
 ---
 
-## 5. Feature 2 — Desk workbench
+## 5. Feature 2 — Clip panel
 
 ### 5.1 Summary
 
@@ -226,7 +226,7 @@ Renderer must not touch `clipboard` / `globalShortcut` directly.
 
 ### 5.3 Requirements
 
-1. Add a **Desk** tab/view in the left sidebar. Keep it list-like, not a dashboard.  
+1. Add a **Clip** tab/view in the left sidebar. Keep it list-like, not a dashboard.  
 2. Exactly **three sections** initially:
 
 | Section | Source | Row fields | Actions |
@@ -656,7 +656,7 @@ E2E gate for Phase 1 = manual demo script checklist.
 
 | # | Question | Recommended default |
 |---|----------|---------------------|
-| Q1 | Default accelerator | `Ctrl+Shift+Alt+V` |
+| Q1 | Default accelerator | `Ctrl+Alt+I` |
 | Q2 | Auto `status: ready` after copy? | Ask; default no silent update |
 | Q3 | Same-day digest rerun | Overwrite proposal |
 | Q4 | Desk as left tab vs command-only | Left tab |

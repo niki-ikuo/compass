@@ -5,6 +5,7 @@ import { app } from 'electron'
 import type {
   AppSettings,
   ColorThemeId,
+  DeskCaptureOpenTarget,
   EmbeddingsMode,
   LlmProviderId,
   UseCasePreset
@@ -47,6 +48,9 @@ interface StoredSettings {
    */
   embeddingsSettingsVersion: number
   usageResetDay: number
+  deskCaptureEnabled: boolean
+  deskCaptureAccelerator: string
+  deskCaptureOpenTarget: DeskCaptureOpenTarget
   lastWorkspaceRoot: string | null
   recentWorkspaceRoots: string[]
 }
@@ -106,6 +110,28 @@ function resolveEmbeddingsModel(value: unknown): string {
 
 function resolveUsageResetDay(value: unknown): number {
   return normalizeUsageResetDay(value ?? DEFAULT_SETTINGS.usageResetDay)
+}
+
+function resolveDeskCaptureEnabled(value: unknown): boolean {
+  return typeof value === 'boolean' ? value : DEFAULT_SETTINGS.deskCaptureEnabled
+}
+
+/** Previous shipped default; migrate to the easier Ctrl+Alt+I. */
+const LEGACY_DESK_CAPTURE_ACCELERATOR = 'CommandOrControl+Shift+Alt+V'
+
+function resolveDeskCaptureAccelerator(value: unknown): string {
+  if (typeof value !== 'string' || !value.trim()) {
+    return DEFAULT_SETTINGS.deskCaptureAccelerator
+  }
+  const trimmed = value.trim()
+  if (trimmed === LEGACY_DESK_CAPTURE_ACCELERATOR) {
+    return DEFAULT_SETTINGS.deskCaptureAccelerator
+  }
+  return trimmed
+}
+
+function resolveDeskCaptureOpenTarget(value: unknown): DeskCaptureOpenTarget {
+  return value === 'desk' || value === 'file' ? value : DEFAULT_SETTINGS.deskCaptureOpenTarget
 }
 
 function resolveProviderId(value: unknown, apiBaseUrl: string): LlmProviderId {
@@ -191,6 +217,9 @@ async function readStoredSettings(): Promise<StoredSettings> {
       ),
       ...resolveEmbeddingsStoredFields(stored),
       usageResetDay: resolveUsageResetDay(stored.usageResetDay),
+      deskCaptureEnabled: resolveDeskCaptureEnabled(stored.deskCaptureEnabled),
+      deskCaptureAccelerator: resolveDeskCaptureAccelerator(stored.deskCaptureAccelerator),
+      deskCaptureOpenTarget: resolveDeskCaptureOpenTarget(stored.deskCaptureOpenTarget),
       lastWorkspaceRoot: stored.lastWorkspaceRoot ?? null,
       recentWorkspaceRoots:
         stored.recentWorkspaceRoots ??
@@ -219,6 +248,9 @@ async function readStoredSettings(): Promise<StoredSettings> {
       embeddingsModel: DEFAULT_SETTINGS.embeddingsModel,
       embeddingsSettingsVersion: EMBEDDINGS_SETTINGS_VERSION,
       usageResetDay: DEFAULT_SETTINGS.usageResetDay,
+      deskCaptureEnabled: DEFAULT_SETTINGS.deskCaptureEnabled,
+      deskCaptureAccelerator: DEFAULT_SETTINGS.deskCaptureAccelerator,
+      deskCaptureOpenTarget: DEFAULT_SETTINGS.deskCaptureOpenTarget,
       lastWorkspaceRoot: null,
       recentWorkspaceRoots: []
     }
@@ -301,7 +333,10 @@ function toAppSettings(stored: StoredSettings): AppSettings {
     embeddingsMode: stored.embeddingsMode,
     embeddingsProviderId: stored.embeddingsProviderId,
     embeddingsModel: stored.embeddingsModel,
-    usageResetDay: stored.usageResetDay
+    usageResetDay: stored.usageResetDay,
+    deskCaptureEnabled: stored.deskCaptureEnabled,
+    deskCaptureAccelerator: stored.deskCaptureAccelerator,
+    deskCaptureOpenTarget: stored.deskCaptureOpenTarget
   }
 }
 
@@ -356,7 +391,10 @@ export async function setSettings(settings: AppSettings): Promise<void> {
     embeddingsProviderId: resolveEmbeddingsProviderId(settings.embeddingsProviderId),
     embeddingsModel: resolveEmbeddingsModel(settings.embeddingsModel),
     embeddingsSettingsVersion: EMBEDDINGS_SETTINGS_VERSION,
-    usageResetDay: resolveUsageResetDay(settings.usageResetDay)
+    usageResetDay: resolveUsageResetDay(settings.usageResetDay),
+    deskCaptureEnabled: resolveDeskCaptureEnabled(settings.deskCaptureEnabled),
+    deskCaptureAccelerator: resolveDeskCaptureAccelerator(settings.deskCaptureAccelerator),
+    deskCaptureOpenTarget: resolveDeskCaptureOpenTarget(settings.deskCaptureOpenTarget)
   })
   setLocale(locale)
 }

@@ -48,6 +48,12 @@ import type {
   HelpAskResult,
   LlmConnectionTestResult,
   LocaleId,
+  DeskCaptureResult,
+  DeskInboxItem,
+  DeskOutboxItem,
+  DeskDigestItem,
+  DeskShipCheckResult,
+  DeskDigestCollectResult,
   GitStatusResult,
   GitDiffResult,
   GitDiffSide,
@@ -181,6 +187,57 @@ const compassAPI = {
       ipcRenderer.invoke('git:branches', workspaceRoot),
     checkout: (workspaceRoot: string, branch: string): Promise<GitCheckoutResult> =>
       ipcRenderer.invoke('git:checkout', workspaceRoot, branch)
+  },
+  desk: {
+    ensureDirs: (workspaceRoot: string): Promise<void> =>
+      ipcRenderer.invoke('desk:ensureDirs', workspaceRoot),
+    captureClipboard: (workspaceRoot: string | null): Promise<DeskCaptureResult> =>
+      ipcRenderer.invoke('desk:captureClipboard', workspaceRoot),
+    listInbox: (workspaceRoot: string, limit?: number): Promise<DeskInboxItem[]> =>
+      ipcRenderer.invoke('desk:listInbox', workspaceRoot, limit),
+    listOutbox: (
+      workspaceRoot: string,
+      limit?: number,
+      includeArchived?: boolean
+    ): Promise<DeskOutboxItem[]> =>
+      ipcRenderer.invoke('desk:listOutbox', workspaceRoot, limit, includeArchived),
+    listDigests: (workspaceRoot: string, limit?: number): Promise<DeskDigestItem[]> =>
+      ipcRenderer.invoke('desk:listDigests', workspaceRoot, limit),
+    markInboxDone: (
+      workspaceRoot: string,
+      absolutePath: string
+    ): Promise<{ ok: true; absolutePath: string } | { ok: false; message: string }> =>
+      ipcRenderer.invoke('desk:markInboxDone', workspaceRoot, absolutePath),
+    archiveOutbox: (
+      workspaceRoot: string,
+      absolutePath: string
+    ): Promise<{ ok: true; absolutePath: string } | { ok: false; message: string }> =>
+      ipcRenderer.invoke('desk:archiveOutbox', workspaceRoot, absolutePath),
+    deleteOutbox: (
+      workspaceRoot: string,
+      absolutePath: string
+    ): Promise<{ ok: true } | { ok: false; message: string }> =>
+      ipcRenderer.invoke('desk:deleteOutbox', workspaceRoot, absolutePath),
+    deleteDigest: (
+      workspaceRoot: string,
+      absolutePath: string
+    ): Promise<{ ok: true } | { ok: false; message: string }> =>
+      ipcRenderer.invoke('desk:deleteDigest', workspaceRoot, absolutePath),
+    runShipCheck: (absolutePath: string): Promise<DeskShipCheckResult> =>
+      ipcRenderer.invoke('desk:runShipCheck', absolutePath),
+    copyOutboxPayload: (
+      absolutePath: string
+    ): Promise<{ ok: true; payload: string } | { ok: false; message: string }> =>
+      ipcRenderer.invoke('desk:copyOutboxPayload', absolutePath),
+    collectDigestContext: (workspaceRoot: string): Promise<DeskDigestCollectResult> =>
+      ipcRenderer.invoke('desk:collectDigestContext', workspaceRoot),
+    onCaptureResult: (callback: (result: DeskCaptureResult) => void): (() => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, result: DeskCaptureResult): void => {
+        callback(result)
+      }
+      ipcRenderer.on('desk:captureResult', handler)
+      return () => ipcRenderer.removeListener('desk:captureResult', handler)
+    }
   },
   ai: {
     chat: (request: ChatRequest): Promise<void> => ipcRenderer.invoke('ai:chat', request),
@@ -408,6 +465,11 @@ const compassAPI = {
       const handler = (): void => callback()
       ipcRenderer.on('menu:show-git', handler)
       return () => ipcRenderer.removeListener('menu:show-git', handler)
+    },
+    onShowDesk: (callback: () => void): (() => void) => {
+      const handler = (): void => callback()
+      ipcRenderer.on('menu:show-desk', handler)
+      return () => ipcRenderer.removeListener('menu:show-desk', handler)
     },
     onOpenHelp: (callback: () => void): (() => void) => {
       const handler = (): void => callback()

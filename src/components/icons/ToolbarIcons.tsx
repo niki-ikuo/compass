@@ -105,6 +105,26 @@ export function GitIcon() {
   )
 }
 
+export function DeskIcon() {
+  return (
+    <svg {...iconProps}>
+      <path
+        d="M2.5 5.5h11v7H2.5v-7z"
+        stroke="currentColor"
+        strokeWidth="1.2"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M2.5 5.5L8 2.5l5.5 3"
+        stroke="currentColor"
+        strokeWidth="1.2"
+        strokeLinejoin="round"
+      />
+      <path d="M8 5.5v7" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+    </svg>
+  )
+}
+
 export function TerminalIcon() {
   return (
     <svg {...iconProps}><rect

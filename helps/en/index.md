@@ -18,6 +18,7 @@ Read this when you are stuck or already know what you want to do. Find pages by 
 - [Install](getting-started/install.md)
 - [AI provider setup](getting-started/ai-provider.md)
 - [Open a project](getting-started/open-project.md)
+- [Clip](getting-started/desk-loop.md)
 - [Search in the workspace](getting-started/search.md)
 
 ---

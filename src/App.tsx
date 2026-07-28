@@ -16,6 +16,7 @@ import { registerWheelZoomListener } from '@/utils/wheel-zoom'
 import { restoreOpenEditors } from '@/utils/restore-open-editors'
 import { refreshLlmConnection } from '@/utils/llm-connection'
 import { listDirtySavableFiles, saveDirtyFiles } from '@/utils/unsaved-files'
+import { openWorkspaceFile } from '@/utils/open-workspace-file'
 
 export function App() {
   const showFileTree = useAppStore((s) => s.showFileTree)
@@ -31,6 +32,7 @@ export function App() {
   const openSearchPanel = useAppStore((s) => s.openSearchPanel)
   const openGitPanel = useAppStore((s) => s.openGitPanel)
   const openOutlinePanel = useAppStore((s) => s.openOutlinePanel)
+  const openDeskPanel = useAppStore((s) => s.openDeskPanel)
   const workspaceRoot = useAppStore((s) => s.workspaceRoot)
   const setWorkspaceRoot = useAppStore((s) => s.setWorkspaceRoot)
   const restoreChatSessions = useAppStore((s) => s.restoreChatSessions)
@@ -268,6 +270,19 @@ export function App() {
   }, [setSettings, openWorkspace])
 
   useEffect(() => {
+    return window.compass.desk.onCaptureResult((result) => {
+      if (!result.ok) return
+      const store = useAppStore.getState()
+      const openTarget = result.openTarget ?? store.settings.deskCaptureOpenTarget
+      if (openTarget === 'desk') {
+        store.openDeskPanel()
+        return
+      }
+      void openWorkspaceFile(result.absolutePath)
+    })
+  }, [])
+
+  useEffect(() => {
     const unsubs = [
       window.compass.menu.onOpenFolder(handleOpenFolder),
       window.compass.menu.onCloseFolder(handleCloseFolder),
@@ -299,6 +314,10 @@ export function App() {
         if (!useAppStore.getState().workspaceRoot) return
         openGitPanel()
       }),
+      window.compass.menu.onShowDesk(() => {
+        if (!useAppStore.getState().workspaceRoot) return
+        openDeskPanel()
+      }),
       window.compass.menu.onOpenHelp(() => openHelp()),
       window.compass.menu.onOpenAiHelp(() => openHelpAsk())
     ]
@@ -312,6 +331,7 @@ export function App() {
     openSearchPanel,
     openOutlinePanel,
     openGitPanel,
+    openDeskPanel,
     openHelp,
     openHelpAsk
   ])

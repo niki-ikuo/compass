@@ -306,6 +306,83 @@ export type LlmProviderId =
   | 'ollama'
   | 'custom'
 
+/** After Desk capture hotkey: open the inbox file or the Desk tab */
+export type DeskCaptureOpenTarget = 'file' | 'desk'
+
+export type OutboxPresetId = 'mail' | 'minutes' | 'report' | 'chat'
+export type OutboxStatusId = 'draft' | 'ready' | 'archived'
+
+export type DeskInboxItem = {
+  absolutePath: string
+  relativePath: string
+  fileName: string
+  capturedAt: string
+  snippet: string
+  mtimeMs: number
+}
+
+export type DeskOutboxItem = {
+  absolutePath: string
+  relativePath: string
+  fileName: string
+  preset: OutboxPresetId
+  status: OutboxStatusId
+  subject: string
+  snippet: string
+  mtimeMs: number
+}
+
+export type DeskDigestItem = {
+  absolutePath: string
+  relativePath: string
+  fileName: string
+  periodStart: string
+  periodEnd: string
+  snippet: string
+  mtimeMs: number
+}
+
+export type DeskCaptureSuccess = {
+  ok: true
+  absolutePath: string
+  relativePath: string
+  openTarget?: DeskCaptureOpenTarget
+}
+
+export type DeskCaptureFailure = {
+  ok: false
+  reason: 'no_workspace' | 'empty' | 'too_large' | 'write_failed'
+  message: string
+}
+
+export type DeskCaptureResult = DeskCaptureSuccess | DeskCaptureFailure
+
+export type ShipFindingSeverity = 'error' | 'warning' | 'info'
+
+export type ShipFinding = {
+  id: string
+  severity: ShipFindingSeverity
+  message: string
+  source: 'rule' | 'llm'
+  excerpt?: string
+}
+
+export type DeskShipCheckResult = {
+  findings: ShipFinding[]
+  body: string
+  preset: OutboxPresetId | null
+}
+
+export type DeskDigestCollectResult = {
+  periodStart: string
+  periodEnd: string
+  digestRelativePath: string
+  filesConsidered: number
+  truncated: boolean
+  contextBlock: string
+  empty: boolean
+}
+
 export interface AppSettings {
   /** 選択中の LLM プロバイダ */
   providerId: LlmProviderId
@@ -357,6 +434,12 @@ export interface AppSettings {
    * Period runs from that day to the day before the next month's same day.
    */
   usageResetDay: number
+  /** Desk Loop: global hotkey capture into `.compass/inbox` */
+  deskCaptureEnabled: boolean
+  /** Electron accelerator, e.g. CommandOrControl+Alt+I */
+  deskCaptureAccelerator: string
+  /** After capture: open the file or switch to Desk tab */
+  deskCaptureOpenTarget: DeskCaptureOpenTarget
 }
 
 /** App-wide LLM usage for the current reset period (BYOK cost awareness). */
@@ -686,7 +769,7 @@ export interface WorkspaceReplaceResult {
   errors: Array<{ path: string; message: string }>
 }
 
-export type LeftSidebarView = 'explorer' | 'search' | 'outline' | 'git'
+export type LeftSidebarView = 'explorer' | 'search' | 'outline' | 'git' | 'desk'
 
 export type GitStatusKind =
   | 'modified'
@@ -934,6 +1017,39 @@ export interface CompassAPI {
     branches: (workspaceRoot: string) => Promise<GitBranchesResult>
     checkout: (workspaceRoot: string, branch: string) => Promise<GitCheckoutResult>
   }
+  desk: {
+    ensureDirs: (workspaceRoot: string) => Promise<void>
+    captureClipboard: (workspaceRoot: string | null) => Promise<DeskCaptureResult>
+    listInbox: (workspaceRoot: string, limit?: number) => Promise<DeskInboxItem[]>
+    listOutbox: (
+      workspaceRoot: string,
+      limit?: number,
+      includeArchived?: boolean
+    ) => Promise<DeskOutboxItem[]>
+    listDigests: (workspaceRoot: string, limit?: number) => Promise<DeskDigestItem[]>
+    markInboxDone: (
+      workspaceRoot: string,
+      absolutePath: string
+    ) => Promise<{ ok: true; absolutePath: string } | { ok: false; message: string }>
+    archiveOutbox: (
+      workspaceRoot: string,
+      absolutePath: string
+    ) => Promise<{ ok: true; absolutePath: string } | { ok: false; message: string }>
+    deleteOutbox: (
+      workspaceRoot: string,
+      absolutePath: string
+    ) => Promise<{ ok: true } | { ok: false; message: string }>
+    deleteDigest: (
+      workspaceRoot: string,
+      absolutePath: string
+    ) => Promise<{ ok: true } | { ok: false; message: string }>
+    runShipCheck: (absolutePath: string) => Promise<DeskShipCheckResult>
+    copyOutboxPayload: (
+      absolutePath: string
+    ) => Promise<{ ok: true; payload: string } | { ok: false; message: string }>
+    collectDigestContext: (workspaceRoot: string) => Promise<DeskDigestCollectResult>
+    onCaptureResult: (callback: (result: DeskCaptureResult) => void) => () => void
+  }
   ai: {
     chat: (request: ChatRequest) => Promise<void>
     cancel: (chatId?: string) => Promise<boolean>
@@ -1016,6 +1132,7 @@ export interface CompassAPI {
     onReplaceInFiles: (callback: () => void) => () => void
     onShowOutline: (callback: () => void) => () => void
     onShowGit: (callback: () => void) => () => void
+    onShowDesk: (callback: () => void) => () => void
     onOpenHelp: (callback: () => void) => () => void
     onOpenAiHelp: (callback: () => void) => () => void
     setAiHelpVisible: (visible: boolean) => Promise<void>
@@ -1103,5 +1220,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   embeddingsMode: 'api',
   embeddingsProviderId: '',
   embeddingsModel: '',
-  usageResetDay: 1
+  usageResetDay: 1,
+  deskCaptureEnabled: true,
+  deskCaptureAccelerator: 'CommandOrControl+Alt+I',
+  deskCaptureOpenTarget: 'file'
 }

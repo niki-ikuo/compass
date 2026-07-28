@@ -2,9 +2,10 @@ import { FileTree } from './FileTree'
 import { SearchPanel } from './SearchPanel'
 import { WorkspaceOutline } from './WorkspaceOutline'
 import { GitPanel } from './GitPanel'
+import { DeskPanel } from './DeskPanel'
 import { useAppStore } from '@/stores/app-store'
 import { useI18n } from '@/i18n'
-import { ExplorerIcon, GitIcon, OutlineIcon, SearchIcon } from './icons/ToolbarIcons'
+import { DeskIcon, ExplorerIcon, GitIcon, OutlineIcon, SearchIcon } from './icons/ToolbarIcons'
 
 export function LeftSidebar() {
   const { t } = useI18n()
@@ -14,11 +15,13 @@ export function LeftSidebar() {
   const openSearchPanel = useAppStore((s) => s.openSearchPanel)
   const openOutlinePanel = useAppStore((s) => s.openOutlinePanel)
   const openGitPanel = useAppStore((s) => s.openGitPanel)
+  const openDeskPanel = useAppStore((s) => s.openDeskPanel)
 
   const explorerActive = leftSidebarView === 'explorer'
   const searchActive = leftSidebarView === 'search'
   const outlineActive = leftSidebarView === 'outline'
   const gitActive = leftSidebarView === 'git'
+  const deskActive = leftSidebarView === 'desk'
 
   return (
     <div className="left-sidebar">
@@ -74,6 +77,19 @@ export function LeftSidebar() {
           <GitIcon />
           <span>{t('sidebar.git')}</span>
         </button>
+        <button
+          type="button"
+          role="tab"
+          className={`left-sidebar-view-btn${deskActive ? ' active' : ''}`}
+          aria-selected={deskActive}
+          disabled={!workspaceRoot}
+          title={workspaceRoot ? t('sidebar.desk') : t('desk.noWorkspace')}
+          aria-label={t('sidebar.desk')}
+          onClick={() => openDeskPanel()}
+        >
+          <DeskIcon />
+          <span>{t('sidebar.desk')}</span>
+        </button>
       </div>
       <div className="left-sidebar-body">
         <div
@@ -91,6 +107,9 @@ export function LeftSidebar() {
         </div>
         <div className="left-sidebar-panel" hidden={!gitActive} aria-hidden={!gitActive}>
           <GitPanel />
+        </div>
+        <div className="left-sidebar-panel" hidden={!deskActive} aria-hidden={!deskActive}>
+          <DeskPanel />
         </div>
       </div>
     </div>

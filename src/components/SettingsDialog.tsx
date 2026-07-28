@@ -34,13 +34,14 @@ import {
 } from '@/i18n'
 import { refreshLlmConnection } from '@/utils/llm-connection'
 
-type SettingsTabId = 'appearance' | 'chat' | 'llm' | 'terminal'
+type SettingsTabId = 'appearance' | 'chat' | 'llm' | 'terminal' | 'desk'
 
 const SETTINGS_TABS: Array<{ id: SettingsTabId; labelKey: MessageKey }> = [
   { id: 'appearance', labelKey: 'settings.appearance' },
   { id: 'chat', labelKey: 'settings.chat' },
   { id: 'llm', labelKey: 'settings.llm' },
-  { id: 'terminal', labelKey: 'settings.terminal' }
+  { id: 'terminal', labelKey: 'settings.terminal' },
+  { id: 'desk', labelKey: 'settings.desk' }
 ]
 
 function switchProvider(form: AppSettings, nextId: LlmProviderId): AppSettings {
@@ -90,7 +91,12 @@ function buildSettingsSnapshot(
     rememberLastUseCasePreset: settings.rememberLastUseCasePreset === true,
     embeddingsMode: settings.embeddingsMode === 'hash' ? 'hash' : 'api',
     embeddingsProviderId: settings.embeddingsProviderId ?? '',
-    embeddingsModel: settings.embeddingsModel ?? ''
+    embeddingsModel: settings.embeddingsModel ?? '',
+    deskCaptureEnabled: settings.deskCaptureEnabled !== false,
+    deskCaptureAccelerator:
+      settings.deskCaptureAccelerator || DEFAULT_SETTINGS.deskCaptureAccelerator,
+    deskCaptureOpenTarget:
+      settings.deskCaptureOpenTarget === 'desk' ? 'desk' : 'file'
   }
   return {
     form,
@@ -712,6 +718,46 @@ export function SettingsPanel() {
               {shells.length === 0 ? t('terminal.noShell') : t('settings.defaultShellHint')}
             </span>
           </label>
+        )}
+
+        {activeTab === 'desk' && (
+          <>
+            <label className="settings-checkbox-label">
+              <input
+                type="checkbox"
+                checked={form.deskCaptureEnabled}
+                onChange={(e) => setForm({ ...form, deskCaptureEnabled: e.target.checked })}
+              />
+              <span>
+                {t('settings.deskCapture')}
+                <span className="field-hint">{t('settings.deskCaptureHint')}</span>
+              </span>
+            </label>
+            <label>
+              {t('settings.deskCaptureAccelerator')}
+              <input
+                type="text"
+                value={form.deskCaptureAccelerator}
+                onChange={(e) => setForm({ ...form, deskCaptureAccelerator: e.target.value })}
+                disabled={!form.deskCaptureEnabled}
+              />
+            </label>
+            <label>
+              {t('settings.deskCaptureOpenTarget')}
+              <select
+                value={form.deskCaptureOpenTarget}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    deskCaptureOpenTarget: e.target.value === 'desk' ? 'desk' : 'file'
+                  })
+                }
+              >
+                <option value="file">{t('settings.deskCaptureOpenFile')}</option>
+                <option value="desk">{t('settings.deskCaptureOpenDesk')}</option>
+              </select>
+            </label>
+          </>
         )}
 
         {message && <p className="form-message">{message}</p>}
