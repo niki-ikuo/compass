@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { DiffEditor } from '@monaco-editor/react'
 import type { editor } from 'monaco-editor'
 import { useAppStore } from '@/stores/app-store'
@@ -32,6 +32,41 @@ interface CompareViewerProps {
   file: OpenFile
 }
 
+/**
+ * @monaco-editor/react の DiffEditor は original 変更時に常に setValue するため
+ * カーソルが先頭へ飛ぶ。編集中は original/modified props を固定し、
+ * 外部からの内容変更だけモデルへ選択位置を保ったまま反映する。
+ */
+function applyExternalModelValue(
+  ed: editor.IStandaloneCodeEditor,
+  next: string,
+  markApplying: (v: boolean) => void
+): void {
+  if (ed.getValue() === next) return
+  const model = ed.getModel()
+  if (!model) return
+  const selections = ed.getSelections()
+  const position = ed.getPosition()
+  markApplying(true)
+  try {
+    ed.executeEdits('', [
+      {
+        range: model.getFullModelRange(),
+        text: next,
+        forceMoveMarkers: true
+      }
+    ])
+    ed.pushUndoStop()
+    if (selections && selections.length > 0) {
+      ed.setSelections(selections)
+    } else if (position) {
+      ed.setPosition(position)
+    }
+  } finally {
+    markApplying(false)
+  }
+}
+
 export function CompareViewer({ file }: CompareViewerProps) {
   const { t } = useI18n()
   const workspaceRoot = useAppStore((s) => s.workspaceRoot)
@@ -42,6 +77,8 @@ export function CompareViewer({ file }: CompareViewerProps) {
 
   const diffEditorRef = useRef<editor.IStandaloneDiffEditor | null>(null)
   const applyingExternalRef = useRef(false)
+  const lastEmittedLeftRef = useRef<string | null>(null)
+  const lastEmittedRightRef = useRef<string | null>(null)
   const [sideBySide, setSideBySide] = useState(true)
 
   const leftPath = file.compareLeftPath ?? ''
@@ -50,28 +87,38 @@ export function CompareViewer({ file }: CompareViewerProps) {
   const rightContent = file.compareRightContent ?? file.content
   const leftLanguage = getLanguageFromPath(leftPath)
   const rightLanguage = getLanguageFromPath(rightPath)
+  const editorKey = `${file.path}:${leftPath}:${rightPath}`
 
-  const syncFromStore = useCallback(() => {
+  // DiffEditor マウント／左右入替時だけ props を渡す（編集中の controlled 更新を避ける）
+  const [seed, setSeed] = useState(() => ({
+    key: editorKey,
+    left: leftContent,
+    right: rightContent
+  }))
+  if (seed.key !== editorKey) {
+    setSeed({ key: editorKey, left: leftContent, right: rightContent })
+    lastEmittedLeftRef.current = leftContent
+    lastEmittedRightRef.current = rightContent
+  }
+
+  // 他タブなど外部からの内容変更のみ反映（自分の編集は lastEmitted でスキップ）
+  useEffect(() => {
     const diff = diffEditorRef.current
     if (!diff) return
-    const original = diff.getOriginalEditor()
-    const modified = diff.getModifiedEditor()
-    applyingExternalRef.current = true
-    try {
-      if (original.getValue() !== leftContent) {
-        original.setValue(leftContent)
-      }
-      if (modified.getValue() !== rightContent) {
-        modified.setValue(rightContent)
-      }
-    } finally {
-      applyingExternalRef.current = false
+
+    if (lastEmittedLeftRef.current !== leftContent) {
+      applyExternalModelValue(diff.getOriginalEditor(), leftContent, (v) => {
+        applyingExternalRef.current = v
+      })
+      lastEmittedLeftRef.current = leftContent
+    }
+    if (lastEmittedRightRef.current !== rightContent) {
+      applyExternalModelValue(diff.getModifiedEditor(), rightContent, (v) => {
+        applyingExternalRef.current = v
+      })
+      lastEmittedRightRef.current = rightContent
     }
   }, [leftContent, rightContent])
-
-  useEffect(() => {
-    syncFromStore()
-  }, [syncFromStore])
 
   useEffect(() => {
     const diff = diffEditorRef.current
@@ -81,16 +128,23 @@ export function CompareViewer({ file }: CompareViewerProps) {
 
   const handleMount = (diffEditor: editor.IStandaloneDiffEditor) => {
     diffEditorRef.current = diffEditor
+    lastEmittedLeftRef.current = diffEditor.getOriginalEditor().getValue()
+    lastEmittedRightRef.current = diffEditor.getModifiedEditor().getValue()
+
     const original = diffEditor.getOriginalEditor()
     const modified = diffEditor.getModifiedEditor()
 
     original.onDidChangeModelContent(() => {
       if (applyingExternalRef.current) return
-      updateCompareSideContent(file.path, 'left', original.getValue())
+      const value = original.getValue()
+      lastEmittedLeftRef.current = value
+      updateCompareSideContent(file.path, 'left', value)
     })
     modified.onDidChangeModelContent(() => {
       if (applyingExternalRef.current) return
-      updateCompareSideContent(file.path, 'right', modified.getValue())
+      const value = modified.getValue()
+      lastEmittedRightRef.current = value
+      updateCompareSideContent(file.path, 'right', value)
     })
   }
 
@@ -144,11 +198,11 @@ export function CompareViewer({ file }: CompareViewerProps) {
       </div>
       <div className="editor-body">
         <DiffEditor
-          key={`${file.path}:${leftPath}:${rightPath}`}
+          key={editorKey}
           height="100%"
           language={rightLanguage || leftLanguage}
-          original={leftContent}
-          modified={rightContent}
+          original={seed.left}
+          modified={seed.right}
           originalModelPath={`${pathToFileUrl(leftPath)}.compare-left`}
           modifiedModelPath={`${pathToFileUrl(rightPath)}.compare-right`}
           theme={monacoTheme}
