@@ -195,11 +195,17 @@ export function formatOpenTodosNudge(state: AgentPlanState): string | null {
 /**
  * Compact plan state for Continue / follow-up injection.
  * Returns null when there is nothing useful to remind the model about.
+ * Fully settled todo lists (all done/cancelled) are omitted so follow-up
+ * turns are not biased toward an already-finished plan.
  */
 export function formatAgentPlanForModel(state: AgentPlanState): string | null {
-  const hasTodos = state.todos.length > 0
+  const open = getOpenTodos(state)
+  const hasOpenTodos = open.length > 0
   const hasCheckpoint = Boolean(state.checkpoint?.trim())
-  if (!hasTodos && !hasCheckpoint) return null
+
+  // Completed-only plans are noise after the work is finished.
+  if (state.todos.length > 0 && !hasOpenTodos) return null
+  if (!hasOpenTodos && !hasCheckpoint) return null
 
   const parts: string[] = [t('ai.agentPlanHeader')]
 
@@ -207,19 +213,35 @@ export function formatAgentPlanForModel(state: AgentPlanState): string | null {
     parts.push(`${t('ai.agentPlanResumeSummary')}\n${state.checkpoint!.trim()}`)
   }
 
-  if (hasTodos) {
-    const open = getOpenTodos(state)
+  if (hasOpenTodos) {
     const done = state.todos.filter((t) => t.status === 'done')
     parts.push(
       `${t('ai.agentPlanTodosHeading', { done: done.length, open: open.length })}\n${formatTodosList(state.todos)}`
     )
-    if (open.length > 0) {
-      const next = open.find((item) => item.status === 'in_progress') ?? open[0]
-      parts.push(t('ai.agentPlanNext', { id: next.id }))
-    }
+    const next = open.find((item) => item.status === 'in_progress') ?? open[0]
+    parts.push(t('ai.agentPlanNext', { id: next.id }))
   }
 
   return parts.join('\n\n')
+}
+
+/**
+ * Whether the chat Plan panel should render for this assistant message.
+ * Open todos stay visible across follow-up tool turns; fully settled plans
+ * only show on the message that last called updateTodo / checkpoint.
+ */
+export function shouldShowAgentPlanPanel(
+  plan: AgentPlanState,
+  messageSteps: Array<{ name: string; status?: string; ok?: boolean }>
+): boolean {
+  if (plan.todos.length === 0 && !plan.checkpoint?.trim()) return false
+  if (countOpenTodos(plan) > 0) return true
+  return messageSteps.some(
+    (step) =>
+      (step.name === 'updateTodo' || step.name === 'checkpoint') &&
+      step.status !== 'error' &&
+      step.ok !== false
+  )
 }
 
 /** Rebuild plan from prior agentSteps (updateTodo / checkpoint calls in order). */

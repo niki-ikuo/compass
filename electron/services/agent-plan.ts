@@ -14,6 +14,7 @@ export {
   sanitizeCheckpointArgs,
   sanitizeUpdateTodoArgs,
   collectAgentStepsThrough,
+  shouldShowAgentPlanPanel,
   type AgentPlanState,
   type AgentTodoItem,
   type AgentTodoStatus

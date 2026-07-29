@@ -219,7 +219,7 @@ Continue = yes: 予算加算し **plan + memory** を user メッセージとし
 |--------|------|
 | アシスタントの `agentSteps` | タイムライン + 履歴永続化 |
 | 過去ツール文脈 | フォローアップで観測要約を再注入（`buildPriorAgentContext`） |
-| Plan（`updateTodo` / `checkpoint`） | チェックリスト + 再開メモ。履歴から再構築、Continue 時に再注入。チャットの計画パネルは当該メッセージまでの全 assistant `agentSteps` から再構築 |
+| Plan（`updateTodo` / `checkpoint`） | チェックリスト + 再開メモ。履歴から再構築、未完了 todo があるあいだ Continue 時に再注入。チャットの計画パネルは当該メッセージまでの全 assistant `agentSteps` から再構築。全 todo が完了/取消し済みの計画は再注入せず、最後に `updateTodo` / `checkpoint` を呼んだメッセージにだけ表示する |
 | 複数パート soft nudge | 最新ユーザー依頼が複数パートっぽく計画が空なら、先に `updateTodo` するよう user ロールで誘導（必須ゲートではない） |
 | Memory（`remember` + 自動観測） | 耐久メモ。履歴から再構築 |
 | Read キャッシュ | 同一ラン内のフル再読込を抑制 |

@@ -1,9 +1,18 @@
-import { rebuildPlanFromSteps, type AgentPlanState, type AgentTodoItem } from '@/utils/agent-plan'
+import {
+  getOpenTodos,
+  rebuildPlanFromSteps,
+  shouldShowAgentPlanPanel,
+  type AgentPlanState,
+  type AgentTodoItem
+} from '@/utils/agent-plan'
 import { useI18n } from '@/i18n'
 import type { AgentToolStep } from '@/types'
 
 interface AgentPlanPanelProps {
+  /** Cumulative agentSteps from chat start through this message (plan rebuild). */
   steps: AgentToolStep[]
+  /** This message's agentSteps only — used to hide settled plans on later turns. */
+  messageSteps?: AgentToolStep[]
 }
 
 function statusMark(status: AgentTodoItem['status']): string {
@@ -19,12 +28,12 @@ function statusMark(status: AgentTodoItem['status']): string {
   }
 }
 
-export function AgentPlanPanel({ steps }: AgentPlanPanelProps) {
+export function AgentPlanPanel({ steps, messageSteps = [] }: AgentPlanPanelProps) {
   const { t } = useI18n()
   const plan: AgentPlanState = rebuildPlanFromSteps(steps)
-  if (plan.todos.length === 0 && !plan.checkpoint?.trim()) return null
+  if (!shouldShowAgentPlanPanel(plan, messageSteps)) return null
 
-  const open = plan.todos.filter((todo) => todo.status === 'pending' || todo.status === 'in_progress')
+  const open = getOpenTodos(plan)
   const done = plan.todos.filter((todo) => todo.status === 'done').length
 
   return (

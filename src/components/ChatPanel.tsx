@@ -1626,7 +1626,10 @@ export function ChatPanel() {
               <div className="chat-content">
                 {msg.role === 'assistant' && msg.agentSteps && msg.agentSteps.length > 0 && (
                   <>
-                    <AgentPlanPanel steps={collectAgentStepsThrough(chatMessages, index)} />
+                    <AgentPlanPanel
+                      steps={collectAgentStepsThrough(chatMessages, index)}
+                      messageSteps={msg.agentSteps}
+                    />
                     <AgentStepTimeline steps={msg.agentSteps} />
                   </>
                 )}

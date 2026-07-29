@@ -12,7 +12,8 @@ import {
   rebuildPlanFromSteps,
   collectAgentStepsThrough,
   sanitizeCheckpointArgs,
-  sanitizeUpdateTodoArgs
+  sanitizeUpdateTodoArgs,
+  shouldShowAgentPlanPanel
 } from './agent-plan'
 
 describe('applyUpdateTodo', () => {
@@ -92,6 +93,18 @@ describe('formatAgentPlanForModel', () => {
     expect(formatAgentPlanForModel(createAgentPlanState())).toBeNull()
   })
 
+  it('returns null when all todos are settled', () => {
+    const state = createAgentPlanState()
+    applyUpdateTodo(state, {
+      todos: [
+        { id: '1', content: 'Done item', status: 'done' },
+        { id: '2', content: 'Skipped', status: 'cancelled' }
+      ]
+    })
+    applyCheckpoint(state, { summary: 'Finished earlier work.' })
+    expect(formatAgentPlanForModel(state)).toBeNull()
+  })
+
   it('includes checkpoint and open/done counts', () => {
     const state = createAgentPlanState()
     applyUpdateTodo(state, {
@@ -123,6 +136,38 @@ describe('formatAgentPlanForModel', () => {
     expect(text).toContain('途中まで完了')
     expect(text).toContain('Todos（0 完了 / 1 残り）:')
     setLocale('en')
+  })
+})
+
+describe('shouldShowAgentPlanPanel', () => {
+  it('hides settled plans on follow-up messages without plan tools', () => {
+    const plan = createAgentPlanState()
+    applyUpdateTodo(plan, {
+      todos: [{ id: '1', content: 'Modularize game', status: 'done' }]
+    })
+    expect(
+      shouldShowAgentPlanPanel(plan, [{ name: 'readFile', status: 'done' }])
+    ).toBe(false)
+  })
+
+  it('shows settled plans on the message that updated them', () => {
+    const plan = createAgentPlanState()
+    applyUpdateTodo(plan, {
+      todos: [{ id: '1', content: 'Modularize game', status: 'done' }]
+    })
+    expect(
+      shouldShowAgentPlanPanel(plan, [{ name: 'updateTodo', status: 'done' }])
+    ).toBe(true)
+  })
+
+  it('keeps open plans visible across follow-up tool turns', () => {
+    const plan = createAgentPlanState()
+    applyUpdateTodo(plan, {
+      todos: [{ id: '1', content: 'Still working', status: 'in_progress' }]
+    })
+    expect(
+      shouldShowAgentPlanPanel(plan, [{ name: 'readFile', status: 'done' }])
+    ).toBe(true)
   })
 })
 

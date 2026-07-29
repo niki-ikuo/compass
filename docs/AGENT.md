@@ -219,7 +219,7 @@ On Continue = yes: budgets increase and **plan + memory** are re-injected as a u
 |-----------|------|
 | `agentSteps` on assistant messages | Timeline + history persistence |
 | Prior tool context | Summarized observations re-injected on follow-up (`buildPriorAgentContext`) |
-| Plan (`updateTodo` / `checkpoint`) | Checklist + resume note; rebuilt from history; re-injected on Continue; chat Plan panel rebuilds from all assistant `agentSteps` through the current message |
+| Plan (`updateTodo` / `checkpoint`) | Checklist + resume note; rebuilt from history; re-injected on Continue while open todos remain; chat Plan panel rebuilds from all assistant `agentSteps` through the current message. Fully settled plans (all done/cancelled) are not re-injected and only render on the message that last called `updateTodo` / `checkpoint` |
 | Soft multi-part nudge | If the latest user ask looks multi-part and the plan is empty, inject a user-role nudge to call `updateTodo` first (not a hard gate) |
 | Memory (`remember` + auto observations) | Durable notes; rebuilt from history |
 | Read cache | Avoid re-sending full file bodies within one run |
