@@ -5181,15 +5181,16 @@ body.is-resizing-terminal iframe {
 }
 
 /*
- * Electron cannot focus nodes that are off-screen or fully transparent.
- * xterm defaults to left:-9999em / opacity:0 / z-index:-5 — override opacity &
- * stacking only; left/top are patched in JS before focus so IME can still track.
+ * Helper textarea: opaque enough for Windows IME; hide ink with transparent color.
  */
 .terminal-instance .xterm-helper-textarea {
-  opacity: 0.01 !important;
+  opacity: 1 !important;
+  color: transparent !important;
+  caret-color: transparent !important;
   z-index: 10 !important;
   pointer-events: auto !important;
-  caret-color: transparent;
+  min-width: 8px !important;
+  min-height: 16px !important;
 }
 
 .terminal-empty {

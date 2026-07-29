@@ -69,54 +69,6 @@ function isTerminalPasteShortcut(event: KeyboardEvent): boolean {
   return Boolean(ctrlKey && !metaKey && shiftKey)
 }
 
-function encodeTerminalKey(event: KeyboardEvent): string | null {
-  if (event.isComposing) return null
-
-  const { key, ctrlKey, altKey, metaKey, shiftKey } = event
-
-  if (ctrlKey && !altKey && !metaKey) {
-    // Ctrl+C is handled in the keydown path when a selection exists (copy).
-    if ((key === 'c' || key === 'C') && !shiftKey) return '\x03'
-    if (key === 'd' || key === 'D') return '\x04'
-    if (key === 'z' || key === 'Z') return '\x1a'
-    if (key === 'l' || key === 'L') return '\x0c'
-  }
-
-  switch (key) {
-    case 'Enter':
-      return '\r'
-    case 'Backspace':
-      return '\x7f'
-    case 'Delete':
-      return '\x1b[3~'
-    case 'Tab':
-      return shiftKey ? '\x1b[Z' : '\t'
-    case 'Escape':
-      return '\x1b'
-    case 'ArrowUp':
-      return '\x1b[A'
-    case 'ArrowDown':
-      return '\x1b[B'
-    case 'ArrowRight':
-      return '\x1b[C'
-    case 'ArrowLeft':
-      return '\x1b[D'
-    case 'Home':
-      return '\x1b[H'
-    case 'End':
-      return '\x1b[F'
-    case 'PageUp':
-      return '\x1b[5~'
-    case 'PageDown':
-      return '\x1b[6~'
-    default:
-      if (key.length === 1 && !ctrlKey && !metaKey) {
-        return key
-      }
-      return null
-  }
-}
-
 function shouldIgnoreTerminalKeyTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false
   if (target.isContentEditable || Boolean(target.closest('[contenteditable="true"]'))) {
@@ -150,9 +102,8 @@ function blurMonacoEditors(): void {
 }
 
 /**
- * Electron cannot focus xterm's helper textarea while it is off-screen
- * (`left: -9999em`) or zero-sized. Move it on-screen before focus(); afterwards
- * xterm may reposition it to the cursor for IME.
+ * Keep xterm's helper textarea on-screen and writable so Windows IME can attach.
+ * Near-zero opacity often breaks Japanese composition in Electron.
  */
 function prepareXtermTextarea(terminal: Terminal): HTMLTextAreaElement | null {
   const textarea = terminal.textarea ?? null
@@ -168,16 +119,16 @@ function prepareXtermTextarea(terminal: Terminal): HTMLTextAreaElement | null {
   if (offscreen) {
     textarea.style.left = '0px'
     textarea.style.top = '0px'
-    textarea.style.width = '20px'
-    textarea.style.height = '20px'
   }
 
-  if (textarea.style.opacity === '0' || textarea.style.opacity === '') {
-    textarea.style.opacity = '0.01'
-  }
-  if (textarea.style.zIndex === '-5' || textarea.style.zIndex === '') {
-    textarea.style.zIndex = '10'
-  }
+  textarea.style.width = '12px'
+  textarea.style.height = '18px'
+  textarea.style.opacity = '1'
+  textarea.style.color = 'transparent'
+  textarea.style.caretColor = 'transparent'
+  textarea.style.background = 'transparent'
+  textarea.style.border = 'none'
+  textarea.style.zIndex = '10'
   textarea.style.pointerEvents = 'auto'
   textarea.tabIndex = 0
   textarea.readOnly = false
@@ -185,16 +136,25 @@ function prepareXtermTextarea(terminal: Terminal): HTMLTextAreaElement | null {
   return textarea
 }
 
-function focusXterm(terminal: Terminal | null, isActive: () => boolean): void {
+function focusXterm(
+  terminal: Terminal | null,
+  isActive: () => boolean,
+  skipIfComposing?: () => boolean
+): void {
   if (!terminal || !isActive()) return
+  if (skipIfComposing?.()) return
   blurMonacoEditors()
   prepareXtermTextarea(terminal)
   terminal.focus()
 }
 
-function scheduleFocusXterm(terminal: Terminal | null, isActive: () => boolean): void {
+function scheduleFocusXterm(
+  terminal: Terminal | null,
+  isActive: () => boolean,
+  skipIfComposing?: () => boolean
+): void {
   for (const delay of [0, 16, 50, 120, 250]) {
-    window.setTimeout(() => focusXterm(terminal, isActive), delay)
+    window.setTimeout(() => focusXterm(terminal, isActive, skipIfComposing), delay)
   }
 }
 
@@ -215,6 +175,7 @@ function TerminalInstance({
   const pendingInputRef = useRef<string[]>([])
   const sendInputRef = useRef<(data: string) => void>(() => {})
   const inputArmedRef = useRef(false)
+  const composingRef = useRef(false)
   const onTitleRef = useRef(onTitle)
   const onExitedRef = useRef(onExited)
   const activeRef = useRef(active)
@@ -224,6 +185,8 @@ function TerminalInstance({
   onTitleRef.current = onTitle
   onExitedRef.current = onExited
   activeRef.current = active
+
+  const isComposing = useCallback(() => composingRef.current, [])
 
   const fitTerminal = useCallback(() => {
     const fitAddon = fitAddonRef.current
@@ -249,9 +212,10 @@ function TerminalInstance({
       cursorBlink: true,
       cursorStyle: 'block',
       cursorInactiveStyle: 'outline',
-      // Input is handled by our keydown → PTY path. xterm is display-only.
-      disableStdin: true,
-      fontFamily: "'Cascadia Code', 'Consolas', 'Monaco', monospace",
+      // xterm handles keys via onData; IME commits via compositionend (deduped below).
+      disableStdin: false,
+      fontFamily:
+        "'Cascadia Code', 'Consolas', 'Yu Gothic UI', 'Meiryo UI', 'MS Gothic', monospace",
       fontSize: 13,
       theme: getColorTheme(useAppStore.getState().settings.colorTheme).terminal
     })
@@ -289,6 +253,69 @@ function TerminalInstance({
     }
 
     sendInputRef.current = sendInput
+
+    // compositionend and xterm onData both fire on IME confirm — send once.
+    let lastImeCommit = ''
+    let lastImeCommitUntil = 0
+
+    const onDataDisposable = terminal.onData((data) => {
+      if (lastImeCommit && data === lastImeCommit && Date.now() < lastImeCommitUntil) {
+        lastImeCommit = ''
+        return
+      }
+      sendInput(data)
+    })
+
+    terminal.attachCustomKeyEventHandler((event) => {
+      if (event.type !== 'keydown') return true
+
+      const imeOwned =
+        composingRef.current ||
+        event.isComposing ||
+        event.key === 'Process' ||
+        event.keyCode === 229
+      if (imeOwned) return false
+
+      const hasSelection = terminal.hasSelection()
+      if (isTerminalCopyShortcut(event, hasSelection)) {
+        copyTerminalSelection(terminal)
+        return false
+      }
+      if (isTerminalPasteShortcut(event)) {
+        void navigator.clipboard.readText().then((text) => {
+          if (!text || !activeRef.current || !inputArmedRef.current) return
+          sendInput(normalizeClipboardTextForPty(text))
+        })
+        return false
+      }
+      return true
+    })
+
+    const textarea = prepareXtermTextarea(terminal)
+
+    const onCompositionStart = (): void => {
+      composingRef.current = true
+      prepareXtermTextarea(terminal)
+    }
+
+    const onCompositionEnd = (event: CompositionEvent): void => {
+      composingRef.current = false
+      // Empty data = cancelled composition; do not fall back to stale textarea value.
+      const text = event.data || ''
+      if (text) {
+        lastImeCommit = text
+        lastImeCommitUntil = Date.now() + 300
+        sendInput(text)
+      }
+      window.setTimeout(() => {
+        if (textarea) textarea.value = ''
+      }, 0)
+    }
+
+    if (textarea) {
+      textarea.addEventListener('compositionstart', onCompositionStart)
+      textarea.addEventListener('compositionend', onCompositionEnd)
+    }
 
     const flushPendingInput = (): void => {
       if (!ptyReadyRef.current) return
@@ -354,7 +381,11 @@ function TerminalInstance({
       fitTerminal()
       void window.compass.terminal.resize(tabId, terminal.cols, terminal.rows)
       if (activeRef.current) {
-        scheduleFocusXterm(terminal, () => isCurrentMount() && activeRef.current)
+        scheduleFocusXterm(
+          terminal,
+          () => isCurrentMount() && activeRef.current,
+          () => composingRef.current
+        )
       }
     }
 
@@ -370,8 +401,14 @@ function TerminalInstance({
       ptyReadyRef.current = false
       pendingInputRef.current = []
       sendInputRef.current = () => {}
+      composingRef.current = false
+      if (textarea) {
+        textarea.removeEventListener('compositionstart', onCompositionStart)
+        textarea.removeEventListener('compositionend', onCompositionEnd)
+      }
       resizeObserver.disconnect()
       releaseIpcSubscriptions()
+      onDataDisposable.dispose()
       terminal.dispose()
       terminalRef.current = null
       fitAddonRef.current = null
@@ -389,13 +426,14 @@ function TerminalInstance({
   useEffect(() => {
     if (!active) {
       inputArmedRef.current = false
+      composingRef.current = false
       return
     }
 
     inputArmedRef.current = true
     fitTerminal()
-    scheduleFocusXterm(terminalRef.current, () => activeRef.current)
-  }, [active, fitTerminal, focusToken])
+    scheduleFocusXterm(terminalRef.current, () => activeRef.current, isComposing)
+  }, [active, fitTerminal, focusToken, isComposing])
 
   useEffect(() => {
     if (!active) return
@@ -414,45 +452,7 @@ function TerminalInstance({
       inputArmedRef.current = false
     }
 
-    /**
-     * Sole input path: always forward keys to the PTY while this terminal is armed.
-     * Do not defer to xterm onData — in Electron the helper textarea can show a
-     * focused cursor without delivering key events to onData.
-     */
-    const handleKeyDown = (event: KeyboardEvent): void => {
-      if (!activeRef.current || !inputArmedRef.current) return
-      if (event.defaultPrevented || event.isComposing) return
-      if (shouldIgnoreTerminalKeyTarget(event.target)) return
-
-      const terminal = terminalRef.current
-      const hasSelection = Boolean(terminal?.hasSelection())
-
-      if (isTerminalCopyShortcut(event, hasSelection)) {
-        if (!copyTerminalSelection(terminal)) return
-        event.preventDefault()
-        event.stopPropagation()
-        return
-      }
-
-      if (isTerminalPasteShortcut(event)) {
-        event.preventDefault()
-        event.stopPropagation()
-        void navigator.clipboard.readText().then((text) => {
-          if (!text || !activeRef.current || !inputArmedRef.current) return
-          sendInputRef.current(normalizeClipboardTextForPty(text))
-        })
-        return
-      }
-
-      const encoded = encodeTerminalKey(event)
-      if (!encoded) return
-
-      event.preventDefault()
-      event.stopPropagation()
-      focusXterm(terminal, () => activeRef.current)
-      sendInputRef.current(encoded)
-    }
-
+    // Clipboard only — capturing character keydowns breaks Windows IME.
     const handleCopy = (event: ClipboardEvent): void => {
       if (!activeRef.current || !inputArmedRef.current) return
       if (shouldIgnoreTerminalKeyTarget(event.target)) return
@@ -476,12 +476,10 @@ function TerminalInstance({
     }
 
     document.addEventListener('mousedown', handleMouseDown, true)
-    window.addEventListener('keydown', handleKeyDown, true)
     window.addEventListener('copy', handleCopy, true)
     window.addEventListener('paste', handlePaste, true)
     return () => {
       document.removeEventListener('mousedown', handleMouseDown, true)
-      window.removeEventListener('keydown', handleKeyDown, true)
       window.removeEventListener('copy', handleCopy, true)
       window.removeEventListener('paste', handlePaste, true)
     }
@@ -496,7 +494,7 @@ function TerminalInstance({
         if (!activeRef.current) return
         event.stopPropagation()
         inputArmedRef.current = true
-        focusXterm(terminalRef.current, () => activeRef.current)
+        focusXterm(terminalRef.current, () => activeRef.current, isComposing)
       }}
     />
   )

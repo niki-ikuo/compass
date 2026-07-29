@@ -68,25 +68,54 @@ function detectPowerShell(): string | null {
 
 export function listAvailableShells(): TerminalShell[] {
   const shells: TerminalShell[] = []
+  const win = process.platform === 'win32'
 
   const powershell = detectPowerShell()
   if (powershell) {
+    // PSReadLine defaults assume a dark console (often SGR 37 "white").
+    // Use terminal default FG (39) for typed tokens so theme foreground applies.
+    const psReadLineColors =
+      "try { Set-PSReadLineOption -Colors @{ Default = '`e[39m'; Command = '`e[39m'; ContinuationPrompt = '`e[39m'; Number = '`e[39m'; Operator = '`e[39m'; Parameter = '`e[36m'; Member = '`e[36m'; Type = '`e[36m'; String = '`e[33m'; Variable = '`e[32m'; Comment = '`e[32m' } } catch {}"
     shells.push({
       id: 'powershell',
       label: powershell.endsWith('pwsh.exe') ? 'PowerShell 7' : 'PowerShell',
       path: powershell,
-      args: []
+      // ConPTY defaults to OEM CP (932 on Japanese Windows). Force UTF-8 for CJK.
+      args: win
+        ? [
+            '-NoLogo',
+            '-NoExit',
+            '-Command',
+            [
+              'chcp 65001 | Out-Null',
+              '[Console]::InputEncoding = [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)',
+              psReadLineColors
+            ].join('; ')
+          ]
+        : []
     })
   }
 
   const cmdPath = join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'cmd.exe')
   if (fileExists(cmdPath)) {
-    shells.push({ id: 'cmd', label: t('terminal.cmd'), path: cmdPath, args: [] })
+    shells.push({
+      id: 'cmd',
+      label: t('terminal.cmd'),
+      path: cmdPath,
+      args: win ? ['/K', 'chcp 65001 >nul'] : []
+    })
   }
 
   const gitBash = detectGitBash()
   if (gitBash) {
-    shells.push({ id: 'bash', label: 'Git Bash', path: gitBash, args: ['--login', '-i'] })
+    shells.push({
+      id: 'bash',
+      label: 'Git Bash',
+      path: gitBash,
+      args: win
+        ? ['-c', 'chcp.com 65001 >/dev/null 2>&1; exec "$BASH" --login -i']
+        : ['--login', '-i']
+    })
   }
 
   const wsl = detectWsl()
@@ -157,6 +186,7 @@ function buildSpawnEnv(shell: TerminalShell): Record<string, string> {
     env.CHERE_INVOKING = '1'
     env.TERM = 'xterm-256color'
     env.GIT_INSTALL_ROOT = gitRoot
+    if (!env.LANG && !env.LC_ALL) env.LANG = 'C.UTF-8'
     prependToPath(env, join(gitRoot, 'bin'), join(gitRoot, 'usr', 'bin'))
   }
 
