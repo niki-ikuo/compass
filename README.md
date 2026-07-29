@@ -2,9 +2,11 @@
 
 **English** | [日本語](README.ja.md)
 
-An AI workspace for Windows. Open a local folder and work with AI on notes, documents, data, and code.
+Your entire folder becomes an AI workspace.
 
-Open a folder → edit files → ask the AI → apply suggestions.
+Work with AI on code, Markdown, documents, CSV, logs, and notes—all in one place.
+
+Open a folder → edit files → ask AI → apply suggestions.
 
 ## Download
 
