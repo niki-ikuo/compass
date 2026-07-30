@@ -92,6 +92,9 @@ while true:
   if no tool_calls:
     if open todos (pending/in_progress) and open-todo nudges < 2
       → append assistant text + user nudge; continue loop
+    else if proposeActions missing/truncated (change request, fake chat JSON, or prior truncation)
+         and propose nudges < 2 and preview not already shown/applied
+      → append assistant text + user nudge (call proposeActions / one-file retry); continue loop
     else → ai:done; return
   if tools would exceed budget → ask Continue
   append assistant(+tool_calls) to messages
@@ -104,7 +107,7 @@ while true:
   turn++
 ```
 
-Natural completion: a turn with **no** `tool_calls`, unless the plan still has open todos — then the runtime injects a user-role nudge (max **2** per run) and continues. Agent does not call an explicit “finish” tool.
+Natural completion: a turn with **no** `tool_calls`, unless the plan still has open todos — then the runtime injects a user-role nudge (max **2** per run) and continues. The same pattern applies when a workspace change request ends without a successful `proposeActions` (or after a truncated propose): max **2** nudges per run. Chat/`compass-actions` JSON is never salvage-parsed in Agent; the model must call the tool. Agent does not call an explicit “finish” tool.
 
 ### 4.3 One SSE turn (`streamAgentTurn`)
 
@@ -221,6 +224,7 @@ On Continue = yes: budgets increase and **plan + memory** are re-injected as a u
 | Prior tool context | Summarized observations re-injected on follow-up (`buildPriorAgentContext`) |
 | Plan (`updateTodo` / `checkpoint`) | Checklist + resume note; rebuilt from history; re-injected on Continue while open todos remain; chat Plan panel rebuilds from all assistant `agentSteps` through the current message. Fully settled plans (all done/cancelled) are not re-injected and only render on the message that last called `updateTodo` / `checkpoint` |
 | Soft multi-part nudge | If the latest user ask looks multi-part and the plan is empty, inject a user-role nudge to call `updateTodo` first (not a hard gate) |
+| Soft proposeActions nudge | If a change request (or fake chat/`compass-actions` JSON / truncated propose) ends without an applied proposal, inject a user-role nudge to call `proposeActions` (max **2** per run; skipped after preview reject unless fake JSON appears) |
 | Memory (`remember` + auto observations) | Durable notes; rebuilt from history |
 | Read cache | Avoid re-sending full file bodies within one run |
 

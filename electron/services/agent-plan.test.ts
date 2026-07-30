@@ -3,16 +3,21 @@ import { setLocale } from '../../src/i18n/runtime'
 import {
   applyCheckpoint,
   applyUpdateTodo,
+  assistantImpliesPendingFileChanges,
   countOpenTodos,
   createAgentPlanState,
   formatAgentPlanForModel,
+  formatMissingProposeActionsNudge,
   formatOpenTodosNudge,
+  formatTruncatedProposeActionsNudge,
   getOpenTodos,
   looksLikeMultiPartAgentTask,
+  looksLikeWorkspaceChangeRequest,
   rebuildPlanFromSteps,
   collectAgentStepsThrough,
   sanitizeCheckpointArgs,
   sanitizeUpdateTodoArgs,
+  shouldNudgeMissingProposeActions,
   shouldShowAgentPlanPanel
 } from './agent-plan'
 
@@ -239,6 +244,76 @@ describe('open todo helpers', () => {
     expect(nudge).toContain('未完了の todo が残っています')
     expect(nudge).toContain('残り作業')
     setLocale('en')
+  })
+})
+
+describe('proposeActions finish nudges', () => {
+  it('detects workspace change requests', () => {
+    expect(looksLikeWorkspaceChangeRequest('Fix the bug in note.txt')).toBe(true)
+    expect(looksLikeWorkspaceChangeRequest('実装してください')).toBe(true)
+    expect(looksLikeWorkspaceChangeRequest('List the workspace')).toBe(false)
+    expect(looksLikeWorkspaceChangeRequest('What does this file do?')).toBe(false)
+  })
+
+  it('detects fake pending file changes in assistant text', () => {
+    expect(
+      assistantImpliesPendingFileChanges(
+        '```compass-actions\n{"actions":[{"type":"writeFile","path":"a.md","content":"x"}]}\n```'
+      )
+    ).toBe(true)
+    expect(assistantImpliesPendingFileChanges('承認してください')).toBe(true)
+    expect(assistantImpliesPendingFileChanges('Here is what I found.')).toBe(false)
+  })
+
+  it('shouldNudgeMissingProposeActions covers truncation and skips after preview', () => {
+    expect(
+      shouldNudgeMissingProposeActions({
+        userText: 'List files',
+        assistantText: '',
+        proposeActionsApplied: false,
+        proposeActionsTruncated: true,
+        proposeActionsReachedPreview: false,
+        alreadyNudging: false
+      })
+    ).toBe(true)
+
+    expect(
+      shouldNudgeMissingProposeActions({
+        userText: 'Fix note.txt',
+        assistantText: 'Stopped.',
+        proposeActionsApplied: false,
+        proposeActionsTruncated: false,
+        proposeActionsReachedPreview: true,
+        alreadyNudging: false
+      })
+    ).toBe(false)
+
+    expect(
+      shouldNudgeMissingProposeActions({
+        userText: 'Fix note.txt',
+        assistantText: '```compass-actions\n{"actions":[]}\n```',
+        proposeActionsApplied: false,
+        proposeActionsTruncated: false,
+        proposeActionsReachedPreview: true,
+        alreadyNudging: false
+      })
+    ).toBe(true)
+
+    expect(
+      shouldNudgeMissingProposeActions({
+        userText: 'What is in this folder?',
+        assistantText: 'Stopping without tool.',
+        proposeActionsApplied: false,
+        proposeActionsTruncated: false,
+        proposeActionsReachedPreview: false,
+        alreadyNudging: true
+      })
+    ).toBe(true)
+  })
+
+  it('formats propose nudge copy', () => {
+    expect(formatMissingProposeActionsNudge()).toContain('proposeActions was not called')
+    expect(formatTruncatedProposeActionsNudge()).toContain('truncated')
   })
 })
 

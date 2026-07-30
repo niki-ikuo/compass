@@ -52,12 +52,15 @@ import {
   applyCheckpoint,
   applyUpdateTodo,
   formatAgentPlanForModel,
+  formatMissingProposeActionsNudge,
   formatOpenTodosNudge,
+  formatTruncatedProposeActionsNudge,
   rebuildPlanFromSteps,
   sanitizeCheckpointArgs,
   sanitizeUpdateTodoArgs,
   looksLikeMultiPartAgentTask,
   formatInitialTodoPlanNudge,
+  shouldNudgeMissingProposeActions,
   type AgentPlanState
 } from './agent-plan'
 import {
@@ -125,6 +128,8 @@ const MAX_PRIOR_CONTEXT_CHARS = 24_000
 const MAX_PRIOR_STEP_OBSERVATION_CHARS = 3_000
 /** text-only 終了時に open todo がある場合の再促し上限（無限ループ防止） */
 const MAX_OPEN_TODO_NUDGES = 2
+/** text-only 終了時に proposeActions 欠落／途中切れの再促し上限 */
+const MAX_PROPOSE_ACTIONS_NUDGES = 2
 
 type ApiMessage = {
   role: string
@@ -1148,7 +1153,13 @@ async function executeProposeActions(
   args: Record<string, unknown>,
   signal: AbortSignal,
   preset?: import('../../src/types').UseCasePreset | null
-): Promise<{ ok: boolean; summary: string; content: string; appliedPaths?: string[] }> {
+): Promise<{
+  ok: boolean
+  summary: string
+  content: string
+  appliedPaths?: string[]
+  previewed?: boolean
+}> {
   const parsed = parseProposeActions(args)
   if ('error' in parsed) {
     return {
@@ -1211,7 +1222,8 @@ async function executeProposeActions(
         ok: true,
         summary: `Applied ${normalized.length} action(s)`,
         content: `${detail}\n\n${getVerifyAfterApplyNudge(preset)}`,
-        appliedPaths: normalized.map((a) => a.path)
+        appliedPaths: normalized.map((a) => a.path),
+        previewed: true
       }
     }
     const detail =
@@ -1220,14 +1232,15 @@ async function executeProposeActions(
     return {
       ok: false,
       summary: summarizeProposeActionsRejection(detail),
-      content: detail
+      content: detail,
+      previewed: true
     }
   } catch (err) {
     if (isAbortError(err) || signal.aborted) {
       throw err
     }
     const message = err instanceof Error ? err.message : String(err)
-    return { ok: false, summary: message, content: `Error: ${message}` }
+    return { ok: false, summary: message, content: `Error: ${message}`, previewed: true }
   }
 }
 
@@ -1639,6 +1652,10 @@ export async function runAgent(webContents: WebContents, request: ChatRequest): 
     let toolBudget = MAX_TOOL_CALLS
     let turn = 0
     let openTodoNudges = 0
+    let proposeActionsNudges = 0
+    let proposeActionsApplied = false
+    let proposeActionsTruncated = false
+    let proposeActionsReachedPreview = false
 
     while (true) {
       if (signal.aborted) {
@@ -1715,6 +1732,31 @@ export async function runAgent(webContents: WebContents, request: ChatRequest): 
             continue
           }
         }
+
+        if (
+          proposeActionsNudges < MAX_PROPOSE_ACTIONS_NUDGES &&
+          shouldNudgeMissingProposeActions({
+            userText: latestUserText,
+            assistantText: turnResult.content || '',
+            proposeActionsApplied,
+            proposeActionsTruncated,
+            proposeActionsReachedPreview,
+            alreadyNudging: proposeActionsNudges > 0
+          })
+        ) {
+          proposeActionsNudges++
+          const proposeNudge = proposeActionsTruncated
+            ? formatTruncatedProposeActionsNudge()
+            : formatMissingProposeActionsNudge()
+          apiMessages.push({
+            role: 'assistant',
+            content: turnResult.content || null
+          })
+          apiMessages.push({ role: 'user', content: proposeNudge })
+          turn++
+          continue
+        }
+
         send('ai:done')
         return
       }
@@ -1765,7 +1807,13 @@ export async function runAgent(webContents: WebContents, request: ChatRequest): 
           args: sanitized
         })
 
-        let result: { ok: boolean; summary: string; content: string; appliedPaths?: string[] }
+        let result: {
+          ok: boolean
+          summary: string
+          content: string
+          appliedPaths?: string[]
+          previewed?: boolean
+        }
         try {
           if (call.function.name === 'proposeActions') {
             // Incomplete JSON (often max_tokens cut mid-writeFile) must not become a preview.
@@ -1773,6 +1821,7 @@ export async function runAgent(webContents: WebContents, request: ChatRequest): 
             const hasRecoveredActions =
               Array.isArray(args.actions) && args.actions.length > 0
             if (incompleteArgs && !hasRecoveredActions) {
+              proposeActionsTruncated = true
               result = truncatedProposeActionsResult()
             } else {
               result = await executeProposeActions(
@@ -1784,7 +1833,12 @@ export async function runAgent(webContents: WebContents, request: ChatRequest): 
                 signal,
                 request.preset
               )
+              if (result.previewed) {
+                proposeActionsReachedPreview = true
+              }
               if (result.ok) {
+                proposeActionsApplied = true
+                proposeActionsTruncated = false
                 const paths =
                   result.appliedPaths && result.appliedPaths.length > 0
                     ? result.appliedPaths

@@ -92,6 +92,8 @@ while true:
   if tool_calls なし:
     if open todo（pending/in_progress）があり open-todo nudge が 2 回未満
       → assistant テキスト + user nudge を追加してループ継続
+    else if proposeActions 欠落／途中切れ（変更依頼・偽チャット JSON・直前の truncate）で propose nudge が 2 回未満、かつプレビュー未提示／未適用
+      → assistant テキスト + user nudge（proposeActions 呼び出し／1ファイル再提案）を追加して継続
     else → ai:done; return
   if ツール予算超過 → Continue 確認
   assistant(+tool_calls) を messages に追加
@@ -104,7 +106,7 @@ while true:
   turn++
 ```
 
-自然終了は **tool_calls のないターン**。ただし計画に未完了 todo が残っている場合は、ランタイムが user ロールの nudge を注入して継続する（1 ランあたり最大 **2** 回）。「finish」専用ツールはない。
+自然終了は **tool_calls のないターン**。ただし計画に未完了 todo が残っている場合は、ランタイムが user ロールの nudge を注入して継続する（1 ランあたり最大 **2** 回）。同様に、変更依頼なのに `proposeActions` が成功していない（または途中切れ後にテキスト終了した）場合も最大 **2** 回再促しする。Agent ではチャット／`compass-actions` JSON の救済パースは行わず、ツール呼び出しを必須とする。「finish」専用ツールはない。
 
 ### 4.3 1 ターンの SSE（`streamAgentTurn`）
 
@@ -221,6 +223,7 @@ Continue = yes: 予算加算し **plan + memory** を user メッセージとし
 | 過去ツール文脈 | フォローアップで観測要約を再注入（`buildPriorAgentContext`） |
 | Plan（`updateTodo` / `checkpoint`） | チェックリスト + 再開メモ。履歴から再構築、未完了 todo があるあいだ Continue 時に再注入。チャットの計画パネルは当該メッセージまでの全 assistant `agentSteps` から再構築。全 todo が完了/取消し済みの計画は再注入せず、最後に `updateTodo` / `checkpoint` を呼んだメッセージにだけ表示する |
 | 複数パート soft nudge | 最新ユーザー依頼が複数パートっぽく計画が空なら、先に `updateTodo` するよう user ロールで誘導（必須ゲートではない） |
+| proposeActions soft nudge | 変更依頼（または偽チャット/`compass-actions` JSON・途中切れ）なのに適用済み提案がないまま終了しようとしたら、`proposeActions` 呼び出しを user ロールで再促し（1 ラン最大 **2** 回。プレビュー却下後は偽 JSON が出ない限りスキップ） |
 | Memory（`remember` + 自動観測） | 耐久メモ。履歴から再構築 |
 | Read キャッシュ | 同一ラン内のフル再読込を抑制 |
 

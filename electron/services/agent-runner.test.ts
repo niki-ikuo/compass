@@ -71,6 +71,10 @@ function sseResponse(parts: string[]): Response {
 }
 
 function toolCallTurn(name: string, args: Record<string, unknown>, id = 'call_1'): string[] {
+  return toolCallTurnRaw(name, JSON.stringify(args), id)
+}
+
+function toolCallTurnRaw(name: string, argumentsJson: string, id = 'call_1'): string[] {
   return [
     sseChunk({
       choices: [
@@ -80,7 +84,7 @@ function toolCallTurn(name: string, args: Record<string, unknown>, id = 'call_1'
               {
                 index: 0,
                 id,
-                function: { name, arguments: JSON.stringify(args) }
+                function: { name, arguments: argumentsJson }
               }
             ]
           }
@@ -412,5 +416,148 @@ describe('runAgent tool loop', () => {
     expect(events.some((e) => e.channel === 'ai:done')).toBe(true)
     // updateTodo + 3 text-only attempts (2 nudges then forced done)
     expect(fetchMock).toHaveBeenCalledTimes(4)
+  })
+
+  it('nudges when a change request finishes without proposeActions', async () => {
+    const root = makeTempRoot('missing-propose-nudge')
+    tempRoots.push(root)
+
+    const fetchMock = vi.mocked(fetch)
+    fetchMock
+      .mockResolvedValueOnce(sseResponse(textTurn('I will update note.txt for you.')))
+      .mockResolvedValueOnce(
+        sseResponse(
+          toolCallTurn(
+            'proposeActions',
+            {
+              actions: [{ type: 'writeFile', path: 'note.txt', content: 'fixed\n' }]
+            },
+            'call_propose'
+          )
+        )
+      )
+      .mockResolvedValueOnce(sseResponse(textTurn('Applied after approval.')))
+
+    const { webContents, events } = createWebContents()
+    const running = runAgent(
+      webContents,
+      baseRequest(root, { messages: [{ role: 'user', content: 'Fix note.txt please' }] })
+    )
+
+    await vi.waitFor(() => {
+      expect(events.some((e) => e.channel === 'ai:needApproval')).toBe(true)
+    })
+
+    const secondBody = JSON.parse(String(fetchMock.mock.calls[1][1]?.body)) as {
+      messages: Array<{ role: string; content: string | null }>
+    }
+    const nudgeMsg = secondBody.messages.find(
+      (m) =>
+        m.role === 'user' &&
+        typeof m.content === 'string' &&
+        m.content.includes('proposeActions was not called')
+    )
+    expect(nudgeMsg).toBeTruthy()
+
+    expect(resolveAgentApproval({ id: 'call_propose', approved: true })).toBe(true)
+    await running
+
+    expect(events.some((e) => e.channel === 'ai:done')).toBe(true)
+    expect(fetchMock).toHaveBeenCalledTimes(3)
+  })
+
+  it('does not nudge missing proposeActions for read-only asks', async () => {
+    const root = makeTempRoot('no-propose-nudge-readonly')
+    tempRoots.push(root)
+
+    const fetchMock = vi.mocked(fetch)
+    fetchMock.mockResolvedValueOnce(sseResponse(textTurn('Here is what I found.')))
+
+    const { webContents, events } = createWebContents()
+    await runAgent(webContents, baseRequest(root))
+
+    expect(events.some((e) => e.channel === 'ai:done')).toBe(true)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('nudges after truncated proposeActions when finishing in text', async () => {
+    const root = makeTempRoot('truncated-propose-nudge')
+    tempRoots.push(root)
+
+    const fetchMock = vi.mocked(fetch)
+    fetchMock
+      .mockResolvedValueOnce(
+        sseResponse(
+          toolCallTurnRaw(
+            'proposeActions',
+            '{"actions":[{"type":"writeFile","path":"big.md","content":"partial',
+            'call_truncated'
+          )
+        )
+      )
+      .mockResolvedValueOnce(sseResponse(textTurn('Done without retry.')))
+      .mockResolvedValueOnce(sseResponse(textTurn('Still done.')))
+      .mockResolvedValueOnce(sseResponse(textTurn('Forced stop.')))
+
+    const { webContents, events } = createWebContents()
+    await runAgent(
+      webContents,
+      baseRequest(root, { messages: [{ role: 'user', content: 'Update big.md' }] })
+    )
+
+    expect(events.some((e) => e.channel === 'ai:needApproval')).toBe(false)
+    const toolResult = events.find((e) => e.channel === 'ai:toolResult')
+    expect(toolResult?.payload[0]).toMatchObject({ name: 'proposeActions', ok: false })
+
+    const thirdBody = JSON.parse(String(fetchMock.mock.calls[2][1]?.body)) as {
+      messages: Array<{ role: string; content: string | null }>
+    }
+    const nudgeMsg = thirdBody.messages.find(
+      (m) =>
+        m.role === 'user' &&
+        typeof m.content === 'string' &&
+        m.content.includes('truncated')
+    )
+    expect(nudgeMsg).toBeTruthy()
+    expect(events.some((e) => e.channel === 'ai:done')).toBe(true)
+    // truncated propose + 3 text-only (2 nudges then forced done)
+    expect(fetchMock).toHaveBeenCalledTimes(4)
+  })
+
+  it('nudges when assistant dumps compass-actions instead of proposeActions', async () => {
+    const root = makeTempRoot('fake-compass-actions-nudge')
+    tempRoots.push(root)
+
+    const fetchMock = vi.mocked(fetch)
+    fetchMock
+      .mockResolvedValueOnce(
+        sseResponse(
+          textTurn(
+            'Please approve:\n\n```compass-actions\n{"actions":[{"type":"writeFile","path":"a.md","content":"x"}]}\n```'
+          )
+        )
+      )
+      .mockResolvedValueOnce(sseResponse(textTurn('Stopping without tool.')))
+      .mockResolvedValueOnce(sseResponse(textTurn('Forced done.')))
+
+    const { webContents, events } = createWebContents()
+    await runAgent(
+      webContents,
+      baseRequest(root, { messages: [{ role: 'user', content: 'What is in this folder?' }] })
+    )
+
+    const secondBody = JSON.parse(String(fetchMock.mock.calls[1][1]?.body)) as {
+      messages: Array<{ role: string; content: string | null }>
+    }
+    expect(
+      secondBody.messages.some(
+        (m) =>
+          m.role === 'user' &&
+          typeof m.content === 'string' &&
+          m.content.includes('proposeActions was not called')
+      )
+    ).toBe(true)
+    expect(events.some((e) => e.channel === 'ai:done')).toBe(true)
+    expect(fetchMock).toHaveBeenCalledTimes(3)
   })
 })

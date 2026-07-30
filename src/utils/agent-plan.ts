@@ -183,6 +183,80 @@ export function formatInitialTodoPlanNudge(): string {
 }
 
 /**
+ * Heuristic: user ask looks like a workspace create/edit/delete request
+ * (Agent should call proposeActions rather than finish with prose).
+ */
+export function looksLikeWorkspaceChangeRequest(text: string): boolean {
+  const trimmed = text.trim()
+  if (!trimmed) return false
+
+  // Imperative / change-oriented verbs (ja + en). Pure Q&A without these stays quiet.
+  return /(?:修正|変更|追加|削除|作成|実装|更新|書き換え|リファクタ|追記|置き換|直して|直す|書いて|書き換|消して|作って|入れて|なおして)|(?:please\s+)?(?:fix|change|add|delete|remove|create|implement|update|refactor|write|edit|patch|rename|replace)\b/i.test(
+    trimmed
+  )
+}
+
+/**
+ * Assistant text looks like an unapplied file proposal (fake Edit protocol,
+ * embedded actions JSON, or asking for approval without proposeActions).
+ */
+export function assistantImpliesPendingFileChanges(text: string): boolean {
+  const trimmed = text.trim()
+  if (!trimmed) return false
+
+  if (/```\s*compass-actions\b/i.test(trimmed)) return true
+  if (/\bcompass-actions\b/i.test(trimmed) && /"actions"\s*:/.test(trimmed)) return true
+  if (/"actions"\s*:\s*\[\s*\{/.test(trimmed)) return true
+  if (
+    /(?:承認して|プレビューで確認|please approve|awaiting (?:your )?approval|review (?:and )?(?:approve|apply))/i.test(
+      trimmed
+    )
+  ) {
+    return true
+  }
+  if (
+    /\bproposeActions\b/i.test(trimmed) &&
+    /"(?:writeFile|applyPatch|replaceSection|mkdir|deleteFile|deleteDir)"/.test(trimmed)
+  ) {
+    return true
+  }
+  return false
+}
+
+/**
+ * Whether text-only finish should be interrupted to force a proposeActions call.
+ * Skips when a proposal was already applied, or when the user already saw a preview
+ * (approved or rejected) unless the assistant is dumping fake change JSON.
+ * Once nudging has started this run, keep nudging until applied or the cap.
+ */
+export function shouldNudgeMissingProposeActions(options: {
+  userText: string
+  assistantText: string
+  proposeActionsApplied: boolean
+  proposeActionsTruncated: boolean
+  proposeActionsReachedPreview: boolean
+  alreadyNudging: boolean
+}): boolean {
+  if (options.proposeActionsApplied) return false
+  if (options.proposeActionsTruncated) return true
+  if (assistantImpliesPendingFileChanges(options.assistantText)) return true
+  if (options.proposeActionsReachedPreview) return false
+  if (options.alreadyNudging) return true
+  if (looksLikeWorkspaceChangeRequest(options.userText)) return true
+  return false
+}
+
+/** User-role nudge when finishing without proposeActions on a change request. */
+export function formatMissingProposeActionsNudge(): string {
+  return t('ai.agentMissingProposeActionsNudge')
+}
+
+/** Stronger nudge after truncated proposeActions when the model tries to finish in text. */
+export function formatTruncatedProposeActionsNudge(): string {
+  return t('ai.agentTruncatedProposeActionsNudge')
+}
+
+/**
  * User-role nudge when the model tries to finish with open todos.
  * Returns null when there is nothing open.
  */
