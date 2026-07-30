@@ -8,7 +8,7 @@ import { getColorTheme } from '@/utils/color-theme'
 import { TERMINAL_LAYOUT_LIMITS } from '@/components/ResizableLayout'
 import type { TerminalShell } from '@/types'
 import { useI18n, t as translate } from '@/i18n'
-import { PlusIcon, CloseIcon } from './icons/ToolbarIcons'
+import { ChevronDownIcon, CloseIcon, PlusIcon } from './icons/ToolbarIcons'
 
 interface TerminalTab {
   id: string
@@ -85,8 +85,9 @@ function shouldIgnoreTerminalKeyTarget(target: EventTarget | null): boolean {
         '.file-tree',
         '.search-panel',
         '.terminal-tab',
-        '.terminal-tab-add',
-        '.terminal-shell-select',
+        '.terminal-new-btn',
+        '.terminal-shell-dropdown-btn',
+        '.terminal-shell-menu',
         '.menu-bar'
       ].join(', ')
     )
@@ -542,6 +543,7 @@ export function TerminalPanel() {
   const { t } = useI18n()
   const workspaceRoot = useAppStore((s) => s.workspaceRoot)
   const showTerminal = useAppStore((s) => s.showTerminal)
+  const newTerminalMenuRequestId = useAppStore((s) => s.newTerminalMenuRequestId)
   const terminalHeight = useAppStore((s) => s.panelLayout.terminalHeight)
   const setTerminalHeight = useAppStore((s) => s.setTerminalHeight)
   const setShowTerminal = useAppStore((s) => s.setShowTerminal)
@@ -551,16 +553,27 @@ export function TerminalPanel() {
 
   const [focusToken, setFocusToken] = useState(0)
   const [shells, setShells] = useState<TerminalShell[]>([])
-  const [selectedShellId, setSelectedShellId] = useState<string>('')
   const [tabs, setTabs] = useState<TerminalTab[]>([])
   const [activeTabId, setActiveTabId] = useState<string | null>(null)
   const [tabContextMenu, setTabContextMenu] = useState<TerminalTabContextMenuState | null>(null)
+  const [shellMenuOpen, setShellMenuOpen] = useState(false)
+  const [highlightedShellId, setHighlightedShellId] = useState('')
   const tabCounterRef = useRef(0)
   const autoCreateRequestedRef = useRef(false)
   const tabContextMenuRef = useRef<HTMLDivElement>(null)
   const terminalTabsRef = useRef<HTMLDivElement>(null)
+  const shellMenuRef = useRef<HTMLDivElement>(null)
+  const newTerminalBtnRef = useRef<HTMLButtonElement>(null)
+  const shellDropdownBtnRef = useRef<HTMLButtonElement>(null)
 
   const closeTabContextMenu = () => setTabContextMenu(null)
+
+  const resolveDefaultShellId = useCallback((): string => {
+    if (defaultShellId && shells.some((shell) => shell.id === defaultShellId)) {
+      return defaultShellId
+    }
+    return shells[0]?.id ?? 'powershell'
+  }, [defaultShellId, shells])
 
   const openTerminalTabsKey = tabs.map((tab) => `${tab.id}:${tab.title}`).join('|')
 
@@ -574,20 +587,14 @@ export function TerminalPanel() {
   useEffect(() => {
     if (showTerminal) {
       setFocusToken((token) => token + 1)
+    } else {
+      setShellMenuOpen(false)
     }
   }, [showTerminal])
 
   useEffect(() => {
     void window.compass.terminal.listShells().then((available) => {
       setShells(available)
-      if (available.length === 0) return
-      setSelectedShellId((current) => {
-        if (defaultShellId && available.some((shell) => shell.id === defaultShellId)) {
-          return defaultShellId
-        }
-        if (current && available.some((shell) => shell.id === current)) return current
-        return available[0].id
-      })
     })
   }, [defaultShellId])
 
@@ -596,14 +603,7 @@ export function TerminalPanel() {
       if (!workspaceRoot) return
       tabCounterRef.current += 1
       const id = generateId()
-      const preferred =
-        shellId ??
-        selectedShellId ??
-        (defaultShellId && shells.some((shell) => shell.id === defaultShellId)
-          ? defaultShellId
-          : undefined) ??
-        shells[0]?.id ??
-        'powershell'
+      const preferred = shellId ?? resolveDefaultShellId()
       const tab: TerminalTab = {
         id,
         title: t('terminal.tabTitle', { n: tabCounterRef.current }),
@@ -611,14 +611,35 @@ export function TerminalPanel() {
       }
       setTabs((prev) => [...prev, tab])
       setActiveTabId(id)
+      setShowTerminal(true)
     },
-    [workspaceRoot, selectedShellId, defaultShellId, shells, t]
+    [workspaceRoot, resolveDefaultShellId, setShowTerminal, t]
+  )
+
+  const openShellMenu = useCallback(() => {
+    if (!workspaceRoot || shells.length === 0) return
+    setShowTerminal(true)
+    setHighlightedShellId(resolveDefaultShellId())
+    setShellMenuOpen(true)
+  }, [workspaceRoot, shells.length, resolveDefaultShellId, setShowTerminal])
+
+  const closeShellMenu = useCallback(() => {
+    setShellMenuOpen(false)
+  }, [])
+
+  const selectShellAndCreate = useCallback(
+    (shellId: string) => {
+      closeShellMenu()
+      createTab(shellId)
+    },
+    [closeShellMenu, createTab]
   )
 
   useEffect(() => {
     if (!workspaceRoot) {
       setTabs([])
       setActiveTabId(null)
+      setShellMenuOpen(false)
       void window.compass.terminal.killAll()
       return
     }
@@ -635,18 +656,30 @@ export function TerminalPanel() {
       autoCreateRequestedRef.current = false
       return
     }
-    // 初期シェル設定を反映するため、シェル一覧と選択状態が揃うまで待つ
-    if (shells.length === 0 || !selectedShellId) return
+    // パネル非表示中は自動作成しない（全タブ閉鎖後にすぐ開き直すのを防ぐ）
+    if (!showTerminal) {
+      autoCreateRequestedRef.current = false
+      return
+    }
+    // 初期シェル設定を反映するため、シェル一覧が揃うまで待つ
+    if (shells.length === 0) return
     if (autoCreateRequestedRef.current) return
     autoCreateRequestedRef.current = true
     createTab()
-  }, [workspaceRoot, tabs.length, createTab, shells.length, selectedShellId])
+  }, [workspaceRoot, tabs.length, createTab, shells.length, showTerminal])
+
+  const lastNewTerminalMenuRequestIdRef = useRef(0)
+  useEffect(() => {
+    if (newTerminalMenuRequestId === 0) return
+    if (newTerminalMenuRequestId === lastNewTerminalMenuRequestIdRef.current) return
+    if (!workspaceRoot || shells.length === 0) return
+    lastNewTerminalMenuRequestIdRef.current = newTerminalMenuRequestId
+    // ショートカットは「＋」と同じく既定シェルで新しいターミナルを開く
+    createTab()
+  }, [newTerminalMenuRequestId, workspaceRoot, shells.length, createTab])
 
   const closeTabs = useCallback(
-    (
-      tabIds: string[],
-      options?: { hidePanelWhenEmpty?: boolean; activateId?: string }
-    ) => {
+    (tabIds: string[], options?: { activateId?: string }) => {
       if (tabIds.length === 0) return
       closeTabContextMenu()
       const idSet = new Set(tabIds)
@@ -664,7 +697,8 @@ export function TerminalPanel() {
           }
           return current
         })
-        if (next.length === 0 && options?.hidePanelWhenEmpty) {
+        // すべてのターミナルタブを閉じたら領域も閉じる
+        if (next.length === 0) {
           setShowTerminal(false)
         }
         return next
@@ -674,8 +708,8 @@ export function TerminalPanel() {
   )
 
   const closeTab = useCallback(
-    (tabId: string, options?: { hidePanelWhenEmpty?: boolean }) => {
-      closeTabs([tabId], options)
+    (tabId: string) => {
+      closeTabs([tabId])
     },
     [closeTabs]
   )
@@ -708,9 +742,60 @@ export function TerminalPanel() {
     }
   }, [tabContextMenu])
 
-  const handleShellChange = (shellId: string) => {
-    setSelectedShellId(shellId)
-  }
+  useEffect(() => {
+    if (!shellMenuOpen) return
+
+    const onPointerDown = (event: MouseEvent) => {
+      const target = event.target as Node | null
+      if (target && shellMenuRef.current?.contains(target)) return
+      closeShellMenu()
+    }
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        closeShellMenu()
+        shellDropdownBtnRef.current?.focus()
+        return
+      }
+      if (shells.length === 0) return
+      const currentIndex = Math.max(
+        0,
+        shells.findIndex((shell) => shell.id === highlightedShellId)
+      )
+      if (event.key === 'ArrowDown') {
+        event.preventDefault()
+        const next = shells[(currentIndex + 1) % shells.length]
+        setHighlightedShellId(next.id)
+        return
+      }
+      if (event.key === 'ArrowUp') {
+        event.preventDefault()
+        const prev = shells[(currentIndex - 1 + shells.length) % shells.length]
+        setHighlightedShellId(prev.id)
+        return
+      }
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault()
+        const shell = shells.find((s) => s.id === highlightedShellId) ?? shells[0]
+        selectShellAndCreate(shell.id)
+      }
+    }
+
+    window.addEventListener('mousedown', onPointerDown)
+    window.addEventListener('keydown', onKeyDown)
+    return () => {
+      window.removeEventListener('mousedown', onPointerDown)
+      window.removeEventListener('keydown', onKeyDown)
+    }
+  }, [shellMenuOpen, shells, highlightedShellId, closeShellMenu, selectShellAndCreate])
+
+  useLayoutEffect(() => {
+    if (!shellMenuOpen) return
+    const item = shellMenuRef.current?.querySelector<HTMLElement>(
+      `[data-shell-id="${highlightedShellId}"]`
+    )
+    item?.focus()
+  }, [shellMenuOpen, highlightedShellId])
 
   const handleResize = useCallback(
     (deltaY: number) => {
@@ -782,11 +867,11 @@ export function TerminalPanel() {
                   if (e.button !== 0) return
                   e.preventDefault()
                   e.stopPropagation()
-                  closeTab(tab.id, { hidePanelWhenEmpty: true })
+                  closeTab(tab.id)
                 }}
                 onClick={(e) => {
                   e.stopPropagation()
-                  closeTab(tab.id, { hidePanelWhenEmpty: true })
+                  closeTab(tab.id)
                 }}
                 aria-label={t('terminal.closeTab')}
               >
@@ -805,9 +890,7 @@ export function TerminalPanel() {
           >
             <button
               type="button"
-              onClick={() =>
-                closeTabs([tabContextMenu.id], { hidePanelWhenEmpty: true })
-              }
+              onClick={() => closeTabs([tabContextMenu.id])}
             >
               {t('editor.closeTab')}
             </button>
@@ -827,10 +910,7 @@ export function TerminalPanel() {
             <button
               type="button"
               onClick={() => {
-                closeTabs(
-                  tabs.map((tab) => tab.id),
-                  { hidePanelWhenEmpty: true }
-                )
+                closeTabs(tabs.map((tab) => tab.id))
               }}
             >
               {t('editor.closeAllTabs')}
@@ -840,28 +920,62 @@ export function TerminalPanel() {
 
         <div className="terminal-panel-actions">
           {shells.length > 0 && (
-            <select
-              className="terminal-shell-select"
-              value={selectedShellId}
-              onChange={(e) => handleShellChange(e.target.value)}
-              title={t('terminal.selectShell')}
-            >
-              {shells.map((shell) => (
-                <option key={shell.id} value={shell.id}>
-                  {shell.label}
-                </option>
-              ))}
-            </select>
+            <div className="terminal-new-wrap" ref={shellMenuRef}>
+              <button
+                ref={newTerminalBtnRef}
+                type="button"
+                className="terminal-new-btn"
+                onClick={() => {
+                  closeShellMenu()
+                  createTab()
+                }}
+                title={`${t('terminal.new')} (${t('menu.newTerminalShortcut')})`}
+                aria-label={t('terminal.new')}
+              >
+                <PlusIcon />
+              </button>
+              <button
+                ref={shellDropdownBtnRef}
+                type="button"
+                className={`terminal-shell-dropdown-btn${shellMenuOpen ? ' open' : ''}`}
+                onClick={() => {
+                  if (shellMenuOpen) {
+                    closeShellMenu()
+                  } else {
+                    openShellMenu()
+                  }
+                }}
+                title={t('terminal.selectShell')}
+                aria-label={t('terminal.selectShell')}
+                aria-haspopup="menu"
+                aria-expanded={shellMenuOpen}
+              >
+                <ChevronDownIcon />
+              </button>
+              {shellMenuOpen && (
+                <div className="terminal-shell-menu" role="menu">
+                  {shells.map((shell) => (
+                    <button
+                      key={shell.id}
+                      type="button"
+                      role="menuitem"
+                      data-shell-id={shell.id}
+                      className={`terminal-shell-menu-item${
+                        shell.id === highlightedShellId ? ' highlighted' : ''
+                      }`}
+                      onMouseEnter={() => setHighlightedShellId(shell.id)}
+                      onClick={() => selectShellAndCreate(shell.id)}
+                    >
+                      <span className="terminal-shell-menu-check" aria-hidden="true">
+                        {shell.id === resolveDefaultShellId() ? '✓' : ''}
+                      </span>
+                      <span>{shell.label}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           )}
-          <button
-            type="button"
-            className="terminal-tab-add"
-            onClick={() => createTab()}
-            title={t('terminal.new')}
-            aria-label={t('terminal.new')}
-          >
-            <PlusIcon />
-          </button>
         </div>
       </div>
 
@@ -875,7 +989,7 @@ export function TerminalPanel() {
             active={showTerminal && activeTabId === tab.id}
             focusToken={focusToken}
             onTitle={(title) => updateTabTitle(tab.id, title)}
-            onExited={() => closeTab(tab.id, { hidePanelWhenEmpty: true })}
+            onExited={() => closeTab(tab.id)}
           />
         ))}
       </div>

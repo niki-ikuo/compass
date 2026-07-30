@@ -291,7 +291,19 @@ export function MenuBar({
     },
     { separator: true, label: '', action: () => {} },
     { label: t('menu.newBrowserTab'), shortcut: 'Ctrl+Shift+B', action: () => openBrowserTab() },
-    { label: t('menu.terminal'), shortcut: 'Ctrl+`', action: workspaceRoot ? onToggleTerminal : () => {} }
+    {
+      label: t('menu.terminal'),
+      shortcut: t('menu.terminalShortcut'),
+      action: workspaceRoot ? onToggleTerminal : () => {}
+    },
+    {
+      label: t('menu.newTerminal'),
+      shortcut: t('menu.newTerminalShortcut'),
+      action: () => {
+        if (!workspaceRoot) return
+        useAppStore.getState().requestNewTerminalMenu()
+      }
+    }
   ]
 
   const helpItems: MenuItem[] = [

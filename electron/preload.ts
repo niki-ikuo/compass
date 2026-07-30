@@ -443,6 +443,11 @@ const compassAPI = {
       ipcRenderer.on('menu:toggle-terminal', handler)
       return () => ipcRenderer.removeListener('menu:toggle-terminal', handler)
     },
+    onNewTerminal: (callback: () => void): (() => void) => {
+      const handler = (): void => callback()
+      ipcRenderer.on('menu:new-terminal', handler)
+      return () => ipcRenderer.removeListener('menu:new-terminal', handler)
+    },
     onFindInFile: (callback: () => void): (() => void) => {
       const handler = (): void => callback()
       ipcRenderer.on('menu:find-in-file', handler)

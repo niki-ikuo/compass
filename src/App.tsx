@@ -312,6 +312,10 @@ export function App() {
         if (!useAppStore.getState().workspaceRoot) return
         setShowTerminal(!useAppStore.getState().showTerminal)
       }),
+      window.compass.menu.onNewTerminal(() => {
+        if (!useAppStore.getState().workspaceRoot) return
+        useAppStore.getState().requestNewTerminalMenu()
+      }),
       window.compass.menu.onFindInFile(() => {
         window.dispatchEvent(new CustomEvent('compass:find-in-file'))
       }),

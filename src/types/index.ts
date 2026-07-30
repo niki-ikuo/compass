@@ -1147,6 +1147,7 @@ export interface CompassAPI {
     onSave: (callback: () => void) => () => void
     onSettings: (callback: () => void) => () => void
     onToggleTerminal: (callback: () => void) => () => void
+    onNewTerminal: (callback: () => void) => () => void
     onFindInFile: (callback: () => void) => () => void
     onReplaceInFile: (callback: () => void) => () => void
     onFindInFiles: (callback: () => void) => () => void

@@ -788,6 +788,8 @@ interface AppState {
   showFileTree: boolean
   showChat: boolean
   showTerminal: boolean
+  /** Incremented to ask TerminalPanel to open the new-terminal shell menu */
+  newTerminalMenuRequestId: number
   leftSidebarView: LeftSidebarView
   searchQuery: string
   searchReplace: string
@@ -946,6 +948,7 @@ interface AppState {
   setShowFileTree: (show: boolean) => void
   setShowChat: (show: boolean) => void
   setShowTerminal: (show: boolean) => void
+  requestNewTerminalMenu: () => void
   setLeftSidebarView: (view: LeftSidebarView) => void
   openSearchPanel: (options?: { replace?: boolean; rootPath?: string | null }) => void
   openOutlinePanel: () => void
@@ -1055,6 +1058,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   showFileTree: initialPanelLayout.showFileTree,
   showChat: initialPanelLayout.showChat,
   showTerminal: initialPanelLayout.showTerminal,
+  newTerminalMenuRequestId: 0,
   leftSidebarView: 'explorer',
   searchQuery: '',
   searchReplace: '',
@@ -2029,6 +2033,11 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ showChat: true, activeChatId })
   },
   setShowTerminal: (show) => set({ showTerminal: show }),
+  requestNewTerminalMenu: () =>
+    set((state) => ({
+      showTerminal: true,
+      newTerminalMenuRequestId: state.newTerminalMenuRequestId + 1
+    })),
   setLeftSidebarView: (view) => set({ leftSidebarView: view }),
   openOutlinePanel: () =>
     set({

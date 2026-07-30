@@ -783,7 +783,7 @@ body.is-resizing-panels iframe {
 /* Explorer-aligned toolbar icon buttons (size + hover) */
 .file-tree-toolbar .btn-icon,
 .chat-header-actions .btn-icon,
-.terminal-tab-add,
+.terminal-new-btn,
 .terminal-panel-btn {
   display: inline-flex;
   align-items: center;
@@ -801,7 +801,7 @@ body.is-resizing-panels iframe {
 
 .file-tree-toolbar .btn-icon:hover:not(:disabled),
 .chat-header-actions .btn-icon:hover:not(:disabled),
-.terminal-tab-add:hover:not(:disabled),
+.terminal-new-btn:hover:not(:disabled),
 .terminal-panel-btn:hover:not(:disabled) {
   background: color-mix(in srgb, var(--text-primary) 16%, transparent);
   color: var(--icon-command);
@@ -5108,28 +5108,103 @@ body.is-resizing-terminal iframe {
   color: var(--text-secondary);
 }
 
-.terminal-shell-select {
-  height: 22px;
-  max-width: 120px;
-  padding: 0 4px 0 6px;
-  border: none;
-  border-radius: 4px;
-  background: transparent;
-  color: var(--icon-command);
-  font-family: var(--font-ui);
-  font-size: 12px;
-  line-height: 1;
-  cursor: pointer;
+.terminal-new-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
 }
 
-.terminal-shell-select:hover {
-  background: color-mix(in srgb, var(--text-primary) 16%, transparent);
-  color: var(--icon-command);
+.terminal-new-btn {
+  border-radius: 4px 0 0 4px;
 }
 
-.terminal-shell-select:focus {
+.terminal-new-btn:focus {
   outline: none;
   background: color-mix(in srgb, var(--text-primary) 16%, transparent);
+}
+
+.terminal-new-btn svg,
+.terminal-shell-dropdown-btn svg {
+  display: block;
+  flex-shrink: 0;
+}
+
+.terminal-shell-dropdown-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: 0 4px 4px 0;
+  background: transparent;
+  color: var(--icon-command);
+  cursor: pointer;
+  line-height: 1;
+}
+
+.terminal-shell-dropdown-btn:hover,
+.terminal-shell-dropdown-btn.open,
+.terminal-shell-dropdown-btn:focus {
+  outline: none;
+  background: color-mix(in srgb, var(--text-primary) 16%, transparent);
+  color: var(--icon-command);
+}
+
+.terminal-shell-dropdown-btn svg {
+  width: 12px;
+  height: 12px;
+}
+
+.terminal-shell-menu {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 4px);
+  z-index: 1200;
+  min-width: 180px;
+  max-width: min(280px, 70vw);
+  max-height: min(280px, 40vh);
+  overflow-y: auto;
+  padding: 4px 0;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  box-shadow: 0 4px 16px var(--shadow);
+}
+
+.terminal-shell-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 6px 12px;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  text-align: left;
+  cursor: default;
+  white-space: nowrap;
+}
+
+.terminal-shell-menu-item:hover,
+.terminal-shell-menu-item.highlighted,
+.terminal-shell-menu-item:focus {
+  outline: none;
+  background: var(--accent);
+  color: var(--menu-hover-fg);
+}
+
+.terminal-shell-menu-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 12px;
+  flex-shrink: 0;
+  font-size: 11px;
 }
 
 .terminal-panel-btn svg {

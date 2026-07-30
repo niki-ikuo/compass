@@ -291,6 +291,19 @@ async function createWindow(): Promise<void> {
     mainWindow?.show()
   })
 
+  // JIS: @ / ` share BracketLeft; Electron menu accelerators often miss them.
+  mainWindow.webContents.on('before-input-event', (event, input) => {
+    if (isNewTerminalShortcut(input)) {
+      event.preventDefault()
+      emitNewTerminalMenu()
+      return
+    }
+    if (isToggleTerminalShortcut(input)) {
+      event.preventDefault()
+      emitToggleTerminal()
+    }
+  })
+
   if (process.env.ELECTRON_RENDERER_URL) {
     mainWindow.loadURL(process.env.ELECTRON_RENDERER_URL)
   } else {
@@ -458,8 +471,27 @@ function createMenu(): void {
         { type: 'separator' },
         {
           label: t('menu.terminal'),
+          // JA menu shows Ctrl+@; JIS Ctrl+@ is also handled via before-input-event.
           accelerator: 'CmdOrCtrl+`',
-          click: () => mainWindow?.webContents.send('menu:toggle-terminal')
+          click: () => emitToggleTerminal()
+        },
+        {
+          label: t('menu.terminal'),
+          accelerator: 'CmdOrCtrl+@',
+          visible: false,
+          click: () => emitToggleTerminal()
+        },
+        {
+          label: t('menu.newTerminal'),
+          // JA menu shows Ctrl+Shift+@; JIS Shift+@ via before-input-event.
+          accelerator: 'CmdOrCtrl+Shift+`',
+          click: () => emitNewTerminalMenu()
+        },
+        {
+          label: t('menu.newTerminal'),
+          accelerator: 'CmdOrCtrl+Shift+@',
+          visible: false,
+          click: () => emitNewTerminalMenu()
         }
       ]
     },
@@ -503,6 +535,54 @@ function setAiHelpMenuVisible(visible: boolean): void {
   if (aiHelpMenuVisible === visible) return
   aiHelpMenuVisible = visible
   createMenu()
+}
+
+let lastNewTerminalMenuAt = 0
+let lastToggleTerminalAt = 0
+
+/** Ctrl+@ — JIS (@ key) / Ctrl+` — US (Backquote), without Shift */
+function isToggleTerminalShortcut(input: Electron.Input): boolean {
+  if (input.type !== 'keyDown') return false
+  if (!(input.control || input.meta) || input.shift || input.alt) return false
+  if (input.isAutoRepeat) return false
+
+  const key = input.key
+  const code = input.code
+  if (key === '@') return true
+  if (code === 'BracketLeft' && key === '@') return true
+  if (key === '`' || code === 'Backquote') return true
+  return false
+}
+
+/** Ctrl+Shift+@ (JIS) / Ctrl+Shift+` (US Backquote) */
+function isNewTerminalShortcut(input: Electron.Input): boolean {
+  if (input.type !== 'keyDown') return false
+  if (!(input.control || input.meta) || !input.shift || input.alt) return false
+  if (input.isAutoRepeat) return false
+
+  const key = input.key
+  const code = input.code
+
+  // JIS: Shift+@ on BracketLeft produces "`" (shown as Ctrl+Shift+@ in the JA menu)
+  if (code === 'BracketLeft' && (key === '`' || key === '@')) return true
+  // US: Ctrl+Shift+2 → "@", or Ctrl+Shift+` on Backquote (may report "~")
+  if (key === '@') return true
+  if (code === 'Backquote') return true
+  return false
+}
+
+function emitNewTerminalMenu(): void {
+  const now = Date.now()
+  if (now - lastNewTerminalMenuAt < 200) return
+  lastNewTerminalMenuAt = now
+  mainWindow?.webContents.send('menu:new-terminal')
+}
+
+function emitToggleTerminal(): void {
+  const now = Date.now()
+  if (now - lastToggleTerminalAt < 200) return
+  lastToggleTerminalAt = now
+  mainWindow?.webContents.send('menu:toggle-terminal')
 }
 
 type EditAction = 'undo' | 'redo' | 'cut' | 'copy' | 'paste' | 'selectAll'
