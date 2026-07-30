@@ -54,8 +54,9 @@ import {
 import { ensureDeskDirs } from './services/desk-dirs'
 import {
   getDeskCaptureHotkeyStatus,
-  refreshDeskCaptureHotkey,
-  unregisterDeskCaptureHotkey
+  getDeskShowHotkeyStatus,
+  refreshDeskHotkeys,
+  unregisterDeskHotkeys
 } from './services/desk-hotkey'
 import {
   destroyDeskTray,
@@ -191,7 +192,7 @@ function beginQuitFlow(): void {
 
 async function refreshTrayAndHotkey(): Promise<void> {
   await syncDeskTrayEnabledFromSettings()
-  await refreshDeskCaptureHotkey(() => mainWindow)
+  await refreshDeskHotkeys(() => mainWindow)
   await refreshDeskTray(appIcon, {
     getMainWindow: () => mainWindow,
     requestQuit: () => beginQuitFlow()
@@ -981,6 +982,10 @@ function registerIpcHandlers(): void {
     return getDeskCaptureHotkeyStatus()
   })
 
+  ipcMain.handle('desk:getShowHotkeyStatus', () => {
+    return getDeskShowHotkeyStatus()
+  })
+
   ipcMain.handle('usage:get', async () => {
     return getUsage()
   })
@@ -1296,7 +1301,7 @@ if (gotSingleInstanceLock) {
   app.on('window-all-closed', () => {
     stopIndexWatcher()
     killAllTerminals()
-    unregisterDeskCaptureHotkey()
+    unregisterDeskHotkeys()
     destroyDeskTray()
     if (process.platform !== 'darwin') app.quit()
   })

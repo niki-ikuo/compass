@@ -293,6 +293,23 @@ export const ja = {
     'ホットキーを登録できませんでした（{accelerator}）。他のアプリと競合していないか確認してください。',
   'settings.deskCaptureHotkeyInvalid':
     'ショートカットの形式が正しくありません（{accelerator}）。例: CommandOrControl+Alt+I',
+  'settings.deskShow': 'ウィンドウを表示ホットキー',
+  'settings.deskShowHint':
+    'アプリ起動中（トレイ常駐中を含む）に Compass を前面表示します',
+  'settings.deskShowAccelerator': 'ショートカット',
+  'settings.deskShowHotkeyOk': '表示ホットキーは登録済みです（{accelerator}）',
+  'settings.deskShowHotkeyDisabled': '表示ホットキーはオフです',
+  'settings.deskShowHotkeyFailed':
+    '表示ホットキーを登録できませんでした（{accelerator}）。他のアプリと競合していないか確認してください。',
+  'settings.deskShowHotkeyInvalid':
+    'ショートカットの形式が正しくありません（{accelerator}）。例: CommandOrControl+Alt+C',
+  'settings.deskShowHotkeyDuplicate':
+    '取込ホットキーと同じショートカットです（{accelerator}）。別のキーにしてください。',
+  'desk.show.hotkeyFailed': '表示ホットキーを登録できませんでした: {accelerator}',
+  'desk.show.hotkeyInvalid':
+    'ショートカットの形式が正しくありません: {accelerator}（例: CommandOrControl+Alt+C）',
+  'desk.show.hotkeyDuplicate':
+    '取込ホットキーと同じショートカットです: {accelerator}',
   'desk.draftPrompt.intro':
     'compass-actions の writeFile で、新しい outbox 下書きをちょうど1つだけ `{path}` に作成してください。',
   'desk.draftPrompt.sourceWithFile':
@@ -1271,6 +1288,22 @@ export const en: Record<MessageKey, string> = {
     'Could not register hotkey ({accelerator}). Check for conflicts with other apps.',
   'settings.deskCaptureHotkeyInvalid':
     'Invalid shortcut format ({accelerator}). Example: CommandOrControl+Alt+I',
+  'settings.deskShow': 'Show window hotkey',
+  'settings.deskShowHint':
+    'Brings Compass to the front while the app is running (including tray residency)',
+  'settings.deskShowAccelerator': 'Shortcut',
+  'settings.deskShowHotkeyOk': 'Show hotkey registered ({accelerator})',
+  'settings.deskShowHotkeyDisabled': 'Show hotkey is off',
+  'settings.deskShowHotkeyFailed':
+    'Could not register show hotkey ({accelerator}). Check for conflicts with other apps.',
+  'settings.deskShowHotkeyInvalid':
+    'Invalid shortcut format ({accelerator}). Example: CommandOrControl+Alt+C',
+  'settings.deskShowHotkeyDuplicate':
+    'Same shortcut as the capture hotkey ({accelerator}). Choose a different key.',
+  'desk.show.hotkeyFailed': 'Could not register show hotkey: {accelerator}',
+  'desk.show.hotkeyInvalid':
+    'Invalid shortcut format: {accelerator} (example: CommandOrControl+Alt+C)',
+  'desk.show.hotkeyDuplicate': 'Same shortcut as the capture hotkey: {accelerator}',
   'desk.draftPrompt.intro':
     'Create exactly one new outbox draft at `{path}` using a compass-actions writeFile.',
   'desk.draftPrompt.sourceWithFile':

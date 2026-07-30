@@ -4,6 +4,7 @@ import type {
   AppSettings,
   ColorThemeId,
   DeskCaptureHotkeyStatus,
+  DeskShowHotkeyStatus,
   EmbeddingsMode,
   LlmProviderId,
   TerminalShell,
@@ -98,7 +99,10 @@ function buildSettingsSnapshot(
       settings.deskCaptureAccelerator || DEFAULT_SETTINGS.deskCaptureAccelerator,
     deskCaptureOpenTarget:
       settings.deskCaptureOpenTarget === 'desk' ? 'desk' : 'file',
-    deskTrayEnabled: settings.deskTrayEnabled === true
+    deskTrayEnabled: settings.deskTrayEnabled === true,
+    deskShowEnabled: settings.deskShowEnabled === true,
+    deskShowAccelerator:
+      settings.deskShowAccelerator || DEFAULT_SETTINGS.deskShowAccelerator
   }
   return {
     form,
@@ -133,16 +137,27 @@ export function SettingsPanel() {
   const [usage, setUsage] = useState<UsageSnapshot | null>(null)
   const [resettingUsage, setResettingUsage] = useState(false)
   const [deskHotkeyStatus, setDeskHotkeyStatus] = useState<DeskCaptureHotkeyStatus | null>(null)
+  const [deskShowHotkeyStatus, setDeskShowHotkeyStatus] = useState<DeskShowHotkeyStatus | null>(
+    null
+  )
   const lastSavedThemeRef = useRef(initial.form.colorTheme)
 
-  const refreshDeskHotkeyStatus = async (): Promise<DeskCaptureHotkeyStatus | null> => {
+  const refreshDeskHotkeyStatus = async (): Promise<{
+    capture: DeskCaptureHotkeyStatus | null
+    show: DeskShowHotkeyStatus | null
+  }> => {
     try {
-      const status = await window.compass.desk.getCaptureHotkeyStatus()
-      setDeskHotkeyStatus(status)
-      return status
+      const [capture, show] = await Promise.all([
+        window.compass.desk.getCaptureHotkeyStatus(),
+        window.compass.desk.getShowHotkeyStatus()
+      ])
+      setDeskHotkeyStatus(capture)
+      setDeskShowHotkeyStatus(show)
+      return { capture, show }
     } catch {
       setDeskHotkeyStatus(null)
-      return null
+      setDeskShowHotkeyStatus(null)
+      return { capture: null, show: null }
     }
   }
 
@@ -154,7 +169,24 @@ export function SettingsPanel() {
     if (status.reason === 'invalid') {
       return t('settings.deskCaptureHotkeyInvalid', { accelerator: status.accelerator })
     }
+    if (status.reason === 'duplicate') {
+      return t('settings.deskShowHotkeyDuplicate', { accelerator: status.accelerator })
+    }
     return t('settings.deskCaptureHotkeyFailed', { accelerator: status.accelerator })
+  }
+
+  const formatDeskShowHotkeyStatusMessage = (status: DeskShowHotkeyStatus): string => {
+    if (!status.enabled) return t('settings.deskShowHotkeyDisabled')
+    if (status.ok) {
+      return t('settings.deskShowHotkeyOk', { accelerator: status.accelerator })
+    }
+    if (status.reason === 'invalid') {
+      return t('settings.deskShowHotkeyInvalid', { accelerator: status.accelerator })
+    }
+    if (status.reason === 'duplicate') {
+      return t('settings.deskShowHotkeyDuplicate', { accelerator: status.accelerator })
+    }
+    return t('settings.deskShowHotkeyFailed', { accelerator: status.accelerator })
   }
 
   useEffect(() => {
@@ -277,13 +309,15 @@ export function SettingsPanel() {
         openSnapshot.embeddingsProviderId !== toSave.embeddingsProviderId ||
         openSnapshot.embeddingsModel !== toSave.embeddingsModel
 
-      const hotkeyStatus = await refreshDeskHotkeyStatus()
+      const { capture: hotkeyStatus, show: showHotkeyStatus } = await refreshDeskHotkeyStatus()
 
       if (workspaceRoot && embeddingsChanged) {
         void window.compass.index.build(workspaceRoot)
         setMessage(t('settings.embeddingsRebuildQueued'))
       } else if (hotkeyStatus && !hotkeyStatus.ok && hotkeyStatus.enabled) {
         setMessage(formatDeskHotkeyStatusMessage(hotkeyStatus))
+      } else if (showHotkeyStatus && !showHotkeyStatus.ok && showHotkeyStatus.enabled) {
+        setMessage(formatDeskShowHotkeyStatusMessage(showHotkeyStatus))
       } else {
         setMessage(t('settings.saved'))
       }
@@ -788,6 +822,42 @@ export function SettingsPanel() {
                 role={deskHotkeyStatus.ok || !deskHotkeyStatus.enabled ? undefined : 'alert'}
               >
                 {formatDeskHotkeyStatusMessage(deskHotkeyStatus)}
+              </p>
+            ) : null}
+            <label className="settings-checkbox-label">
+              <input
+                type="checkbox"
+                checked={form.deskShowEnabled}
+                onChange={(e) => setForm({ ...form, deskShowEnabled: e.target.checked })}
+              />
+              <span>
+                {t('settings.deskShow')}
+                <span className="field-hint">{t('settings.deskShowHint')}</span>
+              </span>
+            </label>
+            <label>
+              {t('settings.deskShowAccelerator')}
+              <input
+                type="text"
+                value={form.deskShowAccelerator}
+                onChange={(e) => setForm({ ...form, deskShowAccelerator: e.target.value })}
+                disabled={!form.deskShowEnabled}
+              />
+            </label>
+            {deskShowHotkeyStatus ? (
+              <p
+                className={`settings-connection-status settings-hotkey-status${
+                  !deskShowHotkeyStatus.enabled
+                    ? ''
+                    : deskShowHotkeyStatus.ok
+                      ? ' status-connected'
+                      : ' status-error'
+                }`}
+                role={
+                  deskShowHotkeyStatus.ok || !deskShowHotkeyStatus.enabled ? undefined : 'alert'
+                }
+              >
+                {formatDeskShowHotkeyStatusMessage(deskShowHotkeyStatus)}
               </p>
             ) : null}
             <label className="settings-checkbox-label">

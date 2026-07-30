@@ -5,6 +5,7 @@ const unregister = vi.fn()
 const captureClipboardToInbox = vi.fn()
 const getSettings = vi.fn()
 const getLastWorkspaceRoot = vi.fn()
+const showMainWindowFromTray = vi.fn()
 
 vi.mock('electron', () => ({
   globalShortcut: {
@@ -31,10 +32,18 @@ vi.mock('./settings', () => ({
     getLastWorkspaceRoot.apply(null, args as never)
 }))
 
+vi.mock('./desk-tray', () => ({
+  showMainWindowFromTray: (...args: unknown[]) =>
+    showMainWindowFromTray.apply(null, args as never)
+}))
+
 import {
   refreshDeskCaptureHotkey,
+  refreshDeskHotkeys,
+  refreshDeskShowHotkey,
   runDeskCaptureFromHotkey,
-  unregisterDeskCaptureHotkey
+  runDeskShowFromHotkey,
+  unregisterDeskHotkeys
 } from './desk-hotkey'
 
 describe('desk-hotkey', () => {
@@ -45,18 +54,21 @@ describe('desk-hotkey', () => {
     captureClipboardToInbox.mockReset()
     getSettings.mockReset()
     getLastWorkspaceRoot.mockReset()
-    unregisterDeskCaptureHotkey()
+    showMainWindowFromTray.mockReset()
+    unregisterDeskHotkeys()
   })
 
   afterEach(() => {
-    unregisterDeskCaptureHotkey()
+    unregisterDeskHotkeys()
   })
 
   it('does not capture when deskCaptureEnabled is false', async () => {
     getSettings.mockResolvedValue({
       deskCaptureEnabled: false,
       deskCaptureAccelerator: 'CommandOrControl+Alt+I',
-      deskCaptureOpenTarget: 'file'
+      deskCaptureOpenTarget: 'file',
+      deskShowEnabled: false,
+      deskShowAccelerator: 'CommandOrControl+Alt+C'
     })
     await runDeskCaptureFromHotkey(() => null)
     expect(captureClipboardToInbox).not.toHaveBeenCalled()
@@ -67,7 +79,9 @@ describe('desk-hotkey', () => {
     getSettings.mockResolvedValue({
       deskCaptureEnabled: false,
       deskCaptureAccelerator: 'CommandOrControl+Alt+I',
-      deskCaptureOpenTarget: 'file'
+      deskCaptureOpenTarget: 'file',
+      deskShowEnabled: false,
+      deskShowAccelerator: 'CommandOrControl+Alt+C'
     })
     const status = await refreshDeskCaptureHotkey(() => null)
     expect(status.enabled).toBe(false)
@@ -79,11 +93,48 @@ describe('desk-hotkey', () => {
     getSettings.mockResolvedValue({
       deskCaptureEnabled: true,
       deskCaptureAccelerator: 'CommandOrControl+Alt+I',
-      deskCaptureOpenTarget: 'file'
+      deskCaptureOpenTarget: 'file',
+      deskShowEnabled: false,
+      deskShowAccelerator: 'CommandOrControl+Alt+C'
     })
     const status = await refreshDeskCaptureHotkey(() => null)
     expect(status.enabled).toBe(true)
     expect(status.ok).toBe(true)
     expect(register).toHaveBeenCalledWith('CommandOrControl+Alt+I', expect.any(Function))
+  })
+
+  it('registers show hotkey when enabled', async () => {
+    getSettings.mockResolvedValue({
+      deskCaptureEnabled: false,
+      deskCaptureAccelerator: 'CommandOrControl+Alt+I',
+      deskCaptureOpenTarget: 'file',
+      deskShowEnabled: true,
+      deskShowAccelerator: 'CommandOrControl+Alt+C'
+    })
+    const status = await refreshDeskShowHotkey(() => null)
+    expect(status.enabled).toBe(true)
+    expect(status.ok).toBe(true)
+    expect(register).toHaveBeenCalledWith('CommandOrControl+Alt+C', expect.any(Function))
+  })
+
+  it('rejects show hotkey when it duplicates capture', async () => {
+    getSettings.mockResolvedValue({
+      deskCaptureEnabled: true,
+      deskCaptureAccelerator: 'CommandOrControl+Alt+I',
+      deskCaptureOpenTarget: 'file',
+      deskShowEnabled: true,
+      deskShowAccelerator: 'CommandOrControl+Alt+I'
+    })
+    const { show } = await refreshDeskHotkeys(() => null)
+    expect(show.ok).toBe(false)
+    expect(show.reason).toBe('duplicate')
+    expect(register).toHaveBeenCalledTimes(1)
+    expect(register).toHaveBeenCalledWith('CommandOrControl+Alt+I', expect.any(Function))
+  })
+
+  it('show hotkey focuses the main window', () => {
+    const getMainWindow = () => null
+    runDeskShowFromHotkey(getMainWindow)
+    expect(showMainWindowFromTray).toHaveBeenCalledWith(getMainWindow)
   })
 })

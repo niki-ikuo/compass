@@ -382,8 +382,11 @@ export type DeskCaptureHotkeyStatus = {
   /** Localized message from main (optional; UI prefers reason). */
   error?: string
   /** Machine-readable failure cause for i18n in the renderer. */
-  reason?: 'conflict' | 'invalid'
+  reason?: 'conflict' | 'invalid' | 'duplicate'
 }
+
+/** Show-window global hotkey status (same shape as capture). */
+export type DeskShowHotkeyStatus = DeskCaptureHotkeyStatus
 
 export type DeskShipCheckResult = {
   findings: ShipFinding[]
@@ -453,6 +456,10 @@ export interface AppSettings {
    * Quit from tray / File → Quit still runs the unsaved confirm flow.
    */
   deskTrayEnabled: boolean
+  /** Global hotkey to show / focus the main window (works while app is running). */
+  deskShowEnabled: boolean
+  /** Electron accelerator, e.g. CommandOrControl+Alt+C */
+  deskShowAccelerator: string
 }
 
 /** App-wide LLM usage for the current reset period (BYOK cost awareness). */
@@ -1069,6 +1076,7 @@ export interface CompassAPI {
       | { ok: false; message: string }
     >
     getCaptureHotkeyStatus: () => Promise<DeskCaptureHotkeyStatus>
+    getShowHotkeyStatus: () => Promise<DeskShowHotkeyStatus>
     onCaptureResult: (callback: (result: DeskCaptureResult) => void) => () => void
   }
   ai: {
@@ -1246,5 +1254,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   deskCaptureEnabled: true,
   deskCaptureAccelerator: 'CommandOrControl+Alt+I',
   deskCaptureOpenTarget: 'file',
-  deskTrayEnabled: false
+  deskTrayEnabled: false,
+  deskShowEnabled: false,
+  deskShowAccelerator: 'CommandOrControl+Alt+C'
 }

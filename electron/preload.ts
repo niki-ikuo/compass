@@ -50,6 +50,7 @@ import type {
   LocaleId,
   DeskCaptureResult,
   DeskCaptureHotkeyStatus,
+  DeskShowHotkeyStatus,
   DeskInboxItem,
   DeskOutboxItem,
   DeskShipCheckResult,
@@ -238,6 +239,8 @@ const compassAPI = {
     > => ipcRenderer.invoke('desk:copyOutboxPayload', absolutePath),
     getCaptureHotkeyStatus: (): Promise<DeskCaptureHotkeyStatus> =>
       ipcRenderer.invoke('desk:getCaptureHotkeyStatus'),
+    getShowHotkeyStatus: (): Promise<DeskShowHotkeyStatus> =>
+      ipcRenderer.invoke('desk:getShowHotkeyStatus'),
     onCaptureResult: (callback: (result: DeskCaptureResult) => void): (() => void) => {
       const handler = (_event: Electron.IpcRendererEvent, result: DeskCaptureResult): void => {
         callback(result)

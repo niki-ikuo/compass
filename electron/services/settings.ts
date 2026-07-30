@@ -52,6 +52,8 @@ interface StoredSettings {
   deskCaptureAccelerator: string
   deskCaptureOpenTarget: DeskCaptureOpenTarget
   deskTrayEnabled: boolean
+  deskShowEnabled: boolean
+  deskShowAccelerator: string
   lastWorkspaceRoot: string | null
   recentWorkspaceRoots: string[]
 }
@@ -137,6 +139,17 @@ function resolveDeskCaptureOpenTarget(value: unknown): DeskCaptureOpenTarget {
 
 function resolveDeskTrayEnabled(value: unknown): boolean {
   return typeof value === 'boolean' ? value : DEFAULT_SETTINGS.deskTrayEnabled
+}
+
+function resolveDeskShowEnabled(value: unknown): boolean {
+  return typeof value === 'boolean' ? value : DEFAULT_SETTINGS.deskShowEnabled
+}
+
+function resolveDeskShowAccelerator(value: unknown): string {
+  if (typeof value !== 'string' || !value.trim()) {
+    return DEFAULT_SETTINGS.deskShowAccelerator
+  }
+  return value.trim()
 }
 
 function resolveProviderId(value: unknown, apiBaseUrl: string): LlmProviderId {
@@ -226,6 +239,8 @@ async function readStoredSettings(): Promise<StoredSettings> {
       deskCaptureAccelerator: resolveDeskCaptureAccelerator(stored.deskCaptureAccelerator),
       deskCaptureOpenTarget: resolveDeskCaptureOpenTarget(stored.deskCaptureOpenTarget),
       deskTrayEnabled: resolveDeskTrayEnabled(stored.deskTrayEnabled),
+      deskShowEnabled: resolveDeskShowEnabled(stored.deskShowEnabled),
+      deskShowAccelerator: resolveDeskShowAccelerator(stored.deskShowAccelerator),
       lastWorkspaceRoot: stored.lastWorkspaceRoot ?? null,
       recentWorkspaceRoots:
         stored.recentWorkspaceRoots ??
@@ -258,6 +273,8 @@ async function readStoredSettings(): Promise<StoredSettings> {
       deskCaptureAccelerator: DEFAULT_SETTINGS.deskCaptureAccelerator,
       deskCaptureOpenTarget: DEFAULT_SETTINGS.deskCaptureOpenTarget,
       deskTrayEnabled: DEFAULT_SETTINGS.deskTrayEnabled,
+      deskShowEnabled: DEFAULT_SETTINGS.deskShowEnabled,
+      deskShowAccelerator: DEFAULT_SETTINGS.deskShowAccelerator,
       lastWorkspaceRoot: null,
       recentWorkspaceRoots: []
     }
@@ -344,7 +361,9 @@ function toAppSettings(stored: StoredSettings): AppSettings {
     deskCaptureEnabled: stored.deskCaptureEnabled,
     deskCaptureAccelerator: stored.deskCaptureAccelerator,
     deskCaptureOpenTarget: stored.deskCaptureOpenTarget,
-    deskTrayEnabled: stored.deskTrayEnabled
+    deskTrayEnabled: stored.deskTrayEnabled,
+    deskShowEnabled: stored.deskShowEnabled,
+    deskShowAccelerator: stored.deskShowAccelerator
   }
 }
 
@@ -403,7 +422,9 @@ export async function setSettings(settings: AppSettings): Promise<void> {
     deskCaptureEnabled: resolveDeskCaptureEnabled(settings.deskCaptureEnabled),
     deskCaptureAccelerator: resolveDeskCaptureAccelerator(settings.deskCaptureAccelerator),
     deskCaptureOpenTarget: resolveDeskCaptureOpenTarget(settings.deskCaptureOpenTarget),
-    deskTrayEnabled: resolveDeskTrayEnabled(settings.deskTrayEnabled)
+    deskTrayEnabled: resolveDeskTrayEnabled(settings.deskTrayEnabled),
+    deskShowEnabled: resolveDeskShowEnabled(settings.deskShowEnabled),
+    deskShowAccelerator: resolveDeskShowAccelerator(settings.deskShowAccelerator)
   })
   setLocale(locale)
 }
