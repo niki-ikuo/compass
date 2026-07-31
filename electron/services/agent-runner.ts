@@ -59,8 +59,8 @@ import {
   sanitizeCheckpointArgs,
   sanitizeUpdateTodoArgs,
   countOpenTodos,
-  looksLikeMultiPartAgentTask,
   formatInitialTodoPlanNudge,
+  shouldPlanFirstAgentTask,
   shouldNudgeMissingProposeActions,
   shouldNudgeMissingTodoPlan,
   type AgentPlanState
@@ -1584,7 +1584,9 @@ async function streamAgentTurn(
               const index = part.index ?? 0
               const existing = toolCallParts.get(index) ?? { id: '', name: '', arguments: '' }
               if (part.id) existing.id = part.id
-              if (part.function?.name) existing.name += part.function.name
+              // Replace (do not +=): some gateways re-send the full name each chunk.
+              // Function *name* fragments are vanishingly rare; arguments still concatenate.
+              if (part.function?.name) existing.name = part.function.name
               if (part.function?.arguments) existing.arguments += part.function.arguments
               toolCallParts.set(index, existing)
             }
@@ -1682,8 +1684,8 @@ export async function runAgent(webContents: WebContents, request: ChatRequest): 
 
     try {
     const latestUserText = [...history].reverse().find((m) => m.role === 'user')?.content ?? ''
-    // Settled todos from earlier turns must not block a fresh plan for a new multi-part ask.
-    if (countOpenTodos(plan) === 0 && looksLikeMultiPartAgentTask(latestUserText)) {
+    // Settled todos from earlier turns must not block a fresh plan for a new plan-first ask.
+    if (countOpenTodos(plan) === 0 && shouldPlanFirstAgentTask(latestUserText)) {
       apiMessages.push({ role: 'user', content: formatInitialTodoPlanNudge() })
     }
 
@@ -1884,10 +1886,12 @@ export async function runAgent(webContents: WebContents, request: ChatRequest): 
         try {
           if (call.function.name === 'proposeActions') {
             // Incomplete JSON (often max_tokens cut mid-writeFile) must not become a preview.
-            const incompleteArgs = isIncompleteJson(rawArgumentText)
+            // finish_reason=length is an explicit cut signal even when bracket repair looks closed.
+            const cutByLength = turnResult.finishReason === 'length'
+            const incompleteArgs = isIncompleteJson(rawArgumentText) || cutByLength
             const hasRecoveredActions =
               Array.isArray(args.actions) && args.actions.length > 0
-            if (incompleteArgs && !hasRecoveredActions) {
+            if (incompleteArgs && (!hasRecoveredActions || cutByLength)) {
               proposeActionsTruncated = true
               result = truncatedProposeActionsResult()
             } else {

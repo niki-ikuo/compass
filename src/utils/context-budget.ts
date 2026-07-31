@@ -64,6 +64,16 @@ export interface HistoryMessageLike {
   content: string
 }
 
+type ToolCallLike = {
+  function?: { name?: string; arguments?: string }
+}
+
+type MessageForBudget = {
+  role: string
+  content?: unknown | null
+  tool_calls?: ToolCallLike[] | null
+}
+
 /**
  * Truncate each message, then drop oldest until under budget.
  * Always keeps the newest message when possible.
@@ -111,46 +121,90 @@ export function fitHistoryMessages<T extends HistoryMessageLike>(
   return kept
 }
 
-export function estimateMessageListTokens(
-  messages: Array<{ content: string | unknown }>
-): number {
+function estimateToolCallsTokens(toolCalls: ToolCallLike[] | null | undefined): number {
+  if (!toolCalls || toolCalls.length === 0) return 0
   let total = 0
-  for (const msg of messages) {
-    if (typeof msg.content === 'string') {
-      total += estimateTokens(msg.content)
-    } else if (Array.isArray(msg.content)) {
-      for (const part of msg.content) {
-        if (part && typeof part === 'object' && 'text' in part && typeof part.text === 'string') {
-          total += estimateTokens(part.text)
-        } else if (
-          part &&
-          typeof part === 'object' &&
-          'image_url' in part &&
-          part.image_url &&
-          typeof part.image_url === 'object' &&
-          'url' in part.image_url &&
-          typeof part.image_url.url === 'string'
-        ) {
-          // Vision payloads are expensive; treat data-URL bulk conservatively.
-          total += Math.ceil(part.image_url.url.length / 4)
-        } else {
-          total += estimateTokens(JSON.stringify(part))
-        }
-      }
-    } else if (msg.content != null) {
-      total += estimateTokens(JSON.stringify(msg.content))
-    }
+  for (const call of toolCalls) {
+    total += estimateTokens(call.function?.name)
+    total += estimateTokens(call.function?.arguments)
   }
   return total
+}
+
+export function estimateMessageTokens(msg: MessageForBudget): number {
+  let total = 0
+  if (typeof msg.content === 'string') {
+    total += estimateTokens(msg.content)
+  } else if (Array.isArray(msg.content)) {
+    for (const part of msg.content) {
+      if (part && typeof part === 'object' && 'text' in part && typeof part.text === 'string') {
+        total += estimateTokens(part.text)
+      } else if (
+        part &&
+        typeof part === 'object' &&
+        'image_url' in part &&
+        part.image_url &&
+        typeof part.image_url === 'object' &&
+        'url' in part.image_url &&
+        typeof part.image_url.url === 'string'
+      ) {
+        // Vision payloads are expensive; treat data-URL bulk conservatively.
+        total += Math.ceil(part.image_url.url.length / 4)
+      } else {
+        total += estimateTokens(JSON.stringify(part))
+      }
+    }
+  } else if (msg.content != null) {
+    total += estimateTokens(JSON.stringify(msg.content))
+  }
+  total += estimateToolCallsTokens(msg.tool_calls)
+  return total
+}
+
+export function estimateMessageListTokens(messages: Array<MessageForBudget>): number {
+  return messages.reduce((sum, msg) => sum + estimateMessageTokens(msg), 0)
+}
+
+function hasToolCalls(msg: MessageForBudget): boolean {
+  return Array.isArray(msg.tool_calls) && msg.tool_calls.length > 0
+}
+
+/**
+ * Inclusive start / exclusive end of the removable unit containing `index`.
+ * Assistant messages with tool_calls are removed together with following role:tool
+ * observations so OpenAI-compatible APIs never see broken tool pairs.
+ */
+export function getToolPairRemovalRange<T extends MessageForBudget>(
+  messages: T[],
+  index: number
+): { start: number; end: number } {
+  if (index < 0 || index >= messages.length) return { start: index, end: index }
+
+  let start = index
+  if (messages[start].role === 'tool') {
+    while (start > 0 && messages[start - 1].role === 'tool') start--
+    if (start > 0 && messages[start - 1].role === 'assistant' && hasToolCalls(messages[start - 1])) {
+      start--
+    }
+  }
+
+  let end = start + 1
+  if (messages[start].role === 'assistant' && hasToolCalls(messages[start])) {
+    while (end < messages.length && messages[end].role === 'tool') end++
+  }
+
+  return { start, end }
 }
 
 /**
  * Drop/truncate oldest non-system messages until under budget.
  * Mutates and returns the same array.
+ * Tool-call assistants are removed as a unit with their role:tool follow-ups.
  */
-export function pruneMessagesToTokenBudget<
-  T extends { role: string; content?: unknown | null }
->(messages: T[], budgetTokens: number): T[] {
+export function pruneMessagesToTokenBudget<T extends MessageForBudget>(
+  messages: T[],
+  budgetTokens: number
+): T[] {
   if (messages.length <= 2) return messages
 
   const shrinkContent = (msg: T, maxTokens: number): void => {
@@ -160,22 +214,17 @@ export function pruneMessagesToTokenBudget<
   }
 
   let guard = 0
-  while (
-    estimateMessageListTokens(messages.map((m) => ({ content: m.content ?? '' }))) >
-      budgetTokens &&
-    guard < 200
-  ) {
+  while (estimateMessageListTokens(messages) > budgetTokens && guard < 200) {
     guard++
     // Prefer shrinking large middle messages before deleting.
+    // Do not shrink assistant tool_calls payloads (JSON args) — only text content / tool results.
     let largestIndex = -1
     let largestTokens = 0
     for (let i = 1; i < messages.length - 1; i++) {
       const msg = messages[i]
       if (msg.role === 'system') continue
-      const tokens =
-        typeof msg.content === 'string'
-          ? estimateTokens(msg.content)
-          : estimateMessageListTokens([{ content: msg.content ?? '' }])
+      if (msg.role === 'assistant' && hasToolCalls(msg)) continue
+      const tokens = estimateMessageTokens(msg)
       if (tokens > largestTokens) {
         largestTokens = tokens
         largestIndex = i
@@ -187,7 +236,7 @@ export function pruneMessagesToTokenBudget<
       continue
     }
 
-    // Remove oldest non-system, non-final message.
+    // Remove oldest non-system, non-final message — tool pairs as one unit.
     let removeAt = -1
     for (let i = 1; i < messages.length - 1; i++) {
       if (messages[i].role !== 'system') {
@@ -196,7 +245,12 @@ export function pruneMessagesToTokenBudget<
       }
     }
     if (removeAt < 0) break
-    messages.splice(removeAt, 1)
+
+    const { start, end } = getToolPairRemovalRange(messages, removeAt)
+    // Never delete the final message (caller keeps the latest turn).
+    const safeEnd = Math.min(end, messages.length - 1)
+    if (safeEnd <= start) break
+    messages.splice(start, safeEnd - start)
   }
 
   return messages

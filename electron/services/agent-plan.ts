@@ -20,6 +20,7 @@ export {
   collectAgentStepsThrough,
   shouldNudgeMissingProposeActions,
   shouldNudgeMissingTodoPlan,
+  shouldPlanFirstAgentTask,
   shouldShowAgentPlanPanel,
   type AgentPlanState,
   type AgentTodoItem,

@@ -19,6 +19,7 @@ import {
   sanitizeUpdateTodoArgs,
   shouldNudgeMissingProposeActions,
   shouldNudgeMissingTodoPlan,
+  shouldPlanFirstAgentTask,
   shouldShowAgentPlanPanel
 } from './agent-plan'
 
@@ -196,12 +197,31 @@ describe('looksLikeMultiPartAgentTask', () => {
       looksLikeMultiPartAgentTask('foo.ts を修正して、テストも追加してください')
     ).toBe(true)
     expect(looksLikeMultiPartAgentTask('Fix the bug in foo.ts and update the docs')).toBe(true)
+    expect(looksLikeMultiPartAgentTask('エラー修正とテスト追加をお願い')).toBe(true)
   })
 
   it('ignores short single asks', () => {
     expect(looksLikeMultiPartAgentTask('What does this function do?')).toBe(false)
     expect(looksLikeWorkspaceChangeRequest('Fix the typo in README.')).toBe(true)
     expect(looksLikeMultiPartAgentTask('Fix the typo in README.')).toBe(false)
+  })
+})
+
+describe('shouldPlanFirstAgentTask', () => {
+  it('plans multi-part and substantial edits first', () => {
+    expect(shouldPlanFirstAgentTask('1. Fix A\n2. Fix B')).toBe(true)
+    expect(
+      shouldPlanFirstAgentTask(
+        'src/components/ChatPanel.tsx の Agent 表示崩れを直してください。タイムラインと計画パネルの順も確認して。'
+      )
+    ).toBe(true)
+    expect(shouldPlanFirstAgentTask('foo.ts と bar.ts を修正してください')).toBe(true)
+  })
+
+  it('skips tiny edits and pure Q&A', () => {
+    expect(shouldPlanFirstAgentTask('Fix the typo in README.')).toBe(false)
+    expect(shouldPlanFirstAgentTask('この修正方針を説明して')).toBe(false)
+    expect(shouldPlanFirstAgentTask('What does this file do?')).toBe(false)
   })
 })
 
@@ -233,6 +253,18 @@ describe('shouldNudgeMissingTodoPlan', () => {
         alreadyNudging: false
       })
     ).toBe(false)
+  })
+
+  it('also nudges substantial single-clause edit asks', () => {
+    expect(
+      shouldNudgeMissingTodoPlan({
+        userText:
+          'ChatPanel.tsx の計画パネルが後からしか出ない問題を直してください',
+        openTodoCount: 0,
+        updateTodoCalledThisRun: false,
+        alreadyNudging: false
+      })
+    ).toBe(true)
   })
 })
 
@@ -295,6 +327,9 @@ describe('proposeActions finish nudges', () => {
     expect(looksLikeWorkspaceChangeRequest('same for utils.ts')).toBe(true)
     expect(looksLikeWorkspaceChangeRequest('List the workspace')).toBe(false)
     expect(looksLikeWorkspaceChangeRequest('What does this file do?')).toBe(false)
+    expect(looksLikeWorkspaceChangeRequest('この修正方針を説明して')).toBe(false)
+    expect(looksLikeWorkspaceChangeRequest('How should I fix this bug?')).toBe(false)
+    expect(looksLikeWorkspaceChangeRequest('修正方法を教えて')).toBe(false)
   })
 
   it('detects fake pending file changes in assistant text', () => {

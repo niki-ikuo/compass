@@ -82,4 +82,30 @@ describe('pruneMessagesToTokenBudget', () => {
       CONTEXT_BUDGET.totalInputTokens
     )
   })
+
+  it('removes assistant tool_calls together with following tool results', () => {
+    const messages = [
+      { role: 'system', content: 'sys' },
+      {
+        role: 'assistant',
+        content: null,
+        tool_calls: [
+          { id: 'c1', type: 'function', function: { name: 'readFile', arguments: '{"path":"a"}' } }
+        ]
+      },
+      { role: 'tool', tool_call_id: 'c1', content: 'file contents '.repeat(80) },
+      { role: 'user', content: 'final ask' }
+    ]
+    pruneMessagesToTokenBudget(messages, 30)
+    expect(messages[0].role).toBe('system')
+    expect(messages[messages.length - 1].content).toBe('final ask')
+    // Must not leave a lone role:tool without its assistant tool_calls.
+    const orphanTool = messages.some(
+      (m, i) =>
+        m.role === 'tool' &&
+        !(messages[i - 1]?.role === 'assistant' && Array.isArray(messages[i - 1].tool_calls))
+    )
+    expect(orphanTool).toBe(false)
+    expect(messages.some((m) => m.role === 'tool')).toBe(false)
+  })
 })

@@ -165,7 +165,6 @@ export function ChatPanel() {
   const activeFilePath = useAppStore((s) => s.activeFilePath)
   const workspaceRoot = useAppStore((s) => s.workspaceRoot)
   const setPendingWorkspacePreview = useAppStore((s) => s.setPendingWorkspacePreview)
-  const setPendingAgentApprovalId = useAppStore((s) => s.setPendingAgentApprovalId)
   const openPreviewFile = useAppStore((s) => s.openPreviewFile)
   const applyWorkspacePreview = useAppStore((s) => s.applyWorkspacePreview)
   const revertWorkspacePreview = useAppStore((s) => s.revertWorkspacePreview)
@@ -627,11 +626,11 @@ export function ChatPanel() {
         if (!isThisChat(eventChatId)) return
         setPendingContinueFor(chatId, null)
         setPendingExecApprovalFor(chatId, null)
-        setPendingAgentApprovalId(event.id)
         setPendingWorkspacePreview({
           chatId,
           actions: event.actions,
-          items: event.items
+          items: event.items,
+          approvalId: event.id
         })
         setAgentStreamStatusFor(chatId, t('chat.agentWaitingApproval'))
         agentSteps = agentSteps.map((step) =>
@@ -756,9 +755,11 @@ export function ChatPanel() {
         updateLastAssistantMessage(chatId, accumulated.trim() || t('chat.aborted'))
       } else if (isAgentMessage) {
         const state = useAppStore.getState()
-        if (state.pendingWorkspacePreview?.chatId === chatId && state.pendingAgentApprovalId) {
-          setPendingAgentApprovalId(null)
-          revertWorkspacePreview()
+        if (
+          state.pendingPreviewsByChatId[chatId] ||
+          state.pendingWorkspacePreview?.chatId === chatId
+        ) {
+          useAppStore.getState().clearPendingPreviewForChat(chatId, 'User aborted the agent run')
         }
         setPendingContinueFor(chatId, null)
         setPendingExecApprovalFor(chatId, null)

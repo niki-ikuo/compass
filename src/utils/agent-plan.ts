@@ -169,6 +169,20 @@ export function looksLikeMultiPartAgentTask(text: string): boolean {
   )
   if (jaClauses && jaClauses.length >= 2 && trimmed.length >= 24) return true
 
+  // “修正とテスト追加” / “型修正とテスト” — multi-item without repeated して.
+  if (
+    trimmed.length >= 12 &&
+    /(?:修正|変更|追加|削除|作成|実装|更新|確認|調査|対応|直す|直)[^。\n]{0,20}(?:と|や|および|／|\/)[^。\n]{0,20}(?:修正|変更|追加|削除|作成|実装|更新|確認|調査|テスト|型|ドキュメント|直)/.test(
+      trimmed
+    )
+  ) {
+    return true
+  }
+
+  // Two or more file paths / mentions often means a multi-step edit.
+  const pathLike = trimmed.match(/@\[[^\]]+\]|\b[\w.-]+\.\w{1,12}\b/g)
+  if (pathLike && pathLike.length >= 2 && trimmed.length >= 18) return true
+
   const enVerbs = trimmed.match(
     /\b(?:fix|add|update|create|implement|remove|delete|refactor|write|change|rename|patch)\b/gi
   )
@@ -188,6 +202,32 @@ export function looksLikeMultiPartAgentTask(text: string): boolean {
   return false
 }
 
+/**
+ * Non-trivial workspace edits also benefit from a checklist first (plan → work),
+ * even when the ask is a single clause. Skips tiny one-liners and pure Q&A.
+ */
+export function shouldPlanFirstAgentTask(text: string): boolean {
+  const trimmed = text.trim()
+  if (!trimmed) return false
+  if (looksLikeQuestionAboutChanges(trimmed)) return false
+  if (looksLikeMultiPartAgentTask(trimmed)) return true
+  if (!looksLikeWorkspaceChangeRequest(trimmed)) return false
+
+  const pathOrMention = (trimmed.match(/@\[[^\]]+\]|\b[\w.-]+\.\w{1,12}\b/g) ?? []).length
+  // Multiple files → always plan-first, even for short asks.
+  if (pathOrMention >= 2) return true
+
+  // Keep "Fix the typo in README." style asks free of a forced checklist.
+  if (trimmed.length < 36) return false
+
+  const hasTargetCue =
+    /(?:\.\w{1,12}\b|[/\\]|@\[|ファイル|コード|関数|メソッド|コンポーネント|\bfile\b|\bcode\b)/i.test(
+      trimmed
+    )
+  const hasDetail = trimmed.length >= 60 || /\n/.test(trimmed)
+  return hasTargetCue || hasDetail
+}
+
 /** Soft nudge before the first turn when the ask looks multi-part and no plan exists yet. */
 export function formatInitialTodoPlanNudge(): string {
   return t('ai.agentInitialTodoPlanNudge')
@@ -195,7 +235,7 @@ export function formatInitialTodoPlanNudge(): string {
 
 /**
  * Text-only finish (or tool rounds that skipped planning) should still force updateTodo
- * on multi-part asks before proposeActions nudges take over.
+ * on plan-first asks before proposeActions nudges take over.
  */
 export function shouldNudgeMissingTodoPlan(options: {
   userText: string
@@ -206,30 +246,63 @@ export function shouldNudgeMissingTodoPlan(options: {
   if (options.openTodoCount > 0) return false
   if (options.updateTodoCalledThisRun) return false
   if (options.alreadyNudging) return true
-  return looksLikeMultiPartAgentTask(options.userText)
+  return shouldPlanFirstAgentTask(options.userText)
 }
 
 /**
  * Heuristic: user ask looks like a workspace create/edit/delete request
  * (Agent should call proposeActions rather than finish with prose).
  */
+export function looksLikeQuestionAboutChanges(text: string): boolean {
+  const trimmed = text.trim()
+  if (!trimmed) return false
+
+  // Q&A / advice — do not treat as a write request.
+  return /(?:どう(?:やって)?(?:修正|変更|直|書|実装)|(?:修正|変更|実装|対応)(?:方法|方針|手順|理由)|(?:について)?(?:教えて|説明して|解説して)|なぜ|どうして|何が原因)|(?:how\s+(?:do|should|can|would|to)\s+(?:i\s+)?(?:fix|change|update|edit)|(?:explain|describe|advise)\b.{0,40}\b(?:fix|change|update)|what\s+(?:should|would|does)\b.{0,40}\b(?:fix|change)|why\s+(?:is|does|did|should))/i.test(
+    trimmed
+  )
+}
+
 export function looksLikeWorkspaceChangeRequest(text: string): boolean {
   const trimmed = text.trim()
   if (!trimmed) return false
 
-  // Imperative / change-oriented verbs (ja + en). Pure Q&A without these stays quiet.
+  // Pure Q&A about how/why to change something must not force proposeActions.
+  if (looksLikeQuestionAboutChanges(trimmed)) return false
+
+  // Short follow-ups that omit verbs ("同様に bar.ts も", "same for utils.ts").
   if (
-    /(?:修正|変更|追加|削除|作成|実装|更新|書き換え|リファクタ|追記|置き換|直して|直す|書いて|書き換|消して|作って|入れて|なおして)|(?:please\s+)?(?:fix|change|add|delete|remove|create|implement|update|refactor|write|edit|patch|rename|replace)\b/i.test(
+    /(?:同様に|同じよう|同じように|続けて|あわせて|合わせて|ついでに|もう一つ|もうひとつ|もお願い|もやって|も対応)|(?:\balso\b.{0,40}\b(?:for|to|in)\b|\bsame\s+(?:for|to|with)\b|\bas\s+well\b|\btoo\b\s*[.!]?\s*$)/i.test(
       trimmed
     )
   ) {
     return true
   }
 
-  // Short follow-ups that omit verbs ("同様に bar.ts も", "same for utils.ts").
-  return /(?:同様に|同じよう|同じように|続けて|あわせて|合わせて|ついでに|もう一つ|もうひとつ|もお願い|もやって|も対応)|(?:\balso\b.{0,40}\b(?:for|to|in)\b|\bsame\s+(?:for|to|with)\b|\bas\s+well\b|\btoo\b\s*[.!]?\s*$)/i.test(
-    trimmed
-  )
+  // Prefer imperative forms over bare nouns like 「修正」alone (which appear in Q&A).
+  const hasJaImperative =
+    /(?:修正|変更|追加|削除|作成|実装|更新|書き換え|リファクタ|追記|置き換)(?:して|してください|してほしい|して下さい)|(?:直して|直す|書いて|書き換|消して|作って|入れて|なおして)/.test(
+      trimmed
+    )
+  const hasEnImperative =
+    /(?:please\s+)?(?:fix|change|add|delete|remove|create|implement|update|refactor|write|edit|patch|rename|replace)\b/i.test(
+      trimmed
+    )
+
+  if (!hasJaImperative && !hasEnImperative) return false
+
+  // Soften false positives: without a path / mention / strong 「ください」, require
+  // something that looks like a concrete edit target or an explicit request ending.
+  const hasTargetCue =
+    /(?:\.\w{1,12}\b|[/\\]|@\[|ファイル|コード|関数|メソッド|コンポーネント|\bfile\b|\bcode\b)/i.test(
+      trimmed
+    )
+  const hasPoliteAsk = /(?:してください|してほしい|して下さい|お願い|please\b)/i.test(trimmed)
+
+  if (hasTargetCue || hasPoliteAsk) return true
+
+  // Bare short imperatives like "Fix it" / "直して" still count.
+  return trimmed.length <= 40
 }
 
 /**
