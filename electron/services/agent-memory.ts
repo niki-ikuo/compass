@@ -329,9 +329,10 @@ export function rebuildMemoryFromSteps(
         content: ''
       })
     } else if (step.name === 'proposeActions' && step.summary) {
+      // Frame as earlier-turn history so follow-ups are not biased toward "already done".
       recordToolObservation(state, 'proposeActions', {}, {
         ok: true,
-        summary: step.summary,
+        summary: `Earlier chat turn: ${step.summary}`,
         content: ''
       })
     } else if (step.name === 'profileData' && step.args && step.summary) {

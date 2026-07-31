@@ -74,7 +74,8 @@ idle → thinking → tool_call → (waiting_approval | waiting_continue)? → t
 3. API Key / Base URL 検証
 4. API messages を組み立て:
    - `system`: Agent システムプロンプト
-   - 過去の user/assistant（`agentSteps` からツール文脈を再構築）
+   - 過去の user/assistant（テキスト履歴）
+   - 過去 `agentSteps` をまとめた **1 件の historical tool context**（直前の Applied を「現依頼の完了」と誤読しない文言。各 assistant の直後には差し込まない）
    - 今回の user（`buildUserMessage` — 開いているファイル、選択、参照、`.compass` 要約）
 5. 履歴から **plan** / **memory** を再構築（`agent-plan`、`agent-memory`）
 6. ラン内 **read キャッシュ** を作成（`agent-read-cache`）

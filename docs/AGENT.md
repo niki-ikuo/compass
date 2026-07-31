@@ -74,7 +74,8 @@ On chat-history reload, in-flight `running` / `waiting_*` steps are coerced to `
 3. Validate API key / base URL
 4. Build API messages:
    - `system`: agent system prompt
-   - prior user/assistant turns (with prior tool context reconstructed from `agentSteps`)
+   - prior user/assistant turns (text history)
+   - one consolidated **historical tool context** from prior `agentSteps` (does not frame earlier Applied results as completing the latest ask; not interleaved after each assistant)
    - current user message via `buildUserMessage` (open file, selection, references, `.compass` index slice)
 5. Rebuild **plan** and **memory** from history (`agent-plan`, `agent-memory`)
 6. Create in-run **read cache** (`agent-read-cache`)
@@ -221,7 +222,7 @@ On Continue = yes: budgets increase and **plan + memory** are re-injected as a u
 | Mechanism | Role |
 |-----------|------|
 | `agentSteps` on assistant messages | Timeline + history persistence |
-| Prior tool context | Summarized observations re-injected on follow-up (`buildPriorAgentContext`) |
+| Prior tool context | One historical summary re-injected before the new ask (`buildPriorAgentContext`); `proposeActions` is labeled HISTORICAL without approval observation text |
 | Plan (`updateTodo` / `checkpoint`) | Checklist + resume note; rebuilt from history; re-injected on Continue while open todos remain; chat Plan panel rebuilds from all assistant `agentSteps` through the current message. Fully settled plans (all done/cancelled) are not re-injected and only render on the message that last called `updateTodo` / `checkpoint` |
 | Soft multi-part nudge | If the latest user ask looks multi-part and the plan is empty, inject a user-role nudge to call `updateTodo` first (not a hard gate) |
 | Soft proposeActions nudge | If a change request (or fake chat/`compass-actions` JSON / truncated propose) ends without an applied proposal, inject a user-role nudge to call `proposeActions` (max **2** per run; skipped after preview reject unless fake JSON appears) |

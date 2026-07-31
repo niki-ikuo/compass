@@ -30,11 +30,9 @@ import { collectAgentStepsThrough } from '@/utils/agent-plan'
 import { AnimatedStatus } from './AnimatedEllipsis'
 import { ChatHistoryIcon, PlusIcon, CloseIcon, WorkspaceRulesIcon } from './icons/ToolbarIcons'
 import {
-  buildDisplayContentForActions,
   inferWorkspaceActionsFromCodeBlocks,
   normalizeWorkspaceActions,
-  parseWorkspaceActionsFromContent,
-  stripAllCompassActionsContent
+  parseWorkspaceActionsFromContent
 } from '@/utils/workspace-actions'
 import {
   hasChatContextDrag,
@@ -585,9 +583,10 @@ export function ChatPanel() {
     unsubChunk = window.compass.ai.onChunk((eventChatId, chunk) => {
       if (!isThisChat(eventChatId)) return
       accumulated += chunk
-      if (isEditMessage) {
-        const display = stripAllCompassActionsContent(accumulated)
-        syncAssistant(display || t('chat.preparingChanges'))
+      // Keep full content (including compass-actions) in history so follow-up
+      // Edit turns still see prior proposals. ChatMessageContent strips for display.
+      if (isEditMessage && !accumulated.trim()) {
+        syncAssistant(t('chat.preparingChanges'))
       } else {
         syncAssistant(accumulated)
       }
@@ -712,7 +711,6 @@ export function ChatPanel() {
 
       if (isEditMessage && workspaceRoot) {
         let actions = parseWorkspaceActions(accumulated)
-        let usedInferredCodeBlock = false
 
         if (actions.length === 0) {
           actions = inferWorkspaceActionsFromCodeBlocks(
@@ -720,15 +718,17 @@ export function ChatPanel() {
             workspaceRoot,
             activeFilePath
           )
-          usedInferredCodeBlock = actions.length > 0
         }
 
-        const displayContent = buildDisplayContentForActions(accumulated, usedInferredCodeBlock)
+        // Persist raw reply (with compass-actions) for follow-up history.
+        // Display still strips via ChatMessageContent.stripActions.
+        const storedContent =
+          accumulated.trim() ||
+          (actions.length > 0 ? t('chat.reviewProposal') : t('chat.preparingChanges'))
+        updateLastAssistantMessage(chatId, storedContent)
 
         if (actions.length > 0) {
           try {
-            updateLastAssistantMessage(chatId, displayContent || t('chat.reviewProposal'))
-
             const normalizedActions = normalizeWorkspaceActions(workspaceRoot, actions)
             const items = await window.compass.fs.previewActions(workspaceRoot, normalizedActions)
             setPendingWorkspacePreview({
@@ -740,13 +740,9 @@ export function ChatPanel() {
             const message = error instanceof Error ? error.message : t('chat.previewFailed')
             updateLastAssistantMessage(
               chatId,
-              displayContent
-                ? `${displayContent}\n\n${formatActionPreviewError(message, t)}`
-                : formatActionPreviewError(message, t)
+              `${storedContent}\n\n${formatActionPreviewError(message, t)}`
             )
           }
-        } else if (displayContent !== accumulated.trim()) {
-          updateLastAssistantMessage(chatId, displayContent)
         }
       } else if (isAgentMessage) {
         syncAssistant(accumulated.trim())
@@ -757,8 +753,7 @@ export function ChatPanel() {
       if (!isThisChat(eventChatId)) return
       finish()
       if (isEditMessage) {
-        const display = stripAllCompassActionsContent(accumulated).trim()
-        updateLastAssistantMessage(chatId, display || t('chat.aborted'))
+        updateLastAssistantMessage(chatId, accumulated.trim() || t('chat.aborted'))
       } else if (isAgentMessage) {
         const state = useAppStore.getState()
         if (state.pendingWorkspacePreview?.chatId === chatId && state.pendingAgentApprovalId) {

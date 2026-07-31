@@ -191,7 +191,16 @@ export function looksLikeWorkspaceChangeRequest(text: string): boolean {
   if (!trimmed) return false
 
   // Imperative / change-oriented verbs (ja + en). Pure Q&A without these stays quiet.
-  return /(?:修正|変更|追加|削除|作成|実装|更新|書き換え|リファクタ|追記|置き換|直して|直す|書いて|書き換|消して|作って|入れて|なおして)|(?:please\s+)?(?:fix|change|add|delete|remove|create|implement|update|refactor|write|edit|patch|rename|replace)\b/i.test(
+  if (
+    /(?:修正|変更|追加|削除|作成|実装|更新|書き換え|リファクタ|追記|置き換|直して|直す|書いて|書き換|消して|作って|入れて|なおして)|(?:please\s+)?(?:fix|change|add|delete|remove|create|implement|update|refactor|write|edit|patch|rename|replace)\b/i.test(
+      trimmed
+    )
+  ) {
+    return true
+  }
+
+  // Short follow-ups that omit verbs ("同様に bar.ts も", "same for utils.ts").
+  return /(?:同様に|同じよう|同じように|続けて|あわせて|合わせて|ついでに|もう一つ|もうひとつ|もお願い|もやって|も対応)|(?:\balso\b.{0,40}\b(?:for|to|in)\b|\bsame\s+(?:for|to|with)\b|\bas\s+well\b|\btoo\b\s*[.!]?\s*$)/i.test(
     trimmed
   )
 }

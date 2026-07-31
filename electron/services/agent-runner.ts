@@ -499,11 +499,25 @@ function truncatePersistedObservation(content: string): string {
   return `${redacted.slice(0, MAX_PERSISTED_OBSERVATION_CHARS)}\n...(truncated for history)`
 }
 
+/** Summarize a past proposeActions step without sounding like the current request is done. */
+function formatHistoricalProposeActionsStep(step: AgentToolStep): string {
+  const paths = extractActionPaths(step.args ?? {})
+  const pathPart = paths.length > 0 ? paths.join(', ') : '(paths unknown)'
+  const outcome =
+    step.ok === false
+      ? step.summary?.toLowerCase().includes('reject')
+        ? 'rejected'
+        : 'failed'
+      : 'applied'
+  return `HISTORICAL proposeActions (${outcome}) paths: ${pathPart} — earlier turn only; does not fulfill the latest user request`
+}
+
 /**
  * 過去アシスタントの agentSteps から、モデルへ渡す調査文脈を組み立てる。
  * 計画レイヤ + 作業メモリを先頭に再注入し、個別ツール観測は予算内で付与する。
+ * proposeActions の Applied 文は「現依頼の完了」と誤読されないよう HISTORICAL に言い換える。
  */
-function buildPriorAgentContext(steps: AgentToolStep[]): string | null {
+export function buildPriorAgentContext(steps: AgentToolStep[]): string | null {
   const usable = steps.filter(
     (step) => step.status === 'done' || step.status === 'error'
   )
@@ -512,7 +526,7 @@ function buildPriorAgentContext(steps: AgentToolStep[]): string | null {
   const planBlock = formatAgentPlanForModel(rebuildPlanFromSteps(usable))
   const memoryBlock = formatAgentMemoryForModel(rebuildMemoryFromSteps(usable))
   const header =
-    '[Previous agent tool context from earlier in this chat. Prefer working memory and this summary over re-reading the same paths unless the files may have changed.]'
+    '[Historical agent tool context from earlier turns in this chat. Prefer working memory and this summary over re-reading the same paths unless the files may have changed. IMPORTANT: This does NOT mean the latest user request is already done. If the latest user message needs file changes, investigate as needed and call proposeActions again — prior Applied/approved results do not satisfy a new request.]'
   const toolBlocks: string[] = []
   let total =
     (planBlock?.length ?? 0) + (memoryBlock?.length ?? 0) + header.length
@@ -526,22 +540,31 @@ function buildPriorAgentContext(steps: AgentToolStep[]): string | null {
     ) {
       continue
     }
-    let argsJson = '{}'
-    try {
-      argsJson = JSON.stringify(step.args)
-    } catch {
-      argsJson = '{}'
-    }
-    const status = step.ok === false ? 'FAIL' : 'OK'
-    const summary = step.summary?.trim() || '(no summary)'
-    let block = `${status} ${step.name}(${argsJson}) — ${summary}`
-    if (step.observation?.trim()) {
-      let observation = step.observation.trim()
-      if (observation.length > MAX_PRIOR_STEP_OBSERVATION_CHARS) {
-        observation = `${observation.slice(0, MAX_PRIOR_STEP_OBSERVATION_CHARS)}\n...(truncated)`
+
+    let block: string
+    if (step.name === 'proposeActions') {
+      // Never re-inject "User approved and applied…" observations — they bias
+      // follow-up turns into text-only finishes without a fresh proposeActions.
+      block = formatHistoricalProposeActionsStep(step)
+    } else {
+      let argsJson = '{}'
+      try {
+        argsJson = JSON.stringify(step.args)
+      } catch {
+        argsJson = '{}'
       }
-      block += `\n${observation}`
+      const status = step.ok === false ? 'FAIL' : 'OK'
+      const summary = step.summary?.trim() || '(no summary)'
+      block = `${status} ${step.name}(${argsJson}) — ${summary}`
+      if (step.observation?.trim()) {
+        let observation = step.observation.trim()
+        if (observation.length > MAX_PRIOR_STEP_OBSERVATION_CHARS) {
+          observation = `${observation.slice(0, MAX_PRIOR_STEP_OBSERVATION_CHARS)}\n...(truncated)`
+        }
+        block += `\n${observation}`
+      }
     }
+
     if (total + block.length + 2 > MAX_PRIOR_CONTEXT_CHARS) {
       toolBlocks.push('...(older tool results omitted to fit context budget)')
       break
@@ -558,6 +581,9 @@ function buildPriorAgentContext(steps: AgentToolStep[]): string | null {
   if (toolBlocks.length > 0) {
     parts.push(header)
     parts.push(...toolBlocks)
+  } else if (planBlock || memoryBlock) {
+    // Still remind the model that plan/memory are historical when no tool blocks.
+    parts.push(header)
   }
   return parts.join('\n\n')
 }
@@ -583,7 +609,13 @@ function rebuildMemoryFromHistory(history: ChatRequestMessage[]): AgentMemorySta
   return rebuildMemoryFromSteps(steps)
 }
 
-function appendHistoryMessages(
+/**
+ * Append prior chat turns, then a single consolidated historical tool context
+ * immediately before the current user payload (added by the caller).
+ * Avoids interleaving "Applied N action(s)" fake user messages after each
+ * assistant reply — that pattern made follow-ups look already completed.
+ */
+export function appendHistoryMessages(
   apiMessages: ApiMessage[],
   history: ChatRequestMessage[]
 ): void {
@@ -600,19 +632,23 @@ function appendHistoryMessages(
     }
   )
 
+  const allSteps: AgentToolStep[] = []
   for (const msg of fitted) {
     apiMessages.push({ role: msg.role, content: msg.content })
-    if (msg.role !== 'assistant' || !msg.agentSteps?.length) continue
-    const priorCtx = buildPriorAgentContext(msg.agentSteps)
-    if (priorCtx) {
-      apiMessages.push({
-        role: 'user',
-        content: truncateToTokenBudget(
-          priorCtx,
-          Math.floor(CONTEXT_BUDGET.perHistoryMessageTokens / 2)
-        )
-      })
+    if (msg.role === 'assistant' && msg.agentSteps?.length) {
+      allSteps.push(...msg.agentSteps)
     }
+  }
+
+  const priorCtx = buildPriorAgentContext(allSteps)
+  if (priorCtx) {
+    apiMessages.push({
+      role: 'user',
+      content: truncateToTokenBudget(
+        priorCtx,
+        Math.floor(CONTEXT_BUDGET.perHistoryMessageTokens)
+      )
+    })
   }
 }
 
@@ -1576,7 +1612,8 @@ async function streamAgentTurn(
  * Agent tool loop: read tools, proposeActions (preview approval), restricted exec,
  * verify (test/lint/typecheck templates), plus updateTodo / checkpoint / remember
  * for durable mid-run orientation.
- * Follow-up turns receive prior agentSteps as injected tool context + working memory.
+ * Follow-up turns receive one consolidated historical tool-context message
+ * (plan + memory + prior tool summaries) immediately before the new user ask.
  * Turn/tool budgets can be extended via user Continue (re-injects plan + memory).
  */
 export async function runAgent(webContents: WebContents, request: ChatRequest): Promise<void> {

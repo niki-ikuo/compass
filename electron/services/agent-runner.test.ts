@@ -20,9 +20,12 @@ vi.mock('./project-indexer', () => ({
 
 import { getSettings } from './settings'
 import {
+  appendHistoryMessages,
+  buildPriorAgentContext,
   isToolsUnsupportedApiError,
   runAgent
 } from './agent-runner'
+import type { AgentToolStep } from '../../src/types'
 
 const mockedGetSettings = vi.mocked(getSettings)
 
@@ -559,5 +562,153 @@ describe('runAgent tool loop', () => {
     ).toBe(true)
     expect(events.some((e) => e.channel === 'ai:done')).toBe(true)
     expect(fetchMock).toHaveBeenCalledTimes(3)
+  })
+
+  it('injects historical tool context once before the new ask on follow-ups', async () => {
+    const root = makeTempRoot('followup-context')
+    tempRoots.push(root)
+    writeFileSync(join(root, 'a.ts'), 'export const a = 1\n', 'utf-8')
+
+    const fetchMock = vi.mocked(fetch)
+    // Change-request follow-up may nudge missing proposeActions up to twice.
+    fetchMock
+      .mockResolvedValueOnce(sseResponse(textTurn('Will update b.ts next.')))
+      .mockResolvedValueOnce(sseResponse(textTurn('Still explaining.')))
+      .mockResolvedValueOnce(sseResponse(textTurn('Stopping.')))
+
+    const priorSteps: AgentToolStep[] = [
+      {
+        id: 's1',
+        name: 'readFile',
+        args: { path: 'a.ts' },
+        status: 'done',
+        ok: true,
+        summary: 'Read a.ts (18 chars)',
+        observation: 'export const a = 1'
+      },
+      {
+        id: 's2',
+        name: 'proposeActions',
+        args: {
+          actions: [{ type: 'writeFile', path: 'a.ts', content: 'export const a = 2\n' }]
+        },
+        status: 'done',
+        ok: true,
+        summary: 'Applied 1 action(s)',
+        observation:
+          'User approved and applied 1 workspace action(s):\n- writeFile: a.ts\n\nPlease call verify.'
+      }
+    ]
+
+    const { webContents, events } = createWebContents()
+    await runAgent(
+      webContents,
+      baseRequest(root, {
+        messages: [
+          { role: 'user', content: 'Update a.ts' },
+          {
+            role: 'assistant',
+            content: 'Updated a.ts.',
+            agentSteps: priorSteps
+          },
+          { role: 'user', content: '同様に b.ts も' }
+        ]
+      })
+    )
+
+    expect(events.some((e) => e.channel === 'ai:done')).toBe(true)
+    const body = JSON.parse(String(fetchMock.mock.calls[0][1]?.body)) as {
+      messages: Array<{ role: string; content: string | null }>
+    }
+    const userTexts = body.messages
+      .filter((m) => m.role === 'user' && typeof m.content === 'string')
+      .map((m) => m.content as string)
+
+    const historical = userTexts.filter((text) => text.includes('Historical agent tool context'))
+    expect(historical).toHaveLength(1)
+    expect(historical[0]).toContain('does NOT mean the latest user request is already done')
+    expect(historical[0]).toContain('HISTORICAL proposeActions (applied) paths: a.ts')
+    expect(historical[0]).not.toContain('User approved and applied')
+    expect(userTexts.some((text) => text.includes('同様に b.ts も'))).toBe(true)
+
+    // Must not interleave Applied-style context after every prior assistant turn.
+    const appliedUserMsgs = userTexts.filter((text) =>
+      /OK proposeActions[\s\S]*Applied 1 action/.test(text)
+    )
+    expect(appliedUserMsgs).toHaveLength(0)
+  })
+})
+
+describe('buildPriorAgentContext / appendHistoryMessages', () => {
+  it('rewrites proposeActions as HISTORICAL without approval observations', () => {
+    const ctx = buildPriorAgentContext([
+      {
+        id: '1',
+        name: 'proposeActions',
+        args: {
+          actions: [{ type: 'applyPatch', path: 'src/foo.ts', patch: '@@\n-a\n+b\n' }]
+        },
+        status: 'done',
+        ok: true,
+        summary: 'Applied 1 action(s)',
+        observation: 'User approved and applied 1 workspace action(s):\n- applyPatch: src/foo.ts'
+      }
+    ])
+    expect(ctx).toContain('HISTORICAL proposeActions (applied) paths: src/foo.ts')
+    expect(ctx).toContain('call proposeActions again')
+    expect(ctx).not.toContain('User approved and applied')
+  })
+
+  it('appends one consolidated prior-context user message at the end', () => {
+    const apiMessages: Array<{ role: string; content?: string | null }> = [
+      { role: 'system', content: 'sys' }
+    ]
+    appendHistoryMessages(apiMessages, [
+      { role: 'user', content: 'first' },
+      {
+        role: 'assistant',
+        content: 'done1',
+        agentSteps: [
+          {
+            id: '1',
+            name: 'listDir',
+            args: { path: '.' },
+            status: 'done',
+            ok: true,
+            summary: 'Listed .'
+          }
+        ]
+      },
+      { role: 'user', content: 'second' },
+      {
+        role: 'assistant',
+        content: 'done2',
+        agentSteps: [
+          {
+            id: '2',
+            name: 'proposeActions',
+            args: { actions: [{ type: 'writeFile', path: 'x.md', content: 'x' }] },
+            status: 'done',
+            ok: true,
+            summary: 'Applied 1 action(s)',
+            observation: 'User approved and applied 1 workspace action(s)'
+          }
+        ]
+      },
+      { role: 'user', content: 'third ask' }
+    ])
+
+    expect(apiMessages.map((m) => m.role)).toEqual([
+      'system',
+      'user',
+      'assistant',
+      'user',
+      'assistant',
+      'user'
+    ])
+    const prior = apiMessages[apiMessages.length - 1]
+    expect(prior.content).toContain('Historical agent tool context')
+    expect(prior.content).toContain('HISTORICAL proposeActions')
+    expect(prior.content).not.toContain('User approved and applied')
   })
 })

@@ -251,6 +251,8 @@ describe('proposeActions finish nudges', () => {
   it('detects workspace change requests', () => {
     expect(looksLikeWorkspaceChangeRequest('Fix the bug in note.txt')).toBe(true)
     expect(looksLikeWorkspaceChangeRequest('実装してください')).toBe(true)
+    expect(looksLikeWorkspaceChangeRequest('同様に bar.ts も')).toBe(true)
+    expect(looksLikeWorkspaceChangeRequest('same for utils.ts')).toBe(true)
     expect(looksLikeWorkspaceChangeRequest('List the workspace')).toBe(false)
     expect(looksLikeWorkspaceChangeRequest('What does this file do?')).toBe(false)
   })

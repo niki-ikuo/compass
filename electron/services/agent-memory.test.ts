@@ -111,6 +111,22 @@ describe('rebuildMemoryFromSteps', () => {
     )
   })
 
+  it('frames prior proposeActions as earlier-turn history', () => {
+    const state = rebuildMemoryFromSteps([
+      {
+        name: 'proposeActions',
+        args: { actions: [{ type: 'writeFile', path: 'a.ts', content: 'x' }] },
+        ok: true,
+        status: 'done',
+        summary: 'Applied 1 action(s)'
+      }
+    ])
+    expect(state.entries).toHaveLength(1)
+    expect(state.entries[0].kind).toBe('write')
+    expect(state.entries[0].text).toContain('Earlier chat turn')
+    expect(state.entries[0].text).toContain('Applied 1 action(s)')
+  })
+
   it('replays profileData and queryData summaries', () => {
     const state = rebuildMemoryFromSteps([
       {
