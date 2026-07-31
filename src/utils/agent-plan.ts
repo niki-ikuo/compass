@@ -163,9 +163,20 @@ export function looksLikeMultiPartAgentTask(text: string): boolean {
   const mentions = trimmed.match(/@\[[^\]]+\]/g)
   if (mentions && mentions.length >= 3) return true
 
-  if (trimmed.length >= 120) {
+  // Several change/imperative clauses (“Aを修正して、Bも追加して”, “fix X and update Y”).
+  const jaClauses = trimmed.match(
+    /(?:してください|してほしい|して下さい)|(?:修正|変更|追加|削除|作成|実装|更新|書き換え|確認|調査|対応)して/g
+  )
+  if (jaClauses && jaClauses.length >= 2 && trimmed.length >= 24) return true
+
+  const enVerbs = trimmed.match(
+    /\b(?:fix|add|update|create|implement|remove|delete|refactor|write|change|rename|patch)\b/gi
+  )
+  if (enVerbs && enVerbs.length >= 2 && trimmed.length >= 24) return true
+
+  if (trimmed.length >= 60) {
     const connectors =
-      /また、|および|かつ、|さらに、|あと、|加えて|and also|additionally|as well as|then also/i
+      /また、|および|かつ、|さらに、|あと、|加えて|それから|次に|and also|additionally|as well as|then also|;\s*/i
     if (connectors.test(trimmed)) return true
   }
 
@@ -180,6 +191,22 @@ export function looksLikeMultiPartAgentTask(text: string): boolean {
 /** Soft nudge before the first turn when the ask looks multi-part and no plan exists yet. */
 export function formatInitialTodoPlanNudge(): string {
   return t('ai.agentInitialTodoPlanNudge')
+}
+
+/**
+ * Text-only finish (or tool rounds that skipped planning) should still force updateTodo
+ * on multi-part asks before proposeActions nudges take over.
+ */
+export function shouldNudgeMissingTodoPlan(options: {
+  userText: string
+  openTodoCount: number
+  updateTodoCalledThisRun: boolean
+  alreadyNudging: boolean
+}): boolean {
+  if (options.openTodoCount > 0) return false
+  if (options.updateTodoCalledThisRun) return false
+  if (options.alreadyNudging) return true
+  return looksLikeMultiPartAgentTask(options.userText)
 }
 
 /**

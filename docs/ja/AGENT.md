@@ -93,6 +93,8 @@ while true:
   if tool_calls なし:
     if open todo（pending/in_progress）があり open-todo nudge が 2 回未満
       → assistant テキスト + user nudge を追加してループ継続
+    else if multi-part なのに updateTodo 未使用で plan nudge が 2 回未満
+      → assistant テキスト + user nudge（先に updateTodo）を追加して継続（proposeActions nudge より優先）
     else if proposeActions 欠落／途中切れ（変更依頼・偽チャット JSON・直前の truncate）で propose nudge が 2 回未満、かつプレビュー未提示／未適用
       → assistant テキスト + user nudge（proposeActions 呼び出し／1ファイル再提案）を追加して継続
     else → ai:done; return

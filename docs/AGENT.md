@@ -93,6 +93,8 @@ while true:
   if no tool_calls:
     if open todos (pending/in_progress) and open-todo nudges < 2
       → append assistant text + user nudge; continue loop
+    else if multi-part ask with no updateTodo yet and plan nudges < 2
+      → append assistant text + user nudge (call updateTodo first); continue (before proposeActions nudges)
     else if proposeActions missing/truncated (change request, fake chat JSON, or prior truncation)
          and propose nudges < 2 and preview not already shown/applied
       → append assistant text + user nudge (call proposeActions / one-file retry); continue loop
@@ -224,7 +226,7 @@ On Continue = yes: budgets increase and **plan + memory** are re-injected as a u
 | `agentSteps` on assistant messages | Timeline + history persistence |
 | Prior tool context | One historical summary re-injected before the new ask (`buildPriorAgentContext`); `proposeActions` is labeled HISTORICAL without approval observation text |
 | Plan (`updateTodo` / `checkpoint`) | Checklist + resume note; rebuilt from history; re-injected on Continue while open todos remain; chat Plan panel rebuilds from all assistant `agentSteps` through the current message. Fully settled plans (all done/cancelled) are not re-injected and only render on the message that last called `updateTodo` / `checkpoint` |
-| Soft multi-part nudge | If the latest user ask looks multi-part and the plan is empty, inject a user-role nudge to call `updateTodo` first (not a hard gate) |
+| Soft multi-part nudge | If the latest user ask looks multi-part and no open todos remain, inject a user-role nudge to call `updateTodo` first (also on text-only finish / tool rounds that skipped planning; takes priority over proposeActions nudges) |
 | Soft proposeActions nudge | If a change request (or fake chat/`compass-actions` JSON / truncated propose) ends without an applied proposal, inject a user-role nudge to call `proposeActions` (max **2** per run; skipped after preview reject unless fake JSON appears) |
 | Memory (`remember` + auto observations) | Durable notes; rebuilt from history |
 | Read cache | Avoid re-sending full file bodies within one run |

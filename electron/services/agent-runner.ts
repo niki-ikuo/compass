@@ -58,9 +58,11 @@ import {
   rebuildPlanFromSteps,
   sanitizeCheckpointArgs,
   sanitizeUpdateTodoArgs,
+  countOpenTodos,
   looksLikeMultiPartAgentTask,
   formatInitialTodoPlanNudge,
   shouldNudgeMissingProposeActions,
+  shouldNudgeMissingTodoPlan,
   type AgentPlanState
 } from './agent-plan'
 import {
@@ -128,6 +130,8 @@ const MAX_PRIOR_CONTEXT_CHARS = 24_000
 const MAX_PRIOR_STEP_OBSERVATION_CHARS = 3_000
 /** text-only 終了時に open todo がある場合の再促し上限（無限ループ防止） */
 const MAX_OPEN_TODO_NUDGES = 2
+/** multi-part なのに updateTodo 未使用の再促し上限 */
+const MAX_MISSING_TODO_PLAN_NUDGES = 2
 /** text-only 終了時に proposeActions 欠落／途中切れの再促し上限 */
 const MAX_PROPOSE_ACTIONS_NUDGES = 2
 
@@ -526,7 +530,7 @@ export function buildPriorAgentContext(steps: AgentToolStep[]): string | null {
   const planBlock = formatAgentPlanForModel(rebuildPlanFromSteps(usable))
   const memoryBlock = formatAgentMemoryForModel(rebuildMemoryFromSteps(usable))
   const header =
-    '[Historical agent tool context from earlier turns in this chat. Prefer working memory and this summary over re-reading the same paths unless the files may have changed. IMPORTANT: This does NOT mean the latest user request is already done. If the latest user message needs file changes, investigate as needed and call proposeActions again — prior Applied/approved results do not satisfy a new request.]'
+    '[Historical agent tool context from earlier turns in this chat. Prefer working memory and this summary over re-reading the same paths unless the files may have changed. IMPORTANT: This does NOT mean the latest user request is already done. For a new multi-part or longer ask, call updateTodo first with a fresh checklist, then work items in order. If the latest user message needs file changes, call proposeActions again — prior Applied/approved results do not satisfy a new request.]'
   const toolBlocks: string[] = []
   let total =
     (planBlock?.length ?? 0) + (memoryBlock?.length ?? 0) + header.length
@@ -1678,7 +1682,8 @@ export async function runAgent(webContents: WebContents, request: ChatRequest): 
 
     try {
     const latestUserText = [...history].reverse().find((m) => m.role === 'user')?.content ?? ''
-    if (plan.todos.length === 0 && looksLikeMultiPartAgentTask(latestUserText)) {
+    // Settled todos from earlier turns must not block a fresh plan for a new multi-part ask.
+    if (countOpenTodos(plan) === 0 && looksLikeMultiPartAgentTask(latestUserText)) {
       apiMessages.push({ role: 'user', content: formatInitialTodoPlanNudge() })
     }
 
@@ -1689,6 +1694,8 @@ export async function runAgent(webContents: WebContents, request: ChatRequest): 
     let toolBudget = MAX_TOOL_CALLS
     let turn = 0
     let openTodoNudges = 0
+    let missingTodoPlanNudges = 0
+    let updateTodoCalledThisRun = false
     let proposeActionsNudges = 0
     let proposeActionsApplied = false
     let proposeActionsTruncated = false
@@ -1770,7 +1777,27 @@ export async function runAgent(webContents: WebContents, request: ChatRequest): 
           }
         }
 
+        // Prefer planning before proposeActions nudges on multi-part asks.
+        // Otherwise the proposeActions nudge steers the model to skip updateTodo.
+        const needsTodoPlan = shouldNudgeMissingTodoPlan({
+          userText: latestUserText,
+          openTodoCount: countOpenTodos(plan),
+          updateTodoCalledThisRun,
+          alreadyNudging: missingTodoPlanNudges > 0
+        })
+        if (needsTodoPlan && missingTodoPlanNudges < MAX_MISSING_TODO_PLAN_NUDGES) {
+          missingTodoPlanNudges++
+          apiMessages.push({
+            role: 'assistant',
+            content: turnResult.content || null
+          })
+          apiMessages.push({ role: 'user', content: formatInitialTodoPlanNudge() })
+          turn++
+          continue
+        }
+
         if (
+          !needsTodoPlan &&
           proposeActionsNudges < MAX_PROPOSE_ACTIONS_NUDGES &&
           shouldNudgeMissingProposeActions({
             userText: latestUserText,
@@ -1826,6 +1853,9 @@ export async function runAgent(webContents: WebContents, request: ChatRequest): 
         }
 
         toolCallsUsed++
+        if (call.function.name === 'updateTodo') {
+          updateTodoCalledThisRun = true
+        }
         const rawArgumentText = call.function.arguments || ''
         let rawArgs = parseToolArgs(rawArgumentText)
         if (call.function.name === 'proposeActions') {
@@ -1929,6 +1959,20 @@ export async function runAgent(webContents: WebContents, request: ChatRequest): 
           name: call.function.name,
           content: truncateForModel(result.content)
         })
+      }
+
+      // Multi-part asks that jumped straight into other tools still need a checklist.
+      if (
+        missingTodoPlanNudges < MAX_MISSING_TODO_PLAN_NUDGES &&
+        shouldNudgeMissingTodoPlan({
+          userText: latestUserText,
+          openTodoCount: countOpenTodos(plan),
+          updateTodoCalledThisRun,
+          alreadyNudging: missingTodoPlanNudges > 0
+        })
+      ) {
+        missingTodoPlanNudges++
+        apiMessages.push({ role: 'user', content: formatInitialTodoPlanNudge() })
       }
 
       turn++

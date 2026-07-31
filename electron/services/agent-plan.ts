@@ -19,6 +19,7 @@ export {
   sanitizeUpdateTodoArgs,
   collectAgentStepsThrough,
   shouldNudgeMissingProposeActions,
+  shouldNudgeMissingTodoPlan,
   shouldShowAgentPlanPanel,
   type AgentPlanState,
   type AgentTodoItem,

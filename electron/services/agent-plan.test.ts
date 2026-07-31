@@ -18,6 +18,7 @@ import {
   sanitizeCheckpointArgs,
   sanitizeUpdateTodoArgs,
   shouldNudgeMissingProposeActions,
+  shouldNudgeMissingTodoPlan,
   shouldShowAgentPlanPanel
 } from './agent-plan'
 
@@ -190,9 +191,48 @@ describe('looksLikeMultiPartAgentTask', () => {
     ).toBe(true)
   })
 
+  it('detects multiple imperative change clauses', () => {
+    expect(
+      looksLikeMultiPartAgentTask('foo.ts を修正して、テストも追加してください')
+    ).toBe(true)
+    expect(looksLikeMultiPartAgentTask('Fix the bug in foo.ts and update the docs')).toBe(true)
+  })
+
   it('ignores short single asks', () => {
     expect(looksLikeMultiPartAgentTask('What does this function do?')).toBe(false)
+    expect(looksLikeWorkspaceChangeRequest('Fix the typo in README.')).toBe(true)
     expect(looksLikeMultiPartAgentTask('Fix the typo in README.')).toBe(false)
+  })
+})
+
+describe('shouldNudgeMissingTodoPlan', () => {
+  it('nudges multi-part asks until updateTodo runs', () => {
+    expect(
+      shouldNudgeMissingTodoPlan({
+        userText: '1. Fix A\n2. Fix B',
+        openTodoCount: 0,
+        updateTodoCalledThisRun: false,
+        alreadyNudging: false
+      })
+    ).toBe(true)
+
+    expect(
+      shouldNudgeMissingTodoPlan({
+        userText: '1. Fix A\n2. Fix B',
+        openTodoCount: 0,
+        updateTodoCalledThisRun: true,
+        alreadyNudging: false
+      })
+    ).toBe(false)
+
+    expect(
+      shouldNudgeMissingTodoPlan({
+        userText: '1. Fix A\n2. Fix B',
+        openTodoCount: 2,
+        updateTodoCalledThisRun: false,
+        alreadyNudging: false
+      })
+    ).toBe(false)
   })
 })
 

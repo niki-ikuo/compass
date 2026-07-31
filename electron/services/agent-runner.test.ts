@@ -421,6 +421,143 @@ describe('runAgent tool loop', () => {
     expect(fetchMock).toHaveBeenCalledTimes(4)
   })
 
+  it('nudges updateTodo before proposeActions on multi-part change asks', async () => {
+    const root = makeTempRoot('todo-before-propose')
+    tempRoots.push(root)
+
+    const fetchMock = vi.mocked(fetch)
+    fetchMock
+      .mockResolvedValueOnce(sseResponse(textTurn('I will fix both files.')))
+      .mockResolvedValueOnce(
+        sseResponse(
+          toolCallTurn(
+            'updateTodo',
+            {
+              todos: [
+                { id: '1', content: 'Fix a.ts', status: 'pending' },
+                { id: '2', content: 'Fix b.ts', status: 'pending' }
+              ]
+            },
+            'call_todo'
+          )
+        )
+      )
+      .mockResolvedValueOnce(sseResponse(textTurn('Working through the checklist.')))
+      .mockResolvedValueOnce(
+        sseResponse(
+          toolCallTurn(
+            'updateTodo',
+            {
+              merge: true,
+              todos: [
+                { id: '1', content: 'Fix a.ts', status: 'done' },
+                { id: '2', content: 'Fix b.ts', status: 'done' }
+              ]
+            },
+            'call_todo_done'
+          )
+        )
+      )
+      // After checklist closes, proposeActions nudge may still fire for change asks.
+      .mockResolvedValueOnce(sseResponse(textTurn('Checklist complete.')))
+      .mockResolvedValueOnce(sseResponse(textTurn('Still no propose.')))
+      .mockResolvedValueOnce(sseResponse(textTurn('Stopping.')))
+
+    const { webContents, events } = createWebContents()
+    await runAgent(
+      webContents,
+      baseRequest(root, {
+        messages: [
+          {
+            role: 'user',
+            content: '1. Fix a.ts\n2. Fix b.ts'
+          }
+        ]
+      })
+    )
+
+    expect(events.some((e) => e.channel === 'ai:done')).toBe(true)
+    const firstBody = JSON.parse(String(fetchMock.mock.calls[0][1]?.body)) as {
+      messages: Array<{ role: string; content: string | null }>
+    }
+    expect(
+      firstBody.messages.some(
+        (m) =>
+          m.role === 'user' &&
+          typeof m.content === 'string' &&
+          m.content.includes('updateTodo')
+      )
+    ).toBe(true)
+
+    const secondBody = JSON.parse(String(fetchMock.mock.calls[1][1]?.body)) as {
+      messages: Array<{ role: string; content: string | null }>
+    }
+    // Text-only finish must re-nudge planning — not jump to proposeActions.
+    const secondUser = secondBody.messages.filter(
+      (m) => m.role === 'user' && typeof m.content === 'string'
+    ) as Array<{ role: string; content: string }>
+    expect(secondUser.some((m) => m.content.includes('updateTodo'))).toBe(true)
+    expect(secondUser.some((m) => m.content.includes('proposeActions was not called'))).toBe(
+      false
+    )
+  })
+
+  it('re-nudges a fresh updateTodo plan after prior todos are settled', async () => {
+    const root = makeTempRoot('fresh-plan-after-settled')
+    tempRoots.push(root)
+
+    const fetchMock = vi.mocked(fetch)
+    fetchMock
+      .mockResolvedValueOnce(sseResponse(textTurn('Planning the new ask.')))
+      .mockResolvedValueOnce(sseResponse(textTurn('Still explaining.')))
+      .mockResolvedValueOnce(sseResponse(textTurn('Stopping.')))
+
+    const { webContents } = createWebContents()
+    await runAgent(
+      webContents,
+      baseRequest(root, {
+        messages: [
+          { role: 'user', content: 'Old multi ask' },
+          {
+            role: 'assistant',
+            content: 'Done earlier.',
+            agentSteps: [
+              {
+                id: 'old',
+                name: 'updateTodo',
+                args: {
+                  todos: [
+                    { id: '1', content: 'Old A', status: 'done' },
+                    { id: '2', content: 'Old B', status: 'done' }
+                  ]
+                },
+                status: 'done',
+                ok: true,
+                summary: 'Todos updated'
+              }
+            ]
+          },
+          {
+            role: 'user',
+            content: '1. Update c.ts\n2. Update d.ts'
+          }
+        ]
+      })
+    )
+
+    const body = JSON.parse(String(fetchMock.mock.calls[0][1]?.body)) as {
+      messages: Array<{ role: string; content: string | null }>
+    }
+    expect(
+      body.messages.some(
+        (m) =>
+          m.role === 'user' &&
+          typeof m.content === 'string' &&
+          m.content.includes('updateTodo')
+      )
+    ).toBe(true)
+  })
+
   it('nudges when a change request finishes without proposeActions', async () => {
     const root = makeTempRoot('missing-propose-nudge')
     tempRoots.push(root)
