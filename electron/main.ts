@@ -175,19 +175,31 @@ function beginQuitFlow(): void {
     app.quit()
     return
   }
-  if (!mainWindow.isVisible()) {
-    showMainWindowFromTray(() => mainWindow)
-  }
+  // Do not show a tray-hidden window here — that flashes the UI before quit.
+  // IPC / dialogs still work while hidden; unsaved dialogs use no parent when hidden.
   if (allowWindowClose) {
-    mainWindow.close()
+    closeMainWindowForQuit()
     return
   }
   if (!mainWindow.webContents || mainWindow.webContents.isLoadingMainFrame()) {
     allowWindowClose = true
-    mainWindow.close()
+    closeMainWindowForQuit()
     return
   }
   requestRendererCloseConfirm()
+}
+
+/** Close without briefly flashing a window that was hidden to the tray. */
+function closeMainWindowForQuit(): void {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    app.quit()
+    return
+  }
+  if (!mainWindow.isVisible()) {
+    mainWindow.destroy()
+    return
+  }
+  mainWindow.close()
 }
 
 async function refreshTrayAndHotkey(): Promise<void> {
@@ -598,9 +610,7 @@ function registerIpcHandlers(): void {
     resetCloseRequestState()
     isAppQuitting = true
     allowWindowClose = true
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.close()
-    }
+    closeMainWindowForQuit()
   })
 
   ipcMain.handle('app:cancel-close', () => {
@@ -609,9 +619,8 @@ function registerIpcHandlers(): void {
   })
 
   ipcMain.handle('dialog:unsavedQuit', async (_event, count: number) => {
-    if (!mainWindow || mainWindow.isDestroyed()) return 'cancel' as const
     const dirtyCount = typeof count === 'number' && count > 0 ? count : 1
-    const { response } = await dialog.showMessageBox(mainWindow, {
+    const options: Electron.MessageBoxOptions = {
       type: 'warning',
       buttons: [t('app.quitSave'), t('app.quitDiscard'), t('app.quitCancel')],
       defaultId: 0,
@@ -619,7 +628,13 @@ function registerIpcHandlers(): void {
       noLink: true,
       title: t('app.quitUnsavedTitle'),
       message: t('app.quitUnsavedMessage', { count: dirtyCount })
-    })
+    }
+    // Parenting to a hidden window can force it on-screen (flash). Use a free-floating dialog.
+    const parent =
+      mainWindow && !mainWindow.isDestroyed() && mainWindow.isVisible() ? mainWindow : undefined
+    const { response } = parent
+      ? await dialog.showMessageBox(parent, options)
+      : await dialog.showMessageBox(options)
     if (response === 0) return 'save' as const
     if (response === 1) return 'discard' as const
     return 'cancel' as const
