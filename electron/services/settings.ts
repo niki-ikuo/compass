@@ -35,6 +35,7 @@ interface StoredSettings {
   editorMinimapEnabled: boolean
   markdownOutlineEnabled: boolean
   autoOpenAgentPreview: boolean
+  autoApplyAgentWrites: boolean
   defaultShellId: string
   defaultUseCasePreset: UseCasePreset
   rememberLastUseCasePreset: boolean
@@ -83,6 +84,10 @@ function resolveMarkdownOutlineEnabled(value: unknown): boolean {
 
 function resolveAutoOpenAgentPreview(value: unknown): boolean {
   return typeof value === 'boolean' ? value : DEFAULT_SETTINGS.autoOpenAgentPreview
+}
+
+function resolveAutoApplyAgentWrites(value: unknown): boolean {
+  return typeof value === 'boolean' ? value : DEFAULT_SETTINGS.autoApplyAgentWrites
 }
 
 function resolveDefaultShellId(value: unknown): string {
@@ -228,6 +233,7 @@ async function readStoredSettings(): Promise<StoredSettings> {
       editorMinimapEnabled: resolveEditorMinimapEnabled(stored.editorMinimapEnabled),
       markdownOutlineEnabled: resolveMarkdownOutlineEnabled(stored.markdownOutlineEnabled),
       autoOpenAgentPreview: resolveAutoOpenAgentPreview(stored.autoOpenAgentPreview),
+      autoApplyAgentWrites: resolveAutoApplyAgentWrites(stored.autoApplyAgentWrites),
       defaultShellId: resolveDefaultShellId(stored.defaultShellId),
       defaultUseCasePreset: resolveUseCasePreset(stored.defaultUseCasePreset),
       rememberLastUseCasePreset: resolveRememberLastUseCasePreset(
@@ -261,6 +267,7 @@ async function readStoredSettings(): Promise<StoredSettings> {
       editorMinimapEnabled: DEFAULT_SETTINGS.editorMinimapEnabled,
       markdownOutlineEnabled: DEFAULT_SETTINGS.markdownOutlineEnabled,
       autoOpenAgentPreview: DEFAULT_SETTINGS.autoOpenAgentPreview,
+      autoApplyAgentWrites: DEFAULT_SETTINGS.autoApplyAgentWrites,
       defaultShellId: DEFAULT_SETTINGS.defaultShellId,
       defaultUseCasePreset: DEFAULT_SETTINGS.defaultUseCasePreset,
       rememberLastUseCasePreset: DEFAULT_SETTINGS.rememberLastUseCasePreset,
@@ -351,6 +358,7 @@ function toAppSettings(stored: StoredSettings): AppSettings {
     editorMinimapEnabled: stored.editorMinimapEnabled,
     markdownOutlineEnabled: stored.markdownOutlineEnabled,
     autoOpenAgentPreview: stored.autoOpenAgentPreview,
+    autoApplyAgentWrites: stored.autoApplyAgentWrites,
     defaultShellId: stored.defaultShellId,
     defaultUseCasePreset: stored.defaultUseCasePreset,
     rememberLastUseCasePreset: stored.rememberLastUseCasePreset,
@@ -409,6 +417,7 @@ export async function setSettings(settings: AppSettings): Promise<void> {
     editorMinimapEnabled: resolveEditorMinimapEnabled(settings.editorMinimapEnabled),
     markdownOutlineEnabled: resolveMarkdownOutlineEnabled(settings.markdownOutlineEnabled),
     autoOpenAgentPreview: resolveAutoOpenAgentPreview(settings.autoOpenAgentPreview),
+    autoApplyAgentWrites: resolveAutoApplyAgentWrites(settings.autoApplyAgentWrites),
     defaultShellId: resolveDefaultShellId(settings.defaultShellId),
     defaultUseCasePreset: resolveUseCasePreset(settings.defaultUseCasePreset),
     rememberLastUseCasePreset: resolveRememberLastUseCasePreset(

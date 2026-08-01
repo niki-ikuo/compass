@@ -86,6 +86,7 @@ function buildSettingsSnapshot(
     editorMinimapEnabled: settings.editorMinimapEnabled !== false,
     markdownOutlineEnabled: settings.markdownOutlineEnabled !== false,
     autoOpenAgentPreview: settings.autoOpenAgentPreview === true,
+    autoApplyAgentWrites: settings.autoApplyAgentWrites === true,
     defaultShellId: settings.defaultShellId || DEFAULT_SETTINGS.defaultShellId,
     defaultUseCasePreset:
       normalizeUseCasePreset(settings.defaultUseCasePreset) ??
@@ -489,6 +490,18 @@ export function SettingsPanel() {
               <span>
                 {t('settings.rememberLastUseCasePreset')}
                 <span className="field-hint">{t('settings.rememberLastUseCasePresetHint')}</span>
+              </span>
+            </label>
+
+            <label className="settings-checkbox-label">
+              <input
+                type="checkbox"
+                checked={form.autoApplyAgentWrites}
+                onChange={(e) => setForm({ ...form, autoApplyAgentWrites: e.target.checked })}
+              />
+              <span>
+                {t('settings.autoApplyAgentWrites')}
+                <span className="field-hint">{t('settings.autoApplyAgentWritesHint')}</span>
               </span>
             </label>
           </>

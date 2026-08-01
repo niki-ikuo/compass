@@ -121,6 +121,7 @@ describe('getSettings / setSettings', () => {
       editorMinimapEnabled: false,
       markdownOutlineEnabled: false,
       autoOpenAgentPreview: false,
+      autoApplyAgentWrites: true,
       defaultShellId: 'bash',
       defaultUseCasePreset: 'code',
       rememberLastUseCasePreset: false
@@ -134,6 +135,7 @@ describe('getSettings / setSettings', () => {
     expect(loaded.inlineCompletionsEnabled).toBe(false)
     expect(loaded.editorMinimapEnabled).toBe(false)
     expect(loaded.markdownOutlineEnabled).toBe(false)
+    expect(loaded.autoApplyAgentWrites).toBe(true)
     expect(loaded.defaultUseCasePreset).toBe('code')
     expect(loaded.temperature).toBe(0.5)
   })

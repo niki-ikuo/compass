@@ -53,6 +53,10 @@ import { buildWorkspaceIndex, ensureWorkspaceIndex } from '@/utils/project-index
 import { getLlmProvider, getModelOptions, getProviderLabel, isAgentModeAvailable } from '@/utils/llm-providers'
 import { refreshLlmConnection } from '@/utils/llm-connection'
 import { parseAgentToolsUnsupportedError } from '@/utils/agent-tools'
+import {
+  agentProposalHasDeletes,
+  shouldAutoApplyAgentProposal
+} from '@/utils/agent-auto-apply'
 import { formatActionPreviewError } from '@/utils/apply-error'
 import { resolveLastSentChatMode } from '@/utils/chat-mode'
 import {
@@ -626,12 +630,82 @@ export function ChatPanel() {
         if (!isThisChat(eventChatId)) return
         setPendingContinueFor(chatId, null)
         setPendingExecApprovalFor(chatId, null)
+
+        const autoApplyEnabled = useAppStore.getState().settings.autoApplyAgentWrites === true
+        const canAutoApply = shouldAutoApplyAgentProposal(autoApplyEnabled, event.actions)
+
         setPendingWorkspacePreview({
           chatId,
           actions: event.actions,
           items: event.items,
-          approvalId: event.id
+          approvalId: event.id,
+          openInEditor: !canAutoApply
         })
+
+        if (canAutoApply) {
+          setAgentStreamStatusFor(chatId, t('chat.agentAutoApplying'))
+          agentSteps = agentSteps.map((step) =>
+            step.id === event.id
+              ? {
+                  ...step,
+                  status: 'running',
+                  summary: t('chat.agentAutoApplying')
+                }
+              : step
+          )
+          syncAssistant(accumulated.trim() || t('chat.agentAutoApplying'))
+
+          void (async () => {
+            const itemCount = event.items.length
+            const root = useAppStore.getState().workspaceRoot
+            try {
+              await useAppStore.getState().applyWorkspacePreview({ auto: true })
+              if (root) {
+                const tree = await window.compass.fs.readDir(root)
+                useAppStore.getState().setFileTree(tree)
+                void buildWorkspaceIndex(root)
+              }
+              const note = t('chat.agentAutoApplied', { count: itemCount })
+              accumulated = accumulated.trim()
+                ? `${accumulated.trim()}\n\n${note}`
+                : note
+              syncAssistant(accumulated)
+              setAgentStreamStatusFor(chatId, t('chat.generating'))
+            } catch (error) {
+              const message = error instanceof Error ? error.message : t('chat.applyFailed')
+              const pending = useAppStore.getState().pendingWorkspacePreview
+              if (pending?.chatId === chatId && pending.items.length > 0) {
+                useAppStore.getState().activateWorkspacePreview(pending.items)
+              }
+              setAgentStreamStatusFor(chatId, t('chat.agentWaitingApproval'))
+              agentSteps = agentSteps.map((step) =>
+                step.id === event.id
+                  ? {
+                      ...step,
+                      status: 'waiting_approval',
+                      summary: t('chat.agentWaitingApproval')
+                    }
+                  : step
+              )
+              const errNote = `${t('chat.fileOpError', { message })}\n${t(
+                'chat.applyFailedAskAgentHint'
+              )}`
+              accumulated = accumulated.trim()
+                ? `${accumulated.trim()}\n\n${errNote}`
+                : errNote
+              syncAssistant(accumulated)
+            }
+          })()
+          return
+        }
+
+        if (autoApplyEnabled && agentProposalHasDeletes(event.actions)) {
+          const skipNote = t('chat.agentAutoApplySkippedDeletes')
+          accumulated = accumulated.trim()
+            ? `${accumulated.trim()}\n\n${skipNote}`
+            : skipNote
+        }
+
         setAgentStreamStatusFor(chatId, t('chat.agentWaitingApproval'))
         agentSteps = agentSteps.map((step) =>
           step.id === event.id
@@ -1844,6 +1918,14 @@ export function ChatPanel() {
                   </div>
                 ) : null}
               </div>
+              {sendMode === 'agent' && settings.autoApplyAgentWrites ? (
+                <span
+                  className="chat-agent-auto-apply-badge"
+                  title={t('chat.agentAutoApplyBadgeTitle')}
+                >
+                  {t('chat.agentAutoApplyBadge')}
+                </span>
+              ) : null}
               <div className="chat-preset-picker" ref={presetPickerRef}>
                 <button
                   type="button"

@@ -419,6 +419,11 @@ export interface AppSettings {
    * false のときはエクスプローラ等で対象を開いたときに確認画面を出す。
    */
   autoOpenAgentPreview: boolean
+  /**
+   * Agent の `proposeActions` をプレビュー承認なしで適用するか。
+   * 削除アクションは常に手動承認。exec 承認は対象外。既定 OFF。
+   */
+  autoApplyAgentWrites: boolean
   /** 新しいターミナルを開くときの初期シェル（powershell / cmd / bash / wsl） */
   defaultShellId: string
   /** 新規チャット / 起動時の用途プリセット初期値 */
@@ -1244,6 +1249,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   editorMinimapEnabled: true,
   markdownOutlineEnabled: true,
   autoOpenAgentPreview: true,
+  autoApplyAgentWrites: false,
   defaultShellId: 'powershell',
   defaultUseCasePreset: 'general',
   rememberLastUseCasePreset: true,

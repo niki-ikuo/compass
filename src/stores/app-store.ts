@@ -1071,6 +1071,8 @@ interface AppState {
       chatId?: string
       /** Agent proposeActions の call id */
       approvalId?: string | null
+      /** false のときエディタにプレビューを開かない（自動適用前など） */
+      openInEditor?: boolean
     } | null
   ) => void
   setPendingAgentApprovalId: (id: string | null, chatId?: string) => void
@@ -1082,7 +1084,7 @@ interface AppState {
   revertWorkspacePreview: () => void
   /** Agent 承認待ち中の適用失敗を観測として返し、再提案させる */
   sendApplyFailureToAgent: () => void
-  applyWorkspacePreview: () => Promise<void>
+  applyWorkspacePreview: (options?: { auto?: boolean }) => Promise<void>
   applyPreviewFile: (filePath: string) => Promise<void>
   rejectPreviewFile: (filePath: string) => void
   dismissAiApplyUndoBanner: () => void
@@ -2269,7 +2271,9 @@ export const useAppStore = create<AppState>((set, get) => ({
       ...activePreviewSlice(nextMap, state.activeChatId),
       lastApplyError: null
     })
-    if (state.activeChatId === chatId && get().settings.autoOpenAgentPreview) {
+    const openInEditor =
+      preview.openInEditor !== false && get().settings.autoOpenAgentPreview
+    if (state.activeChatId === chatId && openInEditor) {
       get().activateWorkspacePreview(preview.items)
     }
   },
@@ -2568,7 +2572,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     )
   },
 
-  applyWorkspacePreview: async () => {
+  applyWorkspacePreview: async (options) => {
     const state = get()
     if (!state.pendingWorkspacePreview || !state.workspaceRoot) return
 
@@ -2670,11 +2674,10 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (changeSet) scheduleChatHistorySave(get().workspaceRoot)
     if (changeSet) void get().refreshAiApplyHistory()
 
-    resolveApprovalById(
-      approvalId,
-      true,
-      `User approved and applied ${actionCount} workspace action(s):\n${actionSummary}`
-    )
+    const detail = options?.auto
+      ? `Auto-applied ${actionCount} workspace action(s) (user enabled Agent auto-apply):\n${actionSummary}`
+      : `User approved and applied ${actionCount} workspace action(s):\n${actionSummary}`
+    resolveApprovalById(approvalId, true, detail)
   },
 
   applyPreviewFile: async (filePath) => {

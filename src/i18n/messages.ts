@@ -52,6 +52,9 @@ export const ja = {
   'settings.autoOpenAgentPreview': 'Agent 変更をエディタで自動表示',
   'settings.autoOpenAgentPreviewHint':
     'オンにすると、Agent のファイル変更提案をすぐにエディタの確認画面で開きます。オフのときはエクスプローラで対象ファイルを開いたときに確認します。',
+  'settings.autoApplyAgentWrites': 'Agent の変更を自動適用',
+  'settings.autoApplyAgentWritesHint':
+    'オンにすると、Agent のファイル提案を確認なしで適用します。削除を含む提案とコマンド実行は従来どおり確認します。Undo で戻せます。',
   'settings.terminal': 'ターミナル',
   'settings.defaultShell': '初期シェル',
   'settings.defaultShellHint': '新しいターミナルを開くときに使うシェルです',
@@ -607,6 +610,13 @@ export const ja = {
   'chat.agentToolBlocked': 'ブロック',
   'chat.agentToolError': '失敗',
   'chat.agentWaitingApproval': '承認待ち（プレビューを確認してください）',
+  'chat.agentAutoApplying': '変更を自動適用しています…',
+  'chat.agentAutoApplyBadge': '自動適用 ON',
+  'chat.agentAutoApplyBadgeTitle':
+    'Agent のファイル変更は確認なしで適用されます（設定 → チャット）。削除とコマンド実行は従来どおり確認します。',
+  'chat.agentAutoApplied': '⚡ {count} 件の変更を自動適用しました（Undo で戻せます）。',
+  'chat.agentAutoApplySkippedDeletes':
+    '削除を含むため自動適用せず、プレビュー承認待ちにしました。',
   'chat.agentWaitingExecApproval': '危険なコマンドの実行承認待ち',
   'chat.agentAllowExec': '実行を許可',
   'chat.agentDenyExec': '拒否',
@@ -1057,6 +1067,9 @@ export const en: Record<MessageKey, string> = {
   'settings.autoOpenAgentPreview': 'Auto-open Agent changes in editor',
   'settings.autoOpenAgentPreviewHint':
     'When on, Agent file proposals open immediately in the editor preview. When off, open the target file from the explorer to review.',
+  'settings.autoApplyAgentWrites': 'Auto-apply Agent file changes',
+  'settings.autoApplyAgentWritesHint':
+    'When on, Agent file proposals apply without preview approval. Proposals that include deletes, and command execution, still need confirmation. You can Undo.',
   'settings.terminal': 'Terminal',
   'settings.defaultShell': 'Default shell',
   'settings.defaultShellHint': 'Shell used when opening a new terminal',
@@ -1599,6 +1612,13 @@ export const en: Record<MessageKey, string> = {
   'chat.agentToolBlocked': 'blocked',
   'chat.agentToolError': 'failed',
   'chat.agentWaitingApproval': 'Waiting for approval (review the preview)',
+  'chat.agentAutoApplying': 'Auto-applying changes…',
+  'chat.agentAutoApplyBadge': 'Auto-apply ON',
+  'chat.agentAutoApplyBadgeTitle':
+    'Agent file changes apply without preview approval (Settings → Chat). Deletes and command execution still need confirmation.',
+  'chat.agentAutoApplied': '⚡ Auto-applied {count} change(s). You can Undo.',
+  'chat.agentAutoApplySkippedDeletes':
+    'Skipped auto-apply because the proposal includes deletes; waiting for preview approval.',
   'chat.agentWaitingExecApproval': 'Waiting to approve a risky command',
   'chat.agentAllowExec': 'Allow once',
   'chat.agentDenyExec': 'Deny',
