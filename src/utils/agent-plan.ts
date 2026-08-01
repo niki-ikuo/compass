@@ -233,6 +233,19 @@ export function formatInitialTodoPlanNudge(): string {
   return t('ai.agentInitialTodoPlanNudge')
 }
 
+/** Soft nudge when a plan-first ask got an overly coarse checklist (≤3 items). */
+export function formatCoarseTodoPlanNudge(todoCount: number): string {
+  return t('ai.agentCoarseTodoPlanNudge', { count: Math.max(0, todoCount) })
+}
+
+/** Non-cancelled todos — used to judge checklist coarseness. */
+export function countActiveTodos(state: AgentPlanState): number {
+  return state.todos.filter((item) => item.status !== 'cancelled').length
+}
+
+/** Plans at or below this active-todo count are treated as coarse for non-trivial asks. */
+export const COARSE_PLAN_ACTIVE_TODO_MAX = 3
+
 /**
  * Text-only finish (or tool rounds that skipped planning) should still force updateTodo
  * on plan-first asks before proposeActions nudges take over.
@@ -247,6 +260,27 @@ export function shouldNudgeMissingTodoPlan(options: {
   if (options.updateTodoCalledThisRun) return false
   if (options.alreadyNudging) return true
   return shouldPlanFirstAgentTask(options.userText)
+}
+
+/**
+ * Soft nudge when updateTodo produced a too-coarse checklist for a substantial ask.
+ * Skips tiny one-liners (shouldPlanFirst false) and short single-clause edits under 60 chars
+ * unless the ask already looks multi-part.
+ */
+export function shouldNudgeCoarseTodoPlan(options: {
+  userText: string
+  activeTodoCount: number
+  updateTodoCalledThisRun: boolean
+  alreadyNudging: boolean
+}): boolean {
+  if (!options.updateTodoCalledThisRun) return false
+  if (options.activeTodoCount <= 0) return false
+  if (options.activeTodoCount > COARSE_PLAN_ACTIVE_TODO_MAX) return false
+  if (options.alreadyNudging) return true
+  if (!shouldPlanFirstAgentTask(options.userText)) return false
+  const trimmed = options.userText.trim()
+  if (looksLikeMultiPartAgentTask(trimmed)) return true
+  return trimmed.length >= 60
 }
 
 /**

@@ -59,8 +59,11 @@ import {
   sanitizeCheckpointArgs,
   sanitizeUpdateTodoArgs,
   countOpenTodos,
+  countActiveTodos,
+  formatCoarseTodoPlanNudge,
   formatInitialTodoPlanNudge,
   shouldPlanFirstAgentTask,
+  shouldNudgeCoarseTodoPlan,
   shouldNudgeMissingProposeActions,
   shouldNudgeMissingTodoPlan,
   type AgentPlanState
@@ -132,6 +135,8 @@ const MAX_PRIOR_STEP_OBSERVATION_CHARS = 3_000
 const MAX_OPEN_TODO_NUDGES = 2
 /** multi-part なのに updateTodo 未使用の再促し上限 */
 const MAX_MISSING_TODO_PLAN_NUDGES = 2
+/** 粗い計画（≤3）への再分解促し上限（1ラン1回） */
+const MAX_COARSE_TODO_PLAN_NUDGES = 1
 /** text-only 終了時に proposeActions 欠落／途中切れの再促し上限 */
 const MAX_PROPOSE_ACTIONS_NUDGES = 2
 
@@ -368,18 +373,23 @@ const AGENT_TOOLS = [
     function: {
       name: 'updateTodo',
       description:
-        'Maintain an explicit checklist for multi-step work and multi-ask user messages. Call early: when the user has multiple discrete requests, list each one before other work; then update statuses as you progress (especially before hitting turn/tool limits). Do not finish with text while any item is pending or in_progress. Pass todos as a JSON array of { id, content, status }. status is pending | in_progress | done | cancelled. Default replaces the full list; set merge=true to patch by id.',
+        'Maintain an explicit medium-granularity checklist for multi-step work and multi-ask user messages. Call early for non-trivial asks (about 5–12 verifiable items; avoid coarse phase-only labels like investigate/implement/test, and avoid over-splitting). Include acceptance-criteria clarification when unclear. Update statuses as you progress (especially before turn/tool limits); after investigation changes assumptions, revise with merge=true. Do not finish with text while any item is pending or in_progress. Pass todos as a JSON array of { id, content, status }. status is pending | in_progress | done | cancelled. Default replaces the full list; set merge=true to patch by id.',
       parameters: {
         type: 'object',
         properties: {
           todos: {
             type: 'array',
-            description: 'Checklist items',
+            description:
+              'Checklist items. Prefer 5–12 for non-trivial work; each content should be a verifiable outcome.',
             items: {
               type: 'object',
               properties: {
                 id: { type: 'string', description: 'Stable item id' },
-                content: { type: 'string', description: 'Short task description' },
+                content: {
+                  type: 'string',
+                  description:
+                    'Verifiable task (outcome-oriented). Prefer naming what to inspect, change, or check—not vague phase labels alone.'
+                },
                 status: {
                   type: 'string',
                   enum: ['pending', 'in_progress', 'done', 'cancelled']
@@ -1697,6 +1707,7 @@ export async function runAgent(webContents: WebContents, request: ChatRequest): 
     let turn = 0
     let openTodoNudges = 0
     let missingTodoPlanNudges = 0
+    let coarseTodoPlanNudges = 0
     let updateTodoCalledThisRun = false
     let proposeActionsNudges = 0
     let proposeActionsApplied = false
@@ -1765,20 +1776,6 @@ export async function runAgent(webContents: WebContents, request: ChatRequest): 
       recordChatCompletionUsageFireAndForget(turnResult.usage)
 
       if (turnResult.toolCalls.length === 0) {
-        if (openTodoNudges < MAX_OPEN_TODO_NUDGES) {
-          const openTodoNudge = formatOpenTodosNudge(plan)
-          if (openTodoNudge) {
-            openTodoNudges++
-            apiMessages.push({
-              role: 'assistant',
-              content: turnResult.content || null
-            })
-            apiMessages.push({ role: 'user', content: openTodoNudge })
-            turn++
-            continue
-          }
-        }
-
         // Prefer planning before proposeActions nudges on multi-part asks.
         // Otherwise the proposeActions nudge steers the model to skip updateTodo.
         const needsTodoPlan = shouldNudgeMissingTodoPlan({
@@ -1796,6 +1793,42 @@ export async function runAgent(webContents: WebContents, request: ChatRequest): 
           apiMessages.push({ role: 'user', content: formatInitialTodoPlanNudge() })
           turn++
           continue
+        }
+
+        // Coarse checklist (≤3) on a substantial ask: ask once to re-split before
+        // open-todo "keep working" so the model refines granularity first.
+        const needsCoarsePlan = shouldNudgeCoarseTodoPlan({
+          userText: latestUserText,
+          activeTodoCount: countActiveTodos(plan),
+          updateTodoCalledThisRun,
+          alreadyNudging: coarseTodoPlanNudges > 0
+        })
+        if (needsCoarsePlan && coarseTodoPlanNudges < MAX_COARSE_TODO_PLAN_NUDGES) {
+          coarseTodoPlanNudges++
+          apiMessages.push({
+            role: 'assistant',
+            content: turnResult.content || null
+          })
+          apiMessages.push({
+            role: 'user',
+            content: formatCoarseTodoPlanNudge(countActiveTodos(plan))
+          })
+          turn++
+          continue
+        }
+
+        if (openTodoNudges < MAX_OPEN_TODO_NUDGES) {
+          const openTodoNudge = formatOpenTodosNudge(plan)
+          if (openTodoNudge) {
+            openTodoNudges++
+            apiMessages.push({
+              role: 'assistant',
+              content: turnResult.content || null
+            })
+            apiMessages.push({ role: 'user', content: openTodoNudge })
+            turn++
+            continue
+          }
         }
 
         if (
@@ -1977,6 +2010,21 @@ export async function runAgent(webContents: WebContents, request: ChatRequest): 
       ) {
         missingTodoPlanNudges++
         apiMessages.push({ role: 'user', content: formatInitialTodoPlanNudge() })
+      } else if (
+        coarseTodoPlanNudges < MAX_COARSE_TODO_PLAN_NUDGES &&
+        shouldNudgeCoarseTodoPlan({
+          userText: latestUserText,
+          activeTodoCount: countActiveTodos(plan),
+          updateTodoCalledThisRun,
+          alreadyNudging: coarseTodoPlanNudges > 0
+        })
+      ) {
+        // updateTodo produced a too-coarse plan — ask once to re-split before more work.
+        coarseTodoPlanNudges++
+        apiMessages.push({
+          role: 'user',
+          content: formatCoarseTodoPlanNudge(countActiveTodos(plan))
+        })
       }
 
       turn++
