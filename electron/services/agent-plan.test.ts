@@ -23,7 +23,9 @@ import {
   shouldNudgeMissingProposeActions,
   shouldNudgeMissingTodoPlan,
   shouldPlanFirstAgentTask,
-  shouldShowAgentPlanPanel
+  shouldShowAgentPlanPanel,
+  looksLikeVaguePhaseTodo,
+  shouldHintCoarseAgentPlan
 } from './agent-plan'
 
 describe('applyUpdateTodo', () => {
@@ -178,6 +180,69 @@ describe('shouldShowAgentPlanPanel', () => {
     expect(
       shouldShowAgentPlanPanel(plan, [{ name: 'readFile', status: 'done' }])
     ).toBe(true)
+  })
+
+  it('still shows short open plans (1–3 items) — never hide by count', () => {
+    const plan = createAgentPlanState()
+    applyUpdateTodo(plan, {
+      todos: [{ id: '1', content: 'Fix typo in README.md', status: 'pending' }]
+    })
+    expect(
+      shouldShowAgentPlanPanel(plan, [{ name: 'readFile', status: 'done' }])
+    ).toBe(true)
+
+    applyUpdateTodo(plan, {
+      todos: [
+        { id: '1', content: '調査', status: 'pending' },
+        { id: '2', content: '実装', status: 'pending' },
+        { id: '3', content: 'テスト', status: 'pending' }
+      ]
+    })
+    expect(
+      shouldShowAgentPlanPanel(plan, [{ name: 'search', status: 'done' }])
+    ).toBe(true)
+  })
+})
+
+describe('looksLikeVaguePhaseTodo / shouldHintCoarseAgentPlan', () => {
+  it('detects phase-only labels and skips concrete outcomes', () => {
+    expect(looksLikeVaguePhaseTodo('調査')).toBe(true)
+    expect(looksLikeVaguePhaseTodo('implement')).toBe(true)
+    expect(looksLikeVaguePhaseTodo('テストする')).toBe(true)
+    expect(looksLikeVaguePhaseTodo('Fix typo in README.md')).toBe(false)
+    expect(
+      looksLikeVaguePhaseTodo('ChatPanel の計画パネル表示を直す')
+    ).toBe(false)
+  })
+
+  it('hints only when open items are mostly vague phases', () => {
+    const vague = createAgentPlanState()
+    applyUpdateTodo(vague, {
+      todos: [
+        { id: '1', content: '調査', status: 'pending' },
+        { id: '2', content: '実装', status: 'in_progress' },
+        { id: '3', content: 'テスト', status: 'pending' }
+      ]
+    })
+    expect(shouldHintCoarseAgentPlan(vague)).toBe(true)
+
+    const concrete = createAgentPlanState()
+    applyUpdateTodo(concrete, {
+      todos: [
+        { id: '1', content: 'Fix typo in README.md', status: 'pending' },
+        { id: '2', content: 'Update helps/ja/ai/agent.md', status: 'pending' }
+      ]
+    })
+    expect(shouldHintCoarseAgentPlan(concrete)).toBe(false)
+
+    const settled = createAgentPlanState()
+    applyUpdateTodo(settled, {
+      todos: [
+        { id: '1', content: '調査', status: 'done' },
+        { id: '2', content: '実装', status: 'done' }
+      ]
+    })
+    expect(shouldHintCoarseAgentPlan(settled)).toBe(false)
   })
 })
 

@@ -2266,6 +2266,10 @@ body:has(.monaco-editor .find-widget.visible) .workbench-hover-container .action
   background: var(--bg-secondary);
 }
 
+.agent-plan-panel.is-coarse {
+  border-color: color-mix(in srgb, var(--warning, #b08900) 45%, var(--border));
+}
+
 .agent-plan-header {
   display: flex;
   align-items: baseline;
@@ -2285,6 +2289,14 @@ body:has(.monaco-editor .find-widget.visible) .workbench-hover-container .action
 .agent-plan-progress {
   font-size: 11px;
   color: var(--text-secondary);
+}
+
+.agent-plan-coarse-hint {
+  margin: 0 0 6px;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--text-secondary);
+  opacity: 0.92;
 }
 
 .agent-plan-checkpoint {

@@ -590,6 +590,8 @@ export const ja = {
   'chat.agentStepsSummaryWarning': '要更新 {count}',
   'chat.agentPlan': '計画',
   'chat.agentPlanProgress': '{done}/{total} 完了（残り {open}）',
+  'chat.agentPlanCoarseHint':
+    '項目が粗い可能性があります。対象や完了条件が分かる単位だと追いやすくなります。',
   'chat.agentToolName.readFile': 'ファイルを読む',
   'chat.agentToolName.listDir': 'フォルダを一覧',
   'chat.agentToolName.search': '検索',
@@ -1594,6 +1596,8 @@ export const en: Record<MessageKey, string> = {
   'chat.agentStepsSummaryWarning': '{count} need refresh',
   'chat.agentPlan': 'Plan',
   'chat.agentPlanProgress': '{done}/{total} done ({open} left)',
+  'chat.agentPlanCoarseHint':
+    'This plan may be too coarse. Items that name a target and a done condition are easier to follow.',
   'chat.agentToolName.readFile': 'Read file',
   'chat.agentToolName.listDir': 'List folder',
   'chat.agentToolName.search': 'Search',

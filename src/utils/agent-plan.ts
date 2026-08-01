@@ -446,6 +446,7 @@ export function formatAgentPlanForModel(state: AgentPlanState): string | null {
  * Whether the chat Plan panel should render for this assistant message.
  * Open todos stay visible across follow-up tool turns; fully settled plans
  * only show on the message that last called updateTodo / checkpoint.
+ * Low todo counts (1–3) are still shown — never hide by length alone.
  */
 export function shouldShowAgentPlanPanel(
   plan: AgentPlanState,
@@ -459,6 +460,49 @@ export function shouldShowAgentPlanPanel(
       step.status !== 'error' &&
       step.ok !== false
   )
+}
+
+/**
+ * Todo content that is only a coarse phase label (investigate / implement / test, etc.)
+ * without a concrete target. Used for a soft UI hint — not a hard block.
+ */
+export function looksLikeVaguePhaseTodo(content: string): boolean {
+  const trimmed = content.trim()
+  if (!trimmed) return true
+
+  // Concrete cues: paths, mentions, code identifiers, quoted symbols.
+  if (
+    /(?:\.\w{1,12}\b|[/\\]|@\[|`[^`]+`|[A-Za-z][\w.-]*\.(?:ts|tsx|js|jsx|md|css|json)\b)/i.test(
+      trimmed
+    )
+  ) {
+    return false
+  }
+  // Longer outcome-oriented wording is usually specific enough.
+  if (trimmed.length > 36) return false
+
+  return /^(?:調査|実装|テスト|検証|確認|修正|変更|対応|設計|レビュー|分析|調査する|実装する|テストする|検証する)(?:する|します|をおこなう|を行う)?[.。！!]?$/i.test(
+    trimmed
+  ) ||
+    /^(?:investigate|implement(?:ation)?|test(?:ing)?|verify|verification|fix|change|review|design|analyze|analysis|plan)(?:\s+(?:it|code|the\s+code|files?|changes?))?[.!]?\s*$/i.test(
+      trimmed
+    )
+}
+
+/**
+ * Soft UI hint: open plan whose active items are mostly vague phase labels.
+ * Does not hide the panel; concrete short plans (even 1–3 items) return false.
+ */
+export function shouldHintCoarseAgentPlan(plan: AgentPlanState): boolean {
+  if (countOpenTodos(plan) === 0) return false
+  const active = plan.todos.filter((item) => item.status !== 'cancelled')
+  if (active.length === 0) return false
+
+  const vagueCount = active.filter((item) => looksLikeVaguePhaseTodo(item.content)).length
+  if (vagueCount === 0) return false
+  // All active items are phase-only, or a clear majority (≥2 and ≥60%).
+  if (vagueCount === active.length) return true
+  return vagueCount >= 2 && vagueCount >= Math.ceil(active.length * 0.6)
 }
 
 /** Rebuild plan from prior agentSteps (updateTodo / checkpoint calls in order). */

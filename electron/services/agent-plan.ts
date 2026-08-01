@@ -26,6 +26,8 @@ export {
   shouldNudgeMissingTodoPlan,
   shouldPlanFirstAgentTask,
   shouldShowAgentPlanPanel,
+  looksLikeVaguePhaseTodo,
+  shouldHintCoarseAgentPlan,
   type AgentPlanState,
   type AgentTodoItem,
   type AgentTodoStatus

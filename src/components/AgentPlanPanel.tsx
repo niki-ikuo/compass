@@ -1,6 +1,7 @@
 import {
   getOpenTodos,
   rebuildPlanFromSteps,
+  shouldHintCoarseAgentPlan,
   shouldShowAgentPlanPanel,
   type AgentPlanState,
   type AgentTodoItem
@@ -35,9 +36,13 @@ export function AgentPlanPanel({ steps, messageSteps = [] }: AgentPlanPanelProps
 
   const open = getOpenTodos(plan)
   const done = plan.todos.filter((todo) => todo.status === 'done').length
+  const showCoarseHint = shouldHintCoarseAgentPlan(plan)
 
   return (
-    <div className="agent-plan-panel" aria-label={t('chat.agentPlan')}>
+    <div
+      className={`agent-plan-panel${showCoarseHint ? ' is-coarse' : ''}`}
+      aria-label={t('chat.agentPlan')}
+    >
       <div className="agent-plan-header">
         <span className="agent-plan-title">{t('chat.agentPlan')}</span>
         {plan.todos.length > 0 && (
@@ -50,6 +55,11 @@ export function AgentPlanPanel({ steps, messageSteps = [] }: AgentPlanPanelProps
           </span>
         )}
       </div>
+      {showCoarseHint ? (
+        <div className="agent-plan-coarse-hint" role="note">
+          {t('chat.agentPlanCoarseHint')}
+        </div>
+      ) : null}
       {plan.checkpoint?.trim() ? (
         <div className="agent-plan-checkpoint" title={plan.checkpoint}>
           {plan.checkpoint}
