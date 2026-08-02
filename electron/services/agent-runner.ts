@@ -1359,6 +1359,11 @@ async function executeExec(
     signal,
     approvalGranted: risk.level === 'needs_approval'
   })
+  if (signal.aborted) {
+    const err = new Error('Aborted')
+    err.name = 'AbortError'
+    throw err
+  }
   return {
     ok: result.ok,
     summary: result.summary,

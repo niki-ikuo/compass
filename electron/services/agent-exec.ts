@@ -10,6 +10,8 @@ const DEFAULT_TIMEOUT_MS = 30_000
 const MAX_TIMEOUT_MS = 120_000
 const MAX_OUTPUT_CHARS = 64_000
 const MAX_COMMAND_CHARS = 4_000
+/** timeout/abort 後、close が来なくても Promise を解消する猶予 */
+const KILL_GRACE_MS = 1_500
 
 /**
  * 危険度:
@@ -248,6 +250,7 @@ type SpawnedShell = {
 /**
  * Windows: prefer Git Bash so POSIX commands (date, python, npm scripts) work.
  * Fall back to cmd.exe when Git Bash is unavailable.
+ * Unix: detached so the shell starts a new process group (tree kill via -pid).
  */
 function spawnShell(command: string, cwd: string): SpawnedShell {
   if (process.platform === 'win32') {
@@ -280,9 +283,58 @@ function spawnShell(command: string, cwd: string): SpawnedShell {
     child: spawn('/bin/sh', ['-c', command], {
       cwd,
       env: process.env,
-      stdio: ['ignore', 'pipe', 'pipe']
+      stdio: ['ignore', 'pipe', 'pipe'],
+      detached: true
     }) as unknown as ChildProcessWithoutNullStreams,
     shellLabel: '/bin/sh'
+  }
+}
+
+/**
+ * Kill the shell and its descendants.
+ * Windows: taskkill /T. Unix: process group (requires detached spawn).
+ */
+function killProcessTree(child: ChildProcessWithoutNullStreams): void {
+  const pid = child.pid
+  if (!pid) return
+
+  if (process.platform === 'win32') {
+    try {
+      spawn('taskkill', ['/pid', String(pid), '/T', '/F'], {
+        windowsHide: true,
+        stdio: 'ignore'
+      })
+    } catch {
+      try {
+        child.kill()
+      } catch {
+        // ignore
+      }
+    }
+    return
+  }
+
+  try {
+    process.kill(-pid, 'SIGKILL')
+  } catch {
+    try {
+      child.kill('SIGKILL')
+    } catch {
+      // ignore
+    }
+  }
+}
+
+function destroyChildStdio(child: ChildProcessWithoutNullStreams): void {
+  try {
+    child.stdout.destroy()
+  } catch {
+    // ignore
+  }
+  try {
+    child.stderr.destroy()
+  } catch {
+    // ignore
   }
 }
 
@@ -391,89 +443,37 @@ export async function runAgentExec(options: AgentExecOptions): Promise<AgentExec
     let child: ChildProcessWithoutNullStreams
     let shellLabel = 'unknown'
     let timer: ReturnType<typeof setTimeout> | undefined
+    let killGraceTimer: ReturnType<typeof setTimeout> | undefined
 
     const finish = (result: AgentExecResult): void => {
       if (settled) return
       settled = true
       options.signal.removeEventListener('abort', onAbort)
       if (timer) clearTimeout(timer)
+      if (killGraceTimer) clearTimeout(killGraceTimer)
       resolvePromise(result)
     }
 
-    const onAbort = (): void => {
-      killed = true
-      try {
-        child.kill()
-      } catch {
-        // ignore
-      }
-    }
-
-    try {
-      const spawned = spawnShell(command, cwdAbs)
-      child = spawned.child
-      shellLabel = spawned.shellLabel
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err)
-      finish({
-        ok: false,
-        exitCode: null,
-        timedOut: false,
-        killed: false,
-        denied: false,
-        risk,
-        cwd: cwdRel,
-        shell: shellLabel,
-        stdout: '',
-        stderr: '',
-        summary: message,
-        content: `Error: ${message}`
-      })
-      return
-    }
-
-    options.signal.addEventListener('abort', onAbort)
-
-    timer = setTimeout(() => {
-      timedOut = true
-      try {
-        child.kill()
-      } catch {
-        // ignore
-      }
-    }, timeoutMs)
-
-    child.stdout.setEncoding('utf8')
-    child.stderr.setEncoding('utf8')
-    child.stdout.on('data', (chunk: string) => {
-      if (stdout.length < MAX_OUTPUT_CHARS * 2) stdout += chunk
-    })
-    child.stderr.on('data', (chunk: string) => {
-      if (stderr.length < MAX_OUTPUT_CHARS * 2) stderr += chunk
-    })
-
-    child.on('error', (err) => {
-      const message = err.message
-      finish({
-        ok: false,
-        exitCode: null,
-        timedOut,
-        killed,
-        denied: false,
-        risk,
-        cwd: cwdRel,
-        shell: shellLabel,
-        stdout: truncateOutput(stdout).text,
-        stderr: truncateOutput(stderr).text,
-        summary: message,
-        content: `Error: ${message}`
-      })
-    })
-
-    child.on('close', (code) => {
+    const buildResult = (exitCode: number | null, errorMessage?: string): AgentExecResult => {
       const out = truncateOutput(stdout)
       const errOut = truncateOutput(stderr)
-      const exitCode = code
+      if (errorMessage) {
+        return {
+          ok: false,
+          exitCode: null,
+          timedOut,
+          killed,
+          denied: false,
+          risk,
+          cwd: cwdRel,
+          shell: shellLabel,
+          stdout: out.text,
+          stderr: errOut.text,
+          summary: errorMessage,
+          content: `Error: ${errorMessage}`
+        }
+      }
+
       const ok = !timedOut && !killed && exitCode === 0
       const flags = [
         timedOut ? 'timed out' : null,
@@ -506,7 +506,7 @@ export async function runAgentExec(options: AgentExecOptions): Promise<AgentExec
         .filter((line) => line !== null)
         .join('\n')
 
-      finish({
+      return {
         ok,
         exitCode,
         timedOut,
@@ -519,7 +519,82 @@ export async function runAgentExec(options: AgentExecOptions): Promise<AgentExec
         stderr: errOut.text,
         summary,
         content
+      }
+    }
+
+    const forceSettle = (): void => {
+      if (settled) return
+      destroyChildStdio(child)
+      try {
+        child.kill()
+      } catch {
+        // ignore
+      }
+      finish(buildResult(null))
+    }
+
+    const requestStop = (reason: 'timeout' | 'abort'): void => {
+      if (settled) return
+      if (reason === 'timeout') timedOut = true
+      if (reason === 'abort') killed = true
+      killProcessTree(child)
+      destroyChildStdio(child)
+      if (!killGraceTimer) {
+        killGraceTimer = setTimeout(forceSettle, KILL_GRACE_MS)
+      }
+    }
+
+    const onAbort = (): void => {
+      requestStop('abort')
+    }
+
+    try {
+      const spawned = spawnShell(command, cwdAbs)
+      child = spawned.child
+      shellLabel = spawned.shellLabel
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      finish({
+        ok: false,
+        exitCode: null,
+        timedOut: false,
+        killed: false,
+        denied: false,
+        risk,
+        cwd: cwdRel,
+        shell: shellLabel,
+        stdout: '',
+        stderr: '',
+        summary: message,
+        content: `Error: ${message}`
       })
+      return
+    }
+
+    options.signal.addEventListener('abort', onAbort)
+    if (options.signal.aborted) {
+      requestStop('abort')
+    }
+
+    timer = setTimeout(() => {
+      requestStop('timeout')
+    }, timeoutMs)
+
+    child.stdout.setEncoding('utf8')
+    child.stderr.setEncoding('utf8')
+    child.stdout.on('data', (chunk: string) => {
+      if (stdout.length < MAX_OUTPUT_CHARS * 2) stdout += chunk
+    })
+    child.stderr.on('data', (chunk: string) => {
+      if (stderr.length < MAX_OUTPUT_CHARS * 2) stderr += chunk
+    })
+
+    child.on('error', (err) => {
+      finish(buildResult(null, err.message))
+    })
+
+    child.on('close', (code) => {
+      finish(buildResult(code))
     })
   })
 }
