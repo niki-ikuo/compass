@@ -616,6 +616,7 @@ body.is-resizing-panels iframe {
   display: flex;
   flex-shrink: 0;
   align-items: center;
+  justify-content: center;
   gap: 2px;
   padding: 4px 6px;
   border-bottom: 1px solid var(--border);
@@ -625,19 +626,13 @@ body.is-resizing-panels iframe {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 5px;
-  flex: 1;
-  min-width: 0;
+  width: 28px;
   height: 26px;
-  padding: 0 8px;
+  padding: 0;
   border: none;
   border-radius: 4px;
   background: transparent;
   color: var(--text-secondary);
-  font-family: var(--font-ui);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.2px;
   cursor: pointer;
 }
 
@@ -645,12 +640,6 @@ body.is-resizing-panels iframe {
   width: 14px;
   height: 14px;
   flex-shrink: 0;
-}
-
-.left-sidebar-view-btn span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .left-sidebar-view-btn:hover:not(:disabled) {
@@ -767,21 +756,52 @@ body.is-resizing-panels iframe {
   display: flex;
   align-items: center;
   justify-content: center;
+  width: 100%;
 }
 
 .file-tree-header.panel-header {
-  padding: 6px 8px;
+  padding: 4px 6px;
+  font-size: inherit;
+  font-weight: inherit;
+  text-transform: none;
+  letter-spacing: normal;
 }
 
 .file-tree-toolbar {
   display: flex;
   align-items: center;
   justify-content: center;
+  width: 100%;
   gap: 2px;
 }
 
-/* Explorer-aligned toolbar icon buttons (size + hover) */
-.file-tree-toolbar .btn-icon,
+/* Explorer-aligned toolbar icon buttons (match left-sidebar-view-btn) */
+.file-tree-toolbar .btn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 26px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  line-height: 1;
+}
+
+.file-tree-toolbar .btn-icon svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+.file-tree-toolbar .btn-icon:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
 .chat-header-actions .btn-icon,
 .terminal-new-btn,
 .terminal-panel-btn {
@@ -799,7 +819,6 @@ body.is-resizing-panels iframe {
   line-height: 1;
 }
 
-.file-tree-toolbar .btn-icon:hover:not(:disabled),
 .chat-header-actions .btn-icon:hover:not(:disabled),
 .terminal-new-btn:hover:not(:disabled),
 .terminal-panel-btn:hover:not(:disabled) {

@@ -36,7 +36,6 @@ export function LeftSidebar() {
           onClick={() => setLeftSidebarView('explorer')}
         >
           <ExplorerIcon />
-          <span>{t('sidebar.explorer')}</span>
         </button>
         <button
           type="button"
@@ -49,7 +48,6 @@ export function LeftSidebar() {
           onClick={() => openOutlinePanel()}
         >
           <OutlineIcon />
-          <span>{t('sidebar.outline')}</span>
         </button>
         <button
           type="button"
@@ -62,7 +60,6 @@ export function LeftSidebar() {
           onClick={() => openSearchPanel()}
         >
           <SearchIcon />
-          <span>{t('sidebar.search')}</span>
         </button>
         <button
           type="button"
@@ -75,7 +72,6 @@ export function LeftSidebar() {
           onClick={() => openGitPanel()}
         >
           <GitIcon />
-          <span>{t('sidebar.git')}</span>
         </button>
         <button
           type="button"
@@ -88,7 +84,6 @@ export function LeftSidebar() {
           onClick={() => openDeskPanel()}
         >
           <DeskIcon />
-          <span>{t('sidebar.desk')}</span>
         </button>
       </div>
       <div className="left-sidebar-body">
