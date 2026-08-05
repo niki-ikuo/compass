@@ -129,6 +129,8 @@ function prepareXtermTextarea(terminal: Terminal): HTMLTextAreaElement | null {
   textarea.style.caretColor = 'transparent'
   textarea.style.background = 'transparent'
   textarea.style.border = 'none'
+  textarea.style.outline = 'none'
+  textarea.style.boxShadow = 'none'
   textarea.style.zIndex = '10'
   textarea.style.pointerEvents = 'auto'
   textarea.tabIndex = 0
@@ -212,7 +214,7 @@ function TerminalInstance({
     const terminal = new Terminal({
       cursorBlink: true,
       cursorStyle: 'block',
-      cursorInactiveStyle: 'outline',
+      cursorInactiveStyle: 'block',
       // xterm handles keys via onData; IME commits via compositionend (deduped below).
       disableStdin: false,
       fontFamily:

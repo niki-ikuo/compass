@@ -5304,15 +5304,26 @@ body.is-resizing-terminal iframe {
 
 /*
  * Helper textarea: opaque enough for Windows IME; hide ink with transparent color.
+ * Suppress focus ring — it sits on the cell and looks like a cursor outline.
  */
 .terminal-instance .xterm-helper-textarea {
   opacity: 1 !important;
   color: transparent !important;
   caret-color: transparent !important;
+  outline: none !important;
+  border: none !important;
+  box-shadow: none !important;
   z-index: 10 !important;
   pointer-events: auto !important;
   min-width: 8px !important;
   min-height: 16px !important;
+}
+
+.terminal-instance .xterm-helper-textarea:focus,
+.terminal-instance .xterm-helper-textarea:focus-visible {
+  outline: none !important;
+  border: none !important;
+  box-shadow: none !important;
 }
 
 .terminal-empty {
