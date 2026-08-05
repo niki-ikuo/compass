@@ -952,7 +952,7 @@ export const ja = {
   'ai.editModeReminder':
     '[Editモード] ファイル変更は通常のコードブロックではなく、必ず```compass-actions```のJSONのみで返してください。既存ファイルは applyPatch（unified diff の @@ hunk。*** Begin Patch 禁止。同一ファイルは1パッチ）を優先。',
   'ai.agentModeReminder':
-    '[Agentモード] readFile / listDir / search / searchMeaning で調査（意味・トピックは searchMeaning）、変更は必ず proposeActions ツール（チャットや compass-actions では不可。actions は配列。既存ファイルは applyPatch＝unified diff の @@ hunkのみ、*** Begin Patch 禁止、同一ファイルは1パッチ。新規・短い全置換は writeFile。途中切れは1ファイルずつ再提案）。適用後は verify（test/lint/typecheck）→失敗なら再提案のループ。スクリプト無しのスキップは最終回答で触れない。verify 不可時のみ exec（短命・ワークスペース内。破壊的コマンドは拒否／書き込み系は承認）。複数依頼や長めのタスクは先に updateTodo で成果物単位（目安3〜5、上限8、検証可能な項目）に分解し、受け入れ条件が不明なら実装前に確認する。pending が残る間は終了しない（checkpoint / remember も活用。調査後は計画更新可）。関連変更は1提案、無関係・大規模は proposeActions を分割。同じファイルの再読はキャッシュされる（force=true で再取得）。パスは相対、ルートは "."。',
+    '[Agentモード] readFile / listDir / search / searchMeaning で調査（意味・トピックは searchMeaning）、変更は必ず proposeActions ツール（チャットや compass-actions では不可。actions は配列。既存ファイルは applyPatch＝unified diff の @@ hunkのみ、*** Begin Patch 禁止、同一ファイルは1パッチ。hunk 不一致時は force=true で再読してから新規パッチ、同一 hunk の連打禁止、繰り返し失敗時は writeFile。新規・短い全置換は writeFile。途中切れは1ファイルずつ再提案）。適用後は verify（test/lint/typecheck）→失敗なら再提案のループ。スクリプト無しのスキップは最終回答で触れない。verify 不可時のみ exec（短命・ワークスペース内。破壊的コマンドは拒否／書き込み系は承認）。複数依頼や長めのタスクは先に updateTodo で成果物単位（目安3〜5、上限8、検証可能な項目）に分解し、受け入れ条件が不明なら実装前に確認する。pending が残る間は終了しない（checkpoint / remember も活用。調査後は計画更新可）。関連変更は1提案、無関係・大規模は proposeActions を分割。同じファイルの再読はキャッシュされる（force=true で再取得）。パスは相対、ルートは "."。',
   'ai.responseLanguage':
     'ユーザー向けの説明・最終回答は必ず日本語で書いてください。コード識別子・パス・ツール名・JSONキーはそのままで構いません。英語のツール指示やコードがあっても、ユーザーへの返答言語は日本語のままにしてください。',
   'ai.agentInitialTodoPlanNudge':
@@ -965,6 +965,12 @@ export const ja = {
     '[Agent] ファイル変更の依頼なのに proposeActions が呼ばれていません。まだ終了しないでください。\nチャット本文や ```compass-actions``` / actions JSON に変更を書いてもプレビューも適用もされません。\n必ず proposeActions ツールを呼び、actions を JSON 配列で渡してください（既存ファイルは短い applyPatch）。ユーザーがプレビュー承認するまで適用されません。',
   'ai.agentTruncatedProposeActionsNudge':
     '[Agent] 直前の proposeActions は途中切れのためプレビューされていません。まだ終了しないでください。\n1ファイルずつ・短い applyPatch hunk だけでもう一度 proposeActions を呼んでください。大きな writeFile や複数ファイルの一括提案は避けてください。',
+  'ai.agentPatchMismatchForceReread':
+    '[Agent] applyPatch が現在のファイル内容と一致しませんでした（{paths}）。\n同じパッチを再送しないでください。先に readFile を force=true で呼び、ディスク上の最新内容を読んでから、新しい applyPatch を作ってください。',
+  'ai.agentPatchMismatchWriteFileFallback':
+    '[Agent] {paths} への applyPatch が繰り返し失敗しています。\nこれ以上 applyPatch を試さず、readFile（force=true）の後に writeFile で正しい全文を提案してください。',
+  'ai.agentPatchSameHunkBlocked':
+    '[Agent] 同じ applyPatch（同一 hunk）の再送は拒否しました（{paths}）。\nreadFile を force=true で呼び直してから、異なるパッチを作るか、writeFile で全文を提案してください。',
   'ai.agentPlanHeader':
     '[Agent 計画チェックポイント — 一時停止や Continue 後の向きを戻す。この計画に従い、進捗に応じて updateTodo / checkpoint で更新してください。]',
   'ai.agentPlanResumeSummary': '再開要約:',
@@ -1943,7 +1949,7 @@ export const en: Record<MessageKey, string> = {
   'ai.editModeReminder':
     '[Edit mode] Return file changes only as ```compass-actions``` JSON, not as normal code blocks. Prefer applyPatch (unified-diff @@ hunks; never *** Begin Patch; one patch per file) for existing files.',
   'ai.agentModeReminder':
-    '[Agent mode] Inspect with readFile / listDir / search / searchMeaning (prefer searchMeaning for topic/meaning); file changes must use the proposeActions tool only (never chat / compass-actions; actions must be an array; prefer applyPatch with unified-diff @@ hunks only—never *** Begin Patch—one patch per file; writeFile for new/tiny files; on truncation re-propose one file at a time); after apply, verify (test/lint/typecheck) then re-propose on failure; if verify only skips for missing scripts, omit that from the final reply. Prefer verify over exec for those checks (exec is short-lived, inside workspace; wipe commands blocked; writes need approval). For multiple asks or longer tasks, split with updateTodo into a short outcome-level checklist first (about 3–5 verifiable deliverables, hard max 8; clarify acceptance criteria before implementing if unclear; avoid micro-step over-splitting) and do not finish while todos remain pending (also use checkpoint + remember; revise the plan after investigation). Batch related edits; split unrelated/large proposeActions. Re-reads may be cached (force=true to reload). Paths are relative; root is ".".',
+    '[Agent mode] Inspect with readFile / listDir / search / searchMeaning (prefer searchMeaning for topic/meaning); file changes must use the proposeActions tool only (never chat / compass-actions; actions must be an array; prefer applyPatch with unified-diff @@ hunks only—never *** Begin Patch—one patch per file; on hunk mismatch re-read with force=true then craft a new patch—identical hunk retries are blocked; after repeated mismatches fall back to writeFile; writeFile for new/tiny files; on truncation re-propose one file at a time); after apply, verify (test/lint/typecheck) then re-propose on failure; if verify only skips for missing scripts, omit that from the final reply. Prefer verify over exec for those checks (exec is short-lived, inside workspace; wipe commands blocked; writes need approval). For multiple asks or longer tasks, split with updateTodo into a short outcome-level checklist first (about 3–5 verifiable deliverables, hard max 8; clarify acceptance criteria before implementing if unclear; avoid micro-step over-splitting) and do not finish while todos remain pending (also use checkpoint + remember; revise the plan after investigation). Batch related edits; split unrelated/large proposeActions. Re-reads may be cached (force=true to reload). Paths are relative; root is ".".',
   'ai.responseLanguage':
     'Write user-facing explanations and final replies in English. Code identifiers, paths, tool names, and JSON keys may stay as-is. Even if tool instructions or code are mixed in, keep the reply language English for the user.',
   'ai.agentInitialTodoPlanNudge':
@@ -1956,6 +1962,12 @@ export const en: Record<MessageKey, string> = {
     '[Agent] This looks like a file-change request, but proposeActions was not called. Do not finish yet.\nWriting changes in chat (or as ```compass-actions``` / actions JSON) does not open preview and is never applied.\nCall the proposeActions tool with `actions` as a JSON array (prefer small applyPatch for existing files). Changes apply only after the user approves the preview.',
   'ai.agentTruncatedProposeActionsNudge':
     '[Agent] The previous proposeActions call was truncated and was not shown in preview. Do not finish yet.\nCall proposeActions again with one file at a time and small applyPatch hunks only. Avoid large writeFile payloads and multi-file batches.',
+  'ai.agentPatchMismatchForceReread':
+    '[Agent] applyPatch did not match the current file contents ({paths}).\nDo not resend the same patch. Call readFile with force=true, read the latest disk contents, then craft a new applyPatch.',
+  'ai.agentPatchMismatchWriteFileFallback':
+    '[Agent] applyPatch keeps failing for {paths}.\nStop retrying applyPatch. After readFile with force=true, propose writeFile with the full corrected file contents.',
+  'ai.agentPatchSameHunkBlocked':
+    '[Agent] Rejected a repeat of the same applyPatch/hunk ({paths}).\nCall readFile with force=true, then either craft a different patch or propose writeFile with the full file.',
   'ai.agentPlanHeader':
     '[Agent plan checkpoint — restore orientation after a pause or Continue. Follow this plan; update with updateTodo / checkpoint as you progress.]',
   'ai.agentPlanResumeSummary': 'Resume summary:',

@@ -4,6 +4,7 @@ import {
   getAgentStepStatusLabelKey,
   getAgentStepTone,
   getApplyErrorTone,
+  isPatchMismatchMessage,
   isVerifyUnavailable
 } from './apply-error'
 
@@ -12,6 +13,13 @@ describe('apply-error tone helpers', () => {
     expect(
       getApplyErrorTone('Failed to locate hunk context near line 1: "async function main()"')
     ).toBe('warning')
+    expect(
+      isPatchMismatchMessage('Failed to locate hunk context near line 1: "async function main()"')
+    ).toBe(true)
+    expect(isPatchMismatchMessage('Hunk context matched 3 locations (ambiguous) near line 2')).toBe(
+      true
+    )
+    expect(isPatchMismatchMessage('actions must be a non-empty array')).toBe(false)
   })
 
   it('treats verify unavailable as skipped warning', () => {

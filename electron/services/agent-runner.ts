@@ -86,6 +86,12 @@ import {
   type AgentReadCache
 } from './agent-read-cache'
 import {
+  createPatchRetryState,
+  getIdenticalPatchBlockMessage,
+  recordPatchMismatchFailure,
+  type PatchRetryState
+} from '../../src/utils/agent-patch-retry'
+import {
   getVerifyAfterApplyNudge,
   normalizeVerifyChecks,
   runAgentVerify
@@ -254,7 +260,7 @@ const AGENT_TOOLS = [
     function: {
       name: 'proposeActions',
       description:
-        'Propose workspace file/folder changes for the user to preview and approve. Paths must be relative to the workspace root. Changes are NOT applied until the user approves. Pass `actions` as a real JSON array (never a stringified JSON blob). Prefer applyPatch (unified diff with @@ -start,count +start,count @@ hunks) for edits to existing files—send only the changed hunks, not the whole file. For Markdown section rewrites, prefer replaceSection (path + heading + section content) so other chapters stay untouched. Never use Cursor/OpenAI *** Begin Patch / *** Update File: wrappers. Combine all edits to the same file into one applyPatch action (or one replaceSection per heading). Use writeFile for new files or tiny full rewrites. Truncated writeFile/applyPatch/replaceSection payloads are rejected.',
+        'Propose workspace file/folder changes for the user to preview and approve. Paths must be relative to the workspace root. Changes are NOT applied until the user approves. Pass `actions` as a real JSON array (never a stringified JSON blob). Prefer applyPatch (unified diff with @@ -start,count +start,count @@ hunks) for edits to existing files—send only the changed hunks, not the whole file. If applyPatch fails with hunk mismatch: call readFile with force=true on that path, then craft a new patch—never resend the identical failed hunk. After repeated mismatches on the same path, fall back to writeFile with full contents. For Markdown section rewrites, prefer replaceSection (path + heading + section content) so other chapters stay untouched. Never use Cursor/OpenAI *** Begin Patch / *** Update File: wrappers. Combine all edits to the same file into one applyPatch action (or one replaceSection per heading). Use writeFile for new files or tiny full rewrites. Truncated writeFile/applyPatch/replaceSection payloads are rejected.',
       parameters: {
         type: 'object',
         properties: {
@@ -1195,6 +1201,37 @@ function summarizeProposeActionsRejection(detail: string): string {
   return applyFailedLine.replace(/^Apply failed:\s*/i, '').trim() || 'Apply failed — re-propose'
 }
 
+function enrichPatchMismatchResult(
+  patchRetry: PatchRetryState | undefined,
+  readCache: AgentReadCache | undefined,
+  actions: WorkspaceAction[],
+  message: string,
+  contentPrefix: string
+): { summary: string; content: string } {
+  const guidance =
+    patchRetry != null ? recordPatchMismatchFailure(patchRetry, actions, message) : null
+  if (guidance && readCache) {
+    invalidateCachedPaths(
+      readCache,
+      actions
+        .map((a) => a.path)
+        .filter((p): p is string => typeof p === 'string' && p.trim().length > 0)
+    )
+  }
+  if (!guidance) {
+    return {
+      summary: message,
+      content: contentPrefix ? `${contentPrefix}${message}` : message
+    }
+  }
+  return {
+    summary: message,
+    content: contentPrefix
+      ? `${contentPrefix}${message}\n\n${guidance}`
+      : `${message}\n\n${guidance}`
+  }
+}
+
 async function executeProposeActions(
   webContents: WebContents,
   chatId: string,
@@ -1202,7 +1239,9 @@ async function executeProposeActions(
   callId: string,
   args: Record<string, unknown>,
   signal: AbortSignal,
-  preset?: import('../../src/types').UseCasePreset | null
+  preset?: import('../../src/types').UseCasePreset | null,
+  patchRetry?: PatchRetryState,
+  readCache?: AgentReadCache
 ): Promise<{
   ok: boolean
   summary: string
@@ -1241,12 +1280,38 @@ async function executeProposeActions(
     }
   }
 
+  if (patchRetry) {
+    const blocked = getIdenticalPatchBlockMessage(patchRetry, normalized)
+    if (blocked) {
+      if (readCache) {
+        invalidateCachedPaths(
+          readCache,
+          normalized
+            .map((a) => a.path)
+            .filter((p): p is string => typeof p === 'string' && p.trim().length > 0)
+        )
+      }
+      return {
+        ok: false,
+        summary: 'Identical applyPatch blocked',
+        content: `Error: ${blocked}`
+      }
+    }
+  }
+
   let items
   try {
     items = await previewWorkspaceActions(workspaceRoot, normalized)
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
-    return { ok: false, summary: message, content: `Error building preview: ${message}` }
+    const enriched = enrichPatchMismatchResult(
+      patchRetry,
+      readCache,
+      normalized,
+      message,
+      'Error building preview: '
+    )
+    return { ok: false, summary: enriched.summary, content: enriched.content }
   }
 
   if (signal.aborted) {
@@ -1279,10 +1344,11 @@ async function executeProposeActions(
     const detail =
       decision.detail ??
       'User rejected the proposed workspace actions. They were not applied. You may propose a revised set of actions or continue without changes.'
+    const enriched = enrichPatchMismatchResult(patchRetry, readCache, normalized, detail, '')
     return {
       ok: false,
       summary: summarizeProposeActionsRejection(detail),
-      content: detail,
+      content: enriched.content,
       previewed: true
     }
   } catch (err) {
@@ -1691,6 +1757,7 @@ export async function runAgent(webContents: WebContents, request: ChatRequest): 
     const plan = rebuildPlanFromHistory(history)
     const memory = rebuildMemoryFromHistory(history)
     const readCache = createAgentReadCache()
+    const patchRetry = createPatchRetryState()
     let lastAppliedPaths: string[] = []
     const dataSandbox =
       normalizeUseCasePreset(request.preset) === 'data'
@@ -1940,7 +2007,9 @@ export async function runAgent(webContents: WebContents, request: ChatRequest): 
                 call.id,
                 args,
                 signal,
-                request.preset
+                request.preset,
+                patchRetry,
+                readCache
               )
               if (result.previewed) {
                 proposeActionsReachedPreview = true

@@ -620,6 +620,76 @@ describe('runAgent tool loop', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 
+  it('on patch mismatch forces re-read guidance and blocks identical hunk retries', async () => {
+    const root = makeTempRoot('patch-mismatch-retry')
+    tempRoots.push(root)
+    writeFileSync(join(root, 'note.ts'), 'const x = 1\n', 'utf-8')
+
+    const badPatch =
+      '@@ -1,1 +1,1 @@\n' +
+      '-const x = 999\n' +
+      '+const x = 2\n'
+
+    const fetchMock = vi.mocked(fetch)
+    fetchMock
+      .mockResolvedValueOnce(
+        sseResponse(
+          toolCallTurn(
+            'proposeActions',
+            {
+              actions: [{ type: 'applyPatch', path: 'note.ts', patch: badPatch }]
+            },
+            'call_patch_1'
+          )
+        )
+      )
+      .mockResolvedValueOnce(
+        sseResponse(
+          toolCallTurn(
+            'proposeActions',
+            {
+              actions: [{ type: 'applyPatch', path: 'note.ts', patch: badPatch }]
+            },
+            'call_patch_2'
+          )
+        )
+      )
+      .mockResolvedValueOnce(sseResponse(textTurn('Stopped after patch guidance.')))
+      .mockResolvedValueOnce(sseResponse(textTurn('Still stopping.')))
+      .mockResolvedValueOnce(sseResponse(textTurn('Forced stop.')))
+
+    const { webContents, events } = createWebContents()
+    await runAgent(
+      webContents,
+      baseRequest(root, {
+        messages: [{ role: 'user', content: 'Fix note.ts' }]
+      })
+    )
+
+    const toolResults = events.filter((e) => e.channel === 'ai:toolResult')
+    expect(toolResults.length).toBeGreaterThanOrEqual(2)
+
+    const first = toolResults[0]?.payload[0] as {
+      ok: boolean
+      observation?: string
+      summary?: string
+    }
+    expect(first.ok).toBe(false)
+    expect(String(first.observation)).toMatch(/force=true/)
+    expect(String(first.observation)).toMatch(/Failed to locate hunk|パッチ/)
+
+    const second = toolResults[1]?.payload[0] as {
+      ok: boolean
+      observation?: string
+      summary?: string
+    }
+    expect(second.ok).toBe(false)
+    expect(String(second.summary)).toMatch(/Identical applyPatch blocked|同一/)
+    expect(String(second.observation)).toMatch(/force=true/)
+    expect(events.some((e) => e.channel === 'ai:needApproval')).toBe(false)
+    expect(events.some((e) => e.channel === 'ai:done')).toBe(true)
+  })
+
   it('nudges after truncated proposeActions when finishing in text', async () => {
     const root = makeTempRoot('truncated-propose-nudge')
     tempRoots.push(root)

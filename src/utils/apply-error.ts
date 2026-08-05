@@ -34,9 +34,14 @@ function stepText(step: { summary?: string; observation?: string }): string {
   return [step.summary, step.observation].filter(Boolean).join('\n')
 }
 
+export function isPatchMismatchMessage(message: string | null | undefined): boolean {
+  if (!message) return false
+  return PATCH_MISMATCH_PATTERNS.some((pattern) => pattern.test(message))
+}
+
 export function getApplyErrorTone(message: string | null | undefined): ApplyErrorTone {
   if (!message) return 'error'
-  return PATCH_MISMATCH_PATTERNS.some((pattern) => pattern.test(message)) ? 'warning' : 'error'
+  return isPatchMismatchMessage(message) ? 'warning' : 'error'
 }
 
 export function isApplyWarning(message: string | null | undefined): boolean {
