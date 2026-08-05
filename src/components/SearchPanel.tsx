@@ -6,7 +6,13 @@ import { formatEmbeddingsStatus } from '@/utils/embeddings-status'
 import { openWorkspaceFile } from '@/utils/open-workspace-file'
 import type { WorkspaceSearchFileResult, WorkspaceSearchMatch } from '@/types'
 import { useI18n, type MessageKey } from '@/i18n'
+import { ConfirmDialog } from './ConfirmDialog'
 import { ChevronRightIcon } from './icons/ToolbarIcons'
+
+type ReplaceConfirmState = {
+  kind: 'replace' | 'dirty'
+  message: string
+}
 
 function ToggleChip({
   label,
@@ -151,6 +157,7 @@ export function SearchPanel() {
   const [expandedFiles, setExpandedFiles] = useState<Set<string>>(new Set())
   const [showFilters, setShowFilters] = useState(false)
   const [isReplacing, setIsReplacing] = useState(false)
+  const [replaceConfirm, setReplaceConfirm] = useState<ReplaceConfirmState | null>(null)
 
   const embeddingsLabels = useMemo(
     () =>
@@ -160,21 +167,37 @@ export function SearchPanel() {
     [indexMeta?.embeddings, t]
   )
 
+  const restoreSearchInputFocus = useCallback(() => {
+    const focusTarget =
+      useAppStore.getState().searchReplaceOpen && useAppStore.getState().searchQuery
+        ? replaceInputRef.current
+        : queryInputRef.current
+    const focus = (): void => {
+      focusTarget?.focus()
+    }
+    // Electron can drop keyboard focus after dialogs / Monaco sync; retry briefly.
+    requestAnimationFrame(() => {
+      focus()
+      window.setTimeout(focus, 0)
+      window.setTimeout(focus, 50)
+    })
+  }, [])
+
   useEffect(() => {
     queryInputRef.current?.focus()
     queryInputRef.current?.select()
   }, [])
 
+  // Focus only when the replace row opens — not on every searchQuery change.
   useEffect(() => {
-    if (searchReplaceOpen) {
-      // keep focus on query unless replace just opened via shortcut with empty query
-      if (!searchQuery) {
-        queryInputRef.current?.focus()
-      } else {
-        replaceInputRef.current?.focus()
-      }
+    if (!searchReplaceOpen) return
+    const query = useAppStore.getState().searchQuery
+    if (!query) {
+      queryInputRef.current?.focus()
+    } else {
+      replaceInputRef.current?.focus()
     }
-  }, [searchReplaceOpen, searchQuery])
+  }, [searchReplaceOpen])
 
   const scopeLabel = useMemo(() => {
     if (!workspaceRoot) return t('search.workspace')
@@ -286,27 +309,8 @@ export function SearchPanel() {
     [openFiles, revealInEditor]
   )
 
-  const handleReplaceAll = useCallback(async () => {
+  const executeReplaceAll = useCallback(async () => {
     if (!workspaceRoot || !searchQuery.trim() || isReplacing) return
-
-    const total = searchResults?.totalMatches ?? 0
-    const message =
-      total > 0
-        ? t('search.replaceConfirmCount', { count: total })
-        : t('search.replaceConfirm')
-    if (!window.confirm(message)) return
-
-    const dirtyInScope = openFiles.filter((file) => {
-      if (!file.isDirty || file.isPreview) return false
-      if (!searchRootPath) return true
-      const norm = file.path.replace(/\\/g, '/').toLowerCase()
-      const root = searchRootPath.replace(/\\/g, '/').toLowerCase()
-      return norm === root || norm.startsWith(`${root}/`)
-    })
-    if (dirtyInScope.length > 0) {
-      const proceed = window.confirm(t('search.dirtyWarning', { count: dirtyInScope.length }))
-      if (!proceed) return
-    }
 
     setIsReplacing(true)
     setSearchError(null)
@@ -338,6 +342,7 @@ export function SearchPanel() {
       setSearchError(error instanceof Error ? error.message : t('search.replaceFailed'))
     } finally {
       setIsReplacing(false)
+      restoreSearchInputFocus()
     }
   }, [
     workspaceRoot,
@@ -349,15 +354,61 @@ export function SearchPanel() {
     searchInclude,
     searchExclude,
     searchRootPath,
-    searchResults,
     isReplacing,
-    openFiles,
     syncOpenFileContents,
     setFileTree,
     runSearch,
     setSearchError,
+    restoreSearchInputFocus,
     t
   ])
+
+  const requestReplaceAll = useCallback(() => {
+    if (!workspaceRoot || !searchQuery.trim() || isReplacing || replaceConfirm) return
+
+    const total = searchResults?.totalMatches ?? 0
+    const message =
+      total > 0
+        ? t('search.replaceConfirmCount', { count: total })
+        : t('search.replaceConfirm')
+    setReplaceConfirm({ kind: 'replace', message })
+  }, [
+    workspaceRoot,
+    searchQuery,
+    isReplacing,
+    replaceConfirm,
+    searchResults,
+    t
+  ])
+
+  const handleReplaceConfirm = useCallback(() => {
+    if (!replaceConfirm) return
+
+    if (replaceConfirm.kind === 'replace') {
+      const dirtyInScope = openFiles.filter((file) => {
+        if (!file.isDirty || file.isPreview) return false
+        if (!searchRootPath) return true
+        const norm = file.path.replace(/\\/g, '/').toLowerCase()
+        const root = searchRootPath.replace(/\\/g, '/').toLowerCase()
+        return norm === root || norm.startsWith(`${root}/`)
+      })
+      if (dirtyInScope.length > 0) {
+        setReplaceConfirm({
+          kind: 'dirty',
+          message: t('search.dirtyWarning', { count: dirtyInScope.length })
+        })
+        return
+      }
+    }
+
+    setReplaceConfirm(null)
+    void executeReplaceAll()
+  }, [replaceConfirm, openFiles, searchRootPath, executeReplaceAll, t])
+
+  const handleReplaceCancel = useCallback(() => {
+    setReplaceConfirm(null)
+    restoreSearchInputFocus()
+  }, [restoreSearchInputFocus])
 
   const toggleFile = (path: string) => {
     setExpandedFiles((prev) => {
@@ -418,7 +469,7 @@ export function SearchPanel() {
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
                   e.preventDefault()
-                  void handleReplaceAll()
+                  requestReplaceAll()
                 }
               }}
             />
@@ -426,7 +477,7 @@ export function SearchPanel() {
               type="button"
               className="search-action-btn"
               disabled={!searchQuery.trim() || isReplacing || searchSearching}
-              onClick={() => void handleReplaceAll()}
+              onClick={requestReplaceAll}
               title={t('search.replaceAll')}
             >
               {t('search.replaceAll')}
@@ -577,6 +628,17 @@ export function SearchPanel() {
           <div className="search-empty">{t('search.noResults')}</div>
         )}
       </div>
+
+      <ConfirmDialog
+        open={replaceConfirm !== null}
+        title={t('search.replaceAll')}
+        message={replaceConfirm?.message ?? ''}
+        confirmLabel={t('search.replaceAll')}
+        cancelLabel={t('common.cancel')}
+        danger
+        onConfirm={handleReplaceConfirm}
+        onCancel={handleReplaceCancel}
+      />
     </div>
   )
 }
