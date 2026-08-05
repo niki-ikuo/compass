@@ -93,8 +93,8 @@ while true:
   if no tool_calls:
     if multi-part ask with no updateTodo yet and plan nudges < 2
       → append assistant text + user nudge (call updateTodo first); continue (before proposeActions nudges)
-    else if coarse plan (active todos ≤3) and coarse plan nudges < 1
-      → append assistant text + user nudge (re-split to medium granularity); continue (before open-todo nudges)
+    else if oversized plan (active todos >5) and oversized plan nudges < 1
+      → append assistant text + user nudge (consolidate to ~3–5 outcomes); continue (before open-todo nudges)
     else if open todos (pending/in_progress) and open-todo nudges < 2
       → append assistant text + user nudge; continue loop
     else if proposeActions missing/truncated (change request, fake chat JSON, or prior truncation)
@@ -110,11 +110,11 @@ while true:
     ai:toolResult
     append role:tool message
   if multi-part ask with no updateTodo yet → plan nudge (within cap)
-  else if coarse plan → coarse plan nudge (max 1 per run)
+  else if oversized plan → oversized plan nudge (max 1 per run)
   turn++
 ```
 
-Natural completion: a turn with **no** `tool_calls`, unless the plan still has open todos — then the runtime injects a user-role nudge (max **2** per run) and continues. For non-trivial asks where `updateTodo` left a coarse checklist (active todos ≤**3**), the runtime nudges once to re-split to medium granularity. The same pattern applies when a workspace change request ends without a successful `proposeActions` (or after a truncated propose): max **2** nudges per run. Chat/`compass-actions` JSON is never salvage-parsed in Agent; the model must call the tool. Agent does not call an explicit “finish” tool.
+Natural completion: a turn with **no** `tool_calls`, unless the plan still has open todos — then the runtime injects a user-role nudge (max **2** per run) and continues. When `updateTodo` left an oversized checklist (active todos >**5**), the runtime nudges once to consolidate to about 3–5 outcome-level items (hard max 8). The same pattern applies when a workspace change request ends without a successful `proposeActions` (or after a truncated propose): max **2** nudges per run. Chat/`compass-actions` JSON is never salvage-parsed in Agent; the model must call the tool. Agent does not call an explicit “finish” tool.
 
 ### 4.3 One SSE turn (`streamAgentTurn`)
 
@@ -229,9 +229,9 @@ On Continue = yes: budgets increase and **plan + memory** are re-injected as a u
 |-----------|------|
 | `agentSteps` on assistant messages | Timeline + history persistence |
 | Prior tool context | One historical summary re-injected before the new ask (`buildPriorAgentContext`); `proposeActions` is labeled HISTORICAL without approval observation text |
-| Plan (`updateTodo` / `checkpoint`) | Medium-granularity checklist (about 5–12 verifiable items) + resume note; rebuilt from history; re-injected on Continue while open todos remain; chat Plan panel rebuilds from all assistant `agentSteps` through the current message. Fully settled plans (all done/cancelled) are not re-injected and only render on the message that last called `updateTodo` / `checkpoint` |
+| Plan (`updateTodo` / `checkpoint`) | Short outcome-level checklist (about 3–5 verifiable deliverables, hard max 8) + resume note; rebuilt from history; re-injected on Continue while open todos remain; chat Plan panel rebuilds from all assistant `agentSteps` through the current message. Fully settled plans (all done/cancelled) are not re-injected and only render on the message that last called `updateTodo` / `checkpoint` |
 | Soft multi-part nudge | If the latest user ask looks multi-part and no open todos remain, inject a user-role nudge to call `updateTodo` first (also on text-only finish / tool rounds that skipped planning; takes priority over proposeActions nudges) |
-| Soft coarse-plan nudge | After `updateTodo`, if active todos are ≤3 on a non-trivial ask, inject a user-role nudge once to re-split to medium granularity (takes priority over open-todo nudges) |
+| Soft oversized-plan nudge | After `updateTodo`, if active todos are >5, inject a user-role nudge once to consolidate to about 3–5 outcomes (takes priority over open-todo nudges) |
 | Soft proposeActions nudge | If a change request (or fake chat/`compass-actions` JSON / truncated propose) ends without an applied proposal, inject a user-role nudge to call `proposeActions` (max **2** per run; skipped after preview reject unless fake JSON appears) |
 | Memory (`remember` + auto observations) | Durable notes; rebuilt from history |
 | Read cache | Avoid re-sending full file bodies within one run |
@@ -260,7 +260,7 @@ electron/services/
   workspace-search.ts       # search backend
 
 src/
-  utils/agent-plan.ts       # todos + checkpoint + multi-part / coarse-plan nudge heuristics (shared)
+  utils/agent-plan.ts       # todos + checkpoint + multi-part / oversized-plan nudge heuristics (shared)
   utils/data-rows.ts / data-profile.ts / data-verify.ts / data-sql-guard.ts
   utils/markdown-outline.ts # Markdown heading sections + document verify
   components/AgentPlanPanel.tsx  # chat Plan checklist UI

@@ -93,8 +93,8 @@ while true:
   if tool_calls なし:
     if multi-part なのに updateTodo 未使用で plan nudge が 2 回未満
       → assistant テキスト + user nudge（先に updateTodo）を追加して継続（proposeActions nudge より優先）
-    else if 粗い計画（active todo ≤3）で coarse plan nudge が 1 回未満
-      → assistant テキスト + user nudge（中粒度へ再分解）を追加して継続（open-todo nudge より優先）
+    else if 過大な計画（active todo >5）で oversized plan nudge が 1 回未満
+      → assistant テキスト + user nudge（成果物単位 3〜5 件へまとめ直し）を追加して継続（open-todo nudge より優先）
     else if open todo（pending/in_progress）があり open-todo nudge が 2 回未満
       → assistant テキスト + user nudge を追加してループ継続
     else if proposeActions 欠落／途中切れ（変更依頼・偽チャット JSON・直前の truncate）で propose nudge が 2 回未満、かつプレビュー未提示／未適用
@@ -109,11 +109,11 @@ while true:
     ai:toolResult
     role:tool を追加
   if multi-part なのに updateTodo 未使用 → plan nudge（上限内）
-  else if 粗い計画 → coarse plan nudge（1ラン最大1回）
+  else if 過大な計画 → oversized plan nudge（1ラン最大1回）
   turn++
 ```
 
-自然終了は **tool_calls のないターン**。ただし計画に未完了 todo が残っている場合は、ランタイムが user ロールの nudge を注入して継続する（1 ランあたり最大 **2** 回）。非自明な依頼で `updateTodo` が粗いチェックリスト（active todo ≤**3**）のままなら、中粒度への再分解を **1** 回促す。同様に、変更依頼なのに `proposeActions` が成功していない（または途中切れ後にテキスト終了した）場合も最大 **2** 回再促しする。Agent ではチャット／`compass-actions` JSON の救済パースは行わず、ツール呼び出しを必須とする。「finish」専用ツールはない。
+自然終了は **tool_calls のないターン**。ただし計画に未完了 todo が残っている場合は、ランタイムが user ロールの nudge を注入して継続する（1 ランあたり最大 **2** 回）。`updateTodo` が細かすぎるチェックリスト（active todo >**5**）のままなら、成果物単位（目安 3〜5、上限 8）へのまとめ直しを **1** 回促す。同様に、変更依頼なのに `proposeActions` が成功していない（または途中切れ後にテキスト終了した）場合も最大 **2** 回再促しする。Agent ではチャット／`compass-actions` JSON の救済パースは行わず、ツール呼び出しを必須とする。「finish」専用ツールはない。
 
 ### 4.3 1 ターンの SSE（`streamAgentTurn`）
 
@@ -228,9 +228,9 @@ Continue = yes: 予算加算し **plan + memory** を user メッセージとし
 |--------|------|
 | アシスタントの `agentSteps` | タイムライン + 履歴永続化 |
 | 過去ツール文脈 | フォローアップで観測要約を再注入（`buildPriorAgentContext`） |
-| Plan（`updateTodo` / `checkpoint`） | 中粒度チェックリスト（目安 5〜12・検証可能な項目）+ 再開メモ。履歴から再構築、未完了 todo があるあいだ Continue 時に再注入。チャットの計画パネルは当該メッセージまでの全 assistant `agentSteps` から再構築。全 todo が完了/取消し済みの計画は再注入せず、最後に `updateTodo` / `checkpoint` を呼んだメッセージにだけ表示する |
+| Plan（`updateTodo` / `checkpoint`） | 成果物単位の短いチェックリスト（目安 3〜5・上限 8・検証可能な項目）+ 再開メモ。履歴から再構築、未完了 todo があるあいだ Continue 時に再注入。チャットの計画パネルは当該メッセージまでの全 assistant `agentSteps` から再構築。全 todo が完了/取消し済みの計画は再注入せず、最後に `updateTodo` / `checkpoint` を呼んだメッセージにだけ表示する |
 | 複数パート soft nudge | 最新ユーザー依頼が複数パートっぽく計画が空なら、先に `updateTodo` するよう user ロールで誘導（必須ゲートではない） |
-| 粗い計画 soft nudge | `updateTodo` 後も active todo が ≤3 の非自明依頼なら、中粒度への再分解を user ロールで **1** 回促す（open-todo nudge より優先） |
+| 過大な計画 soft nudge | `updateTodo` 後に active todo が >5 なら、成果物単位（目安 3〜5）へのまとめ直しを user ロールで **1** 回促す（open-todo nudge より優先） |
 | proposeActions soft nudge | 変更依頼（または偽チャット/`compass-actions` JSON・途中切れ）なのに適用済み提案がないまま終了しようとしたら、`proposeActions` 呼び出しを user ロールで再促し（1 ラン最大 **2** 回。プレビュー却下後は偽 JSON が出ない限りスキップ） |
 | Memory（`remember` + 自動観測） | 耐久メモ。履歴から再構築 |
 | Read キャッシュ | 同一ラン内のフル再読込を抑制 |
@@ -259,7 +259,7 @@ electron/services/
   workspace-search.ts       # search 実装
 
 src/
-  utils/agent-plan.ts       # todos + checkpoint + 複数パート / 粗い計画 nudge（共有）
+  utils/agent-plan.ts       # todos + checkpoint + 複数パート / 過大計画 nudge（共有）
   utils/data-rows.ts / data-profile.ts / data-verify.ts / data-sql-guard.ts
   utils/markdown-outline.ts # Markdown 見出しセクション・document verify
   components/AgentPlanPanel.tsx  # チャット計画パネル

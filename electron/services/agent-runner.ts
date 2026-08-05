@@ -60,10 +60,10 @@ import {
   sanitizeUpdateTodoArgs,
   countOpenTodos,
   countActiveTodos,
-  formatCoarseTodoPlanNudge,
+  formatOversizedTodoPlanNudge,
   formatInitialTodoPlanNudge,
   shouldPlanFirstAgentTask,
-  shouldNudgeCoarseTodoPlan,
+  shouldNudgeOversizedTodoPlan,
   shouldNudgeMissingProposeActions,
   shouldNudgeMissingTodoPlan,
   type AgentPlanState
@@ -135,8 +135,8 @@ const MAX_PRIOR_STEP_OBSERVATION_CHARS = 3_000
 const MAX_OPEN_TODO_NUDGES = 2
 /** multi-part なのに updateTodo 未使用の再促し上限 */
 const MAX_MISSING_TODO_PLAN_NUDGES = 2
-/** 粗い計画（≤3）への再分解促し上限（1ラン1回） */
-const MAX_COARSE_TODO_PLAN_NUDGES = 1
+/** 過大な計画（>5）へのまとめ直し促し上限（1ラン1回） */
+const MAX_OVERSIZED_TODO_PLAN_NUDGES = 1
 /** text-only 終了時に proposeActions 欠落／途中切れの再促し上限 */
 const MAX_PROPOSE_ACTIONS_NUDGES = 2
 
@@ -373,14 +373,14 @@ const AGENT_TOOLS = [
     function: {
       name: 'updateTodo',
       description:
-        'Maintain an explicit medium-granularity checklist for multi-step work and multi-ask user messages. Call early for non-trivial asks (about 5–12 verifiable items; avoid coarse phase-only labels like investigate/implement/test, and avoid over-splitting). Include acceptance-criteria clarification when unclear. Update statuses as you progress (especially before turn/tool limits); after investigation changes assumptions, revise with merge=true. Do not finish with text while any item is pending or in_progress. Pass todos as a JSON array of { id, content, status }. status is pending | in_progress | done | cancelled. Default replaces the full list; set merge=true to patch by id.',
+        'Maintain a short outcome-level checklist for multi-step work and multi-ask user messages. Call early for non-trivial asks (about 3–5 verifiable deliverables; avoid phase-only labels like investigate/implement/test, and avoid micro-step over-splitting that burns turns). Hard cap is 8 items. Include acceptance-criteria clarification when unclear. Update statuses as you progress (especially before turn/tool limits); after investigation changes assumptions, revise with merge=true. Do not finish with text while any item is pending or in_progress. Pass todos as a JSON array of { id, content, status }. status is pending | in_progress | done | cancelled. Default replaces the full list; set merge=true to patch by id.',
       parameters: {
         type: 'object',
         properties: {
           todos: {
             type: 'array',
             description:
-              'Checklist items. Prefer 5–12 for non-trivial work; each content should be a verifiable outcome.',
+              'Checklist items. Prefer 3–5 outcome-level items for non-trivial work (hard max 8); each content should be a verifiable deliverable.',
             items: {
               type: 'object',
               properties: {
@@ -388,7 +388,7 @@ const AGENT_TOOLS = [
                 content: {
                   type: 'string',
                   description:
-                    'Verifiable task (outcome-oriented). Prefer naming what to inspect, change, or check—not vague phase labels alone.'
+                    'Verifiable outcome (what to deliver or check)—not a vague phase label, and not a tiny sub-step.'
                 },
                 status: {
                   type: 'string',
@@ -1712,7 +1712,7 @@ export async function runAgent(webContents: WebContents, request: ChatRequest): 
     let turn = 0
     let openTodoNudges = 0
     let missingTodoPlanNudges = 0
-    let coarseTodoPlanNudges = 0
+    let oversizedTodoPlanNudges = 0
     let updateTodoCalledThisRun = false
     let proposeActionsNudges = 0
     let proposeActionsApplied = false
@@ -1800,23 +1800,23 @@ export async function runAgent(webContents: WebContents, request: ChatRequest): 
           continue
         }
 
-        // Coarse checklist (≤3) on a substantial ask: ask once to re-split before
-        // open-todo "keep working" so the model refines granularity first.
-        const needsCoarsePlan = shouldNudgeCoarseTodoPlan({
+        // Oversized checklist (>5): ask once to consolidate before open-todo
+        // "keep working" so the model stops micro-stepping.
+        const needsOversizedPlan = shouldNudgeOversizedTodoPlan({
           userText: latestUserText,
           activeTodoCount: countActiveTodos(plan),
           updateTodoCalledThisRun,
-          alreadyNudging: coarseTodoPlanNudges > 0
+          alreadyNudging: oversizedTodoPlanNudges > 0
         })
-        if (needsCoarsePlan && coarseTodoPlanNudges < MAX_COARSE_TODO_PLAN_NUDGES) {
-          coarseTodoPlanNudges++
+        if (needsOversizedPlan && oversizedTodoPlanNudges < MAX_OVERSIZED_TODO_PLAN_NUDGES) {
+          oversizedTodoPlanNudges++
           apiMessages.push({
             role: 'assistant',
             content: turnResult.content || null
           })
           apiMessages.push({
             role: 'user',
-            content: formatCoarseTodoPlanNudge(countActiveTodos(plan))
+            content: formatOversizedTodoPlanNudge(countActiveTodos(plan))
           })
           turn++
           continue
@@ -2016,19 +2016,19 @@ export async function runAgent(webContents: WebContents, request: ChatRequest): 
         missingTodoPlanNudges++
         apiMessages.push({ role: 'user', content: formatInitialTodoPlanNudge() })
       } else if (
-        coarseTodoPlanNudges < MAX_COARSE_TODO_PLAN_NUDGES &&
-        shouldNudgeCoarseTodoPlan({
+        oversizedTodoPlanNudges < MAX_OVERSIZED_TODO_PLAN_NUDGES &&
+        shouldNudgeOversizedTodoPlan({
           userText: latestUserText,
           activeTodoCount: countActiveTodos(plan),
           updateTodoCalledThisRun,
-          alreadyNudging: coarseTodoPlanNudges > 0
+          alreadyNudging: oversizedTodoPlanNudges > 0
         })
       ) {
-        // updateTodo produced a too-coarse plan — ask once to re-split before more work.
-        coarseTodoPlanNudges++
+        // updateTodo produced an oversized plan — ask once to consolidate before more work.
+        oversizedTodoPlanNudges++
         apiMessages.push({
           role: 'user',
-          content: formatCoarseTodoPlanNudge(countActiveTodos(plan))
+          content: formatOversizedTodoPlanNudge(countActiveTodos(plan))
         })
       }
 

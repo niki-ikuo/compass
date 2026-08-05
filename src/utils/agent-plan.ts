@@ -16,7 +16,10 @@ export interface AgentPlanState {
   checkpoint: string | null
 }
 
-const MAX_TODOS = 40
+/** Hard ceiling — keeps checklists from ballooning into turn-burners. */
+const MAX_TODOS = 8
+/** Soft target for non-trivial asks (outcome-level items, not micro-steps). */
+export const PREFERRED_PLAN_ACTIVE_TODO_MAX = 5
 const MAX_TODO_CONTENT_CHARS = 400
 const MAX_CHECKPOINT_CHARS = 2_000
 const VALID_STATUSES = new Set<AgentTodoStatus>([
@@ -65,7 +68,7 @@ export function applyUpdateTodo(
 
   const merge = args.merge === true
   const incoming: AgentTodoItem[] = []
-  for (const item of rawTodos.slice(0, MAX_TODOS)) {
+  for (const item of rawTodos) {
     const normalized = normalizeTodoItem(item)
     if (normalized) incoming.push(normalized)
   }
@@ -79,12 +82,22 @@ export function applyUpdateTodo(
     }
   }
 
+  let truncated = false
   if (merge) {
     const byId = new Map(state.todos.map((t) => [t.id, t]))
     for (const item of incoming) {
       byId.set(item.id, item)
     }
-    state.todos = [...byId.values()].slice(0, MAX_TODOS)
+    const merged = [...byId.values()]
+    if (merged.length > MAX_TODOS) {
+      truncated = true
+      state.todos = merged.slice(0, MAX_TODOS)
+    } else {
+      state.todos = merged
+    }
+  } else if (incoming.length > MAX_TODOS) {
+    truncated = true
+    state.todos = incoming.slice(0, MAX_TODOS)
   } else {
     state.todos = incoming
   }
@@ -94,10 +107,15 @@ export function applyUpdateTodo(
   const open = state.todos.filter(
     (t) => t.status === 'pending' || t.status === 'in_progress'
   ).length
+  const truncateNote = truncated
+    ? `\n\nNote: checklist capped at ${MAX_TODOS} items (prefer about 3–${PREFERRED_PLAN_ACTIVE_TODO_MAX} outcome-level items). Merge related micro-steps.`
+    : ''
   return {
     ok: true,
-    summary: `Todos updated (${done} done, ${open} open, ${state.todos.length} total)`,
-    content: `Todo list:\n${rendered}`
+    summary: truncated
+      ? `Todos updated (${done} done, ${open} open, ${state.todos.length} total; capped at ${MAX_TODOS})`
+      : `Todos updated (${done} done, ${open} open, ${state.todos.length} total)`,
+    content: `Todo list:\n${rendered}${truncateNote}`
   }
 }
 
@@ -233,18 +251,15 @@ export function formatInitialTodoPlanNudge(): string {
   return t('ai.agentInitialTodoPlanNudge')
 }
 
-/** Soft nudge when a plan-first ask got an overly coarse checklist (≤3 items). */
-export function formatCoarseTodoPlanNudge(todoCount: number): string {
-  return t('ai.agentCoarseTodoPlanNudge', { count: Math.max(0, todoCount) })
+/** Soft nudge when updateTodo produced more items than the preferred outcome budget. */
+export function formatOversizedTodoPlanNudge(todoCount: number): string {
+  return t('ai.agentOversizedTodoPlanNudge', { count: Math.max(0, todoCount) })
 }
 
-/** Non-cancelled todos — used to judge checklist coarseness. */
+/** Non-cancelled todos — used to judge checklist size. */
 export function countActiveTodos(state: AgentPlanState): number {
   return state.todos.filter((item) => item.status !== 'cancelled').length
 }
-
-/** Plans at or below this active-todo count are treated as coarse for non-trivial asks. */
-export const COARSE_PLAN_ACTIVE_TODO_MAX = 3
 
 /**
  * Text-only finish (or tool rounds that skipped planning) should still force updateTodo
@@ -263,24 +278,20 @@ export function shouldNudgeMissingTodoPlan(options: {
 }
 
 /**
- * Soft nudge when updateTodo produced a too-coarse checklist for a substantial ask.
- * Skips tiny one-liners (shouldPlanFirst false) and short single-clause edits under 60 chars
- * unless the ask already looks multi-part.
+ * Soft nudge when updateTodo produced more than PREFERRED_PLAN_ACTIVE_TODO_MAX
+ * active items. Oversized checklists burn turns via status churn and mid-work stops.
  */
-export function shouldNudgeCoarseTodoPlan(options: {
+export function shouldNudgeOversizedTodoPlan(options: {
   userText: string
   activeTodoCount: number
   updateTodoCalledThisRun: boolean
   alreadyNudging: boolean
 }): boolean {
   if (!options.updateTodoCalledThisRun) return false
-  if (options.activeTodoCount <= 0) return false
-  if (options.activeTodoCount > COARSE_PLAN_ACTIVE_TODO_MAX) return false
+  if (options.activeTodoCount <= PREFERRED_PLAN_ACTIVE_TODO_MAX) return false
   if (options.alreadyNudging) return true
-  if (!shouldPlanFirstAgentTask(options.userText)) return false
-  const trimmed = options.userText.trim()
-  if (looksLikeMultiPartAgentTask(trimmed)) return true
-  return trimmed.length >= 60
+  void options.userText
+  return true
 }
 
 /**

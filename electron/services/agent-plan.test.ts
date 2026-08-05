@@ -8,7 +8,7 @@ import {
   countOpenTodos,
   createAgentPlanState,
   formatAgentPlanForModel,
-  formatCoarseTodoPlanNudge,
+  formatOversizedTodoPlanNudge,
   formatMissingProposeActionsNudge,
   formatOpenTodosNudge,
   formatTruncatedProposeActionsNudge,
@@ -19,7 +19,7 @@ import {
   collectAgentStepsThrough,
   sanitizeCheckpointArgs,
   sanitizeUpdateTodoArgs,
-  shouldNudgeCoarseTodoPlan,
+  shouldNudgeOversizedTodoPlan,
   shouldNudgeMissingProposeActions,
   shouldNudgeMissingTodoPlan,
   shouldPlanFirstAgentTask,
@@ -336,26 +336,34 @@ describe('shouldNudgeMissingTodoPlan', () => {
   })
 })
 
-describe('shouldNudgeCoarseTodoPlan', () => {
+describe('shouldNudgeOversizedTodoPlan', () => {
   const substantialAsk =
     '1. ChatPanel.tsx の計画パネル表示を直す\n2. 関連テストを追加する\n3. lint で確認する'
 
-  it('nudges when updateTodo produced ≤3 items on a substantial ask', () => {
+  it('nudges when updateTodo produced more than 5 items', () => {
     expect(
-      shouldNudgeCoarseTodoPlan({
+      shouldNudgeOversizedTodoPlan({
         userText: substantialAsk,
-        activeTodoCount: 3,
+        activeTodoCount: 6,
         updateTodoCalledThisRun: true,
         alreadyNudging: false
       })
     ).toBe(true)
   })
 
-  it('skips when the checklist is already medium-granularity', () => {
+  it('skips when the checklist stays within the preferred budget', () => {
     expect(
-      shouldNudgeCoarseTodoPlan({
+      shouldNudgeOversizedTodoPlan({
         userText: substantialAsk,
-        activeTodoCount: 6,
+        activeTodoCount: 5,
+        updateTodoCalledThisRun: true,
+        alreadyNudging: false
+      })
+    ).toBe(false)
+    expect(
+      shouldNudgeOversizedTodoPlan({
+        userText: substantialAsk,
+        activeTodoCount: 3,
         updateTodoCalledThisRun: true,
         alreadyNudging: false
       })
@@ -364,15 +372,15 @@ describe('shouldNudgeCoarseTodoPlan', () => {
 
   it('skips before updateTodo runs or when there are no active todos', () => {
     expect(
-      shouldNudgeCoarseTodoPlan({
+      shouldNudgeOversizedTodoPlan({
         userText: substantialAsk,
-        activeTodoCount: 2,
+        activeTodoCount: 8,
         updateTodoCalledThisRun: false,
         alreadyNudging: false
       })
     ).toBe(false)
     expect(
-      shouldNudgeCoarseTodoPlan({
+      shouldNudgeOversizedTodoPlan({
         userText: substantialAsk,
         activeTodoCount: 0,
         updateTodoCalledThisRun: true,
@@ -381,33 +389,38 @@ describe('shouldNudgeCoarseTodoPlan', () => {
     ).toBe(false)
   })
 
-  it('skips tiny one-liners that are not plan-first', () => {
+  it('keeps nudging once already started while still oversized', () => {
     expect(
-      shouldNudgeCoarseTodoPlan({
-        userText: 'Fix the typo in README.',
-        activeTodoCount: 2,
-        updateTodoCalledThisRun: true,
-        alreadyNudging: false
-      })
-    ).toBe(false)
-  })
-
-  it('keeps nudging once already started while still coarse', () => {
-    expect(
-      shouldNudgeCoarseTodoPlan({
+      shouldNudgeOversizedTodoPlan({
         userText: substantialAsk,
-        activeTodoCount: 2,
+        activeTodoCount: 7,
         updateTodoCalledThisRun: true,
         alreadyNudging: true
       })
     ).toBe(true)
   })
 
-  it('formatCoarseTodoPlanNudge includes the count', () => {
+  it('formatOversizedTodoPlanNudge includes the count', () => {
     setLocale('ja')
-    expect(formatCoarseTodoPlanNudge(3)).toContain('3')
+    expect(formatOversizedTodoPlanNudge(8)).toContain('8')
     setLocale('en')
-    expect(formatCoarseTodoPlanNudge(3)).toContain('3')
+    expect(formatOversizedTodoPlanNudge(8)).toContain('8')
+  })
+})
+
+describe('applyUpdateTodo hard cap', () => {
+  it('caps replace lists at 8 items and notes the truncation', () => {
+    const state = createAgentPlanState()
+    const todos = Array.from({ length: 12 }, (_, i) => ({
+      id: String(i + 1),
+      content: `Task ${i + 1}`,
+      status: 'pending' as const
+    }))
+    const result = applyUpdateTodo(state, { todos })
+    expect(result.ok).toBe(true)
+    expect(state.todos).toHaveLength(8)
+    expect(result.summary).toContain('capped')
+    expect(result.content).toContain('capped at 8')
   })
 })
 

@@ -33,7 +33,7 @@ Agent is not “a longer Edit.” The model calls tools, observes results, and t
 - Read and inspect files in the workspace (Markdown can be read by heading)
 - Propose batches of changes (you apply them)
 - Run limited commands (some require approval first)
-- Multi-turn work with plan / memory (medium-granularity checklists for non-trivial asks; coarse plans are nudged to re-split)
+- Multi-turn work with plan / memory (short outcome-level checklists, about 3–5 items; oversized plans are nudged to consolidate)
 - With the **Document** use case: structure checks after edits (headings, relative links)
 - With the **Data** use case: profile CSV / TSV / JSON and run read-only SQL-style queries on imported tables
 
