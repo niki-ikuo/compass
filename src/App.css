@@ -6,7 +6,13 @@
   padding: 0;
 }
 
-:root,
+/* フォント等の共通トークンのみ。配色は data-theme 確定後に適用し起動フラッシュを防ぐ */
+:root {
+  --font-mono: 'Cascadia Code', 'Consolas', 'Monaco', monospace;
+  --font-ui: 'Segoe UI', system-ui, sans-serif;
+  --icon-size: 18px;
+}
+
 [data-theme='dark'] {
   color-scheme: dark;
   --bg-primary: #1e1e1e;
@@ -28,9 +34,6 @@
   --chat-mode-ask: #dcdcaa;
   --chat-mode-edit: #4ec9b0;
   --chat-mode-agent: #3794ff;
-  --font-mono: 'Cascadia Code', 'Consolas', 'Monaco', monospace;
-  --font-ui: 'Segoe UI', system-ui, sans-serif;
-  --icon-size: 18px;
   --icon-command: #969696;
   --icon-command-hover: #969696;
 }
@@ -320,6 +323,12 @@ body,
 body {
   font-family: var(--font-ui);
   font-size: 13px;
+  /* data-theme 未設定時は index.html の transparent を維持し、
+     BrowserWindow.backgroundColor（main がテーマに合わせて設定）を透かす */
+  background: transparent;
+}
+
+html[data-theme] body {
   color: var(--text-primary);
   background: var(--bg-primary);
 }
