@@ -357,15 +357,6 @@ export function MenuBar({
       <div className="menu-bar-controls">
         <button
           type="button"
-          className="menu-bar-btn"
-          onClick={onOpenSettings}
-          title={t('menu.settings')}
-          aria-label={t('menu.settings')}
-        >
-          <SettingsIcon />
-        </button>
-        <button
-          type="button"
           className={`menu-bar-btn${explorerActive ? ' active' : ''}`}
           onClick={onToggleFileTree}
           title={t('menu.toggleExplorer')}
@@ -394,6 +385,15 @@ export function MenuBar({
           aria-pressed={showChat}
         >
           <ChatIcon />
+        </button>
+        <button
+          type="button"
+          className="menu-bar-btn"
+          onClick={onOpenSettings}
+          title={t('menu.settings')}
+          aria-label={t('menu.settings')}
+        >
+          <SettingsIcon />
         </button>
       </div>
     </div>
