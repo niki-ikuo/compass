@@ -17,6 +17,7 @@ related:
   - ../ai/agent.md
 commands:
   - Open Settings
+  - Open Provider
   - Open Folder
 ---
 

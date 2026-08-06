@@ -12,6 +12,9 @@ related:
   - welcome.md
   - open-project.md
   - ../ai/chat.md
+commands:
+  - Open Desk Settings
+  - Focus Chat
 ---
 
 # Clip

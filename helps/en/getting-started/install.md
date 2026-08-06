@@ -15,6 +15,7 @@ related:
   - ../troubleshooting/common-errors.md
 commands:
   - Open Settings
+  - Open Provider
 ---
 
 # Install

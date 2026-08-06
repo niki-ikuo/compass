@@ -17,6 +17,8 @@ related:
   - ../troubleshooting/common-errors.md
 commands:
   - Open Settings
+  - Open Chat Settings
+  - Open Provider
   - Focus Chat
 ---
 

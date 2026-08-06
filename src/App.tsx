@@ -123,8 +123,20 @@ export function App() {
         case 'Open Settings':
           openSettingsTab({ focusFirstField: true })
           break
+        case 'Open Appearance Settings':
+          openSettingsTab({ tab: 'appearance', focusFirstField: true })
+          break
+        case 'Open Chat Settings':
+          openSettingsTab({ tab: 'chat', focusFirstField: true })
+          break
         case 'Open Provider':
           openSettingsTab({ tab: 'llm', focusFirstField: true })
+          break
+        case 'Open Terminal Settings':
+          openSettingsTab({ tab: 'terminal', focusFirstField: true })
+          break
+        case 'Open Desk Settings':
+          openSettingsTab({ tab: 'desk', focusFirstField: true })
           break
         case 'Open Folder':
           void handleOpenFolder()

@@ -192,11 +192,11 @@ export function HelpAskDialog({
                 type="button"
                 className="btn-secondary"
                 onClick={() => {
-                  onCommand('Open Settings')
+                  onCommand('Open Provider')
                   onClose()
                 }}
               >
-                {t('help.cmdOpenSettings')}
+                {t('help.cmdOpenProvider')}
               </button>
             </div>
           ) : (

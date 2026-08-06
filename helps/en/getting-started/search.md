@@ -17,6 +17,7 @@ related:
   - ../ai/chat.md
 commands:
   - Open Folder
+  - Open Chat Settings
 ---
 
 # Search in the workspace

@@ -18,6 +18,10 @@ related:
   - ../getting-started/welcome.md
   - ../ai/chat.md
   - ../ai/agent.md
+commands:
+  - Open Appearance Settings
+  - Open Provider
+  - Focus Chat
 ---
 
 # FAQ

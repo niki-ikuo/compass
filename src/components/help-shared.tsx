@@ -1,33 +1,47 @@
 import { useEffect, useRef, useState, type MouseEvent } from 'react'
 import { useI18n } from '@/i18n'
 
-export type HelpCommandId =
-  | 'Open Settings'
-  | 'Open Provider'
-  | 'Open Folder'
-  | 'Focus Chat'
+export const HELP_COMMAND_IDS = [
+  'Open Settings',
+  'Open Appearance Settings',
+  'Open Chat Settings',
+  'Open Provider',
+  'Open Terminal Settings',
+  'Open Desk Settings',
+  'Open Folder',
+  'Focus Chat'
+] as const
+
+export type HelpCommandId = (typeof HELP_COMMAND_IDS)[number]
 
 export function isHelpCommandId(value: string): value is HelpCommandId {
-  return (
-    value === 'Open Settings' ||
-    value === 'Open Provider' ||
-    value === 'Open Folder' ||
-    value === 'Focus Chat'
-  )
+  return (HELP_COMMAND_IDS as readonly string[]).includes(value)
 }
 
 export function commandLabelKey(
   command: HelpCommandId
 ):
   | 'help.cmdOpenSettings'
+  | 'help.cmdOpenAppearanceSettings'
+  | 'help.cmdOpenChatSettings'
   | 'help.cmdOpenProvider'
+  | 'help.cmdOpenTerminalSettings'
+  | 'help.cmdOpenDeskSettings'
   | 'help.cmdOpenFolder'
   | 'help.cmdFocusChat' {
   switch (command) {
     case 'Open Settings':
       return 'help.cmdOpenSettings'
+    case 'Open Appearance Settings':
+      return 'help.cmdOpenAppearanceSettings'
+    case 'Open Chat Settings':
+      return 'help.cmdOpenChatSettings'
     case 'Open Provider':
       return 'help.cmdOpenProvider'
+    case 'Open Terminal Settings':
+      return 'help.cmdOpenTerminalSettings'
+    case 'Open Desk Settings':
+      return 'help.cmdOpenDeskSettings'
     case 'Open Folder':
       return 'help.cmdOpenFolder'
     case 'Focus Chat':

@@ -16,6 +16,11 @@ related:
 commands:
   - Open Folder
   - Open Settings
+  - Open Appearance Settings
+  - Open Chat Settings
+  - Open Provider
+  - Open Terminal Settings
+  - Open Desk Settings
 ---
 
 # はじめに
