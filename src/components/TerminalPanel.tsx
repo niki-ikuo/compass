@@ -281,10 +281,15 @@ function TerminalInstance({
 
       const hasSelection = terminal.hasSelection()
       if (isTerminalCopyShortcut(event, hasSelection)) {
+        // Stop the native copy event so we do not handle clipboard twice.
+        event.preventDefault()
         copyTerminalSelection(terminal)
         return false
       }
       if (isTerminalPasteShortcut(event)) {
+        // Ctrl+Shift+V / Cmd+V also fire a window `paste` event; preventDefault
+        // so only this path sends input (otherwise the clipboard is pasted twice).
+        event.preventDefault()
         void navigator.clipboard.readText().then((text) => {
           if (!text || !activeRef.current || !inputArmedRef.current) return
           sendInput(normalizeClipboardTextForPty(text))
