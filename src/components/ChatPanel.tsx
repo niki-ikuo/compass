@@ -77,6 +77,7 @@ import {
   resolveTabDropIndex
 } from '@/utils/tab-reorder'
 import { openOrCreateWorkspaceRules } from '@/utils/workspace-rules'
+import { blurChatComposerIfFocused, classifyWorkbenchFocusOwner } from '@/utils/workbench-focus'
 import { useI18n, getDateLocale } from '@/i18n'
 
 function selectionRefKey(ref: ChatSelectionRef): string {
@@ -151,6 +152,13 @@ export function ChatPanel() {
   const hasSettledScrollRef = useRef(false)
   /** Strict Mode の effect 二重実行で同一リクエストを二重送信しない */
   const processedComposerSendRequestIdRef = useRef<number | null>(null)
+  /** AI 実行中の sticky focus: チャット起点なら完了時に戻す。ユーザーが他面へ移ったら戻さない */
+  const stickyChatFocusRef = useRef<{
+    chatId: string
+    shouldRestore: boolean
+    userMovedFocus: boolean
+  } | null>(null)
+  const stickyChatFocusUnsubRef = useRef<(() => void) | null>(null)
 
   const chatSessions = useAppStore((s) => s.chatSessions)
   const activeChatId = useAppStore((s) => s.activeChatId)
@@ -451,6 +459,65 @@ export function ChatPanel() {
     }
   }, [isChatLoading])
 
+  useEffect(() => {
+    return () => {
+      stickyChatFocusUnsubRef.current?.()
+      stickyChatFocusUnsubRef.current = null
+    }
+  }, [])
+
+  const beginStickyChatFocus = (chatId: string) => {
+    stickyChatFocusUnsubRef.current?.()
+    stickyChatFocusUnsubRef.current = null
+
+    const shouldRestore = classifyWorkbenchFocusOwner(document.activeElement) === 'chat'
+    if (shouldRestore) {
+      blurChatComposerIfFocused()
+    }
+
+    stickyChatFocusRef.current = { chatId, shouldRestore, userMovedFocus: false }
+    if (!shouldRestore) return
+
+    const onFocusIn = (event: FocusEvent) => {
+      const sticky = stickyChatFocusRef.current
+      if (!sticky || sticky.chatId !== chatId || sticky.userMovedFocus) return
+      const target = event.target
+      if (!(target instanceof HTMLElement)) return
+      // チャット内（Stop 等）は継続対話の意図とみなす。blur 後の body は無視。
+      if (target.closest('.chat-panel')) return
+      if (target === document.body || target === document.documentElement) return
+      sticky.userMovedFocus = true
+    }
+
+    document.addEventListener('focusin', onFocusIn)
+    stickyChatFocusUnsubRef.current = () => {
+      document.removeEventListener('focusin', onFocusIn)
+    }
+  }
+
+  const endStickyChatFocus = (chatId: string) => {
+    stickyChatFocusUnsubRef.current?.()
+    stickyChatFocusUnsubRef.current = null
+
+    const sticky = stickyChatFocusRef.current
+    if (!sticky || sticky.chatId !== chatId) return
+    stickyChatFocusRef.current = null
+
+    const shouldFocus =
+      sticky.shouldRestore &&
+      !sticky.userMovedFocus &&
+      useAppStore.getState().activeChatId === chatId
+    if (!shouldFocus) return
+
+    // disabled 解除後に当てる。composer.focus() が Selection も復元する
+    const focus = () => inputComposerRef.current?.focus()
+    requestAnimationFrame(() => {
+      focus()
+      window.setTimeout(focus, 0)
+      window.setTimeout(focus, 50)
+    })
+  }
+
   const formatHistoryTime = (timestamp: number) => {
     try {
       return new Intl.DateTimeFormat(getDateLocale(), {
@@ -523,6 +590,7 @@ export function ChatPanel() {
     setPendingContinueFor(chatId, null)
     setPendingExecApprovalFor(chatId, null)
     setChatLoading(chatId, true)
+    beginStickyChatFocus(chatId)
 
     const activeFile = getActiveFile()
 
@@ -533,6 +601,7 @@ export function ChatPanel() {
     if (stopRequestedChatIdsRef.current.has(chatId)) {
       stopRequestedChatIdsRef.current.delete(chatId)
       setChatLoading(chatId, false)
+      endStickyChatFocus(chatId)
       updateLastAssistantMessage(chatId, t('chat.aborted'))
       return
     }
@@ -575,6 +644,7 @@ export function ChatPanel() {
       setPendingContinueFor(chatId, null)
       setPendingExecApprovalFor(chatId, null)
       setChatLoading(chatId, false)
+      endStickyChatFocus(chatId)
     }
 
     const syncAssistant = (content: string, steps = agentSteps) => {
