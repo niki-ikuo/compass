@@ -1,3 +1,5 @@
+import type { LeftSidebarView } from '@/types'
+
 export const SETTINGS_TAB_PATH = 'compass-settings://'
 
 export type SettingsTabId = 'appearance' | 'chat' | 'llm' | 'terminal' | 'desk'
@@ -9,6 +11,17 @@ export type SettingsOpenOptions = {
 }
 
 export type SettingsFocusRequest = {
+  id: number
+}
+
+/** One-shot focus request for left-sidebar panels (search / outline / git). */
+export type SidebarFocusRequest = {
+  id: number
+  view: LeftSidebarView
+}
+
+/** One-shot focus request for the chat composer. */
+export type ChatComposerFocusRequest = {
   id: number
 }
 

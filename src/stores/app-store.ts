@@ -52,9 +52,11 @@ import {
 } from '@/utils/compare-tab'
 import {
   SETTINGS_TAB_PATH,
+  type ChatComposerFocusRequest,
   type SettingsFocusRequest,
   type SettingsOpenOptions,
-  type SettingsTabId
+  type SettingsTabId,
+  type SidebarFocusRequest
 } from '@/utils/settings-tab'
 import { moveItemByDropIndex, reorderOpenSessionsById } from '@/utils/tab-reorder'
 import { t, isDefaultChatTitle } from '@/i18n'
@@ -891,6 +893,10 @@ interface AppState {
   settingsActiveTab: SettingsTabId
   /** One-shot: focus the first field in the active settings sub-tab */
   settingsFocusRequest: SettingsFocusRequest | null
+  /** One-shot: focus the primary input when a left-sidebar view opens */
+  sidebarFocusRequest: SidebarFocusRequest | null
+  /** One-shot: focus the chat composer when the chat panel opens */
+  chatComposerFocusRequest: ChatComposerFocusRequest | null
   editorSelection: EditorSelection | null
   cursorPosition: { line: number; column: number }
   llmConnection: LlmConnectionState
@@ -971,6 +977,8 @@ interface AppState {
   openSettingsTab: (options?: SettingsOpenOptions) => void
   setSettingsActiveTab: (tab: SettingsTabId) => void
   clearSettingsFocusRequest: () => void
+  clearSidebarFocusRequest: () => void
+  clearChatComposerFocusRequest: () => void
   openCompareTab: (input: {
     leftPath: string
     rightPath: string
@@ -1176,6 +1184,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   editorRevealRequest: null,
   settingsActiveTab: 'appearance',
   settingsFocusRequest: null,
+  sidebarFocusRequest: null,
+  chatComposerFocusRequest: null,
   editorSelection: null,
   cursorPosition: { line: 1, column: 1 },
   llmConnection: {
@@ -1316,6 +1326,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       editorRevealRequest: null,
       settingsActiveTab: 'appearance',
       settingsFocusRequest: null,
+      sidebarFocusRequest: null,
+      chatComposerFocusRequest: null,
       loadingChatIds: [],
       lastAiApplyUndo: null,
       lastAiUndoError: null,
@@ -1510,6 +1522,10 @@ export const useAppStore = create<AppState>((set, get) => ({
   setSettingsActiveTab: (tab) => set({ settingsActiveTab: tab }),
 
   clearSettingsFocusRequest: () => set({ settingsFocusRequest: null }),
+
+  clearSidebarFocusRequest: () => set({ sidebarFocusRequest: null }),
+
+  clearChatComposerFocusRequest: () => set({ chatComposerFocusRequest: null }),
 
   openCompareTab: (input) => {
     set((state) => {
@@ -2169,13 +2185,17 @@ export const useAppStore = create<AppState>((set, get) => ({
       return
     }
     const state = get()
+    const nextFocus: ChatComposerFocusRequest = {
+      id: (state.chatComposerFocusRequest?.id ?? 0) + 1
+    }
     const openSessions = getOpenSessions(state.chatSessions)
     if (openSessions.length === 0) {
       const ensured = ensureOpenChatSession(state.chatSessions)
       set({
         showChat: true,
         chatSessions: ensured.sessions,
-        activeChatId: ensured.activeChatId
+        activeChatId: ensured.activeChatId,
+        chatComposerFocusRequest: nextFocus
       })
       scheduleChatHistorySave(state.workspaceRoot)
       return
@@ -2184,7 +2204,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       state.activeChatId && openSessions.some((s) => s.id === state.activeChatId)
         ? state.activeChatId
         : openSessions[openSessions.length - 1].id
-    set({ showChat: true, activeChatId })
+    set({ showChat: true, activeChatId, chatComposerFocusRequest: nextFocus })
   },
   setShowTerminal: (show) => set({ showTerminal: show }),
   requestNewTerminalMenu: () =>
@@ -2194,15 +2214,23 @@ export const useAppStore = create<AppState>((set, get) => ({
     })),
   setLeftSidebarView: (view) => set({ leftSidebarView: view }),
   openOutlinePanel: () =>
-    set({
+    set((state) => ({
       showFileTree: true,
-      leftSidebarView: 'outline'
-    }),
+      leftSidebarView: 'outline',
+      sidebarFocusRequest: {
+        id: (state.sidebarFocusRequest?.id ?? 0) + 1,
+        view: 'outline'
+      }
+    })),
   openGitPanel: () =>
-    set({
+    set((state) => ({
       showFileTree: true,
-      leftSidebarView: 'git'
-    }),
+      leftSidebarView: 'git',
+      sidebarFocusRequest: {
+        id: (state.sidebarFocusRequest?.id ?? 0) + 1,
+        view: 'git'
+      }
+    })),
   openDeskPanel: () =>
     set({
       showFileTree: true,
@@ -2214,7 +2242,11 @@ export const useAppStore = create<AppState>((set, get) => ({
       leftSidebarView: 'search',
       searchReplaceOpen: options?.replace ?? state.searchReplaceOpen,
       searchRootPath:
-        options && 'rootPath' in options ? (options.rootPath ?? null) : state.searchRootPath
+        options && 'rootPath' in options ? (options.rootPath ?? null) : state.searchRootPath,
+      sidebarFocusRequest: {
+        id: (state.sidebarFocusRequest?.id ?? 0) + 1,
+        view: 'search'
+      }
     })),
   setSearchQuery: (query) => set({ searchQuery: query }),
   setSearchReplace: (value) => set({ searchReplace: value }),

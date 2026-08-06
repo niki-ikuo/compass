@@ -94,6 +94,8 @@ export function HelpDialog({
     setActiveId(initialDocId)
     void loadDoc(initialDocId)
     void window.compass.help.list(locale).then(setDocs).catch(() => setDocs([]))
+    // Defer so the dialog is mounted before focusing the search field.
+    const focusTimer = window.setTimeout(() => searchRef.current?.focus(), 0)
 
     const handleKeyDown = (event: KeyboardEvent): void => {
       if (event.key === 'Escape') {
@@ -103,7 +105,10 @@ export function HelpDialog({
       }
     }
     window.addEventListener('keydown', handleKeyDown, true)
-    return () => window.removeEventListener('keydown', handleKeyDown, true)
+    return () => {
+      window.clearTimeout(focusTimer)
+      window.removeEventListener('keydown', handleKeyDown, true)
+    }
   }, [open, initialDocId, loadDoc, onClose, locale])
 
   useEffect(() => {

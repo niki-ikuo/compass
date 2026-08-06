@@ -186,6 +186,8 @@ export function ChatPanel() {
   const clearChatComposerInsertRequest = useAppStore((s) => s.clearChatComposerInsertRequest)
   const chatComposerSendRequest = useAppStore((s) => s.chatComposerSendRequest)
   const clearChatComposerSendRequest = useAppStore((s) => s.clearChatComposerSendRequest)
+  const chatComposerFocusRequest = useAppStore((s) => s.chatComposerFocusRequest)
+  const clearChatComposerFocusRequest = useAppStore((s) => s.clearChatComposerFocusRequest)
   const settings = useAppStore((s) => s.settings)
   const setSettings = useAppStore((s) => s.setSettings)
 
@@ -947,6 +949,23 @@ export function ChatPanel() {
       window.setTimeout(focus, 50)
     })
   }
+
+  useEffect(() => {
+    if (!chatComposerFocusRequest) return
+    const requestId = chatComposerFocusRequest.id
+    const focus = () => inputComposerRef.current?.focus()
+    requestAnimationFrame(() => {
+      focus()
+      window.setTimeout(focus, 0)
+      window.setTimeout(focus, 50)
+    })
+    const clearTimer = window.setTimeout(() => {
+      if (useAppStore.getState().chatComposerFocusRequest?.id === requestId) {
+        clearChatComposerFocusRequest()
+      }
+    }, 60)
+    return () => clearTimeout(clearTimer)
+  }, [chatComposerFocusRequest, clearChatComposerFocusRequest])
 
   const insertContextMentionIntoInput = (ref: {
     path: string

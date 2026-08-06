@@ -121,8 +121,10 @@ export function App() {
     (command: HelpCommandId) => {
       switch (command) {
         case 'Open Settings':
+          openSettingsTab({ focusFirstField: true })
+          break
         case 'Open Provider':
-          openSettingsTab()
+          openSettingsTab({ tab: 'llm', focusFirstField: true })
           break
         case 'Open Folder':
           void handleOpenFolder()
@@ -307,7 +309,7 @@ export function App() {
       window.compass.menu.onOpenFolder(handleOpenFolder),
       window.compass.menu.onCloseFolder(handleCloseFolder),
       window.compass.menu.onSave(handleSave),
-      window.compass.menu.onSettings(() => openSettingsTab()),
+      window.compass.menu.onSettings(() => openSettingsTab({ focusFirstField: true })),
       window.compass.menu.onToggleTerminal(() => {
         if (!useAppStore.getState().workspaceRoot) return
         setShowTerminal(!useAppStore.getState().showTerminal)
@@ -411,7 +413,7 @@ export function App() {
         onToggleFileTree={handleToggleExplorer}
         onToggleChat={() => setShowChat(!showChat)}
         onToggleTerminal={() => setShowTerminal(!showTerminal)}
-        onOpenSettings={() => openSettingsTab()}
+        onOpenSettings={() => openSettingsTab({ focusFirstField: true })}
         onOpenFolder={() => void handleOpenFolder()}
         onCloseFolder={() => void handleCloseFolder()}
         onSave={() => void handleSave()}

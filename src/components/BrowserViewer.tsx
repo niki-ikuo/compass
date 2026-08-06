@@ -8,6 +8,7 @@ import {
 } from 'react'
 import { useAppStore } from '@/stores/app-store'
 import { normalizeBrowserUrl } from '@/utils/browser-tab'
+import { focusWithRetry } from '@/utils/focus-with-retry'
 import { useI18n } from '@/i18n'
 import { ArrowLeftIcon, ArrowRightIcon, RefreshIcon, StopIcon } from './icons/ToolbarIcons'
 
@@ -33,10 +34,18 @@ export function BrowserViewer({ path, initialUrl }: BrowserViewerProps) {
   const { t } = useI18n()
   const updateBrowserTab = useAppStore((s) => s.updateBrowserTab)
   const webviewRef = useRef<ElectronWebView | null>(null)
+  const addressInputRef = useRef<HTMLInputElement>(null)
   const [address, setAddress] = useState(initialUrl === 'about:blank' ? '' : initialUrl)
   const [loading, setLoading] = useState(false)
   const [canBack, setCanBack] = useState(false)
   const [canForward, setCanForward] = useState(false)
+
+  useEffect(() => {
+    // New blank tabs should land in the address bar for immediate typing.
+    if (initialUrl === 'about:blank' || !initialUrl.trim()) {
+      focusWithRetry(() => addressInputRef.current, { select: true })
+    }
+  }, [path, initialUrl])
 
   useEffect(() => {
     const view = webviewRef.current
@@ -151,6 +160,7 @@ export function BrowserViewer({ path, initialUrl }: BrowserViewerProps) {
         </div>
         <form className="browser-address-form" onSubmit={handleSubmit}>
           <input
+            ref={addressInputRef}
             className="browser-address"
             type="text"
             value={address}

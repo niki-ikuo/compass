@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAppStore } from '@/stores/app-store'
+import { focusWithRetry } from '@/utils/focus-with-retry'
 import { openWorkspaceFile } from '@/utils/open-workspace-file'
 import type { WorkspaceOutlineEntry, WorkspaceOutlineHeading } from '@/types'
 import { useI18n } from '@/i18n'
@@ -77,12 +78,27 @@ export function WorkspaceOutline() {
   const openFiles = useAppStore((s) => s.openFiles)
   const revealInEditor = useAppStore((s) => s.revealInEditor)
   const indexStatus = useAppStore((s) => s.indexStatus)
+  const sidebarFocusRequest = useAppStore((s) => s.sidebarFocusRequest)
+  const clearSidebarFocusRequest = useAppStore((s) => s.clearSidebarFocusRequest)
 
+  const filterInputRef = useRef<HTMLInputElement>(null)
   const [files, setFiles] = useState<WorkspaceOutlineEntry[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [filter, setFilter] = useState('')
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
+
+  useEffect(() => {
+    if (!sidebarFocusRequest || sidebarFocusRequest.view !== 'outline') return
+    const requestId = sidebarFocusRequest.id
+    focusWithRetry(() => filterInputRef.current, { select: true })
+    const clearTimer = window.setTimeout(() => {
+      if (useAppStore.getState().sidebarFocusRequest?.id === requestId) {
+        clearSidebarFocusRequest()
+      }
+    }, 60)
+    return () => clearTimeout(clearTimer)
+  }, [sidebarFocusRequest, clearSidebarFocusRequest])
 
   const loadOutline = useCallback(async () => {
     if (!workspaceRoot) {
@@ -166,6 +182,7 @@ export function WorkspaceOutline() {
     <div className="workspace-outline-panel">
       <div className="workspace-outline-toolbar">
         <input
+          ref={filterInputRef}
           type="search"
           className="search-input"
           value={filter}

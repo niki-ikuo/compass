@@ -35,6 +35,7 @@ import {
   type MessageKey
 } from '@/i18n'
 import { refreshLlmConnection } from '@/utils/llm-connection'
+import { focusWithRetry } from '@/utils/focus-with-retry'
 import type { SettingsTabId } from '@/utils/settings-tab'
 
 const SETTINGS_TABS: Array<{ id: SettingsTabId; labelKey: MessageKey }> = [
@@ -231,17 +232,18 @@ export function SettingsPanel() {
   useEffect(() => {
     if (!settingsFocusRequest) return
     const requestId = settingsFocusRequest.id
-    // Wait a frame so the active settings tab panel is in the DOM
-    const frame = requestAnimationFrame(() => {
-      const first = settingsBodyRef.current?.querySelector<HTMLElement>(
+    focusWithRetry(() =>
+      settingsBodyRef.current?.querySelector<HTMLElement>(
         'select:not([disabled]), input:not([disabled]):not([type="hidden"]), textarea:not([disabled])'
       )
-      first?.focus()
+    )
+    // Clear after retries have been scheduled so a later open can request again.
+    const clearTimer = window.setTimeout(() => {
       if (useAppStore.getState().settingsFocusRequest?.id === requestId) {
         clearSettingsFocusRequest()
       }
-    })
-    return () => cancelAnimationFrame(frame)
+    }, 60)
+    return () => clearTimeout(clearTimer)
   }, [settingsFocusRequest, activeTab, clearSettingsFocusRequest])
 
   useEffect(() => {

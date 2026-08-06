@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAppStore } from '@/stores/app-store'
 import { formatUiPath, UI_PATH_MAX_CHARS, UI_PATH_MAX_CHARS_WIDE } from '@/utils/display-path'
+import { focusWithRetry } from '@/utils/focus-with-retry'
 import { openWorkspaceFile } from '@/utils/open-workspace-file'
 import type {
   GitBranchInfo,
@@ -156,6 +157,8 @@ export function GitPanel() {
   const { t } = useI18n()
   const workspaceRoot = useAppStore((s) => s.workspaceRoot)
   const leftSidebarView = useAppStore((s) => s.leftSidebarView)
+  const sidebarFocusRequest = useAppStore((s) => s.sidebarFocusRequest)
+  const clearSidebarFocusRequest = useAppStore((s) => s.clearSidebarFocusRequest)
 
   const [status, setStatus] = useState<GitStatusResult | null>(null)
   const [branches, setBranches] = useState<GitBranchInfo[]>([])
@@ -171,6 +174,28 @@ export function GitPanel() {
   const [branchBusy, setBranchBusy] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
   const refreshToken = useRef(0)
+  const panelRef = useRef<HTMLDivElement>(null)
+  const commitInputRef = useRef<HTMLTextAreaElement>(null)
+
+  useEffect(() => {
+    if (!sidebarFocusRequest || sidebarFocusRequest.view !== 'git') return
+    // Wait until status has settled so the commit box (or fallback controls) exist.
+    if (status === null && loading) return
+    const requestId = sidebarFocusRequest.id
+    focusWithRetry(
+      () =>
+        commitInputRef.current ??
+        panelRef.current?.querySelector<HTMLElement>(
+          'select:not([disabled]), textarea:not([disabled]), input:not([disabled]):not([type="hidden"]), button:not([disabled])'
+        )
+    )
+    const clearTimer = window.setTimeout(() => {
+      if (useAppStore.getState().sidebarFocusRequest?.id === requestId) {
+        clearSidebarFocusRequest()
+      }
+    }, 60)
+    return () => clearTimeout(clearTimer)
+  }, [sidebarFocusRequest, status, loading, clearSidebarFocusRequest])
 
   const refreshBranches = useCallback(async (): Promise<void> => {
     if (!workspaceRoot) {
@@ -440,7 +465,7 @@ export function GitPanel() {
   }
 
   return (
-    <div className="git-panel">
+    <div className="git-panel" ref={panelRef}>
       <div className="git-toolbar">
         <div className="git-branch" title={t('git.branch')}>
           {status?.isRepo ? (
@@ -541,6 +566,7 @@ export function GitPanel() {
               {t('git.commitMessage')}
             </label>
             <textarea
+              ref={commitInputRef}
               id="git-commit-message"
               className="git-commit-input"
               rows={3}

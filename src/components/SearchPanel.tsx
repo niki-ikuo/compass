@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAppStore } from '@/stores/app-store'
 import { formatUiPath, UI_PATH_MAX_CHARS } from '@/utils/display-path'
+import { focusWithRetry } from '@/utils/focus-with-retry'
 import { buildWorkspaceIndex } from '@/utils/project-index'
 import { formatEmbeddingsStatus } from '@/utils/embeddings-status'
 import { openWorkspaceFile } from '@/utils/open-workspace-file'
@@ -149,6 +150,8 @@ export function SearchPanel() {
   const revealInEditor = useAppStore((s) => s.revealInEditor)
   const syncOpenFileContents = useAppStore((s) => s.syncOpenFileContents)
   const setFileTree = useAppStore((s) => s.setFileTree)
+  const sidebarFocusRequest = useAppStore((s) => s.sidebarFocusRequest)
+  const clearSidebarFocusRequest = useAppStore((s) => s.clearSidebarFocusRequest)
 
   const queryInputRef = useRef<HTMLInputElement>(null)
   const replaceInputRef = useRef<HTMLInputElement>(null)
@@ -172,30 +175,33 @@ export function SearchPanel() {
       useAppStore.getState().searchReplaceOpen && useAppStore.getState().searchQuery
         ? replaceInputRef.current
         : queryInputRef.current
-    const focus = (): void => {
-      focusTarget?.focus()
-    }
-    // Electron can drop keyboard focus after dialogs / Monaco sync; retry briefly.
-    requestAnimationFrame(() => {
-      focus()
-      window.setTimeout(focus, 0)
-      window.setTimeout(focus, 50)
-    })
+    focusWithRetry(() => focusTarget)
   }, [])
 
   useEffect(() => {
-    queryInputRef.current?.focus()
-    queryInputRef.current?.select()
-  }, [])
+    if (!sidebarFocusRequest || sidebarFocusRequest.view !== 'search') return
+    const requestId = sidebarFocusRequest.id
+    const target =
+      searchReplaceOpen && useAppStore.getState().searchQuery
+        ? () => replaceInputRef.current
+        : () => queryInputRef.current
+    focusWithRetry(target, { select: true })
+    const clearTimer = window.setTimeout(() => {
+      if (useAppStore.getState().sidebarFocusRequest?.id === requestId) {
+        clearSidebarFocusRequest()
+      }
+    }, 60)
+    return () => clearTimeout(clearTimer)
+  }, [sidebarFocusRequest, searchReplaceOpen, clearSidebarFocusRequest])
 
   // Focus only when the replace row opens — not on every searchQuery change.
   useEffect(() => {
     if (!searchReplaceOpen) return
     const query = useAppStore.getState().searchQuery
     if (!query) {
-      queryInputRef.current?.focus()
+      focusWithRetry(() => queryInputRef.current)
     } else {
-      replaceInputRef.current?.focus()
+      focusWithRetry(() => replaceInputRef.current)
     }
   }, [searchReplaceOpen])
 

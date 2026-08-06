@@ -2,6 +2,7 @@ import { getLocale, t } from '@/i18n'
 import { join } from '@/utils/path'
 import { openWorkspaceFile } from '@/utils/open-workspace-file'
 import { useAppStore } from '@/stores/app-store'
+import { focusMonacoEditor } from '@/utils/workbench-focus'
 
 export const WORKSPACE_RULES_RELATIVE = '.compass/rules.md'
 export const WORKSPACE_GLOSSARY_RELATIVE = '.compass/glossary.md'
@@ -96,6 +97,7 @@ async function openOrCreateRelativeFile(
   const existing = store.openFiles.find((f) => normalizePath(f.path) === absolute)
   if (existing) {
     store.setActiveFile(existing.path)
+    focusMonacoEditor()
     return
   }
 
@@ -103,6 +105,7 @@ async function openOrCreateRelativeFile(
     const opened = await window.compass.fs.openEditorFile(absolute)
     if (opened.kind === 'text') {
       store.openFile(absolute, opened.content, opened.encoding)
+      focusMonacoEditor()
       return
     }
   } catch {
@@ -112,6 +115,7 @@ async function openOrCreateRelativeFile(
   await ensureCompassDir(workspaceRoot)
   await window.compass.fs.writeFile(absolute, starter)
   await openWorkspaceFile(absolute)
+  focusMonacoEditor()
 }
 
 /** Open `.compass/rules.md`, creating a starter file if missing. */
