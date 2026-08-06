@@ -50,7 +50,12 @@ import {
   isCompareOpenFile,
   pathsEqualIgnoreCase
 } from '@/utils/compare-tab'
-import { SETTINGS_TAB_PATH } from '@/utils/settings-tab'
+import {
+  SETTINGS_TAB_PATH,
+  type SettingsFocusRequest,
+  type SettingsOpenOptions,
+  type SettingsTabId
+} from '@/utils/settings-tab'
 import { moveItemByDropIndex, reorderOpenSessionsById } from '@/utils/tab-reorder'
 import { t, isDefaultChatTitle } from '@/i18n'
 
@@ -882,6 +887,10 @@ interface AppState {
   searchError: string | null
   searchReplaceOpen: boolean
   editorRevealRequest: EditorRevealRequest | null
+  /** Active settings sub-tab (persists while the settings editor tab exists) */
+  settingsActiveTab: SettingsTabId
+  /** One-shot: focus the first field in the active settings sub-tab */
+  settingsFocusRequest: SettingsFocusRequest | null
   editorSelection: EditorSelection | null
   cursorPosition: { line: number; column: number }
   llmConnection: LlmConnectionState
@@ -959,7 +968,9 @@ interface AppState {
   ) => void
   openBinaryFile: (path: string, size: number, options?: { transient?: boolean }) => void
   openBrowserTab: (url?: string) => void
-  openSettingsTab: () => void
+  openSettingsTab: (options?: SettingsOpenOptions) => void
+  setSettingsActiveTab: (tab: SettingsTabId) => void
+  clearSettingsFocusRequest: () => void
   openCompareTab: (input: {
     leftPath: string
     rightPath: string
@@ -1163,6 +1174,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   searchError: null,
   searchReplaceOpen: false,
   editorRevealRequest: null,
+  settingsActiveTab: 'appearance',
+  settingsFocusRequest: null,
   editorSelection: null,
   cursorPosition: { line: 1, column: 1 },
   llmConnection: {
@@ -1301,6 +1314,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       searchSearching: false,
       searchError: null,
       editorRevealRequest: null,
+      settingsActiveTab: 'appearance',
+      settingsFocusRequest: null,
       loadingChatIds: [],
       lastAiApplyUndo: null,
       lastAiUndoError: null,
@@ -1461,11 +1476,20 @@ export const useAppStore = create<AppState>((set, get) => ({
     scheduleOpenEditorsSave(get().workspaceRoot)
   },
 
-  openSettingsTab: () =>
+  openSettingsTab: (options) =>
     set((state) => {
       const existing = state.openFiles.find((f) => f.viewKind === 'settings')
+      const settingsActiveTab = options?.tab ?? (existing ? state.settingsActiveTab : 'appearance')
+      const settingsFocusRequest =
+        options?.focusFirstField === true
+          ? { id: (state.settingsFocusRequest?.id ?? 0) + 1 }
+          : state.settingsFocusRequest
       if (existing) {
-        return { activeFilePath: existing.path }
+        return {
+          activeFilePath: existing.path,
+          settingsActiveTab,
+          settingsFocusRequest
+        }
       }
       const tab: OpenFile = {
         path: SETTINGS_TAB_PATH,
@@ -1477,9 +1501,15 @@ export const useAppStore = create<AppState>((set, get) => ({
       }
       return {
         openFiles: [...state.openFiles, tab],
-        activeFilePath: tab.path
+        activeFilePath: tab.path,
+        settingsActiveTab,
+        settingsFocusRequest
       }
     }),
+
+  setSettingsActiveTab: (tab) => set({ settingsActiveTab: tab }),
+
+  clearSettingsFocusRequest: () => set({ settingsFocusRequest: null }),
 
   openCompareTab: (input) => {
     set((state) => {

@@ -35,8 +35,7 @@ import {
   type MessageKey
 } from '@/i18n'
 import { refreshLlmConnection } from '@/utils/llm-connection'
-
-type SettingsTabId = 'appearance' | 'chat' | 'llm' | 'terminal' | 'desk'
+import type { SettingsTabId } from '@/utils/settings-tab'
 
 const SETTINGS_TABS: Array<{ id: SettingsTabId; labelKey: MessageKey }> = [
   { id: 'appearance', labelKey: 'settings.appearance' },
@@ -120,6 +119,10 @@ export function SettingsPanel() {
   const setWorkspaceDefaultUseCasePreset = useAppStore((s) => s.setWorkspaceDefaultUseCasePreset)
   const setSettings = useAppStore((s) => s.setSettings)
   const llmConnection = useAppStore((s) => s.llmConnection)
+  const activeTab = useAppStore((s) => s.settingsActiveTab)
+  const setSettingsActiveTab = useAppStore((s) => s.setSettingsActiveTab)
+  const settingsFocusRequest = useAppStore((s) => s.settingsFocusRequest)
+  const clearSettingsFocusRequest = useAppStore((s) => s.clearSettingsFocusRequest)
   const [testingConnection, setTestingConnection] = useState(false)
 
   const initial = buildSettingsSnapshot(settings, workspaceDefaultUseCasePreset)
@@ -134,7 +137,6 @@ export function SettingsPanel() {
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
   const [shells, setShells] = useState<TerminalShell[]>([])
-  const [activeTab, setActiveTab] = useState<SettingsTabId>('appearance')
   const [usage, setUsage] = useState<UsageSnapshot | null>(null)
   const [resettingUsage, setResettingUsage] = useState(false)
   const [deskHotkeyStatus, setDeskHotkeyStatus] = useState<DeskCaptureHotkeyStatus | null>(null)
@@ -142,6 +144,7 @@ export function SettingsPanel() {
     null
   )
   const lastSavedThemeRef = useRef(initial.form.colorTheme)
+  const settingsBodyRef = useRef<HTMLDivElement>(null)
 
   const refreshDeskHotkeyStatus = async (): Promise<{
     capture: DeskCaptureHotkeyStatus | null
@@ -201,7 +204,6 @@ export function SettingsPanel() {
     setWorkspacePresetSnapshot(snapshot.workspacePreset)
     lastSavedThemeRef.current = snapshot.form.colorTheme
     setMessage('')
-    setActiveTab('appearance')
     void window.compass.terminal.listShells().then(setShells)
 
     return () => {
@@ -211,6 +213,8 @@ export function SettingsPanel() {
           .getState()
           .openFiles.some((f) => f.viewKind === 'settings')
         if (stillOpen) return
+        useAppStore.getState().setSettingsActiveTab('appearance')
+        useAppStore.getState().clearSettingsFocusRequest()
         const currentTheme = useAppStore.getState().settings.colorTheme
         if (currentTheme !== lastSavedThemeRef.current) {
           useAppStore.getState().setSettings({
@@ -223,6 +227,22 @@ export function SettingsPanel() {
     // タブを開いた時点の設定だけを取り込む
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  useEffect(() => {
+    if (!settingsFocusRequest) return
+    const requestId = settingsFocusRequest.id
+    // Wait a frame so the active settings tab panel is in the DOM
+    const frame = requestAnimationFrame(() => {
+      const first = settingsBodyRef.current?.querySelector<HTMLElement>(
+        'select:not([disabled]), input:not([disabled]):not([type="hidden"]), textarea:not([disabled])'
+      )
+      first?.focus()
+      if (useAppStore.getState().settingsFocusRequest?.id === requestId) {
+        clearSettingsFocusRequest()
+      }
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [settingsFocusRequest, activeTab, clearSettingsFocusRequest])
 
   useEffect(() => {
     let cancelled = false
@@ -365,7 +385,7 @@ export function SettingsPanel() {
               aria-selected={activeTab === tab.id}
               aria-controls={`settings-panel-${tab.id}`}
               className={`settings-tab${activeTab === tab.id ? ' active' : ''}`}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => setSettingsActiveTab(tab.id)}
             >
               {t(tab.labelKey)}
             </button>
@@ -373,6 +393,7 @@ export function SettingsPanel() {
         </div>
 
         <div
+          ref={settingsBodyRef}
           className="settings-panel-body"
           role="tabpanel"
           id={`settings-panel-${activeTab}`}

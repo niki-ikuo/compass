@@ -366,7 +366,7 @@ export function StatusBar() {
         <button
           type="button"
           className="status-item status-usage-button"
-          onClick={() => openSettingsTab()}
+          onClick={() => openSettingsTab({ tab: 'llm', focusFirstField: true })}
           title={usageTitle}
         >
           {usageLabel}

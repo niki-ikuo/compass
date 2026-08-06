@@ -38,6 +38,7 @@ import {
 } from './icons/ToolbarIcons'
 import { FileTreeNodeIcon } from './icons/FileTypeIcons'
 import { openWorkspaceFile } from '@/utils/open-workspace-file'
+import { focusMonacoEditor } from '@/utils/workbench-focus'
 import { isComparablePath, openCompareFiles } from '@/utils/open-compare-files'
 import { isHtmlFilePath, pathToFileUrl } from '@/utils/browser-tab'
 import { isExtractableDocumentPath } from '@/utils/extractable-document'
@@ -958,14 +959,15 @@ export function FileTree() {
       if (node.isDirectory) return
       if (e.ctrlKey || e.metaKey || e.shiftKey) return
       closeAllMenus()
-      focusTreeContent()
       const normalized = normalizeNodePath(node.path)
       setSelectedPaths(new Set([normalized]))
       lastSelectedPathRef.current = normalized
       focusedPathRef.current = normalized
-      void handleOpenFile(node.path, { preview: false })
+      void handleOpenFile(node.path, { preview: false }).then(() => {
+        focusMonacoEditor()
+      })
     },
-    [closeAllMenus, focusTreeContent]
+    [closeAllMenus]
   )
 
   const getDeleteTargets = useCallback(
