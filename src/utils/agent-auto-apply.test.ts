@@ -30,4 +30,11 @@ describe('shouldAutoApplyAgentProposal', () => {
     expect(agentProposalHasDeletes(withDelete)).toBe(true)
     expect(shouldAutoApplyAgentProposal(true, withDelete)).toBe(false)
   })
+
+  it('refuses proposals that touch sensitive paths', () => {
+    const sensitive: WorkspaceAction[] = [
+      { type: 'writeFile', path: '.env', content: 'SECRET=1' }
+    ]
+    expect(shouldAutoApplyAgentProposal(true, sensitive)).toBe(false)
+  })
 })

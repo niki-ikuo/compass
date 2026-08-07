@@ -50,12 +50,15 @@ function switchProvider(form: AppSettings, nextId: LlmProviderId): AppSettings {
   if (form.providerId === nextId) return form
 
   const next = getLlmProvider(nextId)
+  // Draft keys stay in form.providerKeys until save; main keeps real secrets.
   const providerKeys: AppSettings['providerKeys'] = {
     ...form.providerKeys,
-    [form.providerId]: form.apiKey
+    ...(form.apiKey.trim() ? { [form.providerId]: form.apiKey } : {})
   }
 
-  const nextKey = providerKeys[nextId] ?? ''
+  const nextDraft = providerKeys[nextId] ?? ''
+  const configured = new Set(form.configuredProviderIds ?? [])
+  if (form.apiKeyConfigured) configured.add(form.providerId)
   const apiBaseUrl =
     nextId === 'custom'
       ? form.apiBaseUrl || next.apiBaseUrl || DEFAULT_SETTINGS.apiBaseUrl
@@ -65,7 +68,10 @@ function switchProvider(form: AppSettings, nextId: LlmProviderId): AppSettings {
     ...form,
     providerId: nextId,
     providerKeys,
-    apiKey: nextKey,
+    apiKey: nextDraft,
+    apiKeyConfigured: Boolean(nextDraft) || configured.has(nextId),
+    configuredProviderIds: [...configured],
+    clearApiKey: false,
     apiBaseUrl,
     model: resolveModelForProvider(nextId, form.model)
   }
@@ -301,14 +307,21 @@ export function SettingsPanel() {
         defaultShellId: defaultShellValue,
         providerKeys: {
           ...form.providerKeys,
-          [form.providerId]: form.apiKey
-        }
+          ...(form.apiKey.trim() ? { [form.providerId]: form.apiKey } : {})
+        },
+        clearApiKey: Boolean(form.clearApiKey)
       }
       await window.compass.settings.set(toSave)
-      setSettings(toSave)
-      setLocale(toSave.locale)
-      setOpenSnapshot(toSave)
-      lastSavedThemeRef.current = toSave.colorTheme
+      const publicSettings = await window.compass.settings.get()
+      setSettings(publicSettings)
+      setForm({
+        ...publicSettings,
+        providerKeys: { ...publicSettings.providerKeys },
+        clearApiKey: false
+      })
+      setLocale(publicSettings.locale)
+      setOpenSnapshot(publicSettings)
+      lastSavedThemeRef.current = publicSettings.colorTheme
 
       if (workspaceRoot) {
         const nextWs = workspacePresetForm
@@ -566,16 +579,70 @@ export function SettingsPanel() {
               )}
             </label>
 
+            {isCustomProvider && (
+              <label className="settings-checkbox-row">
+                <input
+                  type="checkbox"
+                  checked={form.allowLanApiBaseUrl === true}
+                  onChange={(e) =>
+                    setForm({ ...form, allowLanApiBaseUrl: e.target.checked })
+                  }
+                />
+                <span>
+                  {t('settings.allowLanApiBaseUrl')}
+                  <span className="field-hint">{t('settings.allowLanApiBaseUrlHint')}</span>
+                </span>
+              </label>
+            )}
+
             <label>
               {t('settings.apiKey')}
               <input
                 type="password"
                 value={form.apiKey}
-                onChange={(e) => setForm({ ...form, apiKey: e.target.value })}
-                placeholder={activeProvider.requiresApiKey ? 'sk-...' : t('common.optional')}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    apiKey: e.target.value,
+                    clearApiKey: false
+                  })
+                }
+                placeholder={
+                  form.apiKeyConfigured && !form.apiKey
+                    ? t('settings.apiKeyConfiguredPlaceholder')
+                    : activeProvider.requiresApiKey
+                      ? 'sk-...'
+                      : t('common.optional')
+                }
               />
+              {form.apiKeyConfigured && !form.apiKey && (
+                <span className="field-hint">{t('settings.apiKeyKeptInMain')}</span>
+              )}
+              {form.apiKeyStorageInsecure && (
+                <span className="field-hint">{t('settings.apiKeyStorageInsecure')}</span>
+              )}
               {!activeProvider.requiresApiKey && (
                 <span className="field-hint">{t('settings.apiKeyOptionalHint')}</span>
+              )}
+              {form.apiKeyConfigured && (
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  style={{ marginTop: 6 }}
+                  onClick={() =>
+                    setForm({
+                      ...form,
+                      apiKey: '',
+                      apiKeyConfigured: false,
+                      clearApiKey: true,
+                      configuredProviderIds: (form.configuredProviderIds ?? []).filter(
+                        (id) => id !== form.providerId
+                      )
+                    })
+                  }
+                >
+                  {t('settings.clearApiKey')}
+                </button>
               )}
             </label>
 

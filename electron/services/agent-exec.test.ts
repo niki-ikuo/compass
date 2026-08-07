@@ -44,6 +44,24 @@ describe('classifyAgentExecCommand', () => {
     }
   })
 
+  it('requires approval for network / exfiltration commands', () => {
+    const cases = [
+      'curl https://example.com',
+      'wget https://example.com/a',
+      'Invoke-WebRequest https://example.com',
+      'nc example.com 80',
+      'ssh user@host',
+      'python -c "print(1)"',
+      'node -e "console.log(1)"',
+      'powershell -File script.ps1',
+      'pwsh -File ./run.ps1'
+    ]
+    for (const command of cases) {
+      const risk = classifyAgentExecCommand(command)
+      expect(risk.level, command).toBe('needs_approval')
+    }
+  })
+
   it('blocks empty and oversized commands', () => {
     expect(classifyAgentExecCommand('').level).toBe('blocked')
     expect(classifyAgentExecCommand('   ').level).toBe('blocked')
@@ -74,7 +92,8 @@ describe('runAgentExec timeout and abort', () => {
       workspaceRoot,
       command: hangCommand,
       timeoutMs: 2_000,
-      signal: new AbortController().signal
+      signal: new AbortController().signal,
+      approvalGranted: true
     })
     const elapsed = Date.now() - started
 
@@ -91,7 +110,8 @@ describe('runAgentExec timeout and abort', () => {
       workspaceRoot,
       command: hangCommand,
       timeoutMs: 60_000,
-      signal: controller.signal
+      signal: controller.signal,
+      approvalGranted: true
     })
     setTimeout(() => controller.abort(), 400)
     const result = await pending

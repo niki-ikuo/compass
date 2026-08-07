@@ -4,6 +4,7 @@ import { withOpenWebUiChatCompat } from '../../src/utils/open-webui-compat'
 import { jsonStringifyUtf8Safe } from '../../src/utils/utf8-text'
 import { t } from '../../src/i18n/runtime'
 import { buildApiHeaders } from './ai-client'
+import { assertSafeApiBaseUrl } from './path-guard'
 import { getSettings } from './settings'
 
 export type LlmConnectionCode =
@@ -54,6 +55,18 @@ function validateSettings(settings: AppSettings): LlmConnectionTestResult | null
   }
   if (!settings.apiBaseUrl.trim()) {
     return { ok: false, status: 'incomplete', code: 'baseUrl', error: t('status.baseUrlUnset') }
+  }
+  try {
+    assertSafeApiBaseUrl(settings.apiBaseUrl, {
+      allowPrivateLan: settings.allowLanApiBaseUrl === true
+    })
+  } catch (error) {
+    return {
+      ok: false,
+      status: 'incomplete',
+      code: 'baseUrl',
+      error: error instanceof Error ? error.message : t('ai.invalidBaseUrl')
+    }
   }
   const provider = getLlmProvider(settings.providerId)
   if (provider.requiresApiKey && !settings.apiKey.trim()) {

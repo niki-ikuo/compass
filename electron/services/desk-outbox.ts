@@ -1,26 +1,16 @@
 import { readdir, readFile, rm, writeFile } from 'fs/promises'
-import { isAbsolute, join, relative, resolve, sep } from 'path'
+import { join } from 'path'
 import {
   parseDeskFrontmatter,
   serializeOutboxDocument,
   type OutboxDocMeta
 } from '../../src/utils/desk-frontmatter'
 import { ensureDeskDirs, outboxDir } from './desk-dirs'
+import { isPathUnderDir } from './path-guard'
 import { t } from '../../src/i18n/runtime'
 
-function isUnderDir(dir: string, absolutePath: string): boolean {
-  const root = resolve(dir)
-  const target = resolve(absolutePath)
-  const rel = relative(root, target)
-  if (!rel) return false
-  if (isAbsolute(rel)) return false
-  if (rel === '..' || rel.startsWith(`..${sep}`) || rel.startsWith('../')) return false
-  // Windows: tolerate case / slash differences already normalized by resolve/relative
-  return true
-}
-
-function isUnderOutbox(workspaceRoot: string, absolutePath: string): boolean {
-  return isUnderDir(outboxDir(workspaceRoot), absolutePath)
+export function isUnderOutbox(workspaceRoot: string, absolutePath: string): boolean {
+  return isPathUnderDir(outboxDir(workspaceRoot), absolutePath)
 }
 
 export async function archiveOutboxItem(

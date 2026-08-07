@@ -18,6 +18,7 @@ import {
   resolveChatContext,
   resolveInsideWorkspace
 } from './filesystem'
+import { registerExternalContextPaths, resetPathGuardForTests } from './path-guard'
 
 function makeTempRoot(name: string): string {
   const root = join(
@@ -331,13 +332,14 @@ describe('resolveChatContext', () => {
     expect(resolved.folders).toHaveLength(0)
   })
 
-  it('loads external files as read-only context with absolute labels', async () => {
+  it('loads allowlisted external files as read-only context', async () => {
     const root = makeTempRoot('ws-ctx')
     const externalRoot = makeTempRoot('external-ctx')
     tempRoots.push(root, externalRoot)
     writeFileSync(join(root, 'inside.md'), 'in\n', 'utf-8')
     const externalPath = join(externalRoot, 'outside.md')
     writeFileSync(externalPath, 'out\n', 'utf-8')
+    registerExternalContextPaths([externalPath])
 
     const resolved = await resolveChatContext(root, [
       { path: join(root, 'inside.md'), name: 'inside.md', isDirectory: false },
@@ -354,6 +356,21 @@ describe('resolveChatContext', () => {
       externalPath.replace(/\\/g, '/')
     )
     expect(resolved.files[1].relativePath.includes('..')).toBe(false)
+    resetPathGuardForTests()
+  })
+
+  it('skips external files that are not allowlisted', async () => {
+    const root = makeTempRoot('ws-ctx-deny')
+    const externalRoot = makeTempRoot('external-ctx-deny')
+    tempRoots.push(root, externalRoot)
+    resetPathGuardForTests()
+    const externalPath = join(externalRoot, 'secret.md')
+    writeFileSync(externalPath, 'nope\n', 'utf-8')
+
+    const resolved = await resolveChatContext(root, [
+      { path: externalPath, name: 'secret.md', isDirectory: false }
+    ])
+    expect(resolved.files).toHaveLength(0)
   })
 
   it('ignores external folder refs', async () => {

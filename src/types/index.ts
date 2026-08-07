@@ -398,10 +398,27 @@ export interface AppSettings {
   /** 選択中の LLM プロバイダ */
   providerId: LlmProviderId
   apiBaseUrl: string
-  /** 現在のプロバイダ向け API Key */
+  /**
+   * 現在のプロバイダ向け API Key。
+   * Renderer には空文字のみ返す（実体は main プロセスに保持）。
+   * 設定保存時は非空のときだけ更新し、空は「既存キーを維持」。
+   */
   apiKey: string
-  /** プロバイダごとの API Key（切替時に復元） */
+  /** プロバイダごとの API Key（Renderer には空。main 内でのみ実体を保持） */
   providerKeys: Partial<Record<LlmProviderId, string>>
+  /** Renderer: 現在プロバイダにキーが保存済みか */
+  apiKeyConfigured?: boolean
+  /** Renderer: キーが設定済みのプロバイダ ID 一覧 */
+  configuredProviderIds?: LlmProviderId[]
+  /** Renderer: safeStorage 不可でキーが弱い保存になっているとき true */
+  apiKeyStorageInsecure?: boolean
+  /** 設定保存時に現在プロバイダのキーを削除する */
+  clearApiKey?: boolean
+  /**
+   * カスタム API Base URL でプライベート LAN（192.168/10/172.16）を許可するか。
+   * クラウドメタデータ（169.254.169.254 等）は常に拒否。既定 OFF。
+   */
+  allowLanApiBaseUrl: boolean
   model: string
   temperature: number
   maxTokens: number
@@ -988,6 +1005,8 @@ export interface CompassAPI {
     delete: (targetPath: string) => Promise<void>
     pickFiles: () => Promise<string[] | null>
     importFiles: (parentDir: string, sourcePaths: string[]) => Promise<string[]>
+    /** OS ドロップ等の外部パスをチャット文脈 allowlist に登録 */
+    registerExternalContextPaths: (paths: string[]) => Promise<void>
     /** OS ドロップ等の File から絶対パスを得る（Electron webUtils） */
     getPathForFile: (file: File) => string
     search: (
@@ -1073,8 +1092,12 @@ export interface CompassAPI {
       workspaceRoot: string,
       absolutePath: string
     ) => Promise<{ ok: true } | { ok: false; message: string }>
-    runShipCheck: (absolutePath: string) => Promise<DeskShipCheckResult>
+    runShipCheck: (
+      workspaceRoot: string,
+      absolutePath: string
+    ) => Promise<DeskShipCheckResult>
     copyOutboxPayload: (
+      workspaceRoot: string,
       absolutePath: string
     ) => Promise<
       | { ok: true; payload: string; content: string; markedReady: boolean }
@@ -1240,6 +1263,10 @@ export const DEFAULT_SETTINGS: AppSettings = {
   apiBaseUrl: 'https://api.openai.com/v1',
   apiKey: '',
   providerKeys: {},
+  apiKeyConfigured: false,
+  configuredProviderIds: [],
+  apiKeyStorageInsecure: false,
+  allowLanApiBaseUrl: false,
   model: 'gpt-4o-mini',
   temperature: 0.2,
   maxTokens: 32768,

@@ -8,6 +8,7 @@ import {
   type EmbeddingsConnection
 } from '../../src/utils/embeddings'
 import { jsonStringifyUtf8Safe } from '../../src/utils/utf8-text'
+import { assertSafeApiBaseUrl } from './path-guard'
 import { getSettings } from './settings'
 
 export {
@@ -64,6 +65,13 @@ export async function embedTextsViaApi(
   const resolved = settings ?? (await getSettings())
   const connection = resolveEmbeddingsConnection(resolved)
   if (!connection) return null
+  try {
+    assertSafeApiBaseUrl(connection.apiBaseUrl, {
+      allowPrivateLan: resolved.allowLanApiBaseUrl === true
+    })
+  } catch {
+    return null
+  }
 
   const timeoutMs = options?.timeoutMs ?? EMBEDDINGS_REQUEST_TIMEOUT_MS
   const vectors: number[][] = []

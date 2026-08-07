@@ -68,9 +68,10 @@ import { listDeskInbox, listDeskOutbox } from './services/desk-list'
 import { archiveOutboxItem, archiveAllOutboxItems, deleteOutboxItem } from './services/desk-outbox'
 import { copyOutboxPayload, runDeskShipCheck } from './services/desk-ship-check'
 import { cancelChat, cancelInlineCompletion, completeInline, streamChat } from './services/ai-client'
-import { runAgent, resolveAgentApproval, resolveAgentContinue } from './services/agent-runner'
+import { runAgent } from './services/agent-runner'
 import {
   getSettings,
+  getPublicSettings,
   setSettings,
   getLastWorkspaceRoot,
   setLastWorkspaceRoot,
@@ -78,6 +79,17 @@ import {
   addRecentWorkspaceRoot,
   removeRecentWorkspaceRoot
 } from './services/settings'
+import {
+  assertActiveWorkspacePath,
+  assertActiveWorkspacePaths,
+  bindActiveWorkspaceRoot,
+  registerExternalContextPaths,
+  setActiveWorkspaceRoot
+} from './services/path-guard'
+import {
+  resolveAgentApprovalForSender,
+  resolveAgentContinueForSender
+} from './services/agent-approval'
 import { getUsage, resetUsage } from './services/usage'
 import {
   getWorkspaceSettings,
@@ -243,26 +255,44 @@ function zoomMenuClick(action: 'resetZoom' | 'zoomIn' | 'zoomOut'): void {
   applyViewZoom(webContents, action)
 }
 
-/** パッケージ済みビルド向け CSP。開発中は Vite HMR が unsafe-eval を要するため未設定のまま（Electron も警告を許容）。 */
-function applyPackagedContentSecurityPolicy(): void {
-  if (!app.isPackaged) return
-
-  const csp = [
-    "default-src 'self'",
-    "script-src 'self'",
-    "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' data: blob:",
-    "font-src 'self' data:",
-    "connect-src 'self' http: https:",
-    "media-src 'self' blob:",
-    "worker-src 'self' blob:",
-    "frame-src 'self' http: https:"
-  ].join('; ')
+/** App-shell CSP. Dev allows Vite HMR (unsafe-eval + localhost ws/http). */
+function applyContentSecurityPolicy(): void {
+  const csp = app.isPackaged
+    ? [
+        "default-src 'self'",
+        "script-src 'self'",
+        "style-src 'self' 'unsafe-inline'",
+        "img-src 'self' data: blob:",
+        "font-src 'self' data:",
+        // LLM traffic stays in main; renderer should not need broad connect-src
+        "connect-src 'self'",
+        "media-src 'self' blob:",
+        "worker-src 'self' blob:",
+        "frame-src 'self'",
+        "object-src 'none'",
+        "base-uri 'self'"
+      ].join('; ')
+    : [
+        "default-src 'self'",
+        "script-src 'self' 'unsafe-eval' 'unsafe-inline'",
+        "style-src 'self' 'unsafe-inline'",
+        "img-src 'self' data: blob:",
+        "font-src 'self' data:",
+        "connect-src 'self' http://localhost:* http://127.0.0.1:* ws://localhost:* ws://127.0.0.1:*",
+        "media-src 'self' blob:",
+        "worker-src 'self' blob:",
+        "frame-src 'self'",
+        "object-src 'none'",
+        "base-uri 'self'"
+      ].join('; ')
 
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
     const url = details.url
-    // アプリ本体のみ。BrowserViewer 等の外部ページには付けない
-    const isAppShell = url.startsWith('file:')
+    // App shell only (file: packaged, or Vite http: in dev). Skip webview guest pages.
+    const isAppShell =
+      url.startsWith('file:') ||
+      (!app.isPackaged &&
+        (url.startsWith('http://localhost:') || url.startsWith('http://127.0.0.1:')))
     if (!isAppShell) {
       callback({ responseHeaders: details.responseHeaders })
       return
@@ -294,7 +324,7 @@ async function createWindow(): Promise<void> {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false,
+      sandbox: true,
       webviewTag: true,
       additionalArguments: [`${COLOR_THEME_ARG_PREFIX}${settings.colorTheme}`]
     }
@@ -724,14 +754,16 @@ function registerIpcHandlers(): void {
     if (typeof targetPath !== 'string' || targetPath.trim() === '') {
       throw new Error('Invalid path')
     }
-    shell.showItemInFolder(targetPath)
+    const safePath = assertActiveWorkspacePath(targetPath.trim())
+    shell.showItemInFolder(safePath)
   })
 
   ipcMain.handle('shell:openPath', async (_event, targetPath: string) => {
     if (typeof targetPath !== 'string' || targetPath.trim() === '') {
       throw new Error('Invalid path')
     }
-    const errorMessage = await shell.openPath(targetPath.trim())
+    const safePath = assertActiveWorkspacePath(targetPath.trim())
+    const errorMessage = await shell.openPath(safePath)
     if (errorMessage) {
       throw new Error(errorMessage)
     }
@@ -775,61 +807,75 @@ function registerIpcHandlers(): void {
   ipcMain.handle(
     'fs:readDir',
     async (_event, dirPath: string, options?: { missingOk?: boolean }) => {
-      return readDirectory(dirPath, options)
+      const safePath = assertActiveWorkspacePath(dirPath, { allowRoot: true })
+      return readDirectory(safePath, options)
     }
   )
 
   ipcMain.handle('fs:readFile', async (_event, filePath: string, encoding?: FileEncoding) => {
-    return readFileContent(filePath, encoding)
+    const safePath = assertActiveWorkspacePath(filePath)
+    return readFileContent(safePath, encoding)
   })
 
   ipcMain.handle('fs:openEditorFile', async (_event, filePath: string) => {
-    return openEditorFile(filePath)
+    const safePath = assertActiveWorkspacePath(filePath)
+    return openEditorFile(safePath)
   })
 
   ipcMain.handle(
     'fs:writeFile',
     async (_event, filePath: string, content: string, encoding?: FileEncoding) => {
-      await writeFileContent(filePath, content, encoding ?? 'utf8')
+      const safePath = assertActiveWorkspacePath(filePath)
+      await writeFileContent(safePath, content, encoding ?? 'utf8')
     }
   )
 
   ipcMain.handle(
     'fs:writeBinaryFile',
     async (_event, filePath: string, base64: string) => {
-      await writeBinaryFile(filePath, base64)
+      const safePath = assertActiveWorkspacePath(filePath)
+      await writeBinaryFile(safePath, base64)
     }
   )
 
   ipcMain.handle('fs:readBinaryFile', async (_event, filePath: string) => {
-    return readBinaryFile(filePath)
+    const safePath = assertActiveWorkspacePath(filePath)
+    return readBinaryFile(safePath)
   })
 
   ipcMain.handle('fs:createFile', async (_event, parentDir: string, name: string) => {
-    return createFile(parentDir, name)
+    const safeParent = assertActiveWorkspacePath(parentDir, { allowRoot: true })
+    return createFile(safeParent, name)
   })
 
   ipcMain.handle('fs:createDirectory', async (_event, parentDir: string, name: string) => {
-    return createDirectory(parentDir, name)
+    const safeParent = assertActiveWorkspacePath(parentDir, { allowRoot: true })
+    return createDirectory(safeParent, name)
   })
 
   ipcMain.handle('fs:rename', async (_event, targetPath: string, newName: string) => {
-    return renamePath(targetPath, newName)
+    const safePath = assertActiveWorkspacePath(targetPath)
+    return renamePath(safePath, newName)
   })
 
   ipcMain.handle('fs:move', async (_event, sourcePath: string, destDir: string) => {
-    return movePath(sourcePath, destDir)
+    const safeSource = assertActiveWorkspacePath(sourcePath)
+    const safeDest = assertActiveWorkspacePath(destDir, { allowRoot: true })
+    return movePath(safeSource, safeDest)
   })
 
   ipcMain.handle(
     'fs:copy',
     async (_event, sourcePaths: string[], destDir: string) => {
-      return copyPathsInto(sourcePaths, destDir)
+      const safeSources = assertActiveWorkspacePaths(sourcePaths)
+      const safeDest = assertActiveWorkspacePath(destDir, { allowRoot: true })
+      return copyPathsInto(safeSources, safeDest)
     }
   )
 
   ipcMain.handle('fs:delete', async (_event, targetPath: string) => {
-    await deletePath(targetPath)
+    const safePath = assertActiveWorkspacePath(targetPath)
+    await deletePath(safePath)
   })
 
   ipcMain.handle('fs:pickFiles', async () => {
@@ -837,27 +883,43 @@ function registerIpcHandlers(): void {
       properties: ['openFile', 'multiSelections']
     })
     if (result.canceled || result.filePaths.length === 0) return null
+    registerExternalContextPaths(result.filePaths)
     return result.filePaths
   })
 
   ipcMain.handle(
+    'fs:registerExternalContextPaths',
+    async (_event, paths: string[]) => {
+      if (!Array.isArray(paths)) return
+      registerExternalContextPaths(paths.filter((p) => typeof p === 'string'))
+    }
+  )
+
+  ipcMain.handle(
     'fs:importFiles',
     async (_event, parentDir: string, sourcePaths: string[]) => {
-      return importFilesToWorkspace(parentDir, sourcePaths)
+      const safeParent = assertActiveWorkspacePath(parentDir, { allowRoot: true })
+      // Sources may be outside the workspace (user-picked import)
+      if (Array.isArray(sourcePaths)) {
+        registerExternalContextPaths(sourcePaths)
+      }
+      return importFilesToWorkspace(safeParent, sourcePaths)
     }
   )
 
   ipcMain.handle(
     'fs:resolveChatContext',
     async (_event, workspaceRoot: string, references: ChatContextRef[]) => {
-      return resolveChatContext(workspaceRoot, references)
+      const root = bindActiveWorkspaceRoot(workspaceRoot)
+      return resolveChatContext(root, references)
     }
   )
 
   ipcMain.handle(
     'fs:previewActions',
     async (_event, workspaceRoot: string, actions: WorkspaceAction[]) => {
-      return previewWorkspaceActions(workspaceRoot, actions)
+      const root = bindActiveWorkspaceRoot(workspaceRoot)
+      return previewWorkspaceActions(root, actions)
     }
   )
 
@@ -869,48 +931,55 @@ function registerIpcHandlers(): void {
       actions: WorkspaceAction[],
       options?: ApplyWorkspaceOptions
     ) => {
-      return applyWorkspaceActionsRecordingUndo(workspaceRoot, actions, options)
+      const root = bindActiveWorkspaceRoot(workspaceRoot)
+      return applyWorkspaceActionsRecordingUndo(root, actions, options)
     }
   )
 
   ipcMain.handle('fs:undoLastAiApply', async (_event, workspaceRoot: string) => {
-    return undoLastChangeSet(workspaceRoot)
+    const root = bindActiveWorkspaceRoot(workspaceRoot)
+    return undoLastChangeSet(root)
   })
 
   ipcMain.handle(
     'fs:undoAiApply',
     async (_event, workspaceRoot: string, changeSetId: string) => {
-      return undoChangeSet(workspaceRoot, changeSetId)
+      const root = bindActiveWorkspaceRoot(workspaceRoot)
+      return undoChangeSet(root, changeSetId)
     }
   )
 
   ipcMain.handle(
     'fs:undoChatAiApplies',
     async (_event, workspaceRoot: string, chatId: string) => {
-      return undoChatApplies(workspaceRoot, chatId)
+      const root = bindActiveWorkspaceRoot(workspaceRoot)
+      return undoChatApplies(root, chatId)
     }
   )
 
   ipcMain.handle('fs:listAiApplies', async (_event, workspaceRoot: string) => {
-    return listChangeSets(workspaceRoot)
+    const root = bindActiveWorkspaceRoot(workspaceRoot)
+    return listChangeSets(root)
   })
 
   ipcMain.handle(
     'fs:search',
     async (_event, workspaceRoot: string, options: WorkspaceSearchOptions) => {
-      return searchWorkspace(workspaceRoot, options)
+      const root = bindActiveWorkspaceRoot(workspaceRoot)
+      return searchWorkspace(root, options)
     }
   )
 
   ipcMain.handle(
     'fs:replace',
     async (_event, workspaceRoot: string, options: WorkspaceReplaceOptions) => {
-      return replaceInWorkspace(workspaceRoot, options)
+      const root = bindActiveWorkspaceRoot(workspaceRoot)
+      return replaceInWorkspace(root, options)
     }
   )
 
   ipcMain.handle('settings:get', async () => {
-    return getSettings()
+    return getPublicSettings()
   })
 
   ipcMain.handle('settings:set', async (_event, settings: AppSettings) => {
@@ -920,78 +989,90 @@ function registerIpcHandlers(): void {
   })
 
   ipcMain.handle('desk:ensureDirs', async (_event, workspaceRoot: string) => {
-    await ensureDeskDirs(workspaceRoot)
+    await ensureDeskDirs(bindActiveWorkspaceRoot(workspaceRoot))
   })
 
   ipcMain.handle(
     'desk:captureClipboard',
     async (_event, workspaceRoot: string | null) => {
-      return captureClipboardToInbox(workspaceRoot)
+      const root =
+        typeof workspaceRoot === 'string' && workspaceRoot.trim()
+          ? bindActiveWorkspaceRoot(workspaceRoot)
+          : null
+      return captureClipboardToInbox(root)
     }
   )
 
   ipcMain.handle(
     'desk:listInbox',
     async (_event, workspaceRoot: string, limit?: number) => {
-      return listDeskInbox(workspaceRoot, limit)
+      return listDeskInbox(bindActiveWorkspaceRoot(workspaceRoot), limit)
     }
   )
 
   ipcMain.handle(
     'desk:listOutbox',
     async (_event, workspaceRoot: string, limit?: number, includeArchived?: boolean) => {
-      return listDeskOutbox(workspaceRoot, limit, includeArchived)
+      return listDeskOutbox(bindActiveWorkspaceRoot(workspaceRoot), limit, includeArchived)
     }
   )
 
   ipcMain.handle(
     'desk:markInboxDone',
     async (_event, workspaceRoot: string, absolutePath: string) => {
-      return markInboxDone(workspaceRoot, absolutePath)
+      return markInboxDone(bindActiveWorkspaceRoot(workspaceRoot), absolutePath)
     }
   )
 
   ipcMain.handle('desk:markAllInboxDone', async (_event, workspaceRoot: string) => {
-    return markAllInboxDone(workspaceRoot)
+    return markAllInboxDone(bindActiveWorkspaceRoot(workspaceRoot))
   })
 
   ipcMain.handle(
     'desk:deleteInbox',
     async (_event, workspaceRoot: string, absolutePath: string) => {
-      return deleteInboxItem(workspaceRoot, absolutePath)
+      return deleteInboxItem(bindActiveWorkspaceRoot(workspaceRoot), absolutePath)
     }
   )
 
   ipcMain.handle(
     'desk:archiveOutbox',
     async (_event, workspaceRoot: string, absolutePath: string) => {
-      return archiveOutboxItem(workspaceRoot, absolutePath)
+      return archiveOutboxItem(bindActiveWorkspaceRoot(workspaceRoot), absolutePath)
     }
   )
 
   ipcMain.handle('desk:archiveAllOutbox', async (_event, workspaceRoot: string) => {
-    return archiveAllOutboxItems(workspaceRoot)
+    return archiveAllOutboxItems(bindActiveWorkspaceRoot(workspaceRoot))
   })
 
   ipcMain.handle(
     'desk:deleteOutbox',
     async (_event, workspaceRoot: string, absolutePath: string) => {
-      return deleteOutboxItem(workspaceRoot, absolutePath)
+      return deleteOutboxItem(bindActiveWorkspaceRoot(workspaceRoot), absolutePath)
     }
   )
 
-  ipcMain.handle('desk:runShipCheck', async (_event, absolutePath: string) => {
-    const result = await runDeskShipCheck(absolutePath)
-    return {
-      findings: result.findings,
-      body: result.body,
-      preset: result.preset
+  ipcMain.handle(
+    'desk:runShipCheck',
+    async (_event, workspaceRoot: string, absolutePath: string) => {
+      const root = bindActiveWorkspaceRoot(workspaceRoot)
+      const result = await runDeskShipCheck(root, absolutePath)
+      return {
+        findings: result.findings,
+        body: result.body,
+        preset: result.preset
+      }
     }
-  })
+  )
 
-  ipcMain.handle('desk:copyOutboxPayload', async (_event, absolutePath: string) => {
-    return copyOutboxPayload(absolutePath)
-  })
+  ipcMain.handle(
+    'desk:copyOutboxPayload',
+    async (_event, workspaceRoot: string, absolutePath: string) => {
+      const root = bindActiveWorkspaceRoot(workspaceRoot)
+      return copyOutboxPayload(root, absolutePath)
+    }
+  )
 
   ipcMain.handle('desk:getCaptureHotkeyStatus', () => {
     return getDeskCaptureHotkeyStatus()
@@ -1018,6 +1099,7 @@ function registerIpcHandlers(): void {
   })
 
   ipcMain.handle('workspace:addRecent', async (_event, workspaceRoot: string) => {
+    setActiveWorkspaceRoot(workspaceRoot)
     await addRecentWorkspaceRoot(workspaceRoot)
   })
 
@@ -1026,17 +1108,18 @@ function registerIpcHandlers(): void {
   })
 
   ipcMain.handle('workspace:setLast', async (_event, workspaceRoot: string | null) => {
+    setActiveWorkspaceRoot(workspaceRoot)
     await setLastWorkspaceRoot(workspaceRoot)
   })
 
   ipcMain.handle('workspace:getSettings', async (_event, workspaceRoot: string) => {
-    return getWorkspaceSettings(workspaceRoot)
+    return getWorkspaceSettings(bindActiveWorkspaceRoot(workspaceRoot))
   })
 
   ipcMain.handle(
     'workspace:setSettings',
     async (_event, workspaceRoot: string, settings: import('../src/types').WorkspaceSettings) => {
-      return setWorkspaceSettings(workspaceRoot, settings)
+      return setWorkspaceSettings(bindActiveWorkspaceRoot(workspaceRoot), settings)
     }
   )
 
@@ -1055,17 +1138,17 @@ function registerIpcHandlers(): void {
   ipcMain.handle(
     'ai:resolveApproval',
     (
-      _event,
+      event,
       request: { id: string; approved: boolean; detail?: string }
     ): boolean => {
-      return resolveAgentApproval(request)
+      return resolveAgentApprovalForSender(event.sender.id, request)
     }
   )
 
   ipcMain.handle(
     'ai:resolveContinue',
-    (_event, request: { id: string; continue: boolean }): boolean => {
-      return resolveAgentContinue(request)
+    (event, request: { id: string; continue: boolean }): boolean => {
+      return resolveAgentContinueForSender(event.sender.id, request)
     }
   )
 
@@ -1094,42 +1177,45 @@ function registerIpcHandlers(): void {
   }
 
   ipcMain.handle('index:build', async (event, workspaceRoot: string) => {
+    const root = bindActiveWorkspaceRoot(workspaceRoot)
     bindIndexProgress(event.sender)
-    event.sender.send('index:status', 'indexing', workspaceRoot)
+    event.sender.send('index:status', 'indexing', root)
     try {
-      const result = await buildProjectIndex(workspaceRoot)
+      const result = await buildProjectIndex(root)
       event.sender.send('index:updated', result)
-      event.sender.send('index:status', 'ready', workspaceRoot)
+      event.sender.send('index:status', 'ready', root)
       return result
     } catch (error) {
-      event.sender.send('index:status', 'error', workspaceRoot)
+      event.sender.send('index:status', 'error', root)
       throw error
     }
   })
 
   ipcMain.handle('index:ensureFresh', async (event, workspaceRoot: string) => {
+    const root = bindActiveWorkspaceRoot(workspaceRoot)
     bindIndexProgress(event.sender)
-    const stale = await isProjectIndexStale(workspaceRoot)
+    const stale = await isProjectIndexStale(root)
     if (stale) {
-      event.sender.send('index:status', 'indexing', workspaceRoot)
+      event.sender.send('index:status', 'indexing', root)
     }
 
     try {
-      const result = await ensureProjectIndex(workspaceRoot)
+      const result = await ensureProjectIndex(root)
       if (result.rebuilt) {
         event.sender.send('index:updated', result)
       }
-      event.sender.send('index:status', 'ready', workspaceRoot)
+      event.sender.send('index:status', 'ready', root)
       return result
     } catch (error) {
-      event.sender.send('index:status', 'error', workspaceRoot)
+      event.sender.send('index:status', 'error', root)
       throw error
     }
   })
 
   ipcMain.handle('index:watch', (event, workspaceRoot: string) => {
+    const root = bindActiveWorkspaceRoot(workspaceRoot)
     bindIndexProgress(event.sender)
-    startIndexWatcher(workspaceRoot, event.sender)
+    startIndexWatcher(root, event.sender)
   })
 
   ipcMain.handle('index:unwatch', () => {
@@ -1147,16 +1233,16 @@ function registerIpcHandlers(): void {
         preset?: UseCasePreset | null
       }
     ) => {
-      return getProjectIndexContext(workspaceRoot, options)
+      return getProjectIndexContext(bindActiveWorkspaceRoot(workspaceRoot), options)
     }
   )
 
   ipcMain.handle('index:getOutline', async (_event, workspaceRoot: string) => {
-    return getWorkspaceOutline(workspaceRoot)
+    return getWorkspaceOutline(bindActiveWorkspaceRoot(workspaceRoot))
   })
 
   ipcMain.handle('chat:loadHistory', async (_event, workspaceRoot: string) => {
-    return loadChatHistory(workspaceRoot)
+    return loadChatHistory(bindActiveWorkspaceRoot(workspaceRoot))
   })
 
   ipcMain.handle(
@@ -1166,29 +1252,29 @@ function registerIpcHandlers(): void {
       workspaceRoot: string,
       history: { activeChatId: string | null; sessions: ChatSession[] }
     ) => {
-      await saveChatHistory(workspaceRoot, history)
+      await saveChatHistory(bindActiveWorkspaceRoot(workspaceRoot), history)
     }
   )
 
   ipcMain.handle('openEditors:load', async (_event, workspaceRoot: string) => {
-    return loadOpenEditors(workspaceRoot)
+    return loadOpenEditors(bindActiveWorkspaceRoot(workspaceRoot))
   })
 
   ipcMain.handle(
     'openEditors:save',
     async (_event, workspaceRoot: string, editors: WorkspaceOpenEditors) => {
-      await saveOpenEditors(workspaceRoot, editors)
+      await saveOpenEditors(bindActiveWorkspaceRoot(workspaceRoot), editors)
     }
   )
 
   ipcMain.handle('explorerState:load', async (_event, workspaceRoot: string) => {
-    return loadExplorerState(workspaceRoot)
+    return loadExplorerState(bindActiveWorkspaceRoot(workspaceRoot))
   })
 
   ipcMain.handle(
     'explorerState:save',
     async (_event, workspaceRoot: string, state: WorkspaceExplorerState) => {
-      await saveExplorerState(workspaceRoot, state)
+      await saveExplorerState(bindActiveWorkspaceRoot(workspaceRoot), state)
     }
   )
 
@@ -1199,7 +1285,8 @@ function registerIpcHandlers(): void {
   ipcMain.handle(
     'terminal:create',
     (event, id: string, cwd: string, shellId: string | undefined, session: number) => {
-      return createTerminal(id, cwd, shellId, event.sender, session)
+      const safeCwd = assertActiveWorkspacePath(cwd, { allowRoot: true })
+      return createTerminal(id, safeCwd, shellId, event.sender, session)
     }
   )
 
@@ -1220,34 +1307,34 @@ function registerIpcHandlers(): void {
   })
 
   ipcMain.handle('terminal:setCwd', (_event, cwd: string) => {
-    setAllTerminalsCwd(cwd)
+    setAllTerminalsCwd(assertActiveWorkspacePath(cwd, { allowRoot: true }))
   })
 
   ipcMain.handle(
     'git:status',
     async (_event, workspaceRoot: string, options?: { fetch?: boolean }) => {
-      return getGitStatus(workspaceRoot, options)
+      return getGitStatus(bindActiveWorkspaceRoot(workspaceRoot), options)
     }
   )
 
   ipcMain.handle(
     'git:diff',
     async (_event, workspaceRoot: string, path: string, side?: GitDiffSide) => {
-      return getGitDiff(workspaceRoot, path, side)
+      return getGitDiff(bindActiveWorkspaceRoot(workspaceRoot), path, side)
     }
   )
 
   ipcMain.handle(
     'git:stage',
     async (_event, workspaceRoot: string, paths: string[]) => {
-      return stageGitPaths(workspaceRoot, paths)
+      return stageGitPaths(bindActiveWorkspaceRoot(workspaceRoot), paths)
     }
   )
 
   ipcMain.handle(
     'git:unstage',
     async (_event, workspaceRoot: string, paths: string[]) => {
-      return unstageGitPaths(workspaceRoot, paths)
+      return unstageGitPaths(bindActiveWorkspaceRoot(workspaceRoot), paths)
     }
   )
 
@@ -1259,33 +1346,33 @@ function registerIpcHandlers(): void {
       message: string,
       options?: { paths?: string[] }
     ) => {
-      return commitGit(workspaceRoot, message, options)
+      return commitGit(bindActiveWorkspaceRoot(workspaceRoot), message, options)
     }
   )
 
   ipcMain.handle(
     'git:discard',
     async (_event, workspaceRoot: string, paths: string[]) => {
-      return discardGitPaths(workspaceRoot, paths)
+      return discardGitPaths(bindActiveWorkspaceRoot(workspaceRoot), paths)
     }
   )
 
   ipcMain.handle('git:push', async (_event, workspaceRoot: string) => {
-    return pushGit(workspaceRoot)
+    return pushGit(bindActiveWorkspaceRoot(workspaceRoot))
   })
 
   ipcMain.handle('git:pull', async (_event, workspaceRoot: string) => {
-    return pullGit(workspaceRoot)
+    return pullGit(bindActiveWorkspaceRoot(workspaceRoot))
   })
 
   ipcMain.handle('git:branches', async (_event, workspaceRoot: string) => {
-    return listGitBranches(workspaceRoot)
+    return listGitBranches(bindActiveWorkspaceRoot(workspaceRoot))
   })
 
   ipcMain.handle(
     'git:checkout',
     async (_event, workspaceRoot: string, branch: string) => {
-      return checkoutGitBranch(workspaceRoot, branch)
+      return checkoutGitBranch(bindActiveWorkspaceRoot(workspaceRoot), branch)
     }
   )
 }
@@ -1294,7 +1381,9 @@ if (gotSingleInstanceLock) {
   app.whenReady().then(async () => {
     await getSettings()
     await syncDeskTrayEnabledFromSettings()
-    applyPackagedContentSecurityPolicy()
+    applyContentSecurityPolicy()
+    const lastRoot = await getLastWorkspaceRoot()
+    if (lastRoot) setActiveWorkspaceRoot(lastRoot)
     registerIpcHandlers()
     await createWindow()
     createMenu()

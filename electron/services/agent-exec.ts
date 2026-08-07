@@ -2,7 +2,6 @@ import { spawn, type ChildProcessWithoutNullStreams } from 'child_process'
 import { existsSync } from 'fs'
 import { basename, delimiter, dirname, isAbsolute, join, relative, resolve } from 'path'
 import { redactSecrets } from '../../src/utils/redact'
-import { t } from '../../src/i18n/runtime'
 import { resolveInsideWorkspace } from './filesystem'
 import { detectGitBash } from './terminal'
 
@@ -94,7 +93,24 @@ const WRITE_APPROVAL_PATTERNS: Array<{ pattern: RegExp; reason: string }> = [
   { pattern: /\btee\b/i, reason: 'tee (writes files)' },
   { pattern: /\binstall\s+-m\b/i, reason: 'install -m' },
   { pattern: /\bsed\s+-i\b/i, reason: 'in-place sed' },
-  { pattern: /\bperl\s+-i\b/i, reason: 'in-place perl' }
+  { pattern: /\bperl\s+-i\b/i, reason: 'in-place perl' },
+  // Network / exfiltration — require approval (H2)
+  { pattern: /\bcurl\b/i, reason: 'network transfer (curl)' },
+  { pattern: /\bwget\b/i, reason: 'network transfer (wget)' },
+  { pattern: /\bFetch\b/, reason: 'network transfer (Fetch)' },
+  { pattern: /\bInvoke-WebRequest\b/i, reason: 'network transfer (Invoke-WebRequest)' },
+  { pattern: /\bInvoke-RestMethod\b/i, reason: 'network transfer (Invoke-RestMethod)' },
+  { pattern: /\b(?:nc|ncat|netcat)\b/i, reason: 'network transfer (netcat)' },
+  { pattern: /\bssh\b/i, reason: 'remote shell (ssh)' },
+  { pattern: /\bscp\b/i, reason: 'network transfer (scp)' },
+  { pattern: /\bsftp\b/i, reason: 'network transfer (sftp)' },
+  { pattern: /\bftp\b/i, reason: 'network transfer (ftp)' },
+  { pattern: /\bpowershell(?:\.exe)?\b/i, reason: 'powershell' },
+  { pattern: /\bpwsh(?:\.exe)?\b/i, reason: 'pwsh' },
+  { pattern: /\bpython(?:3)?\b[^\n]*\s-c\b/i, reason: 'python -c (may exfiltrate)' },
+  { pattern: /\bnode\b[^\n]*\s-e\b/i, reason: 'node -e (may exfiltrate)' },
+  { pattern: /\bruby\b[^\n]*\s-e\b/i, reason: 'ruby -e (may exfiltrate)' },
+  { pattern: /\bperl\b[^\n]*\s-e\b/i, reason: 'perl -e (may exfiltrate)' }
 ]
 
 export interface AgentExecOptions {
@@ -144,12 +160,7 @@ function resolveExecCwd(workspaceRoot: string, cwdArg?: string): string {
   }
 
   if (isAbsolute(raw) || /^[a-zA-Z]:/.test(raw)) {
-    const abs = resolve(raw)
-    const rel = relative(root, abs)
-    if (rel.startsWith('..') || isAbsolute(rel)) {
-      throw new Error(t('fs.outsideWorkspace', { path: raw }))
-    }
-    return abs
+    return resolveInsideWorkspace(workspaceRoot, raw, { allowRoot: true })
   }
 
   const rootName = basename(root)

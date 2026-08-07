@@ -1,5 +1,6 @@
 import type { WebContents } from 'electron'
 import type {
+  AppSettings,
   ChatRequest,
   InlineCompletionRequest,
   InlineCompletionResult,
@@ -26,6 +27,7 @@ import {
   truncateToTokenBudget
 } from '../../src/utils/context-budget'
 import { getSettings } from './settings'
+import { assertSafeApiBaseUrl } from './path-guard'
 import { recordChatCompletionUsageFireAndForget } from './usage'
 import { ensureProjectIndex, getProjectIndexContext } from './project-indexer'
 import { formatMeaningExcerptsForAi } from './semantic-index'
@@ -38,6 +40,14 @@ import { parseChatCompletionUsage } from '../../src/utils/usage-period'
 
 export type { ChatContentPart, ChatImageAttachment, UserMessagePayload }
 export { toApiUserContent }
+
+/** Validate apiBaseUrl (respecting allowLanApiBaseUrl) and return chat completions URL. */
+export function resolveSafeChatCompletionsUrl(settings: AppSettings): string {
+  const base = assertSafeApiBaseUrl(settings.apiBaseUrl, {
+    allowPrivateLan: settings.allowLanApiBaseUrl === true
+  })
+  return `${base}/chat/completions`
+}
 
 const PRESET_ROLE_KEYS: Record<UseCasePreset, MessageKey> = {
   general: 'ai.preset.general.role',
@@ -509,7 +519,16 @@ export async function completeInline(
       return { text: '', error: t('ai.missingBaseUrl') }
     }
 
-    const url = `${settings.apiBaseUrl.replace(/\/$/, '')}/chat/completions`
+    let url: string
+    try {
+      url = resolveSafeChatCompletionsUrl(settings)
+    } catch (error) {
+      return {
+        text: '',
+        error: error instanceof Error ? error.message : t('ai.invalidBaseUrl')
+      }
+    }
+
     const reasoning = isReasoningModel(settings.model)
     const body: Record<string, unknown> = {
       model: settings.model,
@@ -641,6 +660,17 @@ export async function streamChat(
       return
     }
 
+    let url: string
+    try {
+      url = resolveSafeChatCompletionsUrl(settings)
+    } catch (error) {
+      send(
+        'ai:error',
+        error instanceof Error ? error.message : t('ai.invalidBaseUrl')
+      )
+      return
+    }
+
     const history = request.messages.filter((m) => m.role !== 'system')
     const priorHistory = fitHistoryMessages(
       history.slice(0, -1).map((m) => ({ role: m.role, content: m.content })),
@@ -664,8 +694,6 @@ export async function streamChat(
       send('ai:aborted')
       return
     }
-
-    const url = `${settings.apiBaseUrl.replace(/\/$/, '')}/chat/completions`
 
     const response = await fetch(url, {
       method: 'POST',

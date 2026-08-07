@@ -46,6 +46,12 @@ import {
   MAX_EXTRACTED_TEXT_CHARS
 } from '../../src/utils/extractable-document'
 import { shouldSkipWorkspaceEntry } from './fs-ignore'
+import {
+  assertInsideWorkspace,
+  isExternalContextPathAllowed,
+  isPathInsideWorkspace,
+  isSensitiveAgentPath
+} from './path-guard'
 
 function normalizeActionPath(workspaceRoot: string, actionPath: string): string {
   return normalizeWorkspaceActionPath(workspaceRoot, actionPath, {
@@ -276,28 +282,16 @@ function validateName(name: string): void {
 
 /** パスがワークスペース内（または直下）かどうか */
 export function isInsideWorkspace(workspaceRoot: string, targetPath: string): boolean {
-  const root = resolve(workspaceRoot)
-  const absolutePath = isAbsolute(targetPath) ? resolve(targetPath) : resolve(root, targetPath)
-  const rel = relative(root, absolutePath)
-  return rel === '' || (!rel.startsWith('..') && !isAbsolute(rel))
+  return isPathInsideWorkspace(workspaceRoot, targetPath)
 }
 
-/** ワークスペース内パスへ解決。`allowRoot` でワークスペース直下自体を許可（listDir 用） */
+/** ワークスペース内パスへ解決（symlink は realpath で再検証）。`allowRoot` でルート自体を許可 */
 export function resolveInsideWorkspace(
   workspaceRoot: string,
   targetPath: string,
   options?: { allowRoot?: boolean }
 ): string {
-  const root = resolve(workspaceRoot)
-  const absolutePath = resolve(root, targetPath)
-  const rel = relative(root, absolutePath)
-  if (rel.startsWith('..') || isAbsolute(rel)) {
-    throw new Error(t('fs.outsideWorkspace', { path: targetPath }))
-  }
-  if (rel === '' && !options?.allowRoot) {
-    throw new Error(t('fs.outsideWorkspace', { path: targetPath }))
-  }
-  return absolutePath
+  return assertInsideWorkspace(workspaceRoot, targetPath, options)
 }
 
 export async function createFile(parentDir: string, name: string): Promise<string> {
@@ -790,6 +784,8 @@ export async function resolveChatContext(
       const folderFiles: ResolvedContextFile[] = []
 
       for (const filePath of selected) {
+        const folderFileLabel = toContextPathLabel(workspaceRoot, filePath)
+        if (isSensitiveAgentPath(folderFileLabel) || isSensitiveAgentPath(filePath)) continue
         const file = await readContextFile(filePath, workspaceRoot)
         if (!file) continue
         if (file.kind === 'image') {
@@ -814,7 +810,12 @@ export async function resolveChatContext(
         truncated
       })
     } else {
-      // 外部ファイルも読み取り専用の文脈として許可
+      // 外部ファイルは allowlist（OS ドロップ / pickFiles）経由のみ
+      if (!isInsideWorkspace(workspaceRoot, ref.path)) {
+        if (!isExternalContextPathAllowed(ref.path)) continue
+      }
+      const label = toContextPathLabel(workspaceRoot, ref.path)
+      if (isSensitiveAgentPath(label) || isSensitiveAgentPath(ref.path)) continue
       const file = await readContextFile(ref.path, workspaceRoot)
       acceptFile(file)
     }

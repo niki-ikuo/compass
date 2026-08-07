@@ -79,6 +79,8 @@ export function App() {
       setWorkspaceRoot(folder)
       useAppStore.getState().setPersistedExplorerState(undefined)
       try {
+        // Path guards in main require an active workspace before fs:* IPC
+        await window.compass.workspace.setLast(folder)
         const [tree, chatHistory, workspaceSettings, openEditors, explorerState] = await Promise.all([
           window.compass.fs.readDir(folder),
           window.compass.chat.loadHistory(folder),
@@ -101,6 +103,7 @@ export function App() {
         await window.compass.workspace.addRecent(folder)
       } catch (error) {
         await window.compass.index.unwatch()
+        await window.compass.workspace.setLast(null)
         setWorkspaceRoot(null)
         useAppStore.getState().setWorkspaceDefaultUseCasePreset(null)
         useAppStore.getState().setPersistedExplorerState(undefined)
@@ -290,6 +293,7 @@ export function App() {
           await openWorkspace(lastWorkspace)
         } catch {
           if (!cancelled) {
+            await window.compass.workspace.setLast(null)
             await window.compass.workspace.removeRecent(lastWorkspace)
           }
         }

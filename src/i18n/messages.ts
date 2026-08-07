@@ -29,6 +29,14 @@ export const ja = {
   'settings.apiBaseUrlHint': 'プロバイダ選択で自動設定されます（カスタム時のみ編集可）',
   'settings.apiKey': 'API Key',
   'settings.apiKeyOptionalHint': 'このプロバイダでは API Key は必須ではありません',
+  'settings.apiKeyConfiguredPlaceholder': '保存済み（変更するときだけ入力）',
+  'settings.apiKeyKeptInMain': 'キーはメインプロセスのみに保持され、画面には表示されません',
+  'settings.apiKeyStorageInsecure':
+    'OS の暗号化ストアが使えないため、キーは弱い形式で保存されています',
+  'settings.clearApiKey': 'API Key を削除',
+  'settings.allowLanApiBaseUrl': 'LAN 上の API サーバーを許可',
+  'settings.allowLanApiBaseUrlHint':
+    '192.168/10/172.16 などのプライベート IP を API Base URL に使う場合にオン（メタデータ IP は常に拒否）',
   'settings.model': 'モデル',
   'settings.modelHint': '一覧から選ぶか、任意のモデル ID を入力できます',
   'settings.testConnection': '接続を確認',
@@ -869,6 +877,7 @@ export const ja = {
   'fs.nameRequired': '名前を入力してください',
   'fs.invalidChars': '名前に使えない文字が含まれています',
   'fs.outsideWorkspace': 'ワークスペース外のパスは許可されていません: {path}',
+  'fs.noWorkspace': 'ワークスペースが開かれていません',
   'fs.fileExists':
     '「{name}」という名前のファイルは既にあります。別の名前を入力してください',
   'fs.folderExists':
@@ -987,6 +996,9 @@ export const ja = {
   'ai.userQuestion': '[ユーザーの質問]',
   'ai.missingApiKey': '{provider} の APIキーが設定されていません。設定画面から入力してください。',
   'ai.missingBaseUrl': 'API Base URL が設定されていません。設定画面から入力してください。',
+  'ai.invalidBaseUrl': 'API Base URL が不正です。http(s) の URL を指定してください。',
+  'ai.privateBaseUrlBlocked':
+    'プライベート／メタデータ向けの API Base URL はブロックされました。localhost 以外の内部アドレスは使えません。',
   'ai.apiError': 'APIエラー ({status}): {body}',
   'ai.noResponseBody': 'レスポンスボディがありません',
   'ai.agentNeedsWorkspace': 'Agent モードではフォルダを開いてください。',
@@ -1058,6 +1070,14 @@ export const en: Record<MessageKey, string> = {
   'settings.apiBaseUrlHint': 'Set automatically by provider (editable for Custom only)',
   'settings.apiKey': 'API Key',
   'settings.apiKeyOptionalHint': 'API Key is optional for this provider',
+  'settings.apiKeyConfiguredPlaceholder': 'Saved (enter only to change)',
+  'settings.apiKeyKeptInMain': 'The key stays in the main process and is never shown here',
+  'settings.apiKeyStorageInsecure':
+    'OS secure storage is unavailable, so the key is stored in a weaker form',
+  'settings.clearApiKey': 'Clear API Key',
+  'settings.allowLanApiBaseUrl': 'Allow LAN API servers',
+  'settings.allowLanApiBaseUrlHint':
+    'Turn on to use private IPs (192.168/10/172.16) as API Base URL. Metadata IPs are always blocked.',
   'settings.model': 'Model',
   'settings.modelHint': 'Pick from the list or enter any model ID',
   'settings.testConnection': 'Test connection',
@@ -1876,6 +1896,7 @@ export const en: Record<MessageKey, string> = {
   'fs.nameRequired': 'Enter a name',
   'fs.invalidChars': 'The name contains invalid characters',
   'fs.outsideWorkspace': 'Path outside the workspace is not allowed: {path}',
+  'fs.noWorkspace': 'No workspace is open',
   'fs.fileExists': 'A file named "{name}" already exists. Enter a different name.',
   'fs.folderExists':
     'A folder named "{name}" already exists. Enter a different name.',
@@ -1988,6 +2009,9 @@ export const en: Record<MessageKey, string> = {
   'ai.userQuestion': "[User's question]",
   'ai.missingApiKey': '{provider} API key is not set. Enter it in Settings.',
   'ai.missingBaseUrl': 'API Base URL is not set. Enter it in Settings.',
+  'ai.invalidBaseUrl': 'API Base URL is invalid. Use an http(s) URL.',
+  'ai.privateBaseUrlBlocked':
+    'Private or metadata API Base URLs are blocked. Only localhost is allowed among internal addresses.',
   'ai.apiError': 'API error ({status}): {body}',
   'ai.noResponseBody': 'No response body',
   'ai.agentNeedsWorkspace': 'Open a folder to use Agent mode.',

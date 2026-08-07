@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
-import { marked } from 'marked'
 import { useI18n } from '@/i18n'
 import { useAppStore } from '@/stores/app-store'
 import { getLlmProvider } from '@/utils/llm-providers'
+import { SafeMarkdown } from '@/components/SafeMarkdown'
 import { CloseIcon } from './icons/ToolbarIcons'
 import {
   HELP_ASK_DEFAULT_HEIGHT,
@@ -13,11 +13,6 @@ import {
   isHelpCommandId,
   type HelpCommandId
 } from './help-shared'
-
-marked.setOptions({
-  gfm: true,
-  breaks: true
-})
 
 interface HelpAskDialogProps {
   open: boolean
@@ -51,17 +46,14 @@ export function HelpAskDialog({
 
   const aiReady = useMemo(() => {
     const provider = getLlmProvider(settings.providerId)
-    return provider.requiresApiKey ? Boolean(settings.apiKey.trim()) : Boolean(settings.apiBaseUrl.trim())
-  }, [settings.providerId, settings.apiKey, settings.apiBaseUrl])
-
-  const askAnswerHtml = useMemo(() => {
-    if (!askAnswer) return ''
-    try {
-      return marked.parse(askAnswer) as string
-    } catch {
-      return t('markdown.previewFailed')
-    }
-  }, [askAnswer, t])
+    const hasKey = Boolean(settings.apiKeyConfigured) || Boolean(settings.apiKey.trim())
+    return provider.requiresApiKey ? hasKey : Boolean(settings.apiBaseUrl.trim())
+  }, [
+    settings.providerId,
+    settings.apiKey,
+    settings.apiKeyConfigured,
+    settings.apiBaseUrl
+  ])
 
   const handleResize = useCallback((deltaWidth: number, deltaHeight: number) => {
     setSize((current) =>
@@ -234,7 +226,7 @@ export function HelpAskDialog({
           {askError && <p className="help-error">{askError}</p>}
           {askAnswer && (
             <div className="help-ask-answer markdown-preview">
-              <div className="markdown-body" dangerouslySetInnerHTML={{ __html: askAnswerHtml }} />
+              <SafeMarkdown content={askAnswer} />
             </div>
           )}
           {askSources.length > 0 && (

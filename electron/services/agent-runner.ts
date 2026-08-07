@@ -22,6 +22,7 @@ import {
   getSystemPrompt,
   isAbortError,
   releaseChatAbortController,
+  resolveSafeChatCompletionsUrl,
   sendAiEvent,
   toApiUserContent
 } from './ai-client'
@@ -695,7 +696,7 @@ async function offerAgentContinue(
         ? t('ai.agentStepNeedContinueTools')
         : t('ai.agentStepNeedContinueTurns')
   })
-  const decision = await waitForContinue(id, signal)
+  const decision = await waitForContinue(id, signal, webContents.id)
   return decision.continue
 }
 
@@ -921,6 +922,15 @@ async function executeReadFile(
         ok: false,
         summary: 'path is a directory; use listDir',
         content: 'Error: path is a directory; use listDir'
+      }
+    }
+    const { isSensitiveAgentPath } = await import('./path-guard')
+    if (isSensitiveAgentPath(relativePath) || isSensitiveAgentPath(absolutePath)) {
+      return {
+        ok: false,
+        summary: 'sensitive path blocked',
+        content:
+          'Error: reading this path is blocked because it looks like a secrets file (.env, keys, credentials). Do not send secrets to the model.'
       }
     }
     const info = await stat(absolutePath)
@@ -1326,7 +1336,7 @@ async function executeProposeActions(
   sendAiEvent(webContents, 'ai:step', chatId, { label: t('ai.agentStepWaitingApproval') })
 
   try {
-    const decision = await waitForApproval(callId, signal)
+    const decision = await waitForApproval(callId, signal, webContents.id)
     if (decision.approved) {
       const detail =
         decision.detail ??
@@ -1397,7 +1407,7 @@ async function executeExec(
     sendAiEvent(webContents, 'ai:step', chatId, { label: t('ai.agentStepWaitingExecApproval') })
 
     try {
-      const decision = await waitForApproval(callId, signal)
+      const decision = await waitForApproval(callId, signal, webContents.id)
       if (!decision.approved) {
         const detail =
           decision.detail ??
@@ -1722,6 +1732,17 @@ export async function runAgent(webContents: WebContents, request: ChatRequest): 
       return
     }
 
+    let chatCompletionsUrl: string
+    try {
+      chatCompletionsUrl = resolveSafeChatCompletionsUrl(settings)
+    } catch (error) {
+      send(
+        'ai:error',
+        error instanceof Error ? error.message : t('ai.invalidBaseUrl')
+      )
+      return
+    }
+
     const provider = getLlmProvider(settings.providerId)
     if (provider.agentToolsSupport === 'unsupported') {
       send(
@@ -1771,7 +1792,7 @@ export async function runAgent(webContents: WebContents, request: ChatRequest): 
       apiMessages.push({ role: 'user', content: formatInitialTodoPlanNudge() })
     }
 
-    const url = `${settings.apiBaseUrl.replace(/\/$/, '')}/chat/completions`
+    const url = chatCompletionsUrl
     const headers = buildApiHeaders(settings)
     let toolCallsUsed = 0
     let turnBudget = MAX_AGENT_TURNS

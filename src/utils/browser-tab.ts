@@ -17,13 +17,25 @@ export function isBrowserOpenFile(file: {
 /**
  * アドレスバー入力を URL に正規化する。
  * スキーム無しのドメインは https:// を付与。それ以外は Google 検索。
+ * file:/data: はアドレスバーからは拒否（ワークスペース HTML は pathToFileUrl + allowLocalFile）。
  */
-export function normalizeBrowserUrl(input: string): string {
+export function normalizeBrowserUrl(
+  input: string,
+  options?: { allowLocalFile?: boolean }
+): string {
   const trimmed = input.trim()
   if (!trimmed) return 'about:blank'
 
-  if (/^(https?|about|file|data):/i.test(trimmed)) {
+  if (/^https?:/i.test(trimmed) || /^about:/i.test(trimmed)) {
     return trimmed
+  }
+
+  if (/^file:/i.test(trimmed)) {
+    return options?.allowLocalFile ? trimmed : 'about:blank'
+  }
+
+  if (/^data:/i.test(trimmed)) {
+    return 'about:blank'
   }
 
   if (

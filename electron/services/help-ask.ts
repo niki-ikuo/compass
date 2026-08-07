@@ -3,7 +3,7 @@ import { withOpenWebUiChatCompat } from '../../src/utils/open-webui-compat'
 import { jsonStringifyUtf8Safe } from '../../src/utils/utf8-text'
 import { t } from '../../src/i18n/runtime'
 import type { HelpAskRequest, HelpAskResult, HelpDoc } from '../../src/types'
-import { buildApiHeaders } from './ai-client'
+import { buildApiHeaders, resolveSafeChatCompletionsUrl } from './ai-client'
 import { getSettings } from './settings'
 import {
   getHelpDoc,
@@ -194,12 +194,22 @@ export async function askHelp(request: HelpAskRequest): Promise<HelpAskResult> {
       return { answer: '', sources: [], commands: [], error: t('ai.missingBaseUrl') }
     }
 
+    let url: string
+    try {
+      url = resolveSafeChatCompletionsUrl(settings)
+    } catch (error) {
+      return {
+        answer: '',
+        sources: [],
+        commands: [],
+        error: error instanceof Error ? error.message : t('ai.invalidBaseUrl')
+      }
+    }
+
     const sources = await loadHelpAskSources(question, request.locale, request.currentDocId)
     if (signal.aborted) {
       return { answer: '', sources: [], commands: [], cancelled: true }
     }
-
-    const url = `${settings.apiBaseUrl.replace(/\/$/, '')}/chat/completions`
     const reasoning = isReasoningModel(settings.model)
     const messages = buildHelpAskMessages(question, sources)
     const body: Record<string, unknown> = {

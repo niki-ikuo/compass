@@ -1209,6 +1209,7 @@ export function ChatPanel() {
       return
     }
 
+    void window.compass.fs.registerExternalContextPaths(osFileRefs.map((ref) => ref.path))
     addChatContextRefs(osFileRefs)
     for (const fileRef of osFileRefs) {
       insertContextMentionIntoInput(fileRef)

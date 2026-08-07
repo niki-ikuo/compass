@@ -12,6 +12,13 @@ import { focusWithRetry } from '@/utils/focus-with-retry'
 import { useI18n } from '@/i18n'
 import { ArrowLeftIcon, ArrowRightIcon, RefreshIcon, StopIcon } from './icons/ToolbarIcons'
 
+function isAllowedWebviewNavigation(url: string, initialUrl: string): boolean {
+  if (!url || url === 'about:blank') return true
+  if (/^https?:/i.test(url)) return true
+  if (/^file:/i.test(url) && /^file:/i.test(initialUrl)) return true
+  return false
+}
+
 interface ElectronWebView extends HTMLElement {
   src: string
   getURL: () => string
@@ -77,12 +84,20 @@ export function BrowserViewer({ path, initialUrl }: BrowserViewerProps) {
     }
     const onFail = () => setLoading(false)
 
+    const onWillNavigate = (event: Event) => {
+      const nextUrl = (event as Event & { url?: string }).url ?? ''
+      if (!isAllowedWebviewNavigation(nextUrl, initialUrl)) {
+        event.preventDefault()
+      }
+    }
+
     view.addEventListener('did-start-loading', onStart)
     view.addEventListener('did-stop-loading', onStop)
     view.addEventListener('did-navigate', onNavigate)
     view.addEventListener('did-navigate-in-page', onNavigate)
     view.addEventListener('page-title-updated', onTitle)
     view.addEventListener('did-fail-load', onFail)
+    view.addEventListener('will-navigate', onWillNavigate)
 
     return () => {
       view.removeEventListener('did-start-loading', onStart)
@@ -91,11 +106,13 @@ export function BrowserViewer({ path, initialUrl }: BrowserViewerProps) {
       view.removeEventListener('did-navigate-in-page', onNavigate)
       view.removeEventListener('page-title-updated', onTitle)
       view.removeEventListener('did-fail-load', onFail)
+      view.removeEventListener('will-navigate', onWillNavigate)
     }
-  }, [path, updateBrowserTab])
+  }, [path, updateBrowserTab, initialUrl])
 
   const navigateTo = (raw: string) => {
-    const url = normalizeBrowserUrl(raw)
+    const allowLocalFile = /^file:/i.test(initialUrl)
+    const url = normalizeBrowserUrl(raw, { allowLocalFile })
     setAddress(url === 'about:blank' ? '' : url)
     updateBrowserTab(path, { browserUrl: url })
     const view = webviewRef.current
@@ -187,8 +204,8 @@ export function BrowserViewer({ path, initialUrl }: BrowserViewerProps) {
         },
         className: 'browser-webview',
         src: initialUrl || 'about:blank',
-        allowpopups: 'true',
-        partition: 'persist:compass-browser'
+        partition: 'persist:compass-browser',
+        webpreferences: 'contextIsolation=yes, javascript=yes, nodeIntegration=no'
       })}
     </div>
   )

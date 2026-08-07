@@ -1469,7 +1469,10 @@ export const useAppStore = create<AppState>((set, get) => ({
   openBrowserTab: (url) => {
     set((state) => {
       const path = createBrowserTabPath()
-      const browserUrl = normalizeBrowserUrl(url ?? '')
+      const raw = url ?? ''
+      const browserUrl = normalizeBrowserUrl(raw, {
+        allowLocalFile: /^file:/i.test(raw)
+      })
       const tab: OpenFile = {
         path,
         content: '',

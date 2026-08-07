@@ -143,3 +143,4 @@ Claude など OpenAI 非互換のネイティブ API は未対応。OpenRouter �
 - API キーは Renderer から直接外部 API を叩かない（Main 経由）
 - 設定の機密情報は平文で扱わない想定（Credential Manager 等）
 - `nodeIntegration` を有効にせず、preload の公開面だけを使う
+- 静的診断の所見: [SECURITY_AUDIT.md](./SECURITY_AUDIT.md)

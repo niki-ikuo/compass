@@ -20,6 +20,7 @@ import {
 } from '../../src/utils/llm-providers'
 import { normalizeUsageResetDay } from '../../src/utils/usage-period'
 import { isLocaleId, setLocale, type LocaleId } from '../../src/i18n/runtime'
+import { assertSafeApiBaseUrl } from './path-guard'
 
 interface StoredSettings {
   providerId?: LlmProviderId
@@ -55,6 +56,7 @@ interface StoredSettings {
   deskTrayEnabled: boolean
   deskShowEnabled: boolean
   deskShowAccelerator: string
+  allowLanApiBaseUrl?: boolean
   lastWorkspaceRoot: string | null
   recentWorkspaceRoots: string[]
 }
@@ -100,6 +102,10 @@ function resolveUseCasePreset(value: unknown): UseCasePreset {
 
 function resolveRememberLastUseCasePreset(value: unknown): boolean {
   return typeof value === 'boolean' ? value : DEFAULT_SETTINGS.rememberLastUseCasePreset
+}
+
+function resolveAllowLanApiBaseUrl(value: unknown): boolean {
+  return typeof value === 'boolean' ? value : DEFAULT_SETTINGS.allowLanApiBaseUrl
 }
 
 function resolveEmbeddingsMode(value: unknown): EmbeddingsMode {
@@ -247,6 +253,7 @@ async function readStoredSettings(): Promise<StoredSettings> {
       deskTrayEnabled: resolveDeskTrayEnabled(stored.deskTrayEnabled),
       deskShowEnabled: resolveDeskShowEnabled(stored.deskShowEnabled),
       deskShowAccelerator: resolveDeskShowAccelerator(stored.deskShowAccelerator),
+      allowLanApiBaseUrl: resolveAllowLanApiBaseUrl(stored.allowLanApiBaseUrl),
       lastWorkspaceRoot: stored.lastWorkspaceRoot ?? null,
       recentWorkspaceRoots:
         stored.recentWorkspaceRoots ??
@@ -282,6 +289,7 @@ async function readStoredSettings(): Promise<StoredSettings> {
       deskTrayEnabled: DEFAULT_SETTINGS.deskTrayEnabled,
       deskShowEnabled: DEFAULT_SETTINGS.deskShowEnabled,
       deskShowAccelerator: DEFAULT_SETTINGS.deskShowAccelerator,
+      allowLanApiBaseUrl: DEFAULT_SETTINGS.allowLanApiBaseUrl,
       lastWorkspaceRoot: null,
       recentWorkspaceRoots: []
     }
@@ -371,7 +379,8 @@ function toAppSettings(stored: StoredSettings): AppSettings {
     deskCaptureOpenTarget: stored.deskCaptureOpenTarget,
     deskTrayEnabled: stored.deskTrayEnabled,
     deskShowEnabled: stored.deskShowEnabled,
-    deskShowAccelerator: stored.deskShowAccelerator
+    deskShowAccelerator: stored.deskShowAccelerator,
+    allowLanApiBaseUrl: resolveAllowLanApiBaseUrl(stored.allowLanApiBaseUrl)
   }
 }
 
@@ -382,31 +391,63 @@ export async function getSettings(): Promise<AppSettings> {
   return settings
 }
 
+/** Renderer-facing settings: API keys never leave the main process (M5). */
+export async function getPublicSettings(): Promise<AppSettings> {
+  const full = await getSettings()
+  const configuredProviderIds = Object.entries(full.providerKeys)
+    .filter(([, key]) => Boolean(key?.trim()))
+    .map(([id]) => id as LlmProviderId)
+
+  return {
+    ...full,
+    apiKey: '',
+    providerKeys: {},
+    apiKeyConfigured: Boolean(full.apiKey.trim()),
+    configuredProviderIds,
+    apiKeyStorageInsecure: !safeStorage.isEncryptionAvailable() && Boolean(full.apiKey.trim())
+  }
+}
+
 export async function setSettings(settings: AppSettings): Promise<void> {
   const stored = await readStoredSettings()
+  const current = toAppSettings(stored)
   const providerId = isLlmProviderId(settings.providerId)
     ? settings.providerId
     : inferLlmProviderId(settings.apiBaseUrl)
 
-  const providerKeys: Partial<Record<LlmProviderId, string>> = {
-    ...settings.providerKeys,
-    [providerId]: settings.apiKey
+  // Empty apiKey / providerKeys from renderer means "keep existing" (keys stay in main).
+  const providerKeys: Partial<Record<LlmProviderId, string>> = { ...current.providerKeys }
+  for (const [id, key] of Object.entries(settings.providerKeys ?? {})) {
+    if (!isLlmProviderId(id)) continue
+    if (typeof key === 'string' && key.trim()) {
+      providerKeys[id] = key
+    }
   }
-
-  // 空キーは削除して残さない
-  if (!settings.apiKey) {
+  if (settings.clearApiKey) {
     delete providerKeys[providerId]
+  } else if (settings.apiKey.trim()) {
+    providerKeys[providerId] = settings.apiKey
   }
 
+  const activeKey = providerKeys[providerId] ?? ''
   const encryptedProviderKeys = encryptProviderKeys(providerKeys)
-  const activeEncrypted = encryptApiKey(settings.apiKey)
+  const activeEncrypted = encryptApiKey(activeKey)
   const locale = resolveLocale(settings.locale)
+  const allowLanApiBaseUrl = resolveAllowLanApiBaseUrl(settings.allowLanApiBaseUrl)
+  // Preserve previously saved LAN URLs when the user hasn't toggled the URL;
+  // metadata hosts are always rejected inside assertSafeApiBaseUrl.
+  const nextUrl = (settings.apiBaseUrl || DEFAULT_SETTINGS.apiBaseUrl).trim()
+  const urlUnchanged = nextUrl.replace(/\/$/, '') === (stored.apiBaseUrl || '').replace(/\/$/, '')
+  const apiBaseUrl = assertSafeApiBaseUrl(nextUrl, {
+    allowPrivateLan: allowLanApiBaseUrl || urlUnchanged
+  })
 
   await writeStoredSettings({
     ...stored,
     providerId,
-    apiBaseUrl: settings.apiBaseUrl,
-    encryptedApiKey: activeEncrypted,
+    apiBaseUrl,
+    allowLanApiBaseUrl,
+    encryptedApiKey: activeKey ? activeEncrypted : null,
     encryptedProviderKeys,
     model: settings.model,
     temperature: settings.temperature,

@@ -336,10 +336,11 @@ export function DeskPanel() {
   }
 
   const runShipCheck = async (absolutePath: string) => {
+    if (!workspaceRoot) return
     setShipBusy(true)
     setShipPath(absolutePath)
     try {
-      const result = await window.compass.desk.runShipCheck(absolutePath)
+      const result = await window.compass.desk.runShipCheck(workspaceRoot, absolutePath)
       setShipFindings(result.findings)
     } catch (error) {
       setMessage(error instanceof Error ? error.message : String(error))
@@ -363,9 +364,9 @@ export function DeskPanel() {
   }
 
   const performCopyShip = async () => {
-    if (!shipPath) return
+    if (!shipPath || !workspaceRoot) return
     setCopyAnywayConfirmOpen(false)
-    const result = await window.compass.desk.copyOutboxPayload(shipPath)
+    const result = await window.compass.desk.copyOutboxPayload(workspaceRoot, shipPath)
     if (!result.ok) {
       setMessage(result.message)
       return

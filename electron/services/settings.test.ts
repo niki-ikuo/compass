@@ -198,7 +198,7 @@ describe('getSettings / setSettings', () => {
     expect(settings.defaultUseCasePreset).toBe(DEFAULT_SETTINGS.defaultUseCasePreset)
   })
 
-  it('clears empty active api keys from providerKeys', async () => {
+  it('keeps existing api keys when renderer saves an empty key', async () => {
     await setSettings({
       ...DEFAULT_SETTINGS,
       apiKey: 'keep-me',
@@ -207,7 +207,23 @@ describe('getSettings / setSettings', () => {
     await setSettings({
       ...DEFAULT_SETTINGS,
       apiKey: '',
+      providerKeys: {}
+    })
+    const settings = await getSettings()
+    expect(settings.apiKey).toBe('keep-me')
+    expect(settings.providerKeys.openai).toBe('keep-me')
+  })
+
+  it('clears api keys when clearApiKey is set', async () => {
+    await setSettings({
+      ...DEFAULT_SETTINGS,
+      apiKey: 'keep-me',
       providerKeys: { openai: 'keep-me' }
+    })
+    await setSettings({
+      ...DEFAULT_SETTINGS,
+      apiKey: '',
+      clearApiKey: true
     })
     const settings = await getSettings()
     expect(settings.apiKey).toBe('')

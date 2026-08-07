@@ -4,6 +4,7 @@ export type ContinueDecision = { continue: boolean }
 const pendingApprovals = new Map<
   string,
   {
+    senderId: number
     resolve: (decision: ApprovalDecision) => void
   }
 >()
@@ -11,11 +12,29 @@ const pendingApprovals = new Map<
 const pendingContinues = new Map<
   string,
   {
+    senderId: number
     resolve: (decision: ContinueDecision) => void
   }
 >()
 
-/** Renderer が preview / exec 承認・却下後に呼ぶ */
+/** Renderer が preview / exec 承認・却下後に呼ぶ（送信元 webContents と一致必須） */
+export function resolveAgentApprovalForSender(
+  senderId: number,
+  payload: {
+    id: string
+    approved: boolean
+    detail?: string
+  }
+): boolean {
+  const pending = pendingApprovals.get(payload.id)
+  if (!pending) return false
+  if (pending.senderId !== senderId) return false
+  pendingApprovals.delete(payload.id)
+  pending.resolve({ approved: payload.approved, detail: payload.detail })
+  return true
+}
+
+/** @deprecated Prefer resolveAgentApprovalForSender — tests only */
 export function resolveAgentApproval(payload: {
   id: string
   approved: boolean
@@ -28,7 +47,19 @@ export function resolveAgentApproval(payload: {
   return true
 }
 
-/** Renderer がターン上限の続行/停止後に呼ぶ */
+export function resolveAgentContinueForSender(
+  senderId: number,
+  payload: { id: string; continue: boolean }
+): boolean {
+  const pending = pendingContinues.get(payload.id)
+  if (!pending) return false
+  if (pending.senderId !== senderId) return false
+  pendingContinues.delete(payload.id)
+  pending.resolve({ continue: payload.continue })
+  return true
+}
+
+/** @deprecated Prefer resolveAgentContinueForSender — tests only */
 export function resolveAgentContinue(payload: { id: string; continue: boolean }): boolean {
   const pending = pendingContinues.get(payload.id)
   if (!pending) return false
@@ -37,7 +68,11 @@ export function resolveAgentContinue(payload: { id: string; continue: boolean })
   return true
 }
 
-export function waitForApproval(id: string, signal: AbortSignal): Promise<ApprovalDecision> {
+export function waitForApproval(
+  id: string,
+  signal: AbortSignal,
+  senderId: number
+): Promise<ApprovalDecision> {
   return new Promise((resolve, reject) => {
     if (signal.aborted) {
       reject(new DOMException('Aborted', 'AbortError'))
@@ -52,6 +87,7 @@ export function waitForApproval(id: string, signal: AbortSignal): Promise<Approv
 
     signal.addEventListener('abort', onAbort)
     pendingApprovals.set(id, {
+      senderId,
       resolve: (decision) => {
         signal.removeEventListener('abort', onAbort)
         pendingApprovals.delete(id)
@@ -61,7 +97,11 @@ export function waitForApproval(id: string, signal: AbortSignal): Promise<Approv
   })
 }
 
-export function waitForContinue(id: string, signal: AbortSignal): Promise<ContinueDecision> {
+export function waitForContinue(
+  id: string,
+  signal: AbortSignal,
+  senderId: number
+): Promise<ContinueDecision> {
   return new Promise((resolve, reject) => {
     if (signal.aborted) {
       reject(new DOMException('Aborted', 'AbortError'))
@@ -76,6 +116,7 @@ export function waitForContinue(id: string, signal: AbortSignal): Promise<Contin
 
     signal.addEventListener('abort', onAbort)
     pendingContinues.set(id, {
+      senderId,
       resolve: (decision) => {
         signal.removeEventListener('abort', onAbort)
         pendingContinues.delete(id)

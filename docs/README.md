@@ -15,6 +15,7 @@ Developer docs for Compass (AI workspace for local folders). For product overvie
 | [AI_APPLY_UNDO.md](./AI_APPLY_UNDO.md) | Post-Apply undo — Phase 1–2 shipped; Phase 3 backlog |
 | [TEXT_WORKSPACE_PLAN.md](./TEXT_WORKSPACE_PLAN.md) | Build order: text search → docs → PDF bridge → apply history |
 | [DESK_LOOP.md](./DESK_LOOP.md) | Clip (capture / outbox / ship check) — Phase 1 implemented |
+| [SECURITY_AUDIT.md](./SECURITY_AUDIT.md) | Static security audit (2026-08-07) — IPC / XSS / Agent / secrets |
 | [Contributing](../CONTRIBUTING.md) | How to contribute ([日本語](../CONTRIBUTING.ja.md)) |
 
 English is the source of truth for these docs. Japanese translations live under [ja/](ja/README.md).

@@ -23,7 +23,11 @@ describe('browser-tab', () => {
       'https://www.google.com/search?q=hello%20world'
     )
     expect(normalizeBrowserUrl('')).toBe('about:blank')
-    expect(normalizeBrowserUrl('file:///C:/report.html')).toBe('file:///C:/report.html')
+    expect(normalizeBrowserUrl('file:///C:/report.html')).toBe('about:blank')
+    expect(normalizeBrowserUrl('data:text/html,hi')).toBe('about:blank')
+    expect(
+      normalizeBrowserUrl('file:///C:/report.html', { allowLocalFile: true })
+    ).toBe('file:///C:/report.html')
   })
 
   it('detects html paths', () => {

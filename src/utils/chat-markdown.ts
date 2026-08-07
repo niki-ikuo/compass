@@ -11,6 +11,15 @@ export function isSafeChatHref(href: string | undefined | null): boolean {
   }
 }
 
+/** Relative help doc links like `ai/provider.md` or `./install.md` (no schemes / traversal). */
+export function isSafeHelpDocHref(href: string | undefined | null): boolean {
+  if (!href) return false
+  const trimmed = href.trim()
+  if (!trimmed || /^[a-z][a-z0-9+.-]*:/i.test(trimmed)) return false
+  if (trimmed.startsWith('//') || trimmed.includes('..')) return false
+  return /\.md($|#)/i.test(trimmed)
+}
+
 const STRUCTURED_MENTION_RE = /@\[([^\]\n]+)\]/g
 
 export interface ChatMarkdownTextPiece {

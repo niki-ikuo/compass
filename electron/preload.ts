@@ -110,6 +110,8 @@ const compassAPI = {
     pickFiles: (): Promise<string[] | null> => ipcRenderer.invoke('fs:pickFiles'),
     importFiles: (parentDir: string, sourcePaths: string[]): Promise<string[]> =>
       ipcRenderer.invoke('fs:importFiles', parentDir, sourcePaths),
+    registerExternalContextPaths: (paths: string[]): Promise<void> =>
+      ipcRenderer.invoke('fs:registerExternalContextPaths', paths),
     /** Electron 32+ では File.path が消えたため、OS ドロップの絶対パス取得に使う */
     getPathForFile: (file: File): string => {
       try {
@@ -229,14 +231,18 @@ const compassAPI = {
       absolutePath: string
     ): Promise<{ ok: true } | { ok: false; message: string }> =>
       ipcRenderer.invoke('desk:deleteOutbox', workspaceRoot, absolutePath),
-    runShipCheck: (absolutePath: string): Promise<DeskShipCheckResult> =>
-      ipcRenderer.invoke('desk:runShipCheck', absolutePath),
+    runShipCheck: (
+      workspaceRoot: string,
+      absolutePath: string
+    ): Promise<DeskShipCheckResult> =>
+      ipcRenderer.invoke('desk:runShipCheck', workspaceRoot, absolutePath),
     copyOutboxPayload: (
+      workspaceRoot: string,
       absolutePath: string
     ): Promise<
       | { ok: true; payload: string; content: string; markedReady: boolean }
       | { ok: false; message: string }
-    > => ipcRenderer.invoke('desk:copyOutboxPayload', absolutePath),
+    > => ipcRenderer.invoke('desk:copyOutboxPayload', workspaceRoot, absolutePath),
     getCaptureHotkeyStatus: (): Promise<DeskCaptureHotkeyStatus> =>
       ipcRenderer.invoke('desk:getCaptureHotkeyStatus'),
     getShowHotkeyStatus: (): Promise<DeskShowHotkeyStatus> =>

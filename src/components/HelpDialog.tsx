@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
-import { marked } from 'marked'
+import { useCallback, useEffect, useRef, useState, type MouseEvent } from 'react'
 import { useI18n } from '@/i18n'
 import type { HelpDoc, HelpDocMeta, HelpSearchHit } from '@/types'
+import { SafeMarkdown } from '@/components/SafeMarkdown'
 import { CloseIcon } from './icons/ToolbarIcons'
 import {
   HELP_DEFAULT_HEIGHT,
@@ -13,11 +13,6 @@ import {
   resolveRelativeHelpId,
   type HelpCommandId
 } from './help-shared'
-
-marked.setOptions({
-  gfm: true,
-  breaks: true
-})
 
 export type { HelpCommandId }
 
@@ -132,15 +127,6 @@ export function HelpDialog({
     }
   }, [open, query, locale])
 
-  const html = useMemo(() => {
-    if (!doc) return ''
-    try {
-      return marked.parse(doc.body) as string
-    } catch {
-      return t('markdown.previewFailed')
-    }
-  }, [doc, t])
-
   const sidebarItems = query.trim() ? hits : docs
 
   const handleContentClick = (event: MouseEvent<HTMLDivElement>): void => {
@@ -242,7 +228,7 @@ export function HelpDialog({
             {!loading && !error && doc && (
               <>
                 <div className="markdown-preview help-markdown" onClick={handleContentClick}>
-                  <div className="markdown-body" dangerouslySetInnerHTML={{ __html: html }} />
+                  <SafeMarkdown content={doc.body} allowRelativeDocLinks />
                 </div>
 
                 {(doc.related.length > 0 || doc.commands.length > 0) && (

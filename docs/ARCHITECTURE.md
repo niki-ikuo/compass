@@ -143,3 +143,4 @@ Native non–OpenAI-compatible APIs (e.g. Claude) are unsupported; use OpenRoute
 - Do not call external APIs from the renderer; go through Main
 - Do not store secrets in plaintext (Credential Manager, etc.)
 - Keep `nodeIntegration` off; only expose the preload surface
+- Static audit findings: [SECURITY_AUDIT.md](./SECURITY_AUDIT.md)
