@@ -54,6 +54,8 @@ import {
   applyUpdateTodo,
   formatAgentPlanForModel,
   assistantClaimsUnverifiedFileApply,
+  assistantImpliesPendingFileChanges,
+  formatFinishWithoutProposeActionsNotice,
   formatMissingProposeActionsNudge,
   formatOpenTodosNudge,
   formatTruncatedProposeActionsNudge,
@@ -64,6 +66,8 @@ import {
   countActiveTodos,
   formatOversizedTodoPlanNudge,
   formatInitialTodoPlanNudge,
+  looksLikeWorkspaceChangeRequest,
+  maxProposeActionsNudges,
   shouldPlanFirstAgentTask,
   shouldNudgeOversizedTodoPlan,
   shouldNudgeMissingProposeActions,
@@ -146,8 +150,6 @@ const MAX_OPEN_TODO_NUDGES = 2
 const MAX_MISSING_TODO_PLAN_NUDGES = 2
 /** 過大な計画（>5）へのまとめ直し促し上限（1ラン1回） */
 const MAX_OVERSIZED_TODO_PLAN_NUDGES = 1
-/** text-only 終了時に proposeActions 欠落／途中切れの再促し上限 */
-const MAX_PROPOSE_ACTIONS_NUDGES = 2
 
 type ApiMessage = {
   role: string
@@ -1805,6 +1807,7 @@ export async function runAgent(webContents: WebContents, request: ChatRequest): 
     let oversizedTodoPlanNudges = 0
     let updateTodoCalledThisRun = false
     let proposeActionsNudges = 0
+    let proposeActionsNudgeCap = 2
     let proposeActionsApplied = false
     let proposeActionsTruncated = false
     let proposeActionsReachedPreview = false
@@ -1884,12 +1887,23 @@ export async function runAgent(webContents: WebContents, request: ChatRequest): 
           proposeActionsReachedPreview,
           alreadyNudging: proposeActionsNudges > 0
         })
-        // False "applied in chat" / truncated proposals must force proposeActions
+        // Keep the highest budget seen this run — later vague "Stopping." replies
+        // must not shrink a hard budget earned by false apply/propose claims.
+        proposeActionsNudgeCap = Math.max(
+          proposeActionsNudgeCap,
+          maxProposeActionsNudges({
+            assistantText,
+            proposeActionsTruncated,
+            proposeActionsReachedPreview
+          })
+        )
+        // False "applied/proposed in chat" / truncated proposals must force proposeActions
         // before plan nudges — otherwise the model burns turns on todos and still
         // never writes the workspace.
         const prioritizePropose = shouldPrioritizeProposeActionsNudge({
           assistantText,
-          proposeActionsTruncated
+          proposeActionsTruncated,
+          proposeActionsReachedPreview
         })
 
         const nudgeProposeActions = (): void => {
@@ -1911,7 +1925,7 @@ export async function runAgent(webContents: WebContents, request: ChatRequest): 
         if (
           prioritizePropose &&
           needsProposeActions &&
-          proposeActionsNudges < MAX_PROPOSE_ACTIONS_NUDGES
+          proposeActionsNudges < proposeActionsNudgeCap
         ) {
           nudgeProposeActions()
           turn++
@@ -1982,11 +1996,24 @@ export async function runAgent(webContents: WebContents, request: ChatRequest): 
         if (
           !needsTodoPlan &&
           needsProposeActions &&
-          proposeActionsNudges < MAX_PROPOSE_ACTIONS_NUDGES
+          proposeActionsNudges < proposeActionsNudgeCap
         ) {
           nudgeProposeActions()
           turn++
           continue
+        }
+
+        // Cap exhausted (or soft ask never proposed): do not leave a false "applied/proposed"
+        // claim as the final user-visible answer.
+        if (
+          !proposeActionsApplied &&
+          !proposeActionsReachedPreview &&
+          (proposeActionsTruncated ||
+            assistantClaimsUnverifiedFileApply(assistantText) ||
+            assistantImpliesPendingFileChanges(assistantText) ||
+            (proposeActionsNudges > 0 && looksLikeWorkspaceChangeRequest(latestUserText)))
+        ) {
+          send('ai:chunk', `\n\n${formatFinishWithoutProposeActionsNotice()}`)
         }
 
         send('ai:done')

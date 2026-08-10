@@ -333,6 +333,15 @@ export function looksLikeWorkspaceChangeRequest(text: string): boolean {
     return true
   }
 
+  // Soft bug reports that imply "please fix" in Agent (not pure Q&A).
+  if (
+    /(?:クリアできない|クリア出来ない|動かない|動かなく|起動しない|動作しない|ビルドできない|ゲートが.{0,12}ない|(?:can't|cannot|unable to)\s+(?:clear|pass|complete|run|start|build)\b)/i.test(
+      trimmed
+    )
+  ) {
+    return true
+  }
+
   // Prefer imperative forms over bare nouns like 「修正」alone (which appear in Q&A).
   const hasJaImperative =
     /(?:修正|変更|追加|削除|作成|実装|更新|書き換え|リファクタ|追記|置き換)(?:して|してください|してほしい|して下さい)|(?:直して|直す|書いて|書き換|消して|作って|入れて|なおして)/.test(
@@ -373,14 +382,27 @@ export function assistantClaimsUnverifiedFileApply(text: string): boolean {
 }
 
 /**
+ * Assistant claims it proposed / will propose edits without an actual proposeActions preview.
+ */
+export function assistantClaimsUnverifiedPropose(text: string): boolean {
+  const trimmed = text.trim()
+  if (!trimmed) return false
+
+  return /(?:修正|変更|パッチ)?を?提案(?:します|しました|いたします)|proposeActions\s*(?:ツール)?を?(?:呼び|呼び出し)|(?:I(?:'ll| will)|Let me)\s+propose\b|(?:proposed|proposing)\s+(?:the\s+)?(?:fix|change|changes|patch|update|edit)|here(?:'s| is) (?:my |the )?proposal\b/i.test(
+    trimmed
+  )
+}
+
+/**
  * Assistant text looks like an unapplied file proposal (fake Edit protocol,
- * embedded actions JSON, approval ask, or false "already applied" claim).
+ * embedded actions JSON, approval ask, false propose/apply claim).
  */
 export function assistantImpliesPendingFileChanges(text: string): boolean {
   const trimmed = text.trim()
   if (!trimmed) return false
 
   if (assistantClaimsUnverifiedFileApply(trimmed)) return true
+  if (assistantClaimsUnverifiedPropose(trimmed)) return true
   if (/```\s*compass-actions\b/i.test(trimmed)) return true
   if (/\bcompass-actions\b/i.test(trimmed) && /"actions"\s*:/.test(trimmed)) return true
   if (/"actions"\s*:\s*\[\s*\{/.test(trimmed)) return true
@@ -403,7 +425,8 @@ export function assistantImpliesPendingFileChanges(text: string): boolean {
 /**
  * Whether text-only finish should be interrupted to force a proposeActions call.
  * Skips when a proposal was already applied, or when the user already saw a preview
- * (approved or rejected) unless the assistant is dumping fake change JSON / claiming apply.
+ * (approved or rejected) unless the assistant is dumping fake change JSON / claiming
+ * an unverified apply (chat never writes the disk).
  * Once nudging has started this run, keep nudging until applied or the cap.
  */
 export function shouldNudgeMissingProposeActions(options: {
@@ -416,22 +439,59 @@ export function shouldNudgeMissingProposeActions(options: {
 }): boolean {
   if (options.proposeActionsApplied) return false
   if (options.proposeActionsTruncated) return true
+  // False "applied" claims always need a real tool call, even after a prior preview.
+  if (assistantClaimsUnverifiedFileApply(options.assistantText)) return true
+  // Preview is up — wait for the user. Do not re-nudge on "please approve" prose.
+  if (options.proposeActionsReachedPreview) {
+    // Fake Edit protocol / actions JSON in chat still means the model dodged the tool.
+    if (/```\s*compass-actions\b/i.test(options.assistantText)) return true
+    if (/\bcompass-actions\b/i.test(options.assistantText) && /"actions"\s*:/.test(options.assistantText)) {
+      return true
+    }
+    if (/"actions"\s*:\s*\[\s*\{/.test(options.assistantText)) return true
+    return false
+  }
   if (assistantImpliesPendingFileChanges(options.assistantText)) return true
-  if (options.proposeActionsReachedPreview) return false
   if (options.alreadyNudging) return true
   if (looksLikeWorkspaceChangeRequest(options.userText)) return true
   return false
 }
 
 /**
- * When the model invents an apply in chat, prefer forcing proposeActions over
+ * Soft change asks get a small nudge budget; false apply/propose/truncation get more
+ * retries because models often apologize in text instead of calling the tool.
+ */
+export function maxProposeActionsNudges(options: {
+  assistantText: string
+  proposeActionsTruncated: boolean
+  proposeActionsReachedPreview: boolean
+}): number {
+  const soft = 2
+  const hard = 6
+  if (options.proposeActionsTruncated) return hard
+  if (assistantClaimsUnverifiedFileApply(options.assistantText)) return hard
+  if (
+    !options.proposeActionsReachedPreview &&
+    (assistantClaimsUnverifiedPropose(options.assistantText) ||
+      assistantImpliesPendingFileChanges(options.assistantText))
+  ) {
+    return hard
+  }
+  return soft
+}
+
+/**
+ * When the model invents an apply/propose in chat, prefer forcing proposeActions over
  * plan/todo finish nudges (those burn turns without touching disk).
  */
 export function shouldPrioritizeProposeActionsNudge(options: {
   assistantText: string
   proposeActionsTruncated: boolean
+  proposeActionsReachedPreview?: boolean
 }): boolean {
   if (options.proposeActionsTruncated) return true
+  if (assistantClaimsUnverifiedFileApply(options.assistantText)) return true
+  if (options.proposeActionsReachedPreview) return false
   return assistantImpliesPendingFileChanges(options.assistantText)
 }
 
@@ -443,6 +503,11 @@ export function formatMissingProposeActionsNudge(options?: {
     return t('ai.agentFalseAppliedProposeActionsNudge')
   }
   return t('ai.agentMissingProposeActionsNudge')
+}
+
+/** Appended when the agent still finishes without a real proposeActions preview. */
+export function formatFinishWithoutProposeActionsNotice(): string {
+  return t('ai.agentFinishWithoutProposeActionsNotice')
 }
 
 /** Stronger nudge after truncated proposeActions when the model tries to finish in text. */

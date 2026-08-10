@@ -675,6 +675,36 @@ describe('runAgent tool loop', () => {
     expect(events.some((e) => e.channel === 'ai:done')).toBe(true)
   })
 
+  it('appends a finish notice when false propose claims never reach preview', async () => {
+    const root = makeTempRoot('finish-without-propose-notice')
+    tempRoots.push(root)
+
+    const fetchMock = vi.mocked(fetch)
+    // Exhaust hard nudge budget (6) with text-only "I proposed" replies.
+    for (let i = 0; i < 7; i++) {
+      fetchMock.mockResolvedValueOnce(
+        sseResponse(textTurn('修正を提案しました。承認いただければ適用されます。'))
+      )
+    }
+
+    const { webContents, events } = createWebContents()
+    await runAgent(
+      webContents,
+      baseRequest(root, {
+        messages: [{ role: 'user', content: 'ステージ5がクリアできない' }]
+      })
+    )
+
+    expect(events.some((e) => e.channel === 'ai:done')).toBe(true)
+    const chunks = events
+      .filter((e) => e.channel === 'ai:chunk')
+      .map((e) => String(e.payload[0] ?? ''))
+      .join('')
+    expect(chunks).toContain('did not open a proposeActions')
+    // Soft ask would stop at 2; false propose claims must keep nudging longer.
+    expect(fetchMock.mock.calls.length).toBeGreaterThan(3)
+  })
+
   it('on patch mismatch forces re-read guidance and blocks identical hunk retries', async () => {
     const root = makeTempRoot('patch-mismatch-retry')
     tempRoots.push(root)
@@ -750,19 +780,19 @@ describe('runAgent tool loop', () => {
     tempRoots.push(root)
 
     const fetchMock = vi.mocked(fetch)
-    fetchMock
-      .mockResolvedValueOnce(
-        sseResponse(
-          toolCallTurnRaw(
-            'proposeActions',
-            '{"actions":[{"type":"writeFile","path":"big.md","content":"partial',
-            'call_truncated'
-          )
+    fetchMock.mockResolvedValueOnce(
+      sseResponse(
+        toolCallTurnRaw(
+          'proposeActions',
+          '{"actions":[{"type":"writeFile","path":"big.md","content":"partial',
+          'call_truncated'
         )
       )
-      .mockResolvedValueOnce(sseResponse(textTurn('Done without retry.')))
-      .mockResolvedValueOnce(sseResponse(textTurn('Still done.')))
-      .mockResolvedValueOnce(sseResponse(textTurn('Forced stop.')))
+    )
+    // Hard budget is 6 for truncated proposeActions.
+    for (let i = 0; i < 7; i++) {
+      fetchMock.mockResolvedValueOnce(sseResponse(textTurn(`Done without retry ${i}.`)))
+    }
 
     const { webContents, events } = createWebContents()
     await runAgent(
@@ -785,8 +815,13 @@ describe('runAgent tool loop', () => {
     )
     expect(nudgeMsg).toBeTruthy()
     expect(events.some((e) => e.channel === 'ai:done')).toBe(true)
-    // truncated propose + 3 text-only (2 nudges then forced done)
-    expect(fetchMock).toHaveBeenCalledTimes(4)
+    // truncated propose + 6 nudges + final text finish
+    expect(fetchMock).toHaveBeenCalledTimes(8)
+    const chunks = events
+      .filter((e) => e.channel === 'ai:chunk')
+      .map((e) => String(e.payload[0] ?? ''))
+      .join('')
+    expect(chunks).toContain('did not open a proposeActions')
   })
 
   it('nudges when assistant dumps compass-actions instead of proposeActions', async () => {
@@ -794,16 +829,16 @@ describe('runAgent tool loop', () => {
     tempRoots.push(root)
 
     const fetchMock = vi.mocked(fetch)
-    fetchMock
-      .mockResolvedValueOnce(
-        sseResponse(
-          textTurn(
-            'Please approve:\n\n```compass-actions\n{"actions":[{"type":"writeFile","path":"a.md","content":"x"}]}\n```'
-          )
+    fetchMock.mockResolvedValueOnce(
+      sseResponse(
+        textTurn(
+          'Please approve:\n\n```compass-actions\n{"actions":[{"type":"writeFile","path":"a.md","content":"x"}]}\n```'
         )
       )
-      .mockResolvedValueOnce(sseResponse(textTurn('Stopping without tool.')))
-      .mockResolvedValueOnce(sseResponse(textTurn('Forced done.')))
+    )
+    for (let i = 0; i < 7; i++) {
+      fetchMock.mockResolvedValueOnce(sseResponse(textTurn(`Stopping without tool ${i}.`)))
+    }
 
     const { webContents, events } = createWebContents()
     await runAgent(
@@ -823,7 +858,7 @@ describe('runAgent tool loop', () => {
       )
     ).toBe(true)
     expect(events.some((e) => e.channel === 'ai:done')).toBe(true)
-    expect(fetchMock).toHaveBeenCalledTimes(3)
+    expect(fetchMock.mock.calls.length).toBeGreaterThan(3)
   })
 
   it('injects historical tool context once before the new ask on follow-ups', async () => {
