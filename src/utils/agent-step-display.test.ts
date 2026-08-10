@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest'
 import type { AgentToolStep } from '@/types'
 import {
   formatAgentToolLabel,
+  filterTimelineAgentSteps,
   getAgentToolLabelKey,
   groupConsecutiveAgentSteps,
+  isPlanPanelMirroredStep,
   isQuietAgentStep,
   segmentAgentSteps,
   shouldCollapseQuietSteps,
@@ -54,6 +56,51 @@ describe('isQuietAgentStep', () => {
         })
       )
     ).toBe(false)
+  })
+})
+
+describe('isPlanPanelMirroredStep / filterTimelineAgentSteps', () => {
+  it('hides successful updateTodo and checkpoint only when the plan panel is visible', () => {
+    expect(
+      isPlanPanelMirroredStep(step({ id: '1', name: 'updateTodo' }), {
+        planPanelVisible: true
+      })
+    ).toBe(true)
+    expect(
+      isPlanPanelMirroredStep(step({ id: '2', name: 'checkpoint' }), {
+        planPanelVisible: true
+      })
+    ).toBe(true)
+    expect(
+      isPlanPanelMirroredStep(step({ id: '3', name: 'updateTodo', status: 'running' }), {
+        planPanelVisible: true
+      })
+    ).toBe(true)
+    expect(
+      isPlanPanelMirroredStep(step({ id: '4', name: 'updateTodo' }), {
+        planPanelVisible: false
+      })
+    ).toBe(false)
+    expect(isPlanPanelMirroredStep(step({ id: '5', name: 'search' }))).toBe(false)
+  })
+
+  it('keeps failed plan tools visible and filters mirrors only when plan is shown', () => {
+    const steps = [
+      step({ id: '1', name: 'updateTodo' }),
+      step({ id: '2', name: 'search' }),
+      step({ id: '3', name: 'checkpoint' }),
+      step({ id: '4', name: 'updateTodo', ok: false, status: 'error' })
+    ]
+    expect(filterTimelineAgentSteps(steps, { planPanelVisible: true }).map((s) => s.id)).toEqual([
+      '2',
+      '4'
+    ])
+    expect(filterTimelineAgentSteps(steps, { planPanelVisible: false }).map((s) => s.id)).toEqual([
+      '1',
+      '2',
+      '3',
+      '4'
+    ])
   })
 })
 

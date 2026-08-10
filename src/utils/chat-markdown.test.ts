@@ -67,4 +67,16 @@ describe('ChatMarkdown', () => {
     )
     expect(html).not.toContain('<script>')
   })
+
+  it('keeps the streaming cursor inside the last paragraph', () => {
+    const html = renderToStaticMarkup(
+      ChatMarkdown({
+        content: 'Hello world',
+        showCursor: true
+      })
+    )
+    expect(html).toContain('chat-md-p')
+    expect(html).toContain('<span>Hello world</span><span class="chat-streaming-cursor"')
+    expect(html).not.toMatch(/<\/p><span class="chat-streaming-cursor"/)
+  })
 })

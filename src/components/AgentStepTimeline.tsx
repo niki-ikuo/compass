@@ -3,6 +3,7 @@ import type { AgentToolStep } from '@/types'
 import { getAgentStepStatusLabelKey, getAgentStepTone } from '@/utils/apply-error'
 import {
   formatAgentToolLabel,
+  filterTimelineAgentSteps,
   groupConsecutiveAgentSteps,
   isActiveAgentStep,
   segmentAgentSteps,
@@ -240,13 +241,19 @@ function QuietStepsSegmentView({ steps }: { steps: AgentToolStep[] }) {
 
 interface AgentStepTimelineProps {
   steps: AgentToolStep[]
+  /** When true, hide updateTodo/checkpoint rows (they are shown in AgentPlanPanel). */
+  planPanelVisible?: boolean
 }
 
-export function AgentStepTimeline({ steps }: AgentStepTimelineProps) {
+export function AgentStepTimeline({
+  steps,
+  planPanelVisible = false
+}: AgentStepTimelineProps) {
   const { t } = useI18n()
-  if (steps.length === 0) return null
+  const visibleSteps = filterTimelineAgentSteps(steps, { planPanelVisible })
+  if (visibleSteps.length === 0) return null
 
-  const segments = segmentAgentSteps(steps)
+  const segments = segmentAgentSteps(visibleSteps)
 
   return (
     <div className="agent-step-timeline" aria-label={t('chat.agentSteps')}>

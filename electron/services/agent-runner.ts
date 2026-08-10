@@ -1806,6 +1806,8 @@ export async function runAgent(webContents: WebContents, request: ChatRequest): 
     let proposeActionsApplied = false
     let proposeActionsTruncated = false
     let proposeActionsReachedPreview = false
+    /** After a text-only finish attempt (nudge), prefer "finishing" status over "thinking". */
+    let finishingPhase = false
 
     while (true) {
       if (signal.aborted) {
@@ -1829,7 +1831,9 @@ export async function runAgent(webContents: WebContents, request: ChatRequest): 
       }
 
       send('ai:step', {
-        label: t('ai.agentStepThinking', { turn: String(turn + 1) })
+        label: finishingPhase
+          ? t('ai.agentStepFinishing')
+          : t('ai.agentStepThinking', { turn: String(turn + 1) })
       })
 
       pruneMessagesToTokenBudget(apiMessages, CONTEXT_BUDGET.totalInputTokens)
@@ -1879,6 +1883,8 @@ export async function runAgent(webContents: WebContents, request: ChatRequest): 
         })
         if (needsTodoPlan && missingTodoPlanNudges < MAX_MISSING_TODO_PLAN_NUDGES) {
           missingTodoPlanNudges++
+          finishingPhase = true
+          send('ai:step', { label: t('ai.agentStepCheckingPlan') })
           apiMessages.push({
             role: 'assistant',
             content: turnResult.content || null
@@ -1898,6 +1904,8 @@ export async function runAgent(webContents: WebContents, request: ChatRequest): 
         })
         if (needsOversizedPlan && oversizedTodoPlanNudges < MAX_OVERSIZED_TODO_PLAN_NUDGES) {
           oversizedTodoPlanNudges++
+          finishingPhase = true
+          send('ai:step', { label: t('ai.agentStepCheckingPlan') })
           apiMessages.push({
             role: 'assistant',
             content: turnResult.content || null
@@ -1914,6 +1922,8 @@ export async function runAgent(webContents: WebContents, request: ChatRequest): 
           const openTodoNudge = formatOpenTodosNudge(plan)
           if (openTodoNudge) {
             openTodoNudges++
+            finishingPhase = true
+            send('ai:step', { label: t('ai.agentStepCheckingWork') })
             apiMessages.push({
               role: 'assistant',
               content: turnResult.content || null
@@ -1937,6 +1947,8 @@ export async function runAgent(webContents: WebContents, request: ChatRequest): 
           })
         ) {
           proposeActionsNudges++
+          finishingPhase = true
+          send('ai:step', { label: t('ai.agentStepCheckingChanges') })
           const proposeNudge = proposeActionsTruncated
             ? formatTruncatedProposeActionsNudge()
             : formatMissingProposeActionsNudge()
@@ -1952,6 +1964,8 @@ export async function runAgent(webContents: WebContents, request: ChatRequest): 
         send('ai:done')
         return
       }
+
+      finishingPhase = false
 
       while (toolCallsUsed + turnResult.toolCalls.length > toolBudget) {
         const shouldContinue = await offerAgentContinue(webContents, chatId, signal, {

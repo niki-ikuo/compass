@@ -112,11 +112,27 @@ function renderInline(tokens: Token[] | undefined, keyPrefix: string): ReactNode
   return nodes
 }
 
-function renderBlocks(tokens: Token[] | undefined, keyPrefix: string): ReactNode[] {
-  if (!tokens?.length) return []
+function renderBlocks(
+  tokens: Token[] | undefined,
+  keyPrefix: string,
+  trailing: ReactNode = null
+): ReactNode[] {
+  if (!tokens?.length) {
+    return trailing ? [trailing] : []
+  }
+
+  let lastRenderableIndex = -1
+  for (let i = tokens.length - 1; i >= 0; i--) {
+    if (tokens[i]?.type !== 'space' && tokens[i]?.type !== 'html') {
+      lastRenderableIndex = i
+      break
+    }
+  }
 
   return tokens.map((token, index) => {
     const key = `${keyPrefix}-${index}`
+    const trail = trailing && index === lastRenderableIndex ? trailing : null
+
     switch (token.type) {
       case 'space':
         return null
@@ -125,6 +141,7 @@ function renderBlocks(tokens: Token[] | undefined, keyPrefix: string): ReactNode
         return (
           <p key={key} className="chat-md-p">
             {renderInline(p.tokens, key)}
+            {trail}
           </p>
         )
       }
@@ -135,12 +152,14 @@ function renderBlocks(tokens: Token[] | undefined, keyPrefix: string): ReactNode
         return (
           <Tag key={key} className={`chat-md-h chat-md-h${level}`}>
             {renderInline(h.tokens, key)}
+            {trail}
           </Tag>
         )
       }
       case 'list': {
         const list = token as Tokens.List
         const ListTag = list.ordered ? 'ol' : 'ul'
+        const lastItemIndex = list.items.length - 1
         return (
           <ListTag
             key={key}
@@ -149,7 +168,11 @@ function renderBlocks(tokens: Token[] | undefined, keyPrefix: string): ReactNode
           >
             {list.items.map((item, itemIndex) => (
               <li key={`${key}-${itemIndex}`} className="chat-md-li">
-                {renderBlocks(item.tokens, `${key}-${itemIndex}`)}
+                {renderBlocks(
+                  item.tokens,
+                  `${key}-${itemIndex}`,
+                  trail && itemIndex === lastItemIndex ? trail : null
+                )}
               </li>
             ))}
           </ListTag>
@@ -159,7 +182,7 @@ function renderBlocks(tokens: Token[] | undefined, keyPrefix: string): ReactNode
         const q = token as Tokens.Blockquote
         return (
           <blockquote key={key} className="chat-md-quote">
-            {renderBlocks(q.tokens, key)}
+            {renderBlocks(q.tokens, key, trail)}
           </blockquote>
         )
       }
@@ -168,6 +191,7 @@ function renderBlocks(tokens: Token[] | undefined, keyPrefix: string): ReactNode
         return (
           <pre key={key} className="chat-md-pre">
             <code>{code.text}</code>
+            {trail}
           </pre>
         )
       }
@@ -195,23 +219,31 @@ function renderBlocks(tokens: Token[] | undefined, keyPrefix: string): ReactNode
                 ))}
               </tbody>
             </table>
+            {trail}
           </div>
         )
       }
       case 'hr':
-        return <hr key={key} className="chat-md-hr" />
+        return (
+          <span key={key} className="chat-md-hr-wrap">
+            <hr className="chat-md-hr" />
+            {trail}
+          </span>
+        )
       case 'text': {
         const textToken = token as Tokens.Text
         if (textToken.tokens?.length) {
           return (
             <p key={key} className="chat-md-p">
               {renderInline(textToken.tokens, key)}
+              {trail}
             </p>
           )
         }
         return (
           <p key={key} className="chat-md-p">
             {renderTextWithMentions(textToken.text, key)}
+            {trail}
           </p>
         )
       }
@@ -220,10 +252,10 @@ function renderBlocks(tokens: Token[] | undefined, keyPrefix: string): ReactNode
       default:
         if ('tokens' in token && Array.isArray(token.tokens)) {
           return (
-            <div key={key}>{renderBlocks(token.tokens as Token[], key)}</div>
+            <div key={key}>{renderBlocks(token.tokens as Token[], key, trail)}</div>
           )
         }
-        return null
+        return trail ? <span key={key}>{trail}</span> : null
     }
   })
 }
@@ -235,10 +267,8 @@ interface ChatMarkdownProps {
 
 export function ChatMarkdown({ content, showCursor }: ChatMarkdownProps) {
   const tokens = Lexer.lex(content, CHAT_MARKDOWN_OPTIONS)
-  return (
-    <div className="chat-markdown">
-      {renderBlocks(tokens, 'b')}
-      {showCursor ? <span className="chat-streaming-cursor" aria-hidden="true" /> : null}
-    </div>
-  )
+  const cursor = showCursor ? (
+    <span className="chat-streaming-cursor" aria-hidden="true" />
+  ) : null
+  return <div className="chat-markdown">{renderBlocks(tokens, 'b', cursor)}</div>
 }

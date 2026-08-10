@@ -26,7 +26,7 @@ import {
 } from '@/utils/use-case-preset'
 import { AgentStepTimeline } from './AgentStepTimeline'
 import { AgentPlanPanel } from './AgentPlanPanel'
-import { collectAgentStepsThrough } from '@/utils/agent-plan'
+import { collectAgentStepsThrough, rebuildPlanFromSteps, shouldShowAgentPlanPanel } from '@/utils/agent-plan'
 import { AnimatedStatus } from './AnimatedEllipsis'
 import { ChatHistoryIcon, PlusIcon, CloseIcon, WorkspaceRulesIcon } from './icons/ToolbarIcons'
 import {
@@ -111,6 +111,11 @@ export function ChatPanel() {
   const [agentStreamStatusByChat, setAgentStreamStatusByChat] = useState<
     Record<string, string | null>
   >({})
+  /** Agent: true while answer tokens are actively arriving (soft-settles when chunks pause). */
+  const [agentContentStreamingByChat, setAgentContentStreamingByChat] = useState<
+    Record<string, boolean>
+  >({})
+  const agentContentSettleTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
   const [pendingContinueByChat, setPendingContinueByChat] = useState<
     Record<string, AgentNeedContinueEvent | null>
   >({})
@@ -224,6 +229,9 @@ export function ChatPanel() {
   const chatContextRefs = activeChat?.contextRefs ?? []
   const isChatLoading = Boolean(activeChatId && loadingChatIds.includes(activeChatId))
   const agentStreamStatus = activeChatId ? (agentStreamStatusByChat[activeChatId] ?? null) : null
+  const agentContentStreaming = activeChatId
+    ? Boolean(agentContentStreamingByChat[activeChatId])
+    : false
   const pendingContinue = activeChatId ? (pendingContinueByChat[activeChatId] ?? null) : null
   const pendingExecApproval = activeChatId
     ? (pendingExecApprovalByChat[activeChatId] ?? null)
@@ -246,6 +254,32 @@ export function ChatPanel() {
       if (prev[chatId] === status) return prev
       return { ...prev, [chatId]: status }
     })
+  }
+  const clearAgentContentSettleTimer = (chatId: string) => {
+    const timer = agentContentSettleTimersRef.current[chatId]
+    if (timer) {
+      clearTimeout(timer)
+      delete agentContentSettleTimersRef.current[chatId]
+    }
+  }
+  const setAgentContentStreamingFor = (chatId: string, streaming: boolean) => {
+    setAgentContentStreamingByChat((prev) => {
+      if (Boolean(prev[chatId]) === streaming) return prev
+      return { ...prev, [chatId]: streaming }
+    })
+  }
+  /** Mark answer tokens as in-flight; briefly after the last chunk, treat content as settled. */
+  const noteAgentContentChunk = (chatId: string) => {
+    setAgentContentStreamingFor(chatId, true)
+    clearAgentContentSettleTimer(chatId)
+    agentContentSettleTimersRef.current[chatId] = setTimeout(() => {
+      delete agentContentSettleTimersRef.current[chatId]
+      setAgentContentStreamingFor(chatId, false)
+    }, 320)
+  }
+  const resetAgentContentStreaming = (chatId: string) => {
+    clearAgentContentSettleTimer(chatId)
+    setAgentContentStreamingFor(chatId, false)
   }
   const setPendingContinueFor = (chatId: string, event: AgentNeedContinueEvent | null) => {
     setPendingContinueByChat((prev) => {
@@ -587,6 +621,7 @@ export function ChatPanel() {
     addChatExchange(chatId, text, messageMode, messagePreset, settings.model)
     stopRequestedChatIdsRef.current.delete(chatId)
     setAgentStreamStatusFor(chatId, null)
+    resetAgentContentStreaming(chatId)
     setPendingContinueFor(chatId, null)
     setPendingExecApprovalFor(chatId, null)
     setChatLoading(chatId, true)
@@ -641,6 +676,7 @@ export function ChatPanel() {
       cleanup()
       stopRequestedChatIdsRef.current.delete(chatId)
       setAgentStreamStatusFor(chatId, null)
+      resetAgentContentStreaming(chatId)
       setPendingContinueFor(chatId, null)
       setPendingExecApprovalFor(chatId, null)
       setChatLoading(chatId, false)
@@ -658,6 +694,9 @@ export function ChatPanel() {
     unsubChunk = window.compass.ai.onChunk((eventChatId, chunk) => {
       if (!isThisChat(eventChatId)) return
       accumulated += chunk
+      if (isAgentMessage) {
+        noteAgentContentChunk(chatId)
+      }
       // Keep full content (including compass-actions) in history so follow-up
       // Edit turns still see prior proposals. ChatMessageContent strips for display.
       if (isEditMessage && !accumulated.trim()) {
@@ -670,6 +709,9 @@ export function ChatPanel() {
     if (isAgentMessage) {
       unsubToolStart = window.compass.ai.onToolStart((eventChatId, event) => {
         if (!isThisChat(eventChatId)) return
+        if (accumulated.trim()) {
+          resetAgentContentStreaming(chatId)
+        }
         agentSteps = [
           ...agentSteps.filter((s) => s.id !== event.id),
           {
@@ -830,6 +872,10 @@ export function ChatPanel() {
         if (!isThisChat(eventChatId)) return
         // ステータス行は agentStreamStatus で描画。空 content の再同期はスクロールを余計に走らせる。
         setAgentStreamStatusFor(chatId, event.label)
+        // 回答テキストが出たあとの確認ターンでは、本文を「書き終わり」に見せる。
+        if (accumulated.trim()) {
+          resetAgentContentStreaming(chatId)
+        }
       })
     }
 
@@ -1743,12 +1789,31 @@ export function ChatPanel() {
         )}
         {chatMessages.map((msg, index) => {
           const isLast = index === chatMessages.length - 1
-          const isStreaming = isLast && msg.role === 'assistant' && isChatLoading
+          const isRunActive = isLast && msg.role === 'assistant' && isChatLoading
           const requestMeta =
             msg.role === 'assistant' && index > 0 && chatMessages[index - 1]?.role === 'user'
               ? chatMessages[index - 1]
               : null
           const requestMode = requestMeta?.mode
+          // Agent: once answer text exists and chunks pause, drop the "still writing"
+          // cursor so the message feels finished while background work continues.
+          const isStreaming =
+            requestMode === 'agent'
+              ? isRunActive && (agentContentStreaming || !msg.content?.trim())
+              : isRunActive
+          const answerLooksSettled =
+            requestMode === 'agent' && isRunActive && Boolean(msg.content?.trim()) && !isStreaming
+          const cumulativeAgentSteps =
+            msg.role === 'assistant' && msg.agentSteps && msg.agentSteps.length > 0
+              ? collectAgentStepsThrough(chatMessages, index)
+              : null
+          const planPanelVisible = Boolean(
+            cumulativeAgentSteps &&
+              shouldShowAgentPlanPanel(
+                rebuildPlanFromSteps(cumulativeAgentSteps),
+                msg.agentSteps ?? []
+              )
+          )
           const requestPreset = normalizeUseCasePreset(requestMeta?.preset)
           const requestPresetOption = requestPreset
             ? USE_CASE_PRESET_OPTIONS.find((option) => option.id === requestPreset)
@@ -1784,15 +1849,18 @@ export function ChatPanel() {
                 ) : null}
               </div>
               <div className="chat-content">
-                {msg.role === 'assistant' && msg.agentSteps && msg.agentSteps.length > 0 && (
+                {cumulativeAgentSteps && msg.agentSteps ? (
                   <>
                     <AgentPlanPanel
-                      steps={collectAgentStepsThrough(chatMessages, index)}
+                      steps={cumulativeAgentSteps}
                       messageSteps={msg.agentSteps}
                     />
-                    <AgentStepTimeline steps={msg.agentSteps} />
+                    <AgentStepTimeline
+                      steps={msg.agentSteps}
+                      planPanelVisible={planPanelVisible}
+                    />
                   </>
-                )}
+                ) : null}
                 <ChatMessageContent
                   content={msg.content}
                   isStreaming={isStreaming}
@@ -1804,8 +1872,10 @@ export function ChatPanel() {
                 msg.appliedChangeSets.length > 0 ? (
                   <ChatAppliedChangeSets items={msg.appliedChangeSets} />
                 ) : null}
-                {isStreaming && agentStreamStatus ? (
-                  <div className="chat-agent-stream-status">
+                {isRunActive && agentStreamStatus ? (
+                  <div
+                    className={`chat-agent-stream-status${answerLooksSettled ? ' is-settled' : ''}`}
+                  >
                     <AnimatedStatus label={agentStreamStatus} />
                   </div>
                 ) : null}

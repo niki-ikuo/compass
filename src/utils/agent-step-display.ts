@@ -65,6 +65,31 @@ export function isQuietAgentStep(step: AgentToolStep): boolean {
   return true
 }
 
+/**
+ * updateTodo / checkpoint are mirrored by AgentPlanPanel when it is visible.
+ * Only hide them from the tool timeline in that case — otherwise the user sees
+ * neither the plan nor "タスクを更新", which feels like the plan never appears.
+ * Failures stay visible so the user can see what went wrong.
+ */
+export function isPlanPanelMirroredStep(
+  step: AgentToolStep,
+  options?: { planPanelVisible?: boolean }
+): boolean {
+  if (step.name !== 'updateTodo' && step.name !== 'checkpoint') return false
+  if (step.status === 'error' || step.ok === false) return false
+  // Keep the timeline row until the plan panel actually has something to show.
+  if (options?.planPanelVisible === false) return false
+  return true
+}
+
+/** Steps that should appear in AgentStepTimeline (plan panel mirrors are omitted). */
+export function filterTimelineAgentSteps(
+  steps: AgentToolStep[],
+  options?: { planPanelVisible?: boolean }
+): AgentToolStep[] {
+  return steps.filter((step) => !isPlanPanelMirroredStep(step, options))
+}
+
 export function isActiveAgentStep(step: AgentToolStep): boolean {
   return (
     step.status === 'running' ||
