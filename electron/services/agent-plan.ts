@@ -2,6 +2,7 @@
 export {
   applyCheckpoint,
   applyUpdateTodo,
+  assistantClaimsUnverifiedFileApply,
   assistantImpliesPendingFileChanges,
   PREFERRED_PLAN_ACTIVE_TODO_MAX,
   countActiveTodos,
@@ -25,6 +26,7 @@ export {
   shouldNudgeMissingProposeActions,
   shouldNudgeMissingTodoPlan,
   shouldPlanFirstAgentTask,
+  shouldPrioritizeProposeActionsNudge,
   shouldShowAgentPlanPanel,
   looksLikeVaguePhaseTodo,
   shouldHintCoarseAgentPlan,

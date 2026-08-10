@@ -976,6 +976,8 @@ export const ja = {
     '[Agent] 未完了の todo が残っています。まだ終了しないでください。\n各項目が done または cancelled になるまでツールで続け、進捗に応じて updateTodo を呼んでください。\n未完了がなくなってからテキストで終了してください。\n\n未完了の todo ({count}):',
   'ai.agentMissingProposeActionsNudge':
     '[Agent] ファイル変更の依頼なのに proposeActions が呼ばれていません。まだ終了しないでください。\nチャット本文や ```compass-actions``` / actions JSON に変更を書いてもプレビューも適用もされません。\n必ず proposeActions ツールを呼び、actions を JSON 配列で渡してください（既存ファイルは短い applyPatch）。ユーザーがプレビュー承認するまで適用されません。',
+  'ai.agentFalseAppliedProposeActionsNudge':
+    '[Agent] チャット本文で「修正が適用された／完了した」と書いていますが、proposeActions は呼ばれていない（または承認されていません）。ディスク上のファイルはまだ変わっていません。まだ終了しないでください。\n必ず proposeActions ツールを呼び、actions を JSON 配列で渡してください（既存ファイルは短い applyPatch）。プレビュー承認後にのみ適用されます。チャットの完了宣言だけでは反映されません。',
   'ai.agentTruncatedProposeActionsNudge':
     '[Agent] 直前の proposeActions は途中切れのためプレビューされていません。まだ終了しないでください。\n1ファイルずつ・短い applyPatch hunk だけでもう一度 proposeActions を呼んでください。大きな writeFile や複数ファイルの一括提案は避けてください。',
   'ai.agentPatchMismatchForceReread':
@@ -1993,6 +1995,8 @@ export const en: Record<MessageKey, string> = {
     '[Agent] Open todos remain. Do not finish yet.\nContinue with tools until each item is done or cancelled; call updateTodo as you progress.\nOnly finish with text when nothing is left open.\n\nOpen todos ({count}):',
   'ai.agentMissingProposeActionsNudge':
     '[Agent] This looks like a file-change request, but proposeActions was not called. Do not finish yet.\nWriting changes in chat (or as ```compass-actions``` / actions JSON) does not open preview and is never applied.\nCall the proposeActions tool with `actions` as a JSON array (prefer small applyPatch for existing files). Changes apply only after the user approves the preview.',
+  'ai.agentFalseAppliedProposeActionsNudge':
+    '[Agent] Your reply claims the fix was applied or completed, but proposeActions was not called (or not approved). Nothing was written to disk. Do not finish yet.\nCall the proposeActions tool with `actions` as a JSON array (prefer small applyPatch for existing files). Changes apply only after the user approves the preview — chat completion claims do not apply edits.',
   'ai.agentTruncatedProposeActionsNudge':
     '[Agent] The previous proposeActions call was truncated and was not shown in preview. Do not finish yet.\nCall proposeActions again with one file at a time and small applyPatch hunks only. Avoid large writeFile payloads and multi-file batches.',
   'ai.agentPatchMismatchForceReread':

@@ -324,6 +324,15 @@ export function looksLikeWorkspaceChangeRequest(text: string): boolean {
     return true
   }
 
+  // "Still not fixed" / "doesn't look applied" follow-ups after a claimed edit.
+  if (
+    /(?:修正|変更|反映|適用|更新)(?:され(?:てい)?ない|されてない|されていない)|直って(?:い)?ない|変わって(?:い)?ない|(?:まだ|いまだに).{0,12}(?:直|修正|反映|適用)|(?:not|still\s+not|doesn't\s+(?:look|seem)\s+)\s*(?:fixed|applied|reflected|updated)|(?:doesn't|does\s+not)\s+look\s+(?:fixed|applied)/i.test(
+      trimmed
+    )
+  ) {
+    return true
+  }
+
   // Prefer imperative forms over bare nouns like 「修正」alone (which appear in Q&A).
   const hasJaImperative =
     /(?:修正|変更|追加|削除|作成|実装|更新|書き換え|リファクタ|追記|置き換)(?:して|してください|してほしい|して下さい)|(?:直して|直す|書いて|書き換|消して|作って|入れて|なおして)/.test(
@@ -351,18 +360,32 @@ export function looksLikeWorkspaceChangeRequest(text: string): boolean {
 }
 
 /**
+ * Assistant claims file edits were applied/finished without going through proposeActions.
+ * Chat prose never writes the workspace — these must force a proposeActions nudge.
+ */
+export function assistantClaimsUnverifiedFileApply(text: string): boolean {
+  const trimmed = text.trim()
+  if (!trimmed) return false
+
+  return /(?:修正|変更|パッチ|更新|ファイル)(?:が|を)?(?:適用|反映|完了)(?:されました|しました)|(?:適用|反映)(?:されました|しました)|書き(?:込み|出し)ました|(?:ファイルを)?更新しました|(?:I've|I have|I)\s+applied\b|(?:the\s+)?(?:fix|change|changes|patch|update|edits?)\s+(?:has|have|was|were)\s+been\s+applied\b|(?:successfully\s+)?applied\s+(?:the\s+)?(?:fix|change|changes|patch|update)\b|changes?\s+(?:are|were)\s+now\s+(?:on disk|saved|written)\b/i.test(
+    trimmed
+  )
+}
+
+/**
  * Assistant text looks like an unapplied file proposal (fake Edit protocol,
- * embedded actions JSON, or asking for approval without proposeActions).
+ * embedded actions JSON, approval ask, or false "already applied" claim).
  */
 export function assistantImpliesPendingFileChanges(text: string): boolean {
   const trimmed = text.trim()
   if (!trimmed) return false
 
+  if (assistantClaimsUnverifiedFileApply(trimmed)) return true
   if (/```\s*compass-actions\b/i.test(trimmed)) return true
   if (/\bcompass-actions\b/i.test(trimmed) && /"actions"\s*:/.test(trimmed)) return true
   if (/"actions"\s*:\s*\[\s*\{/.test(trimmed)) return true
   if (
-    /(?:承認して|プレビューで確認|please approve|awaiting (?:your )?approval|review (?:and )?(?:approve|apply))/i.test(
+    /(?:承認(?:して|いただけ|をお願|お願い)|この修正を適用|適用しますか|反映します|プレビューで確認|please approve|awaiting (?:your )?approval|review (?:and )?(?:approve|apply)|shall I apply|can I apply)/i.test(
       trimmed
     )
   ) {
@@ -380,7 +403,7 @@ export function assistantImpliesPendingFileChanges(text: string): boolean {
 /**
  * Whether text-only finish should be interrupted to force a proposeActions call.
  * Skips when a proposal was already applied, or when the user already saw a preview
- * (approved or rejected) unless the assistant is dumping fake change JSON.
+ * (approved or rejected) unless the assistant is dumping fake change JSON / claiming apply.
  * Once nudging has started this run, keep nudging until applied or the cap.
  */
 export function shouldNudgeMissingProposeActions(options: {
@@ -400,8 +423,25 @@ export function shouldNudgeMissingProposeActions(options: {
   return false
 }
 
+/**
+ * When the model invents an apply in chat, prefer forcing proposeActions over
+ * plan/todo finish nudges (those burn turns without touching disk).
+ */
+export function shouldPrioritizeProposeActionsNudge(options: {
+  assistantText: string
+  proposeActionsTruncated: boolean
+}): boolean {
+  if (options.proposeActionsTruncated) return true
+  return assistantImpliesPendingFileChanges(options.assistantText)
+}
+
 /** User-role nudge when finishing without proposeActions on a change request. */
-export function formatMissingProposeActionsNudge(): string {
+export function formatMissingProposeActionsNudge(options?: {
+  assistantClaimedApply?: boolean
+}): string {
+  if (options?.assistantClaimedApply) {
+    return t('ai.agentFalseAppliedProposeActionsNudge')
+  }
   return t('ai.agentMissingProposeActionsNudge')
 }
 

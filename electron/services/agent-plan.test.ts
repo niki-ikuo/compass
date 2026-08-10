@@ -3,6 +3,7 @@ import { setLocale } from '../../src/i18n/runtime'
 import {
   applyCheckpoint,
   applyUpdateTodo,
+  assistantClaimsUnverifiedFileApply,
   assistantImpliesPendingFileChanges,
   countActiveTodos,
   countOpenTodos,
@@ -23,6 +24,7 @@ import {
   shouldNudgeMissingProposeActions,
   shouldNudgeMissingTodoPlan,
   shouldPlanFirstAgentTask,
+  shouldPrioritizeProposeActionsNudge,
   shouldShowAgentPlanPanel,
   looksLikeVaguePhaseTodo,
   shouldHintCoarseAgentPlan
@@ -496,6 +498,8 @@ describe('proposeActions finish nudges', () => {
     expect(looksLikeWorkspaceChangeRequest('実装してください')).toBe(true)
     expect(looksLikeWorkspaceChangeRequest('同様に bar.ts も')).toBe(true)
     expect(looksLikeWorkspaceChangeRequest('same for utils.ts')).toBe(true)
+    expect(looksLikeWorkspaceChangeRequest('修正されていないように感じます')).toBe(true)
+    expect(looksLikeWorkspaceChangeRequest('still not fixed')).toBe(true)
     expect(looksLikeWorkspaceChangeRequest('List the workspace')).toBe(false)
     expect(looksLikeWorkspaceChangeRequest('What does this file do?')).toBe(false)
     expect(looksLikeWorkspaceChangeRequest('この修正方針を説明して')).toBe(false)
@@ -510,7 +514,41 @@ describe('proposeActions finish nudges', () => {
       )
     ).toBe(true)
     expect(assistantImpliesPendingFileChanges('承認してください')).toBe(true)
+    expect(assistantImpliesPendingFileChanges('承認いただければ反映します。')).toBe(true)
+    expect(assistantImpliesPendingFileChanges('この修正を適用しますか？')).toBe(true)
+    expect(assistantImpliesPendingFileChanges('修正が適用されました。')).toBe(true)
+    expect(assistantImpliesPendingFileChanges('修正が完了しました。')).toBe(true)
+    expect(assistantImpliesPendingFileChanges('The fix has been applied.')).toBe(true)
     expect(assistantImpliesPendingFileChanges('Here is what I found.')).toBe(false)
+  })
+
+  it('detects unverified apply claims', () => {
+    expect(assistantClaimsUnverifiedFileApply('修正が適用されました。構文確認を行います。')).toBe(
+      true
+    )
+    expect(assistantClaimsUnverifiedFileApply('I applied the patch to index.html.')).toBe(true)
+    expect(assistantClaimsUnverifiedFileApply('壁とゲートの重なりが原因です。')).toBe(false)
+  })
+
+  it('prioritizes proposeActions when assistant invents an apply', () => {
+    expect(
+      shouldPrioritizeProposeActionsNudge({
+        assistantText: '修正が適用されました。',
+        proposeActionsTruncated: false
+      })
+    ).toBe(true)
+    expect(
+      shouldPrioritizeProposeActionsNudge({
+        assistantText: '調査結果のみです。',
+        proposeActionsTruncated: false
+      })
+    ).toBe(false)
+    expect(
+      shouldPrioritizeProposeActionsNudge({
+        assistantText: '',
+        proposeActionsTruncated: true
+      })
+    ).toBe(true)
   })
 
   it('shouldNudgeMissingProposeActions covers truncation and skips after preview', () => {
@@ -549,6 +587,17 @@ describe('proposeActions finish nudges', () => {
 
     expect(
       shouldNudgeMissingProposeActions({
+        userText: 'ステージ10がクリアできない',
+        assistantText: '修正が適用されました。変更内容は壁の削除です。',
+        proposeActionsApplied: false,
+        proposeActionsTruncated: false,
+        proposeActionsReachedPreview: false,
+        alreadyNudging: false
+      })
+    ).toBe(true)
+
+    expect(
+      shouldNudgeMissingProposeActions({
         userText: 'What is in this folder?',
         assistantText: 'Stopping without tool.',
         proposeActionsApplied: false,
@@ -561,6 +610,9 @@ describe('proposeActions finish nudges', () => {
 
   it('formats propose nudge copy', () => {
     expect(formatMissingProposeActionsNudge()).toContain('proposeActions was not called')
+    expect(formatMissingProposeActionsNudge({ assistantClaimedApply: true })).toContain(
+      'Nothing was written to disk'
+    )
     expect(formatTruncatedProposeActionsNudge()).toContain('truncated')
   })
 })

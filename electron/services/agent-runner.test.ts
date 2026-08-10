@@ -620,6 +620,61 @@ describe('runAgent tool loop', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 
+  it('nudges when assistant claims apply without proposeActions even for soft bug reports', async () => {
+    const root = makeTempRoot('false-applied-nudge')
+    tempRoots.push(root)
+
+    const fetchMock = vi.mocked(fetch)
+    fetchMock
+      .mockResolvedValueOnce(
+        sseResponse(
+          textTurn(
+            '修正が適用されました。壁リストから重複を削除しました。'
+          )
+        )
+      )
+      .mockResolvedValueOnce(
+        sseResponse(
+          toolCallTurn(
+            'proposeActions',
+            {
+              actions: [{ type: 'writeFile', path: 'game.html', content: 'fixed\n' }]
+            },
+            'call_propose_false'
+          )
+        )
+      )
+      .mockResolvedValueOnce(sseResponse(textTurn('提案を送りました。')))
+
+    const { webContents, events } = createWebContents()
+    const running = runAgent(
+      webContents,
+      baseRequest(root, {
+        messages: [{ role: 'user', content: 'ステージ10がクリアできない' }]
+      })
+    )
+
+    await vi.waitFor(() => {
+      expect(events.some((e) => e.channel === 'ai:needApproval')).toBe(true)
+    })
+
+    const secondBody = JSON.parse(String(fetchMock.mock.calls[1][1]?.body)) as {
+      messages: Array<{ role: string; content: string | null }>
+    }
+    const nudgeMsg = secondBody.messages.find(
+      (m) =>
+        m.role === 'user' &&
+        typeof m.content === 'string' &&
+        m.content.includes('Nothing was written to disk')
+    )
+    expect(nudgeMsg).toBeTruthy()
+
+    expect(resolveAgentApproval({ id: 'call_propose_false', approved: true })).toBe(true)
+    await running
+
+    expect(events.some((e) => e.channel === 'ai:done')).toBe(true)
+  })
+
   it('on patch mismatch forces re-read guidance and blocks identical hunk retries', async () => {
     const root = makeTempRoot('patch-mismatch-retry')
     tempRoots.push(root)

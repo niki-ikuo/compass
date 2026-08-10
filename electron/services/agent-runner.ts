@@ -53,6 +53,7 @@ import {
   applyCheckpoint,
   applyUpdateTodo,
   formatAgentPlanForModel,
+  assistantClaimsUnverifiedFileApply,
   formatMissingProposeActionsNudge,
   formatOpenTodosNudge,
   formatTruncatedProposeActionsNudge,
@@ -67,6 +68,7 @@ import {
   shouldNudgeOversizedTodoPlan,
   shouldNudgeMissingProposeActions,
   shouldNudgeMissingTodoPlan,
+  shouldPrioritizeProposeActionsNudge,
   type AgentPlanState
 } from './agent-plan'
 import {
@@ -1873,6 +1875,49 @@ export async function runAgent(webContents: WebContents, request: ChatRequest): 
       recordChatCompletionUsageFireAndForget(turnResult.usage)
 
       if (turnResult.toolCalls.length === 0) {
+        const assistantText = turnResult.content || ''
+        const needsProposeActions = shouldNudgeMissingProposeActions({
+          userText: latestUserText,
+          assistantText,
+          proposeActionsApplied,
+          proposeActionsTruncated,
+          proposeActionsReachedPreview,
+          alreadyNudging: proposeActionsNudges > 0
+        })
+        // False "applied in chat" / truncated proposals must force proposeActions
+        // before plan nudges — otherwise the model burns turns on todos and still
+        // never writes the workspace.
+        const prioritizePropose = shouldPrioritizeProposeActionsNudge({
+          assistantText,
+          proposeActionsTruncated
+        })
+
+        const nudgeProposeActions = (): void => {
+          proposeActionsNudges++
+          finishingPhase = true
+          send('ai:step', { label: t('ai.agentStepCheckingChanges') })
+          const proposeNudge = proposeActionsTruncated
+            ? formatTruncatedProposeActionsNudge()
+            : formatMissingProposeActionsNudge({
+                assistantClaimedApply: assistantClaimsUnverifiedFileApply(assistantText)
+              })
+          apiMessages.push({
+            role: 'assistant',
+            content: turnResult.content || null
+          })
+          apiMessages.push({ role: 'user', content: proposeNudge })
+        }
+
+        if (
+          prioritizePropose &&
+          needsProposeActions &&
+          proposeActionsNudges < MAX_PROPOSE_ACTIONS_NUDGES
+        ) {
+          nudgeProposeActions()
+          turn++
+          continue
+        }
+
         // Prefer planning before proposeActions nudges on multi-part asks.
         // Otherwise the proposeActions nudge steers the model to skip updateTodo.
         const needsTodoPlan = shouldNudgeMissingTodoPlan({
@@ -1936,27 +1981,10 @@ export async function runAgent(webContents: WebContents, request: ChatRequest): 
 
         if (
           !needsTodoPlan &&
-          proposeActionsNudges < MAX_PROPOSE_ACTIONS_NUDGES &&
-          shouldNudgeMissingProposeActions({
-            userText: latestUserText,
-            assistantText: turnResult.content || '',
-            proposeActionsApplied,
-            proposeActionsTruncated,
-            proposeActionsReachedPreview,
-            alreadyNudging: proposeActionsNudges > 0
-          })
+          needsProposeActions &&
+          proposeActionsNudges < MAX_PROPOSE_ACTIONS_NUDGES
         ) {
-          proposeActionsNudges++
-          finishingPhase = true
-          send('ai:step', { label: t('ai.agentStepCheckingChanges') })
-          const proposeNudge = proposeActionsTruncated
-            ? formatTruncatedProposeActionsNudge()
-            : formatMissingProposeActionsNudge()
-          apiMessages.push({
-            role: 'assistant',
-            content: turnResult.content || null
-          })
-          apiMessages.push({ role: 'user', content: proposeNudge })
+          nudgeProposeActions()
           turn++
           continue
         }
