@@ -57,6 +57,7 @@ import {
   agentProposalHasDeletes,
   shouldAutoApplyAgentProposal
 } from '@/utils/agent-auto-apply'
+import { failInFlightAgentSteps, updateAgentStepById } from '@/utils/agent-steps'
 import { formatActionPreviewError } from '@/utils/apply-error'
 import { resolveLastSentChatMode } from '@/utils/chat-mode'
 import {
@@ -726,17 +727,12 @@ export function ChatPanel() {
 
       unsubToolResult = window.compass.ai.onToolResult((eventChatId, event) => {
         if (!isThisChat(eventChatId)) return
-        agentSteps = agentSteps.map((step) =>
-          step.id === event.id
-            ? {
-                ...step,
-                status: event.ok ? 'done' : 'error',
-                ok: event.ok,
-                summary: event.summary,
-                observation: event.observation
-              }
-            : step
-        )
+        agentSteps = updateAgentStepById(agentSteps, event.id, {
+          status: event.ok ? 'done' : 'error',
+          ok: event.ok,
+          summary: event.summary,
+          observation: event.observation
+        })
         syncAssistant(accumulated || t('chat.generating'))
       })
 
@@ -758,15 +754,10 @@ export function ChatPanel() {
 
         if (canAutoApply) {
           setAgentStreamStatusFor(chatId, t('chat.agentAutoApplying'))
-          agentSteps = agentSteps.map((step) =>
-            step.id === event.id
-              ? {
-                  ...step,
-                  status: 'running',
-                  summary: t('chat.agentAutoApplying')
-                }
-              : step
-          )
+          agentSteps = updateAgentStepById(agentSteps, event.id, {
+            status: 'running',
+            summary: t('chat.agentAutoApplying')
+          })
           syncAssistant(accumulated.trim() || t('chat.agentAutoApplying'))
 
           void (async () => {
@@ -792,15 +783,10 @@ export function ChatPanel() {
                 useAppStore.getState().activateWorkspacePreview(pending.items)
               }
               setAgentStreamStatusFor(chatId, t('chat.agentWaitingApproval'))
-              agentSteps = agentSteps.map((step) =>
-                step.id === event.id
-                  ? {
-                      ...step,
-                      status: 'waiting_approval',
-                      summary: t('chat.agentWaitingApproval')
-                    }
-                  : step
-              )
+              agentSteps = updateAgentStepById(agentSteps, event.id, {
+                status: 'waiting_approval',
+                summary: t('chat.agentWaitingApproval')
+              })
               const errNote = `${t('chat.fileOpError', { message })}\n${t(
                 'chat.applyFailedAskAgentHint'
               )}`
@@ -821,15 +807,10 @@ export function ChatPanel() {
         }
 
         setAgentStreamStatusFor(chatId, t('chat.agentWaitingApproval'))
-        agentSteps = agentSteps.map((step) =>
-          step.id === event.id
-            ? {
-                ...step,
-                status: 'waiting_approval',
-                summary: t('chat.agentWaitingApproval')
-              }
-            : step
-        )
+        agentSteps = updateAgentStepById(agentSteps, event.id, {
+          status: 'waiting_approval',
+          summary: t('chat.agentWaitingApproval')
+        })
         syncAssistant(accumulated.trim() || t('chat.reviewProposal'))
       })
 
@@ -838,15 +819,10 @@ export function ChatPanel() {
         setPendingContinueFor(chatId, null)
         setPendingExecApprovalFor(chatId, event)
         setAgentStreamStatusFor(chatId, t('chat.agentWaitingExecApproval'))
-        agentSteps = agentSteps.map((step) =>
-          step.id === event.id
-            ? {
-                ...step,
-                status: 'waiting_approval',
-                summary: t('chat.agentWaitingExecApproval')
-              }
-            : step
-        )
+        agentSteps = updateAgentStepById(agentSteps, event.id, {
+          status: 'waiting_approval',
+          summary: t('chat.agentWaitingExecApproval')
+        })
         syncAssistant(accumulated.trim() || t('chat.agentWaitingExecApproval'))
       })
 
@@ -955,13 +931,9 @@ export function ChatPanel() {
         }
         setPendingContinueFor(chatId, null)
         setPendingExecApprovalFor(chatId, null)
-        agentSteps = agentSteps.map((step) =>
-          step.status === 'running' ||
-          step.status === 'waiting_approval' ||
-          step.status === 'waiting_continue'
-            ? { ...step, status: 'error', ok: false, summary: step.summary || t('chat.aborted') }
-            : step
-        )
+        agentSteps = failInFlightAgentSteps(agentSteps, t('chat.aborted'), {
+          preferExistingSummary: true
+        })
         syncAssistant(accumulated.trim() || t('chat.aborted'))
       } else {
         updateLastAssistantMessage(chatId, accumulated.trim() || t('chat.aborted'))
@@ -978,26 +950,14 @@ export function ChatPanel() {
           lastSentModeRef.current = 'edit'
           setAgentEditFallback({ prompt: text })
         }
-        agentSteps = agentSteps.map((step) =>
-          step.status === 'running' ||
-          step.status === 'waiting_approval' ||
-          step.status === 'waiting_continue'
-            ? { ...step, status: 'error', ok: false, summary: toolsUnsupportedMessage }
-            : step
-        )
+        agentSteps = failInFlightAgentSteps(agentSteps, toolsUnsupportedMessage)
         syncAssistant(
           `${t('chat.errorPrefix', { error: toolsUnsupportedMessage })}\n${t('chat.agentFallbackSwitched')}`
         )
         return
       }
       if (isAgentMessage) {
-        agentSteps = agentSteps.map((step) =>
-          step.status === 'running' ||
-          step.status === 'waiting_approval' ||
-          step.status === 'waiting_continue'
-            ? { ...step, status: 'error', ok: false, summary: error }
-            : step
-        )
+        agentSteps = failInFlightAgentSteps(agentSteps, error)
         syncAssistant(t('chat.errorPrefix', { error }))
       } else {
         updateLastAssistantMessage(chatId, t('chat.errorPrefix', { error }))

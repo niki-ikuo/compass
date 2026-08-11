@@ -851,6 +851,40 @@ function revertPreviewFileInOpenFiles(
   return { openFiles: nextOpenFiles, activeFilePath: nextActiveFilePath }
 }
 
+/** Drop all preview tabs: restore existing files, discard new-file previews. */
+function revertAllPreviewFilesInOpenFiles(
+  openFiles: OpenFile[],
+  activeFilePath: string | null
+): { openFiles: OpenFile[]; activeFilePath: string | null } {
+  const nextOpenFiles: OpenFile[] = []
+  let nextActive = activeFilePath
+
+  for (const file of openFiles) {
+    if (!file.isPreview) {
+      nextOpenFiles.push(file)
+      continue
+    }
+    if (file.isNewPreview) {
+      if (nextActive === file.path) nextActive = null
+      continue
+    }
+    nextOpenFiles.push({
+      ...file,
+      content: file.previewOriginal ?? file.content,
+      isPreview: false,
+      previewOriginal: undefined,
+      isNewPreview: false,
+      isDirty: false
+    })
+  }
+
+  if (!nextActive && nextOpenFiles.length > 0) {
+    nextActive = nextOpenFiles[nextOpenFiles.length - 1].path
+  }
+
+  return { openFiles: nextOpenFiles, activeFilePath: nextActive }
+}
+
 interface AppState {
   workspaceRoot: string | null
   /** 開いているワークスペースの用途既定（`.compass/settings.json`）。未設定は null */
@@ -2421,29 +2455,10 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (state.activeChatId === chatId && state.pendingWorkspacePreview?.chatId === chatId) {
       // Reuse file cleanup from revert, but approval already resolved above.
       set((s) => {
-        const openFiles: OpenFile[] = []
-        let activeFilePath = s.activeFilePath
-        for (const file of s.openFiles) {
-          if (!file.isPreview) {
-            openFiles.push(file)
-            continue
-          }
-          if (file.isNewPreview) {
-            if (activeFilePath === file.path) activeFilePath = null
-            continue
-          }
-          openFiles.push({
-            ...file,
-            content: file.previewOriginal ?? file.content,
-            isPreview: false,
-            previewOriginal: undefined,
-            isNewPreview: false,
-            isDirty: false
-          })
-        }
-        if (!activeFilePath && openFiles.length > 0) {
-          activeFilePath = openFiles[openFiles.length - 1].path
-        }
+        const { openFiles, activeFilePath } = revertAllPreviewFilesInOpenFiles(
+          s.openFiles,
+          s.activeFilePath
+        )
         const nextMap = { ...s.pendingPreviewsByChatId }
         delete nextMap[chatId]
         return {
@@ -2530,32 +2545,10 @@ export const useAppStore = create<AppState>((set, get) => ({
       state.pendingAgentApprovalId
 
     set((s) => {
-      const openFiles: OpenFile[] = []
-      let activeFilePath = s.activeFilePath
-
-      for (const file of s.openFiles) {
-        if (!file.isPreview) {
-          openFiles.push(file)
-          continue
-        }
-        if (file.isNewPreview) {
-          if (activeFilePath === file.path) activeFilePath = null
-          continue
-        }
-        openFiles.push({
-          ...file,
-          content: file.previewOriginal ?? file.content,
-          isPreview: false,
-          previewOriginal: undefined,
-          isNewPreview: false,
-          isDirty: false
-        })
-      }
-
-      if (!activeFilePath && openFiles.length > 0) {
-        activeFilePath = openFiles[openFiles.length - 1].path
-      }
-
+      const { openFiles, activeFilePath } = revertAllPreviewFilesInOpenFiles(
+        s.openFiles,
+        s.activeFilePath
+      )
       const nextMap = { ...s.pendingPreviewsByChatId }
       if (chatId) delete nextMap[chatId]
 
@@ -2586,32 +2579,10 @@ export const useAppStore = create<AppState>((set, get) => ({
       .join('\n')
 
     set((s) => {
-      const openFiles: OpenFile[] = []
-      let activeFilePath = s.activeFilePath
-
-      for (const file of s.openFiles) {
-        if (!file.isPreview) {
-          openFiles.push(file)
-          continue
-        }
-        if (file.isNewPreview) {
-          if (activeFilePath === file.path) activeFilePath = null
-          continue
-        }
-        openFiles.push({
-          ...file,
-          content: file.previewOriginal ?? file.content,
-          isPreview: false,
-          previewOriginal: undefined,
-          isNewPreview: false,
-          isDirty: false
-        })
-      }
-
-      if (!activeFilePath && openFiles.length > 0) {
-        activeFilePath = openFiles[openFiles.length - 1].path
-      }
-
+      const { openFiles, activeFilePath } = revertAllPreviewFilesInOpenFiles(
+        s.openFiles,
+        s.activeFilePath
+      )
       const nextMap = { ...s.pendingPreviewsByChatId }
       delete nextMap[chatId]
 

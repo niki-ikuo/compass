@@ -62,6 +62,7 @@ import {
   rebuildPlanFromSteps,
   sanitizeCheckpointArgs,
   sanitizeUpdateTodoArgs,
+  collectAgentStepsThrough,
   countOpenTodos,
   countActiveTodos,
   formatOversizedTodoPlanNudge,
@@ -613,25 +614,18 @@ export function buildPriorAgentContext(steps: AgentToolStep[]): string | null {
   return parts.join('\n\n')
 }
 
+/** 履歴上の assistant agentSteps をすべて集める */
+function collectAgentStepsFromHistory(history: ChatRequestMessage[]): AgentToolStep[] {
+  return collectAgentStepsThrough(history, history.length - 1)
+}
+
 /** 履歴上の assistant agentSteps から計画状態を復元する */
 function rebuildPlanFromHistory(history: ChatRequestMessage[]): AgentPlanState {
-  const steps: AgentToolStep[] = []
-  for (const msg of history) {
-    if (msg.role === 'assistant' && msg.agentSteps?.length) {
-      steps.push(...msg.agentSteps)
-    }
-  }
-  return rebuildPlanFromSteps(steps)
+  return rebuildPlanFromSteps(collectAgentStepsFromHistory(history))
 }
 
 function rebuildMemoryFromHistory(history: ChatRequestMessage[]): AgentMemoryState {
-  const steps: AgentToolStep[] = []
-  for (const msg of history) {
-    if (msg.role === 'assistant' && msg.agentSteps?.length) {
-      steps.push(...msg.agentSteps)
-    }
-  }
-  return rebuildMemoryFromSteps(steps)
+  return rebuildMemoryFromSteps(collectAgentStepsFromHistory(history))
 }
 
 /**
