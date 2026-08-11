@@ -22,6 +22,7 @@ import { isBrowserOpenFile, pathToFileUrl } from '@/utils/browser-tab'
 import { isCompareOpenFile } from '@/utils/compare-tab'
 import { isSettingsOpenFile } from '@/utils/settings-tab'
 import { CompareViewer } from './CompareViewer'
+import { PanelResizeHandle } from './ResizableLayout'
 import { buildWorkspaceIndex } from '@/utils/project-index'
 import {
   buildSelectionDragPayload,
@@ -33,6 +34,13 @@ import { useI18n } from '@/i18n'
 import { patchAppSettings } from '@/utils/patch-app-settings'
 
 type MarkdownViewMode = 'edit' | 'preview' | 'split'
+
+const DEFAULT_MARKDOWN_SPLIT_RATIO = 0.5
+const MIN_MARKDOWN_SPLIT_PANE = 160
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value))
+}
 
 const editorOptionsBase: editor.IStandaloneEditorConstructionOptions = {
   fontSize: 14,
@@ -94,10 +102,12 @@ export function CodeEditor() {
   const clearEditorRevealRequest = useAppStore((s) => s.clearEditorRevealRequest)
 
   const [markdownViewMode, setMarkdownViewMode] = useState<MarkdownViewMode>('edit')
+  const [markdownSplitRatio, setMarkdownSplitRatio] = useState(DEFAULT_MARKDOWN_SPLIT_RATIO)
   const [isApplying, setIsApplying] = useState(false)
   // null = 言語既定（Markdown: on / それ以外: off）。Alt+Z で一時上書き
   const [wordWrapOverride, setWordWrapOverride] = useState<'on' | 'off' | null>(null)
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null)
+  const markdownSplitRef = useRef<HTMLDivElement | null>(null)
   const selectionPayloadRef = useRef<ReturnType<typeof buildSelectionDragPayload> | null>(null)
 
   const activeFile = openFiles.find((f) => f.path === activeFilePath) ?? null
@@ -143,6 +153,25 @@ export function CodeEditor() {
     }),
     [inlineCompletionsEnabled, editorMinimapEnabled, isMarkdown, markdownViewMode, wordWrap]
   )
+
+  const handleMarkdownSplitDrag = useCallback((clientX: number) => {
+    const body = markdownSplitRef.current
+    if (!body) return
+
+    const bodyRect = body.getBoundingClientRect()
+    if (bodyRect.width <= 0) return
+
+    const outlineEl = body.querySelector('.markdown-outline')
+    const splitLeft = outlineEl
+      ? outlineEl.getBoundingClientRect().right
+      : bodyRect.left
+    const splitWidth = bodyRect.right - splitLeft
+    if (splitWidth <= 0) return
+
+    const minRatio = Math.min(0.5, MIN_MARKDOWN_SPLIT_PANE / splitWidth)
+    const nextRatio = clamp((clientX - splitLeft) / splitWidth, minRatio, 1 - minRatio)
+    setMarkdownSplitRatio(nextRatio)
+  }, [])
 
   useEffect(() => {
     if (inlineCompletionsEnabled === false) {
@@ -647,13 +676,23 @@ export function CodeEditor() {
         </div>
       )}
 
-      <div className={`editor-body ${markdownViewMode === 'split' ? 'split' : ''}${showOutline ? ' with-outline' : ''}`}>
+      <div
+        ref={markdownSplitRef}
+        className={`editor-body ${markdownViewMode === 'split' ? 'split' : ''}${showOutline ? ' with-outline' : ''}`}
+      >
         {showOutline && (
           <MarkdownOutline content={activeFile.content} filePath={activeFile.path} />
         )}
 
         {showEditor && (
-          <div className={`editor-pane ${markdownViewMode === 'split' ? 'half' : 'full'}`}>
+          <div
+            className={`editor-pane ${markdownViewMode === 'split' ? 'half' : 'full'}`}
+            style={
+              markdownViewMode === 'split'
+                ? { flexGrow: markdownSplitRatio, flexShrink: 1, flexBasis: 0 }
+                : undefined
+            }
+          >
             <Editor
               height="100%"
               path={pathToFileUrl(activeFile.path)}
@@ -668,8 +707,19 @@ export function CodeEditor() {
           </div>
         )}
 
+        {markdownViewMode === 'split' && showEditor && showPreviewPane && (
+          <PanelResizeHandle onDrag={handleMarkdownSplitDrag} />
+        )}
+
         {showPreviewPane && (
-          <div className={`preview-pane ${markdownViewMode === 'split' ? 'half' : 'full'}`}>
+          <div
+            className={`preview-pane ${markdownViewMode === 'split' ? 'half' : 'full'}`}
+            style={
+              markdownViewMode === 'split'
+                ? { flexGrow: 1 - markdownSplitRatio, flexShrink: 1, flexBasis: 0 }
+                : undefined
+            }
+          >
             <MarkdownPreview content={activeFile.content} />
           </div>
         )}

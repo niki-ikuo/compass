@@ -30,12 +30,12 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value))
 }
 
-function ResizeHandle({
+export function PanelResizeHandle({
   onDrag,
   onDragEnd
 }: {
   onDrag: (clientX: number) => void
-  onDragEnd: () => void
+  onDragEnd?: () => void
 }) {
   const [active, setActive] = useState(false)
 
@@ -55,7 +55,7 @@ function ResizeHandle({
     const handleMouseUp = () => {
       setActive(false)
       document.body.classList.remove('is-resizing-panels')
-      onDragEnd()
+      onDragEnd?.()
     }
 
     window.addEventListener('mousemove', handleMouseMove)
@@ -135,7 +135,7 @@ export function ResizableLayout({
           <div className="panel file-tree-panel" style={sidePanelStyle(leftRatio)}>
             {left}
           </div>
-          <ResizeHandle onDrag={handleLeftDrag} onDragEnd={() => undefined} />
+          <PanelResizeHandle onDrag={handleLeftDrag} />
         </>
       )}
 
@@ -143,7 +143,7 @@ export function ResizableLayout({
 
       {showRight && (
         <>
-          <ResizeHandle onDrag={handleRightDrag} onDragEnd={() => undefined} />
+          <PanelResizeHandle onDrag={handleRightDrag} />
           <div className="panel chat-panel-container" style={sidePanelStyle(rightRatio)}>
             {right}
           </div>
