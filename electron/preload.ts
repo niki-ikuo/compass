@@ -40,6 +40,7 @@ import type {
   AgentNeedExecApprovalEvent,
   WorkspaceSettings,
   WorkspaceOpenEditors,
+  WorkspacePinnedActions,
   WorkspaceExplorerState,
   HelpDoc,
   HelpDocMeta,
@@ -568,6 +569,15 @@ const compassAPI = {
       ipcRenderer.invoke('openEditors:load', workspaceRoot),
     save: (workspaceRoot: string, editors: WorkspaceOpenEditors): Promise<void> =>
       ipcRenderer.invoke('openEditors:save', workspaceRoot, editors)
+  },
+  pinnedActions: {
+    load: (workspaceRoot: string): Promise<WorkspacePinnedActions> =>
+      ipcRenderer.invoke('pinnedActions:load', workspaceRoot),
+    save: (
+      workspaceRoot: string,
+      data: WorkspacePinnedActions
+    ): Promise<WorkspacePinnedActions> =>
+      ipcRenderer.invoke('pinnedActions:save', workspaceRoot, data)
   },
   explorerState: {
     load: (workspaceRoot: string): Promise<WorkspaceExplorerState | null> =>

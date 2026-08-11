@@ -1,6 +1,7 @@
 import { useRef } from 'react'
 import { useAppStore } from '@/stores/app-store'
 import { TabBar } from './TabBar'
+import { PinnedActionsBar } from './PinnedActionsBar'
 import { PreviewBar } from './PreviewBar'
 import { AiApplyUndoBar } from './AiApplyUndoBar'
 import { CodeEditor } from './Editor'
@@ -18,6 +19,7 @@ export function EditorCenter() {
     <div className="editor-center">
       <div className="editor-main">
         <TabBar />
+        <PinnedActionsBar />
         <CodeEditor />
         <PreviewBar />
         <AiApplyUndoBar />

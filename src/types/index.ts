@@ -523,6 +523,26 @@ export interface WorkspaceExplorerState {
   lastSelectedPath: string | null
 }
 
+/** エディタ上部バーに表示できるピン留めアクションの上限 */
+export const PINNED_ACTIONS_BAR_MAX = 5
+
+/** ユーザー定義のワンタッチ AI アクション（`.compass/pinned-actions.json`） */
+export interface PinnedAction {
+  id: string
+  label: string
+  prompt: string
+  mode: ChatMode
+  preset?: UseCasePreset
+  /** エディタバーに表示する（最大 PINNED_ACTIONS_BAR_MAX 件） */
+  pinned: boolean
+}
+
+/** ワークスペースのピン留めアクション一覧 */
+export interface WorkspacePinnedActions {
+  version: number
+  actions: PinnedAction[]
+}
+
 /** ワークスペース固有設定（`.compass/settings.json`） */
 export interface WorkspaceSettings {
   /** フォルダ既定の用途。未設定時はアプリの defaultUseCasePreset に従う */
@@ -1229,6 +1249,10 @@ export interface CompassAPI {
   openEditors: {
     load: (workspaceRoot: string) => Promise<WorkspaceOpenEditors>
     save: (workspaceRoot: string, editors: WorkspaceOpenEditors) => Promise<void>
+  }
+  pinnedActions: {
+    load: (workspaceRoot: string) => Promise<WorkspacePinnedActions>
+    save: (workspaceRoot: string, data: WorkspacePinnedActions) => Promise<WorkspacePinnedActions>
   }
   explorerState: {
     load: (workspaceRoot: string) => Promise<WorkspaceExplorerState | null>

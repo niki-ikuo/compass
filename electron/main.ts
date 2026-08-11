@@ -106,6 +106,7 @@ import {
 import { startIndexWatcher, stopIndexWatcher } from './services/index-watcher'
 import { loadChatHistory, saveChatHistory } from './services/chat-history'
 import { loadOpenEditors, saveOpenEditors } from './services/open-editors'
+import { loadPinnedActions, savePinnedActions } from './services/pinned-actions'
 import { loadExplorerState, saveExplorerState } from './services/explorer-state'
 import {
   createTerminal,
@@ -129,6 +130,7 @@ import type {
   InlineCompletionRequest,
   WorkspaceAction,
   WorkspaceOpenEditors,
+  WorkspacePinnedActions,
   WorkspaceExplorerState,
   WorkspaceReplaceOptions,
   WorkspaceSearchOptions
@@ -1264,6 +1266,17 @@ function registerIpcHandlers(): void {
     'openEditors:save',
     async (_event, workspaceRoot: string, editors: WorkspaceOpenEditors) => {
       await saveOpenEditors(bindActiveWorkspaceRoot(workspaceRoot), editors)
+    }
+  )
+
+  ipcMain.handle('pinnedActions:load', async (_event, workspaceRoot: string) => {
+    return loadPinnedActions(bindActiveWorkspaceRoot(workspaceRoot))
+  })
+
+  ipcMain.handle(
+    'pinnedActions:save',
+    async (_event, workspaceRoot: string, data: WorkspacePinnedActions) => {
+      return savePinnedActions(bindActiveWorkspaceRoot(workspaceRoot), data)
     }
   )
 
