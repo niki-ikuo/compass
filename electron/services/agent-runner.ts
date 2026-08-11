@@ -117,6 +117,11 @@ import { formatAgentToolsUnsupportedError } from '../../src/utils/agent-tools'
 import { extractMarkdownSection } from '../../src/utils/markdown-outline'
 import { normalizeUseCasePreset } from '../../src/types'
 import {
+  detailForProposeActionsReject,
+  parseProposeActionsRejectIntent,
+  type ProposeActionsRejectIntent
+} from '../../src/utils/agent-approval-reject'
+import {
   CONTEXT_BUDGET,
   fitHistoryMessages,
   pruneMessagesToTokenBudget,
@@ -1256,6 +1261,7 @@ async function executeProposeActions(
   content: string
   appliedPaths?: string[]
   previewed?: boolean
+  rejectIntent?: ProposeActionsRejectIntent
 }> {
   const parsed = parseProposeActions(args)
   if ('error' in parsed) {
@@ -1349,15 +1355,17 @@ async function executeProposeActions(
         previewed: true
       }
     }
+    const rejectIntent =
+      parseProposeActionsRejectIntent(decision.detail) ?? ('stop' as ProposeActionsRejectIntent)
     const detail =
-      decision.detail ??
-      'User rejected the proposed workspace actions. They were not applied. You may propose a revised set of actions or continue without changes.'
+      decision.detail ?? detailForProposeActionsReject(rejectIntent)
     const enriched = enrichPatchMismatchResult(patchRetry, readCache, normalized, detail, '')
     return {
       ok: false,
       summary: summarizeProposeActionsRejection(detail),
       content: enriched.content,
-      previewed: true
+      previewed: true,
+      rejectIntent
     }
   } catch (err) {
     if (isAbortError(err) || signal.aborted) {
@@ -1805,6 +1813,10 @@ export async function runAgent(webContents: WebContents, request: ChatRequest): 
     let proposeActionsApplied = false
     let proposeActionsTruncated = false
     let proposeActionsReachedPreview = false
+    /** Full reject-and-stop: end the run after the rejection observation. */
+    let stopAfterProposeReject = false
+    /** Reject-and-revise: keep looping but do not push open-todo nudges. */
+    let suppressOpenTodoNudgesAfterReject = false
     /** After a text-only finish attempt (nudge), prefer "finishing" status over "thinking". */
     let finishingPhase = false
 
@@ -1971,7 +1983,7 @@ export async function runAgent(webContents: WebContents, request: ChatRequest): 
           continue
         }
 
-        if (openTodoNudges < MAX_OPEN_TODO_NUDGES) {
+        if (openTodoNudges < MAX_OPEN_TODO_NUDGES && !suppressOpenTodoNudgesAfterReject) {
           const openTodoNudge = formatOpenTodosNudge(plan)
           if (openTodoNudge) {
             openTodoNudges++
@@ -2071,6 +2083,7 @@ export async function runAgent(webContents: WebContents, request: ChatRequest): 
           content: string
           appliedPaths?: string[]
           previewed?: boolean
+          rejectIntent?: ProposeActionsRejectIntent
         }
         try {
           if (call.function.name === 'proposeActions') {
@@ -2101,6 +2114,7 @@ export async function runAgent(webContents: WebContents, request: ChatRequest): 
               if (result.ok) {
                 proposeActionsApplied = true
                 proposeActionsTruncated = false
+                suppressOpenTodoNudgesAfterReject = false
                 const paths =
                   result.appliedPaths && result.appliedPaths.length > 0
                     ? result.appliedPaths
@@ -2108,6 +2122,13 @@ export async function runAgent(webContents: WebContents, request: ChatRequest): 
                 invalidateCachedPaths(readCache, paths)
                 invalidateDataSandboxPaths(dataSandbox, paths)
                 if (paths.length > 0) lastAppliedPaths = paths
+              } else if (result.rejectIntent === 'stop') {
+                stopAfterProposeReject = true
+              } else if (result.rejectIntent === 'revise') {
+                // Allow missing-proposeActions nudges again so "ask for revision"
+                // does not silently end on a text-only reply.
+                proposeActionsReachedPreview = false
+                suppressOpenTodoNudgesAfterReject = true
               }
             }
           } else {
@@ -2154,6 +2175,11 @@ export async function runAgent(webContents: WebContents, request: ChatRequest): 
           name: call.function.name,
           content: truncateForModel(result.content)
         })
+      }
+
+      if (stopAfterProposeReject) {
+        send('ai:done')
+        return
       }
 
       // Multi-part asks that jumped straight into other tools still need a checklist.

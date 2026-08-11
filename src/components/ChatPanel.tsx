@@ -1850,7 +1850,10 @@ export function ChatPanel() {
           items={pendingWorkspacePreview.items}
           applyError={lastApplyError}
           onApply={() => void handleApplyActions()}
-          onReject={() => revertWorkspacePreview()}
+          onReject={() => revertWorkspacePreview('stop')}
+          onAskRevision={
+            pendingAgentApprovalId ? () => revertWorkspacePreview('revise') : undefined
+          }
           onAskAgentFix={
             lastApplyError && pendingAgentApprovalId
               ? () => sendApplyFailureToAgent()

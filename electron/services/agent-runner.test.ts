@@ -282,8 +282,51 @@ describe('runAgent tool loop', () => {
     expect(events.some((e) => e.channel === 'ai:done')).toBe(false)
   })
 
-  it('waits for proposeActions approval and reports rejection', async () => {
+  it('stops the run after proposeActions reject-and-stop', async () => {
     const root = makeTempRoot('propose')
+    tempRoots.push(root)
+
+    vi.mocked(fetch).mockResolvedValueOnce(
+      sseResponse(
+        toolCallTurn(
+          'proposeActions',
+          {
+            actions: [{ type: 'writeFile', path: 'new.md', content: 'hello\n' }]
+          },
+          'call_propose'
+        )
+      )
+    )
+
+    const { webContents, events } = createWebContents()
+    const running = runAgent(webContents, baseRequest(root))
+
+    await vi.waitFor(() => {
+      expect(events.some((e) => e.channel === 'ai:needApproval')).toBe(true)
+    })
+    expect(
+      resolveAgentApproval({
+        id: 'call_propose',
+        approved: false,
+        detail:
+          'User rejected the proposed workspace actions and asked to stop. They were not applied. Do not continue with other todos or propose further changes; wait for the next user message.'
+      })
+    ).toBe(true)
+    await running
+
+    const toolResult = events.find((e) => e.channel === 'ai:toolResult')
+    expect(toolResult?.payload[0]).toMatchObject({
+      name: 'proposeActions',
+      ok: false,
+      summary: 'User rejected'
+    })
+    expect(events.some((e) => e.channel === 'ai:done')).toBe(true)
+    // No follow-up model turn after stop.
+    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1)
+  })
+
+  it('continues after proposeActions reject-and-revise', async () => {
+    const root = makeTempRoot('propose-revise')
     tempRoots.push(root)
 
     vi.mocked(fetch)
@@ -294,11 +337,11 @@ describe('runAgent tool loop', () => {
             {
               actions: [{ type: 'writeFile', path: 'new.md', content: 'hello\n' }]
             },
-            'call_propose'
+            'call_propose_rev'
           )
         )
       )
-      .mockResolvedValueOnce(sseResponse(textTurn('Stopped after rejection.')))
+      .mockResolvedValueOnce(sseResponse(textTurn('Here is a revised approach.')))
 
     const { webContents, events } = createWebContents()
     const running = runAgent(webContents, baseRequest(root))
@@ -306,6 +349,47 @@ describe('runAgent tool loop', () => {
     await vi.waitFor(() => {
       expect(events.some((e) => e.channel === 'ai:needApproval')).toBe(true)
     })
+    expect(
+      resolveAgentApproval({
+        id: 'call_propose_rev',
+        approved: false,
+        detail:
+          'User rejected the proposed workspace actions and asked for a revision. They were not applied. Propose a revised set of actions for the same goal; do not advance to unrelated todos.'
+      })
+    ).toBe(true)
+    await running
+
+    expect(events.find((e) => e.channel === 'ai:toolResult')?.payload[0]).toMatchObject({
+      name: 'proposeActions',
+      ok: false
+    })
+    expect(events.some((e) => e.channel === 'ai:done')).toBe(true)
+    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(2)
+  })
+
+  it('waits for proposeActions approval and reports rejection', async () => {
+    const root = makeTempRoot('propose')
+    tempRoots.push(root)
+
+    vi.mocked(fetch).mockResolvedValueOnce(
+      sseResponse(
+        toolCallTurn(
+          'proposeActions',
+          {
+            actions: [{ type: 'writeFile', path: 'new.md', content: 'hello\n' }]
+          },
+          'call_propose'
+        )
+      )
+    )
+
+    const { webContents, events } = createWebContents()
+    const running = runAgent(webContents, baseRequest(root))
+
+    await vi.waitFor(() => {
+      expect(events.some((e) => e.channel === 'ai:needApproval')).toBe(true)
+    })
+    // Legacy detail without intent → treat as stop.
     expect(resolveAgentApproval({ id: 'call_propose', approved: false, detail: 'nope' })).toBe(
       true
     )
@@ -317,6 +401,7 @@ describe('runAgent tool loop', () => {
       ok: false
     })
     expect(events.some((e) => e.channel === 'ai:done')).toBe(true)
+    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1)
   })
 
   it('reads a file via readFile tool', async () => {

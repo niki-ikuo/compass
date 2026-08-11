@@ -84,7 +84,7 @@ idle → thinking → tool_call → (waiting_approval)? → applying? → thinki
 |----------|------|
 | 書き込みツール | 一括 **`proposeActions`** → `WorkspaceAction[]`（`writeFile` / **`applyPatch`** / mkdir / 削除） |
 | 適用場所 | Renderer の `applyWorkspacePreview` / `revertWorkspacePreview`（Edit と同じ UX） |
-| 却下後 | 観測結果をモデルに返しループを**続行**（再提案可） |
+| 却下後 | **拒否して停止** → 観測を残してラン終了 / **別案を依頼** → 観測を返して続行（open-todo nudge 抑制） |
 | 適用後 | 適用サマリを返し**続行** |
 | ポーズ IPC | `ai:needApproval` + `ai:resolveApproval` |
 
@@ -115,7 +115,7 @@ idle → thinking → tool_call → (waiting_approval)? → applying? → thinki
 - ツール: `proposeActions({ actions: WorkspaceAction[] })` — 既存ファイルは **`applyPatch`** 優先、`writeFile` は新規／短い全置換向け
 - ループが**一時停止**し、プレビュー付きで `ai:needApproval` を送る
 - UI は Edit の preview / PreviewBar を再利用。採用/拒否で `ai:resolveApproval`
-- 却下・適用のどちらも観測結果を返し、ランは**続行**
+- 適用は観測を返して続行。**別案を依頼**も続行。**拒否して停止**は観測を残してラン終了
 - Ask / Edit の経路は無変更
 
 **完了条件:** 達成済み。
@@ -210,7 +210,7 @@ v2.0 出荷までに実際に使った順:
 
 | トピック | 選択肢 / メモ | 決定 |
 |----------|---------------|------|
-| 却下後の承認ポリシー | ラン停止 vs 書き込みなしで続行 | **却下観測を返して続行** |
+| 却下後の承認ポリシー | ラン停止 vs 書き込みなしで続行 | **フル拒否は停止（観測残す）。別案依頼・部分適用は続行** |
 | 書き込みツールの粒度 | 一括 `proposeActions` vs 複数ツール | **`proposeActions` 一括** |
 | tools 非対応プロバイダ | Agent 非表示 / 警告 / フォールバック | **非対応時は Agent を非表示**；万一選ばれていた場合は **Edit 誘導フォールバック**；それ以外は明確なエラー（`ai.agentToolsUnsupported`） |
 | ステップ永続化の形 | メッセージ上 vs 別ラン記録 | **`ChatMessage.agentSteps`** |

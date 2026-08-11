@@ -96,6 +96,7 @@ export function CodeEditor() {
   const rejectPreviewFile = useAppStore((s) => s.rejectPreviewFile)
   const applyWorkspacePreview = useAppStore((s) => s.applyWorkspacePreview)
   const revertWorkspacePreview = useAppStore((s) => s.revertWorkspacePreview)
+  const pendingAgentApprovalId = useAppStore((s) => s.pendingAgentApprovalId)
   const editorSelection = useAppStore((s) => s.editorSelection)
   const requestChatComposerInsert = useAppStore((s) => s.requestChatComposerInsert)
   const editorRevealRequest = useAppStore((s) => s.editorRevealRequest)
@@ -410,7 +411,11 @@ export function CodeEditor() {
   }
 
   const handleRejectAll = () => {
-    revertWorkspacePreview()
+    revertWorkspacePreview('stop')
+  }
+
+  const handleAskRevisionAll = () => {
+    revertWorkspacePreview('revise')
   }
 
   const goToPreview = (offset: number) => {
@@ -590,13 +595,23 @@ export function CodeEditor() {
           <div className="editor-preview-bulk-bar">
             <span>{t('editor.otherChanges', { count: previewFiles.length - 1 })}</span>
             <div className="editor-preview-bulk-actions">
+              {pendingAgentApprovalId ? (
+                <button
+                  type="button"
+                  className="btn-secondary btn-compact"
+                  onClick={handleAskRevisionAll}
+                  disabled={isApplying}
+                >
+                  {t('editor.askRevisionAll')}
+                </button>
+              ) : null}
               <button
                 type="button"
                 className="btn-secondary btn-compact"
                 onClick={handleRejectAll}
                 disabled={isApplying}
               >
-                {t('editor.rejectAll')}
+                {pendingAgentApprovalId ? t('editor.rejectAllAndStop') : t('editor.rejectAll')}
               </button>
               <button
                 type="button"

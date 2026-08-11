@@ -10,7 +10,10 @@ import { useI18n, t } from '@/i18n'
 interface WorkspaceActionPreviewProps {
   items: ActionPreviewItem[]
   onApply: () => void
+  /** 拒否してランを停止 */
   onReject: () => void
+  /** 別案の再提案を依頼（適用失敗時の onAskAgentFix とは別） */
+  onAskRevision?: () => void
   onSelectItem?: (item: ActionPreviewItem) => void
   applyError?: string | null
   /** Agent approval pending + apply failed → send error back to the loop */
@@ -140,6 +143,7 @@ export function WorkspaceActionPreview({
   items,
   onApply,
   onReject,
+  onAskRevision,
   onSelectItem,
   applyError,
   onAskAgentFix
@@ -147,6 +151,8 @@ export function WorkspaceActionPreview({
   const { t } = useI18n()
   const summary = summarizePreviewItems(items)
   const showAskAgent = Boolean(applyError && onAskAgentFix)
+  const showAskRevision = Boolean(!applyError && onAskRevision)
+  const isAgentApproval = Boolean(onAskRevision || onAskAgentFix)
   const applyErrorTone = getApplyErrorTone(applyError)
   const isWarning = applyErrorTone === 'warning'
 
@@ -163,8 +169,13 @@ export function WorkspaceActionPreview({
               {t('chat.askAgentToFix')}
             </button>
           ) : null}
+          {showAskRevision ? (
+            <button className="btn-secondary" type="button" onClick={onAskRevision}>
+              {t('editor.askRevision')}
+            </button>
+          ) : null}
           <button className="btn-reject" onClick={onReject}>
-            {t('editor.reject')}
+            {isAgentApproval ? t('editor.rejectAndStop') : t('editor.reject')}
           </button>
         </div>
       </div>

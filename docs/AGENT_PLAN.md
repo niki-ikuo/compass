@@ -83,7 +83,7 @@ Tool steps embed on `ChatMessage.agentSteps` (assistant messages). Ask/Edit tran
 |-------|----------|
 | Write tool shape | Single batched **`proposeActions`** → `WorkspaceAction[]` (`writeFile`, **`applyPatch`**, mkdir, deletes) |
 | Apply location | Renderer `applyWorkspacePreview` / `revertWorkspacePreview` (same UX as Edit) |
-| After reject | Return observation to the model and **continue** the loop (re-propose allowed) |
+| After reject | **Reject & stop** → keep observation and end run / **Ask for revision** → continue (open-todo nudges suppressed) |
 | After apply | Return applied summary and **continue** |
 | Pause IPC | `ai:needApproval` + `ai:resolveApproval` |
 
@@ -113,8 +113,8 @@ End-to-end tool loop without mutating the workspace.
 
 - Tool: `proposeActions({ actions: WorkspaceAction[] })` — prefer **`applyPatch`** for surgical edits; `writeFile` for new/small full files
 - Loop **pauses** and emits `ai:needApproval` with preview items
-- UI reuses Edit preview / PreviewBar; Apply or Reject calls `ai:resolveApproval`
-- Reject / apply both return an observation; the run **continues**
+- UI reuses Edit preview / PreviewBar; Apply / Ask for revision / Reject & stop call `ai:resolveApproval`
+- Apply and **Ask for revision** return an observation and the run **continues**; **Reject & stop** keeps the observation and ends the run
 - Ask/Edit paths unchanged
 
 **Exit criteria:** Met.
@@ -209,7 +209,7 @@ Avoid shipping “commands + auto-apply writes” in one slice — cancel, appro
 
 | Topic | Options / notes | Decision |
 |-------|-----------------|----------|
-| Approval policy after reject | Stop run vs continue without write | **Continue with rejection observation** |
+| Approval policy after reject | Stop run vs continue without write | **Full reject → stop (keep observation). Revise ask / partial apply → continue** |
 | Batched vs per-file write tools | One `proposeActions` vs many tools | **`proposeActions` batch** |
 | Tools-less providers | Hide Agent / warn / fallback | **Hide Agent when unsupported**; guided **Edit fallback** if Agent was still selected; otherwise clear error (`ai.agentToolsUnsupported`) |
 | Step persistence shape | On message vs separate run record | **On `ChatMessage.agentSteps`** |

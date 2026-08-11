@@ -111,9 +111,17 @@ export function PreviewBar() {
           >
             {t('chat.askAgentToFix')}
           </button>
+        ) : pendingAgentApprovalId ? (
+          <button
+            className="btn-secondary"
+            type="button"
+            onClick={() => revertWorkspacePreview('revise')}
+          >
+            {t('editor.askRevision')}
+          </button>
         ) : null}
-        <button className="btn-reject" onClick={() => revertWorkspacePreview()}>
-          {t('editor.reject')}
+        <button className="btn-reject" onClick={() => revertWorkspacePreview('stop')}>
+          {pendingAgentApprovalId ? t('editor.rejectAndStop') : t('editor.reject')}
         </button>
       </div>
     </div>

@@ -136,7 +136,7 @@ Defined as OpenAI function schemas in `AGENT_TOOLS` (`agent-runner.ts`). Dispatc
 | `listDir` | runner | One level, ≤ 200 entries | — |
 | `search` | `workspace-search` | Keyword content search, ≤ 30 hits | — |
 | `searchMeaning` | `workspace-search` / `semantic-index` | Hybrid meaning search (path + heading + snippet citations), ≤ 30 hits | — |
-| `proposeActions` | `agent-propose-actions` + `filesystem` | Normalize → preview → **pause** (optional `replaceSection` for one Markdown chapter) | Apply / Reject / partial / Ask Agent to fix |
+| `proposeActions` | `agent-propose-actions` + `filesystem` | Normalize → preview → **pause** (optional `replaceSection` for one Markdown chapter) | Apply / Ask for revision / Reject & stop / partial / Ask Agent to fix |
 | `exec` | `agent-exec` | Workspace cwd, deny-list, timeout, output cap | Write-risk cmds need `ai:needExecApproval` |
 | `verify` | `agent-verify` | test / lint / typecheck via scripts or fallbacks; document/data light checks | — (uses internal exec for code) |
 | `profileData` | `agent-data-sandbox` | **data use-case only** — column profile (types / nulls / uniques / samples); imports into in-run SQLite | — |
@@ -175,9 +175,10 @@ After a successful apply, the tool observation includes `VERIFY_AFTER_APPLY_NUDG
 2. User Apply → `fs.applyActions`
 3. Main materializes actions; **`applyPatch`** is applied to on-disk text via `applyUnifiedDiff` (`src/utils/apply-patch.ts`) then stored as `writeFile`. **`replaceSection`** replaces one Markdown heading subtree via `replaceMarkdownSection`, then stores as `writeFile`
 4. Success → `ai:resolveApproval({ approved: true, detail })` → loop resumes
-5. Reject → `approved: false` → loop continues (Agent may revise)
-6. Apply failure → keep preview; **Ask Agent to fix** returns failure observation so the model can re-propose
-7. Partial apply/reject empties the queue → resolve approval with applied/rejected detail
+5. Reject & stop → `approved: false` (stop) → keep observation and **`ai:done`** (do not advance other todos)
+6. Ask for revision → `approved: false` (revise) → loop continues (re-propose same goal; open-todo nudges suppressed)
+7. Apply failure → keep preview; **Ask Agent to fix** returns failure observation so the model can re-propose
+8. Partial apply/reject empties the queue → resolve approval with applied/rejected detail (all-rejected → stop)
 
 Preferred edit shape for existing files: **`applyPatch`** (unified diff with `@@` hunks), not full-file `writeFile`. For one Markdown chapter, prefer **`replaceSection`**. Cursor-style `*** Begin Patch` wrappers are normalized away in the patch util.
 
@@ -298,7 +299,8 @@ src/
 ┌────────────────────▼────────────────────────────┐
 │  Preview UI (same as Edit)                       │
 │  apply → fs.applyActions → resolveApproval(true) │
-│  reject / fix → resolve → loop continues         │
+│  revise → resolve(false, revise) → loop continues│
+│  reject & stop → resolve(false, stop) → ai:done  │
 └─────────────────────────────────────────────────┘
 ```
 

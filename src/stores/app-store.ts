@@ -33,6 +33,11 @@ import {
   normalizeChatMode,
   normalizeUseCasePreset
 } from '@/types'
+import type { ProposeActionsRejectIntent } from '@/utils/agent-approval-reject'
+import {
+  detailForProposeActionsReject,
+  PROPOSE_ACTIONS_REJECT_STOP_PARTIAL_DETAIL
+} from '@/utils/agent-approval-reject'
 import { getLanguageFromPath } from '@/utils/language'
 import { generateId } from '@/utils/code-blocks'
 import {
@@ -459,7 +464,7 @@ function resolveAgentApprovalIfPreviewCleared(
       ]
         .filter(Boolean)
         .join('\n')
-    : 'User rejected the proposed file changes (partial). Remaining items were cleared without apply.'
+    : PROPOSE_ACTIONS_REJECT_STOP_PARTIAL_DETAIL
 
   resolveApprovalById(id, approved, detail)
 }
@@ -1134,7 +1139,11 @@ interface AppState {
   clearLastApplyError: () => void
   activateWorkspacePreview: (items: ActionPreviewItem[]) => void
   openPreviewFile: (path: string, newContent: string, originalContent: string, isNew: boolean) => void
-  revertWorkspacePreview: () => void
+  /**
+   * プレビューを破棄して承認を resolve。
+   * stop（既定）= ラン終了、revise = 別案再提案のためループ続行。
+   */
+  revertWorkspacePreview: (intent?: ProposeActionsRejectIntent) => void
   /** Agent 承認待ち中の適用失敗を観測として返し、再提案させる */
   sendApplyFailureToAgent: () => void
   applyWorkspacePreview: (options?: { auto?: boolean }) => Promise<void>
@@ -2537,7 +2546,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     })
   },
 
-  revertWorkspacePreview: () => {
+  revertWorkspacePreview: (intent = 'stop') => {
     const state = get()
     const chatId = state.pendingWorkspacePreview?.chatId ?? state.activeChatId
     const approvalId =
@@ -2560,11 +2569,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         lastApplyError: null
       }
     })
-    resolveApprovalById(
-      approvalId,
-      false,
-      'User rejected the proposed workspace actions'
-    )
+    resolveApprovalById(approvalId, false, detailForProposeActionsReject(intent))
   },
 
   sendApplyFailureToAgent: () => {

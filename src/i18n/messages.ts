@@ -704,7 +704,8 @@ export const ja = {
   'chat.fileOpError': '⚠️ ファイル操作エラー: {message}',
   'chat.generating': '生成中',
   'chat.preparingChangesShort': '変更を準備しています',
-  'chat.actionsHint': '中央エディタで差分を確認し、採用/拒否を選んでください。',
+  'chat.actionsHint':
+    '中央エディタで差分を確認し、採用・別案依頼・拒否して停止を選んでください。',
 
   // editor
   'editor.selectFile': 'ファイルを選択してください',
@@ -719,6 +720,10 @@ export const ja = {
   'editor.prevChange': '前の変更',
   'editor.nextChange': '次の変更',
   'editor.reject': '拒否',
+  'editor.rejectAndStop': '拒否して停止',
+  'editor.askRevision': '別案を依頼',
+  'editor.rejectAllAndStop': 'すべて拒否して停止',
+  'editor.askRevisionAll': 'すべて別案を依頼',
   'editor.accept': '採用',
   'editor.applying': '適用中...',
   'editor.otherChanges': '他 {count} 件の変更があります',
@@ -1771,7 +1776,8 @@ export const en: Record<MessageKey, string> = {
   'chat.fileOpError': '⚠️ File operation error: {message}',
   'chat.generating': 'Generating',
   'chat.preparingChangesShort': 'Preparing changes',
-  'chat.actionsHint': 'Review the diff in the center editor, then accept or reject.',
+  'chat.actionsHint':
+    'Review the diff in the center editor, then accept, ask for a revision, or reject & stop.',
 
   'editor.selectFile': 'Select a file',
   'editor.newFilePreview': 'New file (preview)',
@@ -1785,6 +1791,10 @@ export const en: Record<MessageKey, string> = {
   'editor.prevChange': 'Previous change',
   'editor.nextChange': 'Next change',
   'editor.reject': 'Reject',
+  'editor.rejectAndStop': 'Reject & stop',
+  'editor.askRevision': 'Ask for revision',
+  'editor.rejectAllAndStop': 'Reject all & stop',
+  'editor.askRevisionAll': 'Revise all',
   'editor.accept': 'Accept',
   'editor.applying': 'Applying...',
   'editor.otherChanges': '{count} more change(s)',
