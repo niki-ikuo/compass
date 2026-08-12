@@ -213,8 +213,13 @@ export function ScheduledJobsPanel() {
   const [jobs, setJobs] = useState<ScheduledJob[]>([])
   const [draft, setDraft] = useState<Draft | null>(null)
   const [message, setMessage] = useState('')
+  const [cardMessages, setCardMessages] = useState<Record<string, string>>({})
   const [busy, setBusy] = useState(false)
   const [loading, setLoading] = useState(true)
+
+  const setCardMessage = (jobId: string, text: string): void => {
+    setCardMessages((prev) => ({ ...prev, [jobId]: text }))
+  }
 
   const reload = useCallback(async () => {
     setLoading(true)
@@ -274,17 +279,18 @@ export function ScheduledJobsPanel() {
 
   const handleRunNow = async (id: string): Promise<void> => {
     setBusy(true)
-    setMessage(t('jobs.running'))
+    setCardMessage(id, t('jobs.running'))
     try {
       const result = await window.compass.jobs.runNow(id)
-      setMessage(
+      setCardMessage(
+        id,
         result.ok
           ? t('jobs.runOk', { path: result.runDir || '-' })
           : t('jobs.runFailed', { message: result.error || result.message })
       )
       await reload()
     } catch (err) {
-      setMessage(err instanceof Error ? err.message : t('common.unknownError'))
+      setCardMessage(id, err instanceof Error ? err.message : t('common.unknownError'))
     } finally {
       setBusy(false)
     }
@@ -299,9 +305,9 @@ export function ScheduledJobsPanel() {
   const copyJobId = async (jobId: string): Promise<void> => {
     try {
       await navigator.clipboard.writeText(jobId)
-      setMessage(t('jobs.idCopied', { id: jobId }))
+      setCardMessage(jobId, t('jobs.idCopied', { id: jobId }))
     } catch {
-      setMessage(t('jobs.idCopyFailed'))
+      setCardMessage(jobId, t('jobs.idCopyFailed'))
     }
   }
 
@@ -361,6 +367,9 @@ export function ScheduledJobsPanel() {
                 {job.lastRunError ? (
                   <span className="settings-connection-status status-error">{job.lastRunError}</span>
                 ) : null}
+                {cardMessages[job.id] ? (
+                  <p className="form-message scheduled-jobs-card-message">{cardMessages[job.id]}</p>
+                ) : null}
               </div>
               <div className="scheduled-jobs-item-actions">
                 <button
@@ -410,6 +419,9 @@ export function ScheduledJobsPanel() {
                   {t('jobs.copyId')}
                 </button>
               </div>
+              {cardMessages[draft.id] ? (
+                <p className="form-message scheduled-jobs-card-message">{cardMessages[draft.id]}</p>
+              ) : null}
             </div>
           ) : null}
           <label>

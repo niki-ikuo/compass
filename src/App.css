@@ -5132,6 +5132,11 @@ body.is-resizing-help * {
   align-items: flex-start;
 }
 
+.scheduled-jobs-card-message {
+  margin: 2px 0 0;
+  word-break: break-word;
+}
+
 .scheduled-jobs-editor {
   display: flex;
   flex-direction: column;
