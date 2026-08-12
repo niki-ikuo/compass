@@ -99,6 +99,21 @@ describe('validateMarkdownDocument', () => {
     expect(issues.some((i) => i.kind === 'level_jump')).toBe(true)
   })
 
+  it('does not flag valid h2+ ATX headings that already have a space', () => {
+    // Regression: /^#{1,6}\S/ backtracked on `## Title` and treated the 2nd `#` as \S.
+    const text = ['## 高松市の天気予報', '', '### Detail', '', '## ラジオ風天気予報'].join('\n')
+    const issues = validateMarkdownDocument(text)
+    expect(issues.filter((i) => i.kind === 'broken_atx')).toEqual([])
+    expect(issues.filter((i) => i.kind === 'empty_heading')).toEqual([])
+  })
+
+  it('still flags missing space and empty ATX headings at every level', () => {
+    const text = ['##Ok', '###', '# ', '####Title'].join('\n')
+    const issues = validateMarkdownDocument(text)
+    expect(issues.filter((i) => i.kind === 'broken_atx').map((i) => i.line)).toEqual([1, 4])
+    expect(issues.filter((i) => i.kind === 'empty_heading').map((i) => i.line)).toEqual([2, 3])
+  })
+
   it('flags duplicate headings and broken relative doc links', () => {
     const text = ['# Title', '## Dup', '## Dup', '[gone](./missing.md)'].join('\n')
     const issues = validateMarkdownDocument(text, {

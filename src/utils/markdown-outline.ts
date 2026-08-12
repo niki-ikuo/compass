@@ -448,19 +448,24 @@ export function findBrokenAtxHeadings(text: string): MarkdownHeadingIssue[] {
     }
     if (inFence) continue
 
-    if (/^#{1,6}\S/.test(line)) {
-      issues.push({
-        kind: 'broken_atx',
-        line: i + 1,
-        message: `ATX heading needs a space after #: "${line.trim().slice(0, 60)}"`
-      })
-      continue
-    }
-    if (/^#{1,6}\s*$/.test(line)) {
+    // Match the full hash run first. `/^#{1,6}\S/` is wrong: on `## Title` it
+    // backtracks to `#` + `#` and false-positives every h2+ heading with a space.
+    const atx = line.match(/^(#{1,6})(.*)$/)
+    if (!atx) continue
+    const rest = atx[2]
+    if (rest.length === 0 || /^\s+$/.test(rest)) {
       issues.push({
         kind: 'empty_heading',
         line: i + 1,
         message: 'Empty ATX heading'
+      })
+      continue
+    }
+    if (!/^\s/.test(rest)) {
+      issues.push({
+        kind: 'broken_atx',
+        line: i + 1,
+        message: `ATX heading needs a space after #: "${line.trim().slice(0, 60)}"`
       })
     }
   }
