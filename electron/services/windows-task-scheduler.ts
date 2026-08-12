@@ -1,5 +1,10 @@
 import { execFile } from 'child_process'
+import { randomBytes } from 'crypto'
+import { unlink, writeFile } from 'fs/promises'
+import { tmpdir } from 'os'
+import { join } from 'path'
 import { promisify } from 'util'
+import iconv from 'iconv-lite'
 import { app } from 'electron'
 import type { ScheduledJob, ScheduledJobSchedule } from '../../src/types'
 import {
@@ -152,6 +157,44 @@ export function listTaskNamesForJob(job: ScheduledJob): string[] {
   return [base]
 }
 
+export function escapeXmlText(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;')
+}
+
+/**
+ * Insert or replace RegistrationInfo/Description in a schtasks /Query /XML document.
+ * Set-ScheduledTask cannot update Description for interactive (/IT) tasks (Access Denied).
+ */
+export function injectTaskDescriptionXml(xml: string, description: string): string {
+  const escaped = escapeXmlText(description)
+  if (/<Description(?:\s[^>]*)?>[\s\S]*?<\/Description>/i.test(xml)) {
+    return xml.replace(
+      /<Description(?:\s[^>]*)?>[\s\S]*?<\/Description>/i,
+      `<Description>${escaped}</Description>`
+    )
+  }
+  if (/<\/RegistrationInfo>/i.test(xml)) {
+    return xml.replace(
+      /<\/RegistrationInfo>/i,
+      `    <Description>${escaped}</Description>\r\n  </RegistrationInfo>`
+    )
+  }
+  throw new Error('Task XML missing RegistrationInfo')
+}
+
+function execErrorMessage(err: unknown, fallback: string): string {
+  if (err instanceof Error) return err.message
+  if (typeof err === 'object' && err && 'stderr' in err) {
+    return String((err as { stderr: Buffer | string }).stderr)
+  }
+  return String(err) || fallback
+}
+
 async function runSchtasks(args: string[]): Promise<TaskSchedulerResult> {
   if (process.platform !== 'win32') {
     return { ok: false, message: 'Windows Task Scheduler is only available on Windows' }
@@ -164,13 +207,80 @@ async function runSchtasks(args: string[]): Promise<TaskSchedulerResult> {
     })
     return { ok: true }
   } catch (err) {
-    const message =
-      err instanceof Error
-        ? err.message
-        : typeof err === 'object' && err && 'stderr' in err
-          ? String((err as { stderr: Buffer | string }).stderr)
-          : String(err)
-    return { ok: false, message: message.trim() || 'schtasks failed' }
+    return { ok: false, message: execErrorMessage(err, 'schtasks failed').trim() || 'schtasks failed' }
+  }
+}
+
+/** Decode schtasks /Query /XML stdout (UTF-16 BOM, UTF-8, or CP932 console). */
+export function decodeSchtasksXml(stdout: Buffer): string {
+  if (stdout.length >= 2 && stdout[0] === 0xff && stdout[1] === 0xfe) {
+    return stdout.subarray(2).toString('utf16le')
+  }
+  if (stdout.length >= 2 && stdout[0] === 0xfe && stdout[1] === 0xff) {
+    const swapped = Buffer.from(stdout.subarray(2))
+    swapped.swap16()
+    return swapped.toString('utf16le')
+  }
+  const asUtf8 = stdout.toString('utf8').replace(/^\uFEFF/, '')
+  if (asUtf8.includes('<Task') && !asUtf8.includes('\uFFFD')) return asUtf8
+  // Japanese Windows may deliver legacy code page bytes through the pipe.
+  const asCp932 = iconv.decode(stdout, 'cp932')
+  if (asCp932.includes('<Task')) return asCp932
+  return asUtf8
+}
+
+async function queryTaskXml(
+  taskName: string
+): Promise<{ ok: true; xml: string } | { ok: false; message: string }> {
+  if (process.platform !== 'win32') {
+    return { ok: false, message: 'Windows Task Scheduler is only available on Windows' }
+  }
+  try {
+    const { stdout } = await execFileAsync('schtasks.exe', ['/Query', '/TN', taskName, '/XML'], {
+      windowsHide: true,
+      timeout: 30_000,
+      maxBuffer: 2 * 1024 * 1024,
+      encoding: 'buffer'
+    })
+    const xml = decodeSchtasksXml(stdout)
+    if (!xml.includes('<Task')) {
+      return { ok: false, message: 'schtasks /Query /XML returned empty task definition' }
+    }
+    return { ok: true, xml }
+  } catch (err) {
+    return { ok: false, message: execErrorMessage(err, 'schtasks query failed').trim() || 'schtasks query failed' }
+  }
+}
+
+/** Rewrite task XML with Description = job name, then re-register via schtasks /XML. */
+async function setTaskDescription(
+  taskName: string,
+  description: string
+): Promise<TaskSchedulerResult> {
+  const queried = await queryTaskXml(taskName)
+  if (!queried.ok) return queried
+
+  let xml: string
+  try {
+    xml = injectTaskDescriptionXml(queried.xml, description)
+  } catch (err) {
+    return { ok: false, message: err instanceof Error ? err.message : String(err) }
+  }
+
+  const tmpPath = join(tmpdir(), `compass-task-${randomBytes(8).toString('hex')}.xml`)
+  try {
+    const payload = Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from(xml, 'utf16le')])
+    await writeFile(tmpPath, payload)
+    return await runSchtasks(['/Create', '/TN', taskName, '/XML', tmpPath, '/F'])
+  } catch (err) {
+    return {
+      ok: false,
+      message:
+        execErrorMessage(err, 'failed to set task description').trim() ||
+        'failed to set task description'
+    }
+  } finally {
+    await unlink(tmpPath).catch(() => undefined)
   }
 }
 
@@ -178,9 +288,12 @@ export async function installScheduledTask(job: ScheduledJob): Promise<TaskSched
   await uninstallAllTasksForJob(job.id)
 
   const sets = buildSchtasksCreateArgSets(job)
-  for (const args of sets) {
-    const result = await runSchtasks(args)
+  const names = listTaskNamesForJob(job)
+  for (let i = 0; i < sets.length; i++) {
+    const result = await runSchtasks(sets[i]!)
     if (!result.ok) return result
+    const descResult = await setTaskDescription(names[i]!, job.name)
+    if (!descResult.ok) return descResult
   }
   return { ok: true }
 }

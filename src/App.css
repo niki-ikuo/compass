@@ -5141,8 +5141,6 @@ body.is-resizing-help * {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  padding-top: 8px;
-  border-top: 1px solid var(--border);
 }
 
 .scheduled-jobs-editor h3 {

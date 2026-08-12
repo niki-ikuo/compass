@@ -315,96 +315,9 @@ export function ScheduledJobsPanel() {
 
   const schedule = draft?.schedule
 
-  return (
-    <div className="scheduled-jobs-panel">
-      <p className="field-hint">{t('jobs.hint')}</p>
-
-      <div className="scheduled-jobs-toolbar">
-        <button
-          type="button"
-          className="btn-primary"
-          disabled={busy}
-          onClick={() => setDraft(emptyDraft(workspaceRoot))}
-        >
-          {t('jobs.add')}
-        </button>
-        <button
-          type="button"
-          className="btn-secondary"
-          disabled={busy || loading}
-          onClick={() => void reload()}
-        >
-          {t('jobs.refresh')}
-        </button>
-      </div>
-
-      {loading ? (
-        <p className="field-hint">{t('common.saving')}</p>
-      ) : jobs.length === 0 && !draft ? (
-        <p className="field-hint">{t('jobs.empty')}</p>
-      ) : (
-        <ul className="scheduled-jobs-list">
-          {jobs.map((job) => (
-            <li key={job.id} className="scheduled-jobs-item">
-              <div className="scheduled-jobs-item-main">
-                <strong>{job.name}</strong>
-                <span className="field-hint">
-                  {job.enabled ? t('jobs.enabled') : t('jobs.disabled')} ·{' '}
-                  {formatScheduleSummary(job.schedule, t)} · {job.policy}
-                </span>
-                <span className="field-hint">{job.workspaceRoot}</span>
-                <div className="scheduled-jobs-id-row">
-                  <span className="field-hint">{t('jobs.id')}:</span>
-                  <code className="scheduled-jobs-id">{job.id}</code>
-                  <button
-                    type="button"
-                    className="btn-secondary scheduled-jobs-copy-btn"
-                    disabled={busy}
-                    onClick={() => void copyJobId(job.id)}
-                  >
-                    {t('jobs.copyId')}
-                  </button>
-                </div>
-                <span className="field-hint">{formatLastRun(job, t)}</span>
-                {job.lastRunError ? (
-                  <span className="settings-connection-status status-error">{job.lastRunError}</span>
-                ) : null}
-                {message && messageJobId === job.id ? (
-                  <p className="form-message scheduled-jobs-card-message">{message}</p>
-                ) : null}
-              </div>
-              <div className="scheduled-jobs-item-actions">
-                <button
-                  type="button"
-                  className="btn-secondary"
-                  disabled={busy}
-                  onClick={() => setDraft(jobToDraft(job))}
-                >
-                  {t('jobs.edit')}
-                </button>
-                <button
-                  type="button"
-                  className="btn-secondary"
-                  disabled={busy || job.lastRunStatus === 'running'}
-                  onClick={() => void handleRunNow(job.id)}
-                >
-                  {t('jobs.runNow')}
-                </button>
-                <button
-                  type="button"
-                  className="btn-secondary"
-                  disabled={busy}
-                  onClick={() => void handleDelete(job.id)}
-                >
-                  {t('common.delete')}
-                </button>
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
-
-      {draft && schedule && (
+  if (draft && schedule) {
+    return (
+      <div className="scheduled-jobs-panel">
         <div className="scheduled-jobs-editor">
           <h3>{draft.id ? t('jobs.edit') : t('jobs.add')}</h3>
           {draft.id ? (
@@ -731,7 +644,99 @@ export function ScheduledJobsPanel() {
               {busy ? t('common.saving') : t('common.save')}
             </button>
           </div>
+          {message ? <p className="form-message">{message}</p> : null}
         </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="scheduled-jobs-panel">
+      <p className="field-hint">{t('jobs.hint')}</p>
+
+      <div className="scheduled-jobs-toolbar">
+        <button
+          type="button"
+          className="btn-primary"
+          disabled={busy}
+          onClick={() => setDraft(emptyDraft(workspaceRoot))}
+        >
+          {t('jobs.add')}
+        </button>
+        <button
+          type="button"
+          className="btn-secondary"
+          disabled={busy || loading}
+          onClick={() => void reload()}
+        >
+          {t('jobs.refresh')}
+        </button>
+      </div>
+
+      {loading ? (
+        <p className="field-hint">{t('common.saving')}</p>
+      ) : jobs.length === 0 ? (
+        <p className="field-hint">{t('jobs.empty')}</p>
+      ) : (
+        <ul className="scheduled-jobs-list">
+          {jobs.map((job) => (
+            <li key={job.id} className="scheduled-jobs-item">
+              <div className="scheduled-jobs-item-main">
+                <strong>{job.name}</strong>
+                <span className="field-hint">
+                  {job.enabled ? t('jobs.enabled') : t('jobs.disabled')} ·{' '}
+                  {formatScheduleSummary(job.schedule, t)} · {job.policy}
+                </span>
+                <span className="field-hint">{job.workspaceRoot}</span>
+                <div className="scheduled-jobs-id-row">
+                  <span className="field-hint">{t('jobs.id')}:</span>
+                  <code className="scheduled-jobs-id">{job.id}</code>
+                  <button
+                    type="button"
+                    className="btn-secondary scheduled-jobs-copy-btn"
+                    disabled={busy}
+                    onClick={() => void copyJobId(job.id)}
+                  >
+                    {t('jobs.copyId')}
+                  </button>
+                </div>
+                <span className="field-hint">{formatLastRun(job, t)}</span>
+                {job.lastRunError ? (
+                  <span className="settings-connection-status status-error">{job.lastRunError}</span>
+                ) : null}
+                {message && messageJobId === job.id ? (
+                  <p className="form-message scheduled-jobs-card-message">{message}</p>
+                ) : null}
+              </div>
+              <div className="scheduled-jobs-item-actions">
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  disabled={busy}
+                  onClick={() => setDraft(jobToDraft(job))}
+                >
+                  {t('jobs.edit')}
+                </button>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  disabled={busy || job.lastRunStatus === 'running'}
+                  onClick={() => void handleRunNow(job.id)}
+                >
+                  {t('jobs.runNow')}
+                </button>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  disabled={busy}
+                  onClick={() => void handleDelete(job.id)}
+                >
+                  {t('common.delete')}
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
       )}
 
       {message && !messageJobId ? <p className="form-message">{message}</p> : null}

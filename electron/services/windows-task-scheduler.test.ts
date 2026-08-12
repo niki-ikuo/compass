@@ -13,6 +13,8 @@ import {
   buildLaunchCommand,
   buildSchtasksArgsFromSchedule,
   buildSchtasksCreateArgSets,
+  escapeXmlText,
+  injectTaskDescriptionXml,
   quoteForSchtasks
 } from './windows-task-scheduler'
 
@@ -115,5 +117,31 @@ describe('buildSchtasksCreateArgSets', () => {
     expect(sets[0]).toContain('Compass\\job-abc')
     expect(sets[1]).toContain('Compass\\job-abc-d15')
     expect(buildLaunchCommand('abc').tr).toContain('--run-job=abc')
+  })
+})
+
+describe('task description helpers', () => {
+  it('escapes XML text', () => {
+    expect(escapeXmlText(`a<b>&"'`)).toBe('a&lt;b&gt;&amp;&quot;&apos;')
+  })
+
+  it('injects Description into RegistrationInfo', () => {
+    const xml = `<?xml version="1.0" encoding="UTF-16"?>
+<Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
+  <RegistrationInfo>
+    <Author>user</Author>
+    <URI>\\Compass\\job-abc</URI>
+  </RegistrationInfo>
+</Task>`
+    const out = injectTaskDescriptionXml(xml, 'Daily sync <v2>')
+    expect(out).toContain('<Description>Daily sync &lt;v2&gt;</Description>')
+    expect(out).toContain('</RegistrationInfo>')
+  })
+
+  it('replaces an existing Description', () => {
+    const xml = `<RegistrationInfo><Description>old</Description></RegistrationInfo>`
+    expect(injectTaskDescriptionXml(xml, 'new')).toBe(
+      `<RegistrationInfo><Description>new</Description></RegistrationInfo>`
+    )
   })
 })
