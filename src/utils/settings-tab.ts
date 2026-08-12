@@ -2,7 +2,7 @@ import type { LeftSidebarView } from '@/types'
 
 export const SETTINGS_TAB_PATH = 'compass-settings://'
 
-export type SettingsTabId = 'appearance' | 'chat' | 'llm' | 'terminal' | 'desk'
+export type SettingsTabId = 'appearance' | 'chat' | 'llm' | 'terminal' | 'desk' | 'jobs'
 
 export type SettingsOpenOptions = {
   tab?: SettingsTabId

@@ -128,6 +128,7 @@ import type {
   ChatSession,
   HelpAskRequest,
   InlineCompletionRequest,
+  ScheduledJobInput,
   WorkspaceAction,
   WorkspaceOpenEditors,
   WorkspacePinnedActions,
@@ -136,8 +137,21 @@ import type {
   WorkspaceSearchOptions
 } from '../src/types'
 import { testLlmConnection } from './services/ai-connection'
-
+import { parseRunJobArg } from './services/run-job-arg'
+import {
+  deleteScheduledJob,
+  getScheduledJob,
+  listScheduledJobs,
+  saveScheduledJob
+} from './services/scheduled-jobs'
+import { runScheduledJobById } from './services/agent-job-runner'
+import {
+  syncJobWithTaskScheduler,
+  uninstallAllTasksForJob
+} from './services/windows-task-scheduler'
 let mainWindow: BrowserWindow | null = null
+/** Headless `--run-job` mode — skip window / tray */
+let headlessJobMode = false
 let aiHelpMenuVisible = false
 /** 未保存確認を経たうえでウィンドウを閉じる許可 */
 let allowWindowClose = false
@@ -159,7 +173,15 @@ const gotSingleInstanceLock = app.requestSingleInstanceLock()
 if (!gotSingleInstanceLock) {
   app.quit()
 } else {
-  app.on('second-instance', () => {
+  app.on('second-instance', (_event, commandLine) => {
+    const jobId = parseRunJobArg(commandLine)
+    if (jobId) {
+      void runScheduledJobById(jobId).catch((err) => {
+        console.error('[jobs] second-instance run failed:', err)
+      })
+      return
+    }
+    if (headlessJobMode) return
     if (!mainWindow || mainWindow.isDestroyed()) {
       if (app.isReady()) {
         void createWindow()
@@ -1388,21 +1410,63 @@ function registerIpcHandlers(): void {
       return checkoutGitBranch(bindActiveWorkspaceRoot(workspaceRoot), branch)
     }
   )
+
+  ipcMain.handle('jobs:list', async () => listScheduledJobs())
+
+  ipcMain.handle('jobs:get', async (_event, id: string) => getScheduledJob(String(id ?? '')))
+
+  ipcMain.handle('jobs:save', async (_event, input: ScheduledJobInput) => {
+    const job = await saveScheduledJob(input)
+    const sync = await syncJobWithTaskScheduler(job)
+    return { job, scheduler: sync }
+  })
+
+  ipcMain.handle('jobs:delete', async (_event, id: string) => {
+    const jobId = String(id ?? '')
+    await uninstallAllTasksForJob(jobId)
+    const deleted = await deleteScheduledJob(jobId)
+    return { ok: deleted }
+  })
+
+  ipcMain.handle('jobs:runNow', async (_event, id: string) => {
+    return runScheduledJobById(String(id ?? ''))
+  })
+
+  ipcMain.handle('jobs:syncScheduler', async (_event, id: string) => {
+    const job = await getScheduledJob(String(id ?? ''))
+    if (!job) return { ok: false as const, message: 'Job not found' }
+    return syncJobWithTaskScheduler(job)
+  })
 }
 
 if (gotSingleInstanceLock) {
   app.whenReady().then(async () => {
     await getSettings()
-    await syncDeskTrayEnabledFromSettings()
     applyContentSecurityPolicy()
+    registerIpcHandlers()
+
+    const runJobId = parseRunJobArg(process.argv)
+    if (runJobId) {
+      headlessJobMode = true
+      try {
+        const result = await runScheduledJobById(runJobId)
+        app.exit(result.ok ? 0 : 1)
+      } catch (err) {
+        console.error('[jobs] headless run failed:', err)
+        app.exit(1)
+      }
+      return
+    }
+
+    await syncDeskTrayEnabledFromSettings()
     const lastRoot = await getLastWorkspaceRoot()
     if (lastRoot) setActiveWorkspaceRoot(lastRoot)
-    registerIpcHandlers()
     await createWindow()
     createMenu()
     await refreshTrayAndHotkey()
 
     app.on('activate', () => {
+      if (headlessJobMode) return
       if (BrowserWindow.getAllWindows().length === 0) {
         void createWindow()
         return
@@ -1416,6 +1480,7 @@ if (gotSingleInstanceLock) {
   })
 
   app.on('window-all-closed', () => {
+    if (headlessJobMode) return
     stopIndexWatcher()
     killAllTerminals()
     unregisterDeskHotkeys()

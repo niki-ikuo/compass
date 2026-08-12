@@ -37,13 +37,15 @@ import {
 import { refreshLlmConnection } from '@/utils/llm-connection'
 import { focusWithRetry } from '@/utils/focus-with-retry'
 import type { SettingsTabId } from '@/utils/settings-tab'
+import { ScheduledJobsPanel } from '@/components/ScheduledJobsPanel'
 
 const SETTINGS_TABS: Array<{ id: SettingsTabId; labelKey: MessageKey }> = [
   { id: 'appearance', labelKey: 'settings.appearance' },
   { id: 'chat', labelKey: 'settings.chat' },
   { id: 'llm', labelKey: 'settings.llm' },
   { id: 'terminal', labelKey: 'settings.terminal' },
-  { id: 'desk', labelKey: 'settings.desk' }
+  { id: 'desk', labelKey: 'settings.desk' },
+  { id: 'jobs', labelKey: 'settings.jobs' }
 ]
 
 function switchProvider(form: AppSettings, nextId: LlmProviderId): AppSettings {
@@ -891,6 +893,8 @@ export function SettingsPanel() {
           </label>
         )}
 
+        {activeTab === 'jobs' && <ScheduledJobsPanel />}
+
         {activeTab === 'desk' && (
           <>
             <label className="settings-checkbox-label">
@@ -996,14 +1000,16 @@ export function SettingsPanel() {
         </div>
       </div>
 
-      <div className="settings-panel-footer">
-        <button type="button" className="btn-secondary" onClick={handleReset}>
-          {t('common.reset')}
-        </button>
-        <button type="button" className="btn-primary" onClick={() => void handleSave()} disabled={saving}>
-          {saving ? t('common.saving') : t('common.save')}
-        </button>
-      </div>
+      {activeTab !== 'jobs' && (
+        <div className="settings-panel-footer">
+          <button type="button" className="btn-secondary" onClick={handleReset}>
+            {t('common.reset')}
+          </button>
+          <button type="button" className="btn-primary" onClick={() => void handleSave()} disabled={saving}>
+            {saving ? t('common.saving') : t('common.save')}
+          </button>
+        </div>
+      )}
     </div>
   )
 }

@@ -5050,6 +5050,190 @@ body.is-resizing-help * {
   min-height: 0;
 }
 
+.scheduled-jobs-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.scheduled-jobs-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.scheduled-jobs-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.scheduled-jobs-item {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-elevated, var(--bg));
+}
+
+.scheduled-jobs-item-main {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  flex: 1;
+}
+
+.scheduled-jobs-id-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.scheduled-jobs-id-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.scheduled-jobs-id {
+  display: block;
+  flex: 1;
+  min-width: 0;
+  padding: 4px 8px;
+  font-size: 11px;
+  line-height: 1.4;
+  word-break: break-all;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--input-bg, var(--bg));
+  color: var(--text-secondary);
+  user-select: all;
+}
+
+.scheduled-jobs-copy-btn {
+  flex-shrink: 0;
+  padding: 4px 10px;
+  font-size: 12px;
+}
+
+.scheduled-jobs-item-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: flex-start;
+}
+
+.scheduled-jobs-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.scheduled-jobs-editor h3 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.scheduled-jobs-editor textarea {
+  width: 100%;
+  min-height: 96px;
+  resize: vertical;
+  font: inherit;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--input-bg, var(--bg));
+  color: var(--text);
+}
+
+.scheduled-jobs-path-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.scheduled-jobs-path-row input {
+  flex: 1;
+  min-width: 0;
+}
+
+.scheduled-jobs-editor-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.scheduled-jobs-schedule {
+  margin: 0;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.scheduled-jobs-schedule legend {
+  padding: 0 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.scheduled-jobs-checkgrid {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.scheduled-jobs-checkgrid-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.scheduled-jobs-checkgrid-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+}
+
+.scheduled-jobs-days-month {
+  max-height: 140px;
+  overflow-y: auto;
+}
+
+.scheduled-jobs-chip {
+  flex-direction: row !important;
+  align-items: center;
+  gap: 4px !important;
+  margin: 0;
+  font-size: 12px;
+}
+
+.scheduled-jobs-monthly-weekday {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+@media (max-width: 640px) {
+  .scheduled-jobs-monthly-weekday {
+    grid-template-columns: 1fr;
+  }
+}
+
 .modal-header {
   display: flex;
   align-items: center;

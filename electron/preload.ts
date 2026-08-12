@@ -26,6 +26,9 @@ import type {
   WorkspaceReplaceOptions,
   WorkspaceReplaceResult,
   ChatSession,
+  ScheduledJob,
+  ScheduledJobInput,
+  ScheduledJobRunResult,
   TerminalShell,
   UseCasePreset,
   InlineCompletionRequest,
@@ -358,6 +361,22 @@ const compassAPI = {
   settings: {
     get: (): Promise<AppSettings> => ipcRenderer.invoke('settings:get'),
     set: (settings: AppSettings): Promise<void> => ipcRenderer.invoke('settings:set', settings)
+  },
+  jobs: {
+    list: (): Promise<ScheduledJob[]> => ipcRenderer.invoke('jobs:list'),
+    get: (id: string): Promise<ScheduledJob | null> => ipcRenderer.invoke('jobs:get', id),
+    save: (
+      input: ScheduledJobInput
+    ): Promise<{
+      job: ScheduledJob
+      scheduler: { ok: true } | { ok: false; message: string }
+    }> => ipcRenderer.invoke('jobs:save', input),
+    delete: (id: string): Promise<{ ok: boolean }> => ipcRenderer.invoke('jobs:delete', id),
+    runNow: (id: string): Promise<ScheduledJobRunResult> => ipcRenderer.invoke('jobs:runNow', id),
+    syncScheduler: (
+      id: string
+    ): Promise<{ ok: true } | { ok: false; message: string }> =>
+      ipcRenderer.invoke('jobs:syncScheduler', id)
   },
   usage: {
     get: (): Promise<UsageSnapshot> => ipcRenderer.invoke('usage:get'),

@@ -221,6 +221,153 @@ export interface AgentResolveContinueRequest {
   continue: boolean
 }
 
+/**
+ * Unattended scheduled Agent job approval policy.
+ * - report-only: no proposeActions apply; no exec approve (run artifacts only)
+ * - auto-apply-files: apply safe file writes; reject exec that needs approval
+ * - auto-apply-safe: apply safe file writes; skip/log dangerous exec (do not fail for that alone)
+ * - full-unattended: apply safe file writes; auto-approve exec that needs approval
+ */
+export type ScheduledJobPolicy =
+  | 'report-only'
+  | 'auto-apply-files'
+  | 'auto-apply-safe'
+  | 'full-unattended'
+
+/**
+ * Windows Task Scheduler “On a schedule” trigger kind.
+ * (Matches taskschd.msc: One time / Daily / Weekly / Monthly)
+ */
+export type ScheduledJobScheduleKind = 'once' | 'daily' | 'weekly' | 'monthly'
+
+export type ScheduledJobMonthlyWeek = 'FIRST' | 'SECOND' | 'THIRD' | 'FOURTH' | 'LAST'
+
+export type ScheduledJobMonthlyMode = 'days' | 'weekday'
+
+/**
+ * Trigger settings aligned with Windows Task Scheduler calendar triggers.
+ * Dates are `yyyy-MM-dd`; times are `HH:mm` (24h).
+ */
+export interface ScheduledJobSchedule {
+  kind: ScheduledJobScheduleKind
+  /** Start time (Task Scheduler /ST) */
+  startTime: string
+  /** Start date (Task Scheduler /SD). Required for `once`. */
+  startDate?: string
+  /** Optional end / expire date (Task Scheduler /ED) */
+  endDate?: string
+  /** Recur every N days (daily) or N weeks (weekly). Default 1. */
+  interval?: number
+  /** Weekly: selected weekdays, 0=Sun … 6=Sat */
+  daysOfWeek?: number[]
+  /** Monthly: days-of-month vs Nth weekday */
+  monthlyMode?: ScheduledJobMonthlyMode
+  /** Monthly days mode: 1–31 */
+  daysOfMonth?: number[]
+  /** Monthly weekday mode: FIRST…LAST */
+  monthlyWeek?: ScheduledJobMonthlyWeek
+  /** Monthly weekday mode: 0=Sun … 6=Sat */
+  monthlyWeekday?: number
+  /** Monthly: months 1–12; omit/empty = all months */
+  months?: number[]
+}
+
+/** @deprecated Legacy frequency — migrated into `schedule.kind` */
+export type ScheduledJobFrequency = 'daily' | 'weekly' | 'hourly'
+
+export type ScheduledJobRunStatus = 'ok' | 'error' | 'running'
+
+/** Persisted scheduled job (AppData jobs.json + Windows Task Scheduler) */
+export interface ScheduledJob {
+  id: string
+  name: string
+  enabled: boolean
+  workspaceRoot: string
+  prompt: string
+  preset: UseCasePreset
+  policy: ScheduledJobPolicy
+  /**
+   * @deprecated Derived from policy === 'full-unattended'. Kept for older jobs.json.
+   */
+  allowExec: boolean
+  /** Windows Task Scheduler–style start schedule */
+  schedule: ScheduledJobSchedule
+  createdAt: string
+  updatedAt: string
+  lastRunAt?: string
+  lastRunStatus?: ScheduledJobRunStatus
+  lastRunError?: string
+  lastRunDir?: string
+}
+
+export type ScheduledJobInput = Omit<
+  ScheduledJob,
+  'id' | 'createdAt' | 'updatedAt' | 'lastRunAt' | 'lastRunStatus' | 'lastRunError' | 'lastRunDir'
+> & {
+  id?: string
+}
+
+export interface ScheduledJobRunResult {
+  ok: boolean
+  jobId: string
+  runDir: string
+  status: Exclude<ScheduledJobRunStatus, 'running'>
+  error?: string
+  changedFiles: string[]
+  message: string
+}
+
+export function normalizeScheduledJobPolicy(value: unknown): ScheduledJobPolicy | undefined {
+  if (
+    value === 'report-only' ||
+    value === 'auto-apply-files' ||
+    value === 'auto-apply-safe' ||
+    value === 'full-unattended'
+  ) {
+    return value
+  }
+  return undefined
+}
+
+/** Whether the policy auto-applies proposeActions file writes (subject to delete/sensitive gates). */
+export function scheduledJobPolicyAppliesFiles(policy: ScheduledJobPolicy): boolean {
+  return policy !== 'report-only'
+}
+
+/** Whether the policy auto-approves exec that needs approval. */
+export function scheduledJobPolicyAllowsExec(policy: ScheduledJobPolicy): boolean {
+  return policy === 'full-unattended'
+}
+
+export function normalizeScheduledJobFrequency(value: unknown): ScheduledJobFrequency | undefined {
+  if (value === 'daily' || value === 'weekly' || value === 'hourly') return value
+  return undefined
+}
+
+export function normalizeScheduledJobScheduleKind(
+  value: unknown
+): ScheduledJobScheduleKind | undefined {
+  if (value === 'once' || value === 'daily' || value === 'weekly' || value === 'monthly') {
+    return value
+  }
+  return undefined
+}
+
+export function normalizeScheduledJobMonthlyWeek(
+  value: unknown
+): ScheduledJobMonthlyWeek | undefined {
+  if (
+    value === 'FIRST' ||
+    value === 'SECOND' ||
+    value === 'THIRD' ||
+    value === 'FOURTH' ||
+    value === 'LAST'
+  ) {
+    return value
+  }
+  return undefined
+}
+
 export function normalizeChatMode(mode: unknown): ChatMode | undefined {
   if (mode === 'ask' || mode === 'edit' || mode === 'agent') return mode
   return undefined
@@ -1151,6 +1298,21 @@ export interface CompassAPI {
   settings: {
     get: () => Promise<AppSettings>
     set: (settings: AppSettings) => Promise<void>
+  }
+  jobs: {
+    list: () => Promise<ScheduledJob[]>
+    get: (id: string) => Promise<ScheduledJob | null>
+    save: (
+      input: ScheduledJobInput
+    ) => Promise<{
+      job: ScheduledJob
+      scheduler: { ok: true } | { ok: false; message: string }
+    }>
+    delete: (id: string) => Promise<{ ok: boolean }>
+    runNow: (id: string) => Promise<ScheduledJobRunResult>
+    syncScheduler: (
+      id: string
+    ) => Promise<{ ok: true } | { ok: false; message: string }>
   }
   usage: {
     get: () => Promise<UsageSnapshot>
