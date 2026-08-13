@@ -19,7 +19,7 @@ import {
   acquireChatAbortController,
   buildApiHeaders,
   buildUserMessagePayload,
-  getSystemPrompt,
+  getSystemPromptForRequest,
   isAbortError,
   releaseChatAbortController,
   resolveSafeChatCompletionsUrl,
@@ -1772,7 +1772,7 @@ export async function runAgent(webContents: WebContents, request: ChatRequest): 
 
     const history = request.messages.filter((m) => m.role !== 'system')
     const apiMessages: ApiMessage[] = [
-      { role: 'system', content: getSystemPrompt('agent', request.preset) }
+      { role: 'system', content: await getSystemPromptForRequest({ ...request, mode: 'agent' }) }
     ]
 
     appendHistoryMessages(apiMessages, history)

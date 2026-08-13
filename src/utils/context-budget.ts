@@ -17,6 +17,8 @@ export const CONTEXT_BUDGET = {
   perRefFileTokens: 6_000,
   /** `.compass/rules.md` + optional glossary auto-attached to Ask / Edit / Agent */
   rulesTokens: 3_000,
+  /** `.compass/role.md` / job rolePrompt replacing the preset role in the system prompt */
+  roleTokens: 2_000,
   maxImages: 2,
   /** Raw base64 char cap per image (~75KB) */
   maxImageBase64Chars: 75_000,

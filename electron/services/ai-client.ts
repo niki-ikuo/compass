@@ -10,7 +10,7 @@ import type {
 import { normalizeUseCasePreset, DEFAULT_SETTINGS } from '../../src/types'
 import { t } from '../../src/i18n/runtime'
 import type { MessageKey } from '../../src/i18n/messages'
-import { composeSystemPrompt, getUseCasePresetReminderKey } from '../../src/utils/system-prompt'
+import { composeSystemPrompt, getUseCasePresetReminderKey, resolveRolePromptLayer, normalizeCustomRolePrompt } from '../../src/utils/system-prompt'
 import { resolveInlineCompletionStyle } from '../../src/utils/inline-completion-prompt'
 import {
   toApiUserContent,
@@ -31,7 +31,7 @@ import { assertSafeApiBaseUrl } from './path-guard'
 import { recordChatCompletionUsageFireAndForget } from './usage'
 import { ensureProjectIndex, getProjectIndexContext } from './project-indexer'
 import { formatMeaningExcerptsForAi } from './semantic-index'
-import { formatWorkspaceRulesForAi } from './workspace-rules'
+import { formatWorkspaceRulesForAi, loadWorkspaceRolePrompt } from './workspace-rules'
 import { resolveChatContext, isInsideWorkspace } from './filesystem'
 import { getLlmProvider, getProviderLabel } from '../../src/utils/llm-providers'
 import { withOpenWebUiChatCompat } from '../../src/utils/open-webui-compat'
@@ -113,10 +113,16 @@ function appendResolvedFile(
 
 export function getSystemPrompt(
   mode: ChatRequest['mode'],
-  preset?: UseCasePreset | null
+  preset?: UseCasePreset | null,
+  customRole?: string | null
 ): string {
   const resolved = normalizeUseCasePreset(preset) ?? DEFAULT_SETTINGS.defaultUseCasePreset
-  const rolePrompt = t(PRESET_ROLE_KEYS[resolved])
+  const rolePrompt = resolveRolePromptLayer(
+    t(PRESET_ROLE_KEYS[resolved]),
+    customRole,
+    CONTEXT_BUDGET.roleTokens,
+    t('ai.contextTruncated')
+  )
   const modePrompt =
     mode === 'ask'
       ? t('ai.askSystemPrompt')
@@ -125,6 +131,29 @@ export function getSystemPrompt(
         : t('ai.editSystemPrompt')
   // Reinforce reply language after the (often long) mode constraints.
   return `${composeSystemPrompt(rolePrompt, modePrompt)}\n\n${t('ai.responseLanguage')}`
+}
+
+/** Job rolePrompt wins; otherwise `.compass/role.md`; otherwise null (preset role). */
+export async function resolveRequestRolePrompt(
+  request: Pick<ChatRequest, 'workspaceRoot' | 'rolePrompt'>
+): Promise<string | null> {
+  const fromRequest = normalizeCustomRolePrompt(
+    request.rolePrompt,
+    CONTEXT_BUDGET.roleTokens,
+    t('ai.contextTruncated')
+  )
+  if (fromRequest) return fromRequest
+  if (!request.workspaceRoot) return null
+  try {
+    return await loadWorkspaceRolePrompt(request.workspaceRoot)
+  } catch {
+    return null
+  }
+}
+
+export async function getSystemPromptForRequest(request: ChatRequest): Promise<string> {
+  const customRole = await resolveRequestRolePrompt(request)
+  return getSystemPrompt(request.mode, request.preset, customRole)
 }
 
 const INLINE_COMPLETION_MAX_TOKENS = 96
@@ -682,7 +711,7 @@ export async function streamChat(
       }
     )
     const apiMessages: Array<{ role: string; content: string | ChatContentPart[] }> = [
-      { role: 'system', content: getSystemPrompt(request.mode, request.preset) },
+      { role: 'system', content: await getSystemPromptForRequest(request) },
       ...priorHistory,
       {
         role: 'user',

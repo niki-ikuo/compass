@@ -420,3 +420,18 @@ export function WorkspaceRulesIcon() {
     </svg>
   )
 }
+
+/** 役割プロンプト（人物） */
+export function WorkspaceRoleIcon() {
+  return (
+    <svg {...iconProps}>
+      <circle cx="8" cy="5.5" r="2.4" stroke="currentColor" strokeWidth="1.2" />
+      <path
+        d="M3.2 13.5c.5-2.6 2.2-4 4.8-4s4.3 1.4 4.8 4"
+        stroke="currentColor"
+        strokeWidth="1.2"
+        strokeLinecap="round"
+      />
+    </svg>
+  )
+}

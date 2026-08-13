@@ -127,12 +127,12 @@ Today `getSystemPrompt(mode)` returns the full mode prompt. After presets:
 
 ```
 system = [
-  rolePrompt(preset),   // role, tone, preferred targets
-  modePrompt(mode),     // Ask / Edit / Agent constraints (mostly current)
+  rolePrompt,           // job rolePrompt → .compass/role.md → preset role
+  modePrompt(mode),     // Ask / Edit / Agent constraints (not user-editable)
 ].join('\n\n')
 ```
 
-Or replace a role placeholder inside the mode prompt.
+A non-empty custom role **replaces** the built-in preset role text so “You are a coding assistant” and “You are a PM” are not both present. The use-case preset **id** still selects tools / verify / reminders. Inline completion and Help Ask do not load a custom role.
 
 **Reminders** (end of `buildUserMessage`):
 
@@ -153,6 +153,8 @@ i18n keys (example): `ai.preset.code.role` / `document` / `data` / `general` (ja
 | UI | `sendPreset` in `ChatPanel` | Current chat selection |
 | Settings | `AppSettings.defaultUseCasePreset` | Default for new chats / startup |
 | Workspace | `.compass/settings.json` → `defaultUseCasePreset` | Folder default; overrides app settings |
+| Workspace role | `.compass/role.md` | Optional system-prompt role overlay (replaces preset role text) |
+| Job | `ScheduledJob.rolePrompt` | Optional per-job overlay; wins over `role.md` |
 
 **Resolve order on send:**
 

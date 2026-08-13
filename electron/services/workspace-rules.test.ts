@@ -3,7 +3,7 @@ import { tmpdir } from 'os'
 import { join } from 'path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { setLocale } from '../../src/i18n/runtime'
-import { formatWorkspaceRulesForAi } from './workspace-rules'
+import { formatWorkspaceRulesForAi, loadWorkspaceRolePrompt } from './workspace-rules'
 
 afterEach(() => {
   setLocale('en')
@@ -57,5 +57,20 @@ describe('formatWorkspaceRulesForAi', () => {
     const text = await formatWorkspaceRulesForAi(root)
     expect(text).toContain('[Workspace glossary')
     expect(text).toContain('API Key | apikey')
+  })
+})
+
+describe('loadWorkspaceRolePrompt', () => {
+  it('returns null when role.md is missing or blank', async () => {
+    const root = await makeRoot()
+    expect(await loadWorkspaceRolePrompt(root)).toBeNull()
+    await writeFile(join(root, '.compass', 'role.md'), '  \n', 'utf-8')
+    expect(await loadWorkspaceRolePrompt(root)).toBeNull()
+  })
+
+  it('returns trimmed role body without a section header', async () => {
+    const root = await makeRoot()
+    await writeFile(join(root, '.compass', 'role.md'), '  You are a PM.\n', 'utf-8')
+    await expect(loadWorkspaceRolePrompt(root)).resolves.toBe('You are a PM.')
   })
 })

@@ -105,7 +105,7 @@
 | Context | (1) full current file (2) user selection if any |
 | Streaming | Token-by-token display |
 | History | Persisted per workspace in `.compass/chat-history.json` (survives restart) |
-| System prompt | Use-case role (`general` / `document` / `data` / `code`) + mode constraints (Ask / Edit / Agent). See [USE_CASE_PRESET.md](./USE_CASE_PRESET.md) |
+| System prompt | Use-case role (`general` / `document` / `data` / `code`), optionally replaced by `.compass/role.md` or a scheduled job `rolePrompt`, + mode constraints (Ask / Edit / Agent). See [USE_CASE_PRESET.md](./USE_CASE_PRESET.md) |
 
 **Example context format:**
 

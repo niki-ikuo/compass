@@ -478,6 +478,7 @@ export async function runScheduledJob(job: ScheduledJob): Promise<ScheduledJobRu
         mode: 'agent',
         workspaceRoot: job.workspaceRoot,
         preset: job.preset,
+        rolePrompt: job.rolePrompt,
         messages: [{ role: 'user', content: `${HEADLESS_TASK_PREFIX}${job.prompt}` }]
       })
       await Promise.race([donePromise, new Promise<void>((r) => setTimeout(r, 500))])

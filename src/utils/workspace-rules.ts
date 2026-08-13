@@ -6,6 +6,7 @@ import { focusMonacoEditor } from '@/utils/workbench-focus'
 
 export const WORKSPACE_RULES_RELATIVE = '.compass/rules.md'
 export const WORKSPACE_GLOSSARY_RELATIVE = '.compass/glossary.md'
+export const WORKSPACE_ROLE_RELATIVE = '.compass/role.md'
 
 function normalizePath(path: string): string {
   return path.replace(/\\/g, '/')
@@ -79,6 +80,43 @@ export function buildDefaultGlossaryMarkdown(locale: 'ja' | 'en' = getLocale()):
   ].join('\n')
 }
 
+export function buildDefaultRoleMarkdown(locale: 'ja' | 'en' = getLocale()): string {
+  if (locale === 'ja') {
+    return [
+      '# 役割',
+      '',
+      'このフォルダの Ask / Edit / Agent（およびスケジュールジョブ）の system 先頭に載ります。',
+      '用途プリセットの「あなたは〇〇アシスタントです」を置き換えます。Ask / Edit / Agent の動作制約は変わりません。',
+      '短く具体的に書いてください。API キーなどの秘密情報は書かないでください。',
+      '',
+      '## 役割',
+      '',
+      '- （例）あなたはこのフォルダの PM 担当です。計画と整理だけを行う。',
+      '',
+      '## やらない',
+      '',
+      '- （例）ソースコードを作らない・編集しない',
+      ''
+    ].join('\n')
+  }
+
+  return [
+    '# Role',
+    '',
+    'This file replaces the use-case preset role (“You are a … assistant”) at the start of the system prompt for Ask / Edit / Agent (and scheduled jobs). Mode constraints do not change.',
+    'Keep it short and concrete. Do not put API keys or other secrets here.',
+    '',
+    '## Role',
+    '',
+    '- (e.g.) You are the PM for this folder. Plan and organize only.',
+    '',
+    '## Do not',
+    '',
+    '- (e.g.) Do not create or edit source code',
+    ''
+  ].join('\n')
+}
+
 async function ensureCompassDir(workspaceRoot: string): Promise<void> {
   try {
     await window.compass.fs.createDirectory(workspaceRoot, '.compass')
@@ -141,5 +179,18 @@ export async function openOrCreateWorkspaceGlossary(workspaceRoot: string): Prom
     )
   } catch (err) {
     window.alert(err instanceof Error ? err.message : t('rules.openGlossaryFailed'))
+  }
+}
+
+/** Open `.compass/role.md`, creating a starter file if missing. */
+export async function openOrCreateWorkspaceRole(workspaceRoot: string): Promise<void> {
+  try {
+    await openOrCreateRelativeFile(
+      workspaceRoot,
+      WORKSPACE_ROLE_RELATIVE,
+      buildDefaultRoleMarkdown()
+    )
+  } catch (err) {
+    window.alert(err instanceof Error ? err.message : t('rules.openRoleFailed'))
   }
 }

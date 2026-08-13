@@ -117,12 +117,13 @@ Renderer からは `window.compass.*` を呼び出します。実装の正は `e
 | `chat-history.json` | 永続化されたチャット履歴 |
 | `settings.json` | ワークスペース設定（例: 既定の用途プリセット） |
 | `templates/` | 任意の文書テンプレート |
+| `role.md` | 任意の役割プロンプト（system の用途ロールを置換） |
 | `rules.md` | 人が編集するワークスペースルール（Ask / Edit / Agent に自動添付） |
 | `glossary.md` | 任意の用語集（文書 verify + AI コンテキスト） |
 | `inbox/` | クリップ取込（生テキスト）。処理済みは `inbox/done/` |
 | `outbox/` | クリップ下書き（mail / minutes / report / chat）。詳細: [DESK_LOOP.md](./DESK_LOOP.md) |
 
-チャット時に構造索引の関連部分と、ハイブリッド検索の Related workspace excerpts、および `.compass/rules.md`（と任意の glossary）をコンテキストへ載せる。埋め込みは既定で OpenAI 互換 `/embeddings`（埋め込み専用に Ollama も可）。失敗時やキー未設定時はローカルハッシュへフォールバック。Ask/Agent の回答自体はオンライン LLM を使う。
+チャット時に構造索引の関連部分と、ハイブリッド検索の Related workspace excerpts、および `.compass/rules.md`（と任意の glossary）をコンテキストへ載せる。任意の `.compass/role.md` は system の役割レイヤに載る（user コンテキストではない）。埋め込みは既定で OpenAI 互換 `/embeddings`（埋め込み専用に Ollama も可）。失敗時やキー未設定時はローカルハッシュへフォールバック。Ask/Agent の回答自体はオンライン LLM を使う。
 
 ## マルチ LLM
 

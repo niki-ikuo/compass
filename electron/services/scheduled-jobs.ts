@@ -77,6 +77,10 @@ export function normalizeScheduledJob(raw: unknown): ScheduledJob | null {
     updatedAt
   }
 
+  if (typeof o.rolePrompt === 'string' && o.rolePrompt.trim()) {
+    job.rolePrompt = o.rolePrompt.trim()
+  }
+
   if (typeof o.lastRunAt === 'string') job.lastRunAt = o.lastRunAt
   if (o.lastRunStatus === 'ok' || o.lastRunStatus === 'error' || o.lastRunStatus === 'running') {
     job.lastRunStatus = o.lastRunStatus
@@ -154,11 +158,14 @@ export function buildScheduledJobFromInput(
   const name = input.name.trim()
   const workspaceRoot = resolve(input.workspaceRoot.trim())
   const prompt = input.prompt
+  const rolePrompt = (
+    input.rolePrompt !== undefined ? input.rolePrompt : (existing?.rolePrompt ?? '')
+  ).trim()
   if (!name) throw new Error('Job name is required')
   if (!workspaceRoot) throw new Error('Workspace folder is required')
   if (!prompt.trim()) throw new Error('Prompt is required')
 
-  return {
+  const job: ScheduledJob = {
     id: (input.id ?? existing?.id ?? randomUUID()).trim(),
     name,
     enabled: input.enabled === true,
@@ -175,6 +182,8 @@ export function buildScheduledJobFromInput(
     lastRunError: existing?.lastRunError,
     lastRunDir: existing?.lastRunDir
   }
+  if (rolePrompt) job.rolePrompt = rolePrompt
+  return job
 }
 
 export async function saveScheduledJob(input: ScheduledJobInput): Promise<ScheduledJob> {

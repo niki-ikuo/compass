@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { composeSystemPrompt, getUseCasePresetReminderKey } from '@/utils/system-prompt'
+import { composeSystemPrompt, getUseCasePresetReminderKey, normalizeCustomRolePrompt, resolveRolePromptLayer } from '@/utils/system-prompt'
 import { ja, en } from '@/i18n/messages'
+import { CONTEXT_BUDGET } from '@/utils/context-budget'
 
 describe('composeSystemPrompt', () => {
   it('joins role then mode with a blank line', () => {
@@ -42,5 +43,33 @@ describe('ai.responseLanguage', () => {
   it('pins reply language for ja and en catalogs', () => {
     expect(ja['ai.responseLanguage']).toContain('日本語')
     expect(en['ai.responseLanguage']).toContain('English')
+  })
+})
+
+describe('normalizeCustomRolePrompt', () => {
+  it('returns null for empty or whitespace', () => {
+    expect(normalizeCustomRolePrompt(undefined)).toBeNull()
+    expect(normalizeCustomRolePrompt('')).toBeNull()
+    expect(normalizeCustomRolePrompt('   \n')).toBeNull()
+  })
+
+  it('trims and keeps a short role', () => {
+    expect(normalizeCustomRolePrompt('  You are a PM.  ')).toBe('You are a PM.')
+  })
+
+  it('truncates to the role token budget', () => {
+    const long = `You are a PM. ${'x'.repeat(20_000)}`
+    const out = normalizeCustomRolePrompt(long, CONTEXT_BUDGET.roleTokens)
+    expect(out).not.toBeNull()
+    expect(out!.length).toBeLessThan(long.length)
+    expect(out).toContain('You are a PM.')
+  })
+})
+
+describe('resolveRolePromptLayer', () => {
+  it('uses custom role when present and otherwise the preset', () => {
+    expect(resolveRolePromptLayer('PRESET', 'You are a PM.')).toBe('You are a PM.')
+    expect(resolveRolePromptLayer('PRESET', '  ')).toBe('PRESET')
+    expect(resolveRolePromptLayer('PRESET', null)).toBe('PRESET')
   })
 })

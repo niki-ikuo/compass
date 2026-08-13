@@ -117,12 +117,13 @@ Indexing policy is **include text / exclude binary** (not an extension allowlist
 | `chat-history.json` | Persisted chat sessions |
 | `settings.json` | Workspace settings (e.g. default use-case preset) |
 | `templates/` | Optional document templates |
+| `role.md` | Optional custom role overlay (replaces the use-case preset role in the system prompt) |
 | `rules.md` | Human-editable workspace rules (auto-attached to Ask / Edit / Agent) |
 | `glossary.md` | Optional glossary (document verify + AI context) |
 | `inbox/` | Clip captures (raw text). Done items under `inbox/done/` |
 | `outbox/` | Clip drafts (mail / minutes / report / chat). Details: [DESK_LOOP.md](./DESK_LOOP.md) |
 
-Relevant structure-index slices, hybrid-search Related workspace excerpts, and `.compass/rules.md` (plus optional glossary) are added to chat context. Embeddings default to OpenAI-compatible `/embeddings` (optional separate Ollama provider); falls back to local hash on failure or when credentials/model are unavailable. Ask/Agent answers still use the online LLM.
+Relevant structure-index slices, hybrid-search Related workspace excerpts, and `.compass/rules.md` (plus optional glossary) are added to chat context. Optional `.compass/role.md` is loaded into the system prompt role layer (not user context). Embeddings default to OpenAI-compatible `/embeddings` (optional separate Ollama provider); falls back to local hash on failure or when credentials/model are unavailable. Ask/Agent answers still use the online LLM.
 
 ## Multi-LLM
 

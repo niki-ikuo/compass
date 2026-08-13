@@ -127,12 +127,12 @@ UI でも同じドロップダウンに同居させない。
 
 ```
 system = [
-  rolePrompt(preset),   // 用途の自己認識・文体・優先対象
-  modePrompt(mode),     // Ask / Edit / Agent の制約（ほぼ現状）
+  rolePrompt,           // ジョブ rolePrompt → .compass/role.md → プリセット役割
+  modePrompt(mode),     // Ask / Edit / Agent の制約（ユーザーは編集不可）
 ].join('\n\n')
 ```
 
-または mode プロンプト内の役割プレースホルダを `preset` で置換。
+カスタム役割があるときは内蔵のプリセット役割文を**置換**する（「コーディングアシスタント」と「PM」を同居させない）。用途プリセットの **ID** はツール / verify / リマインダーの分岐に残す。インライン補完とヘルプ Ask にはカスタム役割を載せない。
 
 **リマインダー**（`buildUserMessage` 末尾）:
 
@@ -153,6 +153,8 @@ i18n キー例: `ai.preset.code.role` / `document` / `data` / `general`（ja / e
 | UI | `ChatPanel` の `sendPreset` | 今の会話で選んでいる用途 |
 | 設定 | `AppSettings.defaultUseCasePreset` | 新規チャット / 起動時の初期値 |
 | ワークスペース | `.compass/settings.json` → `defaultUseCasePreset` | フォルダ既定。アプリ設定より優先 |
+| ワークスペース役割 | `.compass/role.md` | 任意。system の用途ロール文を置換 |
+| ジョブ | `ScheduledJob.rolePrompt` | 任意。その実行だけ `role.md` より優先 |
 
 **送信時の解決順:**
 

@@ -28,7 +28,7 @@ import { AgentStepTimeline } from './AgentStepTimeline'
 import { AgentPlanPanel } from './AgentPlanPanel'
 import { collectAgentStepsThrough, rebuildPlanFromSteps, shouldShowAgentPlanPanel } from '@/utils/agent-plan'
 import { AnimatedStatus } from './AnimatedEllipsis'
-import { ChatHistoryIcon, PlusIcon, CloseIcon, WorkspaceRulesIcon } from './icons/ToolbarIcons'
+import { ChatHistoryIcon, PlusIcon, CloseIcon, WorkspaceRulesIcon, WorkspaceRoleIcon } from './icons/ToolbarIcons'
 import {
   inferWorkspaceActionsFromCodeBlocks,
   normalizeWorkspaceActions,
@@ -77,7 +77,7 @@ import {
   hasTabReorderDrag,
   resolveTabDropIndex
 } from '@/utils/tab-reorder'
-import { openOrCreateWorkspaceRules } from '@/utils/workspace-rules'
+import { openOrCreateWorkspaceRole, openOrCreateWorkspaceRules } from '@/utils/workspace-rules'
 import { blurChatComposerIfFocused, classifyWorkbenchFocusOwner } from '@/utils/workbench-focus'
 import { useI18n, getDateLocale } from '@/i18n'
 
@@ -1727,6 +1727,18 @@ export function ChatPanel() {
             <WorkspaceRulesIcon />
           </button>
           <button
+            type="button"
+            className="btn-icon"
+            disabled={!workspaceRoot}
+            onClick={() => {
+              if (!workspaceRoot) return
+              void openOrCreateWorkspaceRole(workspaceRoot)
+            }}
+            title={t('role.edit')}
+          >
+            <WorkspaceRoleIcon />
+          </button>
+          <button
             className="btn-icon"
             onClick={() => createChatSession()}
             title={t('chat.newChat')}
@@ -1744,6 +1756,7 @@ export function ChatPanel() {
             <p className="hint">{t('chat.emptyContext')}</p>
             <p className="hint">{t('chat.emptyPasteHint')}</p>
             {workspaceRoot ? <p className="hint">{t('chat.emptyRulesHint')}</p> : null}
+            {workspaceRoot ? <p className="hint">{t('chat.emptyRoleHint')}</p> : null}
             {workspaceRoot ? <p className="hint">{t('chat.emptyDataHint')}</p> : null}
           </div>
         )}

@@ -7,10 +7,12 @@ import {
   estimateTokens,
   truncateToTokenBudget
 } from '../../src/utils/context-budget'
+import { normalizeCustomRolePrompt } from '../../src/utils/system-prompt'
 import { decodeFileBuffer } from './encoding'
 
 export const WORKSPACE_RULES_RELATIVE = '.compass/rules.md'
 export const WORKSPACE_GLOSSARY_RELATIVE = '.compass/glossary.md'
+export const WORKSPACE_ROLE_RELATIVE = '.compass/role.md'
 
 async function readOptionalText(workspaceRoot: string, relativePath: string): Promise<string | null> {
   const absolute = join(workspaceRoot, relativePath)
@@ -61,4 +63,17 @@ export async function formatWorkspaceRulesForAi(
 
   if (sections.length === 0) return null
   return sections.join('\n\n')
+}
+
+/**
+ * Load `.compass/role.md` as a system-prompt role overlay (no section header).
+ * Empty / missing → null so the caller keeps the built-in preset role.
+ */
+export async function loadWorkspaceRolePrompt(
+  workspaceRoot: string,
+  maxTokens: number = CONTEXT_BUDGET.roleTokens
+): Promise<string | null> {
+  if (maxTokens <= 0) return null
+  const role = await readOptionalText(workspaceRoot, WORKSPACE_ROLE_RELATIVE)
+  return normalizeCustomRolePrompt(role, maxTokens, t('ai.contextTruncated'))
 }

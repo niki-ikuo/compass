@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildDefaultGlossaryMarkdown, buildDefaultRulesMarkdown } from './workspace-rules'
+import { buildDefaultGlossaryMarkdown, buildDefaultRoleMarkdown, buildDefaultRulesMarkdown } from './workspace-rules'
 
 describe('workspace-rules starters', () => {
   it('builds Japanese rules starter', () => {
@@ -17,5 +17,12 @@ describe('workspace-rules starters', () => {
   it('builds glossary starters with preferred|avoid form', () => {
     expect(buildDefaultGlossaryMarkdown('ja')).toContain('API Key |')
     expect(buildDefaultGlossaryMarkdown('en')).toContain('API Key |')
+  })
+
+  it('builds role starters that warn against secrets', () => {
+    expect(buildDefaultRoleMarkdown('ja')).toContain('# 役割')
+    expect(buildDefaultRoleMarkdown('ja')).toContain('秘密情報')
+    expect(buildDefaultRoleMarkdown('en')).toContain('# Role')
+    expect(buildDefaultRoleMarkdown('en')).toContain('secrets')
   })
 })

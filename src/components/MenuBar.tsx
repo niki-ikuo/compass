@@ -4,6 +4,7 @@ import { useAppStore } from '@/stores/app-store'
 import { patchAppSettings } from '@/utils/patch-app-settings'
 import {
   openOrCreateWorkspaceGlossary,
+  openOrCreateWorkspaceRole,
   openOrCreateWorkspaceRules
 } from '@/utils/workspace-rules'
 import { useI18n } from '@/i18n'
@@ -160,6 +161,13 @@ export function MenuBar({
       action: () => {
         if (!workspaceRoot) return
         void openOrCreateWorkspaceRules(workspaceRoot)
+      }
+    },
+    {
+      label: t('menu.workspaceRole'),
+      action: () => {
+        if (!workspaceRoot) return
+        void openOrCreateWorkspaceRole(workspaceRoot)
       }
     },
     {

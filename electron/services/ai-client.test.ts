@@ -1,13 +1,20 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { WebContents } from 'electron'
+import { mkdtemp, mkdir, writeFile } from 'fs/promises'
+import { tmpdir } from 'os'
+import { join } from 'path'
 import { DEFAULT_SETTINGS } from '../../src/types'
+import { setLocale } from '../../src/i18n/runtime'
+import { en } from '../../src/i18n/messages'
 import {
   acquireChatAbortController,
   buildApiHeaders,
   cancelChat,
   cancelInlineCompletion,
+  getSystemPrompt,
   isAbortError,
   releaseChatAbortController,
+  resolveRequestRolePrompt,
   sanitizeInlineCompletion,
   sendAiEvent
 } from './ai-client'
@@ -15,6 +22,7 @@ import {
 afterEach(() => {
   cancelChat()
   cancelInlineCompletion()
+  setLocale('en')
 })
 
 describe('sanitizeInlineCompletion', () => {
@@ -122,5 +130,50 @@ describe('isAbortError / sendAiEvent', () => {
     const webContents = { send } as unknown as WebContents
     sendAiEvent(webContents, 'ai:chunk', 'chat-9', 'hello')
     expect(send).toHaveBeenCalledWith('ai:chunk', 'chat-9', 'hello')
+  })
+})
+
+describe('getSystemPrompt', () => {
+  it('uses the preset role when no custom role is set', () => {
+    setLocale('en')
+    const system = getSystemPrompt('ask', 'code')
+    expect(system.startsWith(en['ai.preset.code.role'])).toBe(true)
+    expect(system).toContain(en['ai.askSystemPrompt'])
+    expect(system).toContain(en['ai.responseLanguage'])
+  })
+
+  it('replaces the preset role but keeps mode constraints', () => {
+    setLocale('en')
+    const system = getSystemPrompt('ask', 'code', 'You are a PM.')
+    expect(system.startsWith('You are a PM.')).toBe(true)
+    expect(system).toContain(en['ai.askSystemPrompt'])
+    expect(system).not.toContain(en['ai.preset.code.role'])
+  })
+
+  it('treats whitespace custom role as unset', () => {
+    setLocale('en')
+    const system = getSystemPrompt('agent', 'document', '  \n')
+    expect(system.startsWith(en['ai.preset.document.role'])).toBe(true)
+    expect(system).toContain(en['ai.agentSystemPrompt'])
+  })
+})
+
+describe('resolveRequestRolePrompt', () => {
+  it('prefers the request overlay over role.md', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'compass-role-req-'))
+    await mkdir(join(root, '.compass'), { recursive: true })
+    await writeFile(join(root, '.compass', 'role.md'), 'You are from the file.\n', 'utf-8')
+    await expect(
+      resolveRequestRolePrompt({ workspaceRoot: root, rolePrompt: 'You are a PM.' })
+    ).resolves.toBe('You are a PM.')
+  })
+
+  it('loads .compass/role.md when the request overlay is empty', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'compass-role-file-'))
+    await mkdir(join(root, '.compass'), { recursive: true })
+    await writeFile(join(root, '.compass', 'role.md'), 'You are from the file.\n', 'utf-8')
+    await expect(resolveRequestRolePrompt({ workspaceRoot: root })).resolves.toBe(
+      'You are from the file.'
+    )
   })
 })

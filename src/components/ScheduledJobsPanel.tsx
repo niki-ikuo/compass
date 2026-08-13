@@ -69,6 +69,7 @@ type Draft = {
   enabled: boolean
   workspaceRoot: string
   prompt: string
+  rolePrompt: string
   preset: UseCasePreset
   policy: ScheduledJobPolicy
   schedule: ScheduledJobSchedule
@@ -80,6 +81,7 @@ function emptyDraft(workspaceRoot: string): Draft {
     enabled: true,
     workspaceRoot,
     prompt: '',
+    rolePrompt: '',
     preset: 'general',
     policy: 'auto-apply-safe',
     schedule: defaultScheduledJobSchedule()
@@ -93,6 +95,7 @@ function jobToDraft(job: ScheduledJob): Draft {
     enabled: job.enabled,
     workspaceRoot: job.workspaceRoot,
     prompt: job.prompt,
+    rolePrompt: job.rolePrompt ?? '',
     preset: job.preset,
     policy: job.policy,
     schedule: { ...job.schedule }
@@ -106,6 +109,7 @@ function draftToInput(draft: Draft): ScheduledJobInput {
     enabled: draft.enabled,
     workspaceRoot: draft.workspaceRoot,
     prompt: draft.prompt,
+    rolePrompt: draft.rolePrompt,
     preset: draft.preset,
     policy: draft.policy,
     allowExec: draft.policy === 'full-unattended',
@@ -364,6 +368,15 @@ export function ScheduledJobsPanel() {
               value={draft.prompt}
               onChange={(e) => setDraft({ ...draft, prompt: e.target.value })}
             />
+          </label>
+          <label>
+            {t('jobs.rolePrompt')}
+            <textarea
+              rows={4}
+              value={draft.rolePrompt}
+              onChange={(e) => setDraft({ ...draft, rolePrompt: e.target.value })}
+            />
+            <span className="field-hint">{t('jobs.rolePromptHint')}</span>
           </label>
           <label>
             {t('jobs.preset')}

@@ -37,6 +37,19 @@ describe('normalizeScheduledJob', () => {
     expect(job?.schedule.interval).toBe(2)
   })
 
+  it('reads optional rolePrompt', () => {
+    const job = normalizeScheduledJob({
+      id: '1',
+      name: 'PM',
+      enabled: true,
+      workspaceRoot: 'C:\\Work\\notes',
+      prompt: 'Plan',
+      rolePrompt: 'You are a PM.',
+      schedule: { kind: 'daily', startTime: '09:00', startDate: '2026-08-12' }
+    })
+    expect(job?.rolePrompt).toBe('You are a PM.')
+  })
+
   it('migrates legacy frequency/time/dayOfWeek', () => {
     const job = normalizeScheduledJob({
       id: '1',
@@ -88,5 +101,41 @@ describe('buildScheduledJobFromInput', () => {
     })
     expect(job.schedule.daysOfWeek).toEqual([1, 2, 3, 4, 5])
     expect(job.allowExec).toBe(true)
+  })
+
+  it('persists a non-empty rolePrompt and omits blank', () => {
+    const withRole = buildScheduledJobFromInput({
+      name: 'PM',
+      enabled: true,
+      workspaceRoot: 'D:\\proj',
+      prompt: 'Plan',
+      rolePrompt: '  You are a PM.  ',
+      preset: 'document',
+      policy: 'auto-apply-files',
+      allowExec: false,
+      schedule: {
+        kind: 'daily',
+        startTime: '09:00',
+        startDate: '2026-08-12',
+        interval: 1
+      }
+    })
+    expect(withRole.rolePrompt).toBe('You are a PM.')
+
+    const cleared = buildScheduledJobFromInput(
+      {
+        name: 'PM',
+        enabled: true,
+        workspaceRoot: 'D:\\proj',
+        prompt: 'Plan',
+        rolePrompt: '   ',
+        preset: 'document',
+        policy: 'auto-apply-files',
+        allowExec: false,
+        schedule: withRole.schedule
+      },
+      withRole
+    )
+    expect(cleared.rolePrompt).toBeUndefined()
   })
 })

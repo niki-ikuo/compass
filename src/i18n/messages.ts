@@ -138,6 +138,7 @@ export const ja = {
   'menu.save': '保存',
   'menu.settings': '設定',
   'menu.workspaceRules': 'ワークスペースルールを編集',
+  'menu.workspaceRole': '役割プロンプトを編集',
   'menu.workspaceGlossary': '用語集を編集',
   'menu.quit': '終了',
   'menu.undo': '元に戻す',
@@ -308,6 +309,9 @@ export const ja = {
   'jobs.workspace': '対象フォルダ',
   'jobs.browse': '参照…',
   'jobs.prompt': 'プロンプト',
+  'jobs.rolePrompt': '役割プロンプト（任意）',
+  'jobs.rolePromptHint':
+    '空なら対象フォルダの .compass/role.md、それも空なら用途プリセットの役割文を使います。Ask / Edit / Agent の動作制約は変わりません。API キーは書かないでください。',
   'jobs.preset': '用途プリセット',
   'jobs.policy': '承認ポリシー',
   'jobs.policyReportOnly': 'レポートのみ（report-only）',
@@ -1169,10 +1173,14 @@ export const ja = {
   'ai.workspaceGlossaryHeader': '[ワークスペース用語集 (.compass/glossary.md)]',
   'ai.indexLines': '{count}行',
   'rules.edit': 'ルールを編集',
+  'role.edit': '役割を編集',
   'rules.openFailed': 'ワークスペースルールを開けませんでした',
   'rules.openGlossaryFailed': '用語集を開けませんでした',
+  'rules.openRoleFailed': '役割プロンプトを開けませんでした',
   'chat.emptyRulesHint':
     'トーンや用語はファイル → ワークスペースルールを編集（.compass/rules.md）に書くと、次回から自動で効きます',
+  'chat.emptyRoleHint':
+    '「あなたは PM です」などの役割はファイル → 役割プロンプトを編集（.compass/role.md）に書けます',
   'ai.inlineCompletionSystemPromptCode':
     'あなたは fill-in-the-middle のコード補完エンジンです。ユーザーはカーソルを <|cursor|> で示します。<|cursor|> に挿入すべきコードだけを返してください。説明・markdown・コードフェンス・引用符・ラベルは付けないでください。<|cursor|> の前後に既にあるテキストは繰り返さないでください。短く（数トークン〜数行）。改行とインデントは可。',
   'ai.inlineCompletionSystemPromptText':
@@ -1324,6 +1332,7 @@ export const en: Record<MessageKey, string> = {
   'menu.save': 'Save',
   'menu.settings': 'Settings',
   'menu.workspaceRules': 'Edit Workspace Rules',
+  'menu.workspaceRole': 'Edit Role Prompt',
   'menu.workspaceGlossary': 'Edit Glossary',
   'menu.quit': 'Quit',
   'menu.undo': 'Undo',
@@ -1490,6 +1499,9 @@ export const en: Record<MessageKey, string> = {
   'jobs.workspace': 'Target folder',
   'jobs.browse': 'Browse…',
   'jobs.prompt': 'Prompt',
+  'jobs.rolePrompt': 'Role prompt (optional)',
+  'jobs.rolePromptHint':
+    'If empty, uses .compass/role.md in the target folder, then the use-case preset role. Ask / Edit / Agent constraints do not change. Do not put API keys here.',
   'jobs.preset': 'Use-case preset',
   'jobs.policy': 'Approval policy',
   'jobs.policyReportOnly': 'Report only (report-only)',
@@ -2329,10 +2341,14 @@ export const en: Record<MessageKey, string> = {
   'ai.workspaceGlossaryHeader': '[Workspace glossary (.compass/glossary.md)]',
   'ai.indexLines': '{count} lines',
   'rules.edit': 'Edit rules',
+  'role.edit': 'Edit role',
   'rules.openFailed': 'Could not open workspace rules',
   'rules.openGlossaryFailed': 'Could not open glossary',
+  'rules.openRoleFailed': 'Could not open role prompt',
   'chat.emptyRulesHint':
     'Tone and terms: File → Edit Workspace Rules (.compass/rules.md) — applied automatically next time',
+  'chat.emptyRoleHint':
+    'Role (“You are the PM…”) lives in File → Edit Role Prompt (.compass/role.md)',
   'ai.inlineCompletionSystemPromptCode':
     'You are a fill-in-the-middle code completion engine. The user marks the cursor with <|cursor|>. Respond with ONLY the code that should be inserted at <|cursor|>. No explanations, markdown, fences, quotes, or labels. Do not repeat text already before or after <|cursor|>. Keep it short (tokens to a few lines). Newlines/indentation are allowed.',
   'ai.inlineCompletionSystemPromptText':

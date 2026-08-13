@@ -105,7 +105,7 @@
 | コンテキスト | ①現在開いているファイル全文 ②ユーザーが選択したテキスト（あれば） |
 | ストリーミング | トークン単位で逐次表示 |
 | 会話履歴 | ワークスペースごとに `.compass/chat-history.json` へ永続化（再起動後も残る） |
-| システムプロンプト | 用途ロール（`general` / `document` / `data` / `code`）+ モード制約（Ask / Edit / Agent）。詳細は [USE_CASE_PRESET.md](./USE_CASE_PRESET.md) |
+| システムプロンプト | 用途ロール（`general` / `document` / `data` / `code`）。任意で `.compass/role.md` またはスケジュールジョブの `rolePrompt` が用途ロールを置換。+ モード制約（Ask / Edit / Agent）。詳細は [USE_CASE_PRESET.md](./USE_CASE_PRESET.md) |
 
 **コンテキスト送信フォーマット例:**
 
