@@ -549,7 +549,9 @@ export async function completeInline(
       fetch(url, {
         method: 'POST',
         headers: buildApiHeaders(settings),
-        body: jsonStringifyUtf8Safe(withOpenWebUiChatCompat(payload, settings.apiBaseUrl)),
+        body: jsonStringifyUtf8Safe(
+          withOpenWebUiChatCompat(payload, settings.openWebUiChatCompat === true)
+        ),
         signal
       })
 
@@ -708,7 +710,7 @@ export async function streamChat(
             stream: true,
             stream_options: { include_usage: true }
           },
-          settings.apiBaseUrl
+          settings.openWebUiChatCompat === true
         )
       ),
       signal

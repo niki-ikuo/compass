@@ -1860,7 +1860,7 @@ export async function runAgent(webContents: WebContents, request: ChatRequest): 
           tools: getAgentTools(request.preset),
           tool_choice: 'auto'
         },
-        settings.apiBaseUrl
+        settings.openWebUiChatCompat === true
       )
 
       let turnResult: StreamTurnResult

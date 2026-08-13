@@ -230,7 +230,9 @@ export async function askHelp(request: HelpAskRequest): Promise<HelpAskResult> {
       fetch(url, {
         method: 'POST',
         headers: buildApiHeaders(settings),
-        body: jsonStringifyUtf8Safe(withOpenWebUiChatCompat(payload, settings.apiBaseUrl)),
+        body: jsonStringifyUtf8Safe(
+          withOpenWebUiChatCompat(payload, settings.openWebUiChatCompat === true)
+        ),
         signal
       })
 

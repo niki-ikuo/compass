@@ -582,19 +582,34 @@ export function SettingsPanel() {
             </label>
 
             {isCustomProvider && (
-              <label className="settings-checkbox-row">
-                <input
-                  type="checkbox"
-                  checked={form.allowLanApiBaseUrl === true}
-                  onChange={(e) =>
-                    setForm({ ...form, allowLanApiBaseUrl: e.target.checked })
-                  }
-                />
-                <span>
-                  {t('settings.allowLanApiBaseUrl')}
-                  <span className="field-hint">{t('settings.allowLanApiBaseUrlHint')}</span>
-                </span>
-              </label>
+              <>
+                <label className="settings-checkbox-row">
+                  <input
+                    type="checkbox"
+                    checked={form.allowLanApiBaseUrl === true}
+                    onChange={(e) =>
+                      setForm({ ...form, allowLanApiBaseUrl: e.target.checked })
+                    }
+                  />
+                  <span>
+                    {t('settings.allowLanApiBaseUrl')}
+                    <span className="field-hint">{t('settings.allowLanApiBaseUrlHint')}</span>
+                  </span>
+                </label>
+                <label className="settings-checkbox-row">
+                  <input
+                    type="checkbox"
+                    checked={form.openWebUiChatCompat === true}
+                    onChange={(e) =>
+                      setForm({ ...form, openWebUiChatCompat: e.target.checked })
+                    }
+                  />
+                  <span>
+                    {t('settings.openWebUiChatCompat')}
+                    <span className="field-hint">{t('settings.openWebUiChatCompatHint')}</span>
+                  </span>
+                </label>
+              </>
             )}
 
             <label>

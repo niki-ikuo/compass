@@ -37,6 +37,9 @@ export const ja = {
   'settings.allowLanApiBaseUrl': 'LAN 上の API サーバーを許可',
   'settings.allowLanApiBaseUrlHint':
     '192.168/10/172.16 などのプライベート IP を API Base URL に使う場合にオン（メタデータ IP は常に拒否）',
+  'settings.openWebUiChatCompat': 'Open WebUI 互換（chat_id を付与）',
+  'settings.openWebUiChatCompatHint':
+    '古い Open WebUI で startswith エラーになるときだけオン。Azure / LiteLLM 経由ではオフ（未知パラメータで 400 になる）',
   'settings.model': 'モデル',
   'settings.modelHint': '一覧から選ぶか、任意のモデル ID を入力できます',
   'settings.testConnection': '接続を確認',
@@ -1222,6 +1225,9 @@ export const en: Record<MessageKey, string> = {
   'settings.allowLanApiBaseUrl': 'Allow LAN API servers',
   'settings.allowLanApiBaseUrlHint':
     'Turn on to use private IPs (192.168/10/172.16) as API Base URL. Metadata IPs are always blocked.',
+  'settings.openWebUiChatCompat': 'Open WebUI compat (send chat_id)',
+  'settings.openWebUiChatCompatHint':
+    'Turn on only for older Open WebUI startswith errors. Leave off for Azure / LiteLLM (unknown parameter 400).',
   'settings.model': 'Model',
   'settings.modelHint': 'Pick from the list or enter any model ID',
   'settings.testConnection': 'Test connection',

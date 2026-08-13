@@ -57,6 +57,7 @@ interface StoredSettings {
   deskShowEnabled: boolean
   deskShowAccelerator: string
   allowLanApiBaseUrl?: boolean
+  openWebUiChatCompat?: boolean
   lastWorkspaceRoot: string | null
   recentWorkspaceRoots: string[]
 }
@@ -106,6 +107,10 @@ function resolveRememberLastUseCasePreset(value: unknown): boolean {
 
 function resolveAllowLanApiBaseUrl(value: unknown): boolean {
   return typeof value === 'boolean' ? value : DEFAULT_SETTINGS.allowLanApiBaseUrl
+}
+
+function resolveOpenWebUiChatCompat(value: unknown): boolean {
+  return typeof value === 'boolean' ? value : DEFAULT_SETTINGS.openWebUiChatCompat
 }
 
 function resolveEmbeddingsMode(value: unknown): EmbeddingsMode {
@@ -254,6 +259,7 @@ async function readStoredSettings(): Promise<StoredSettings> {
       deskShowEnabled: resolveDeskShowEnabled(stored.deskShowEnabled),
       deskShowAccelerator: resolveDeskShowAccelerator(stored.deskShowAccelerator),
       allowLanApiBaseUrl: resolveAllowLanApiBaseUrl(stored.allowLanApiBaseUrl),
+      openWebUiChatCompat: resolveOpenWebUiChatCompat(stored.openWebUiChatCompat),
       lastWorkspaceRoot: stored.lastWorkspaceRoot ?? null,
       recentWorkspaceRoots:
         stored.recentWorkspaceRoots ??
@@ -290,6 +296,7 @@ async function readStoredSettings(): Promise<StoredSettings> {
       deskShowEnabled: DEFAULT_SETTINGS.deskShowEnabled,
       deskShowAccelerator: DEFAULT_SETTINGS.deskShowAccelerator,
       allowLanApiBaseUrl: DEFAULT_SETTINGS.allowLanApiBaseUrl,
+      openWebUiChatCompat: DEFAULT_SETTINGS.openWebUiChatCompat,
       lastWorkspaceRoot: null,
       recentWorkspaceRoots: []
     }
@@ -380,7 +387,8 @@ function toAppSettings(stored: StoredSettings): AppSettings {
     deskTrayEnabled: stored.deskTrayEnabled,
     deskShowEnabled: stored.deskShowEnabled,
     deskShowAccelerator: stored.deskShowAccelerator,
-    allowLanApiBaseUrl: resolveAllowLanApiBaseUrl(stored.allowLanApiBaseUrl)
+    allowLanApiBaseUrl: resolveAllowLanApiBaseUrl(stored.allowLanApiBaseUrl),
+    openWebUiChatCompat: resolveOpenWebUiChatCompat(stored.openWebUiChatCompat)
   }
 }
 
@@ -434,6 +442,7 @@ export async function setSettings(settings: AppSettings): Promise<void> {
   const activeEncrypted = encryptApiKey(activeKey)
   const locale = resolveLocale(settings.locale)
   const allowLanApiBaseUrl = resolveAllowLanApiBaseUrl(settings.allowLanApiBaseUrl)
+  const openWebUiChatCompat = resolveOpenWebUiChatCompat(settings.openWebUiChatCompat)
   // Preserve previously saved LAN URLs when the user hasn't toggled the URL;
   // metadata hosts are always rejected inside assertSafeApiBaseUrl.
   const nextUrl = (settings.apiBaseUrl || DEFAULT_SETTINGS.apiBaseUrl).trim()
@@ -447,6 +456,7 @@ export async function setSettings(settings: AppSettings): Promise<void> {
     providerId,
     apiBaseUrl,
     allowLanApiBaseUrl,
+    openWebUiChatCompat,
     encryptedApiKey: activeKey ? activeEncrypted : null,
     encryptedProviderKeys,
     model: settings.model,

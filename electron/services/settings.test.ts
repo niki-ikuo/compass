@@ -65,7 +65,8 @@ describe('getSettings / setSettings', () => {
       colorTheme: DEFAULT_SETTINGS.colorTheme,
       locale: DEFAULT_SETTINGS.locale,
       embeddingsMode: 'api',
-      embeddingsProviderId: ''
+      embeddingsProviderId: '',
+      openWebUiChatCompat: false
     })
   })
 
@@ -138,6 +139,15 @@ describe('getSettings / setSettings', () => {
     expect(loaded.autoApplyAgentWrites).toBe(true)
     expect(loaded.defaultUseCasePreset).toBe('code')
     expect(loaded.temperature).toBe(0.5)
+    expect(loaded.openWebUiChatCompat).toBe(false)
+  })
+
+  it('round-trips openWebUiChatCompat', async () => {
+    await setSettings({
+      ...DEFAULT_SETTINGS,
+      openWebUiChatCompat: true
+    })
+    await expect(getSettings()).resolves.toMatchObject({ openWebUiChatCompat: true })
   })
 
   it('uses safeStorage encrypt/decrypt when available', async () => {

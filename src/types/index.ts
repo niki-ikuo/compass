@@ -566,6 +566,11 @@ export interface AppSettings {
    * クラウドメタデータ（169.254.169.254 等）は常に拒否。既定 OFF。
    */
   allowLanApiBaseUrl: boolean
+  /**
+   * 古い Open WebUI 向けに chat_id / parent_id を付与するか。
+   * Azure / LiteLLM 経由では未知パラメータで 400 になるため既定 OFF。
+   */
+  openWebUiChatCompat: boolean
   model: string
   temperature: number
   maxTokens: number
@@ -1453,6 +1458,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   configuredProviderIds: [],
   apiKeyStorageInsecure: false,
   allowLanApiBaseUrl: false,
+  openWebUiChatCompat: false,
   model: 'gpt-4o-mini',
   temperature: 0.2,
   maxTokens: 32768,

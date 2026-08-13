@@ -163,7 +163,9 @@ async function probeChat(
     let response = await fetch(url, {
       method: 'POST',
       headers: buildApiHeaders(settings),
-      body: jsonStringifyUtf8Safe(withOpenWebUiChatCompat(payload, settings.apiBaseUrl)),
+      body: jsonStringifyUtf8Safe(
+        withOpenWebUiChatCompat(payload, settings.openWebUiChatCompat === true)
+      ),
       signal
     })
     if (!response.ok && reasoning) {
@@ -178,7 +180,7 @@ async function probeChat(
               stream: false,
               max_tokens: 1
             },
-            settings.apiBaseUrl
+            settings.openWebUiChatCompat === true
           )
         ),
         signal
