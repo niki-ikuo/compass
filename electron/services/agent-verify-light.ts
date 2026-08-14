@@ -4,13 +4,13 @@ import { join } from 'path'
 import type { UseCasePreset } from '../../src/types'
 import { normalizeUseCasePreset, DEFAULT_SETTINGS } from '../../src/types'
 import {
-  parseGlossaryMarkdown,
   validateMarkdownDocument,
   type MarkdownHeadingIssue
 } from '../../src/utils/markdown-outline'
 import { verifyDataFile } from '../../src/utils/data-verify'
 import type { AgentVerifyCheckResult } from './agent-verify'
 import { decodeFileBuffer } from './encoding'
+import { loadWorkspaceTermPairs } from './workspace-rules'
 
 function isMarkdownPath(path: string): boolean {
   const lower = path.replace(/\\/g, '/').toLowerCase()
@@ -50,14 +50,6 @@ async function readWorkspaceFile(
   } catch {
     return null
   }
-}
-
-async function loadGlossaryTerms(workspaceRoot: string) {
-  const glossaryPath = join(workspaceRoot, '.compass', 'glossary.md')
-  if (!existsSync(glossaryPath)) return []
-  const content = await readWorkspaceFile(workspaceRoot, '.compass/glossary.md')
-  if (content === null) return []
-  return parseGlossaryMarkdown(content)
 }
 
 function isHeadingIssue(issue: MarkdownHeadingIssue): boolean {
@@ -121,14 +113,14 @@ export async function runDocumentLightVerify(
     return [
       checkResult('headings', [], 0, 'no markdown paths to check', '', () => ''),
       checkResult('links', [], 0, 'no markdown paths to check', '', () => ''),
-      checkResult('glossary', [], 0, 'no markdown paths to check', '', () => '')
+      checkResult('terms', [], 0, 'no markdown paths to check', '', () => '')
     ]
   }
 
-  const glossaryTerms = await loadGlossaryTerms(workspaceRoot)
+  const termPairs = await loadWorkspaceTermPairs(workspaceRoot)
   const headingLines: string[] = []
   const linkLines: string[] = []
-  const glossaryLines: string[] = []
+  const termLines: string[] = []
 
   for (const rel of targets) {
     const content = await readWorkspaceFile(workspaceRoot, rel)
@@ -149,13 +141,13 @@ export async function runDocumentLightVerify(
           return null
         }
       },
-      glossaryTerms
+      termPairs
     })
     for (const issue of issues) {
       const line = `${rel}:L${issue.line} ${issue.message}`
       if (isHeadingIssue(issue)) headingLines.push(line)
       else if (isLinkIssue(issue)) linkLines.push(line)
-      else if (issue.kind === 'term_mismatch') glossaryLines.push(line)
+      else if (issue.kind === 'term_mismatch') termLines.push(line)
       else headingLines.push(line)
     }
   }
@@ -178,12 +170,12 @@ export async function runDocumentLightVerify(
       (n) => `links failed (${n} issue(s))`
     ),
     checkResult(
-      'glossary',
-      glossaryLines,
-      glossaryTerms.length === 0 ? 0 : targets.length,
-      glossaryTerms.length === 0 ? 'no glossary.md; skipped' : 'no markdown paths to check',
-      `glossary ok (${targets.length} file(s))`,
-      (n) => `glossary failed (${n} issue(s))`
+      'terms',
+      termLines,
+      termPairs.length === 0 ? 0 : targets.length,
+      termPairs.length === 0 ? 'no terms; skipped' : 'no markdown paths to check',
+      `terms ok (${targets.length} file(s))`,
+      (n) => `terms failed (${n} issue(s))`
     )
   ]
 }

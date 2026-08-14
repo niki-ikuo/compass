@@ -5,7 +5,7 @@ import {
   diffMarkdownHeadings,
   extractMarkdownSection,
   extractMarkdownSummary,
-  parseGlossaryMarkdown,
+  parseTermPairs,
   parseMarkdownDocLinks,
   parseMarkdownHeadings,
   replaceMarkdownSection,
@@ -124,13 +124,34 @@ describe('validateMarkdownDocument', () => {
     expect(issues.some((i) => i.kind === 'broken_link')).toBe(true)
   })
 
-  it('flags glossary term mismatches', () => {
-    const glossary = parseGlossaryMarkdown('API Key | apikey\n')
-    expect(glossary).toEqual([{ preferred: 'API Key', avoid: ['apikey'] }])
+  it('flags term-pair mismatches', () => {
+    const terms = parseTermPairs('API Key | apikey\n')
+    expect(terms).toEqual([{ preferred: 'API Key', avoid: ['apikey'] }])
     const issues = validateMarkdownDocument('Use an apikey here.\n', {
-      glossaryTerms: glossary
+      termPairs: terms
     })
     expect(issues.some((i) => i.kind === 'term_mismatch')).toBe(true)
+  })
+
+  it('ignores tables, fences, heading examples, and 1-character avoid terms', () => {
+    const terms = parseTermPairs(
+      [
+        '# Terms',
+        'API Key | apikey, APIキー',
+        '| preferred | avoid |',
+        '| API | api |',
+        '```',
+        'Login | logon',
+        '```',
+        '# ログイン | ログオン',
+        '鍵 | か',
+        'ログイン | ログオン'
+      ].join('\n')
+    )
+    expect(terms).toEqual([
+      { preferred: 'API Key', avoid: ['apikey', 'APIキー'] },
+      { preferred: 'ログイン', avoid: ['ログオン'] }
+    ])
   })
 
   it('flags broken heading anchors and missing media', () => {

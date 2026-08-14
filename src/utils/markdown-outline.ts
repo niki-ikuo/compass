@@ -77,7 +77,7 @@ export type MarkdownHeadingIssueKind =
   | 'broken_media'
   | 'term_mismatch'
 
-export interface GlossaryTerm {
+export interface TermPair {
   /** 推奨表記 */
   preferred: string
   /** 避ける表記 */
@@ -88,6 +88,8 @@ export interface MarkdownHeadingIssue {
   kind: MarkdownHeadingIssueKind
   line: number
   message: string
+  preferred?: string
+  avoid?: string
 }
 
 const MD_LINK = /(!)?\[([^\]]*)\]\(([^)]+)\)/g
@@ -499,16 +501,16 @@ export interface ValidateMarkdownDocumentOptions {
   fileExists?: (workspaceRelativePath: string) => boolean
   /** 他 Markdown の見出しアンカー検証用。未指定なら他ファイルの #fragment はスキップ */
   readFile?: (workspaceRelativePath: string) => string | null
-  /** 用語集。未指定なら用語検査なし */
-  glossaryTerms?: GlossaryTerm[]
+  /** 用語対。未指定なら用語検査なし */
+  termPairs?: TermPair[]
 }
 
 /**
- * `.compass/glossary.md` 向けの薄い用語集パーサ。
- * 行形式: `推奨 | 避け1, 避け2` または表行 `| 推奨 | 避け |`
+ * 用語対パーサ。行形式: `推奨 | 避け1, 避け2`
+ * 見出し行・フェンス内・Markdown 表は無視。避けたい語が2文字未満なら捨てる。
  */
-export function parseGlossaryMarkdown(text: string): GlossaryTerm[] {
-  const terms: GlossaryTerm[] = []
+export function parseTermPairs(text: string): TermPair[] {
+  const terms: TermPair[] = []
   const seen = new Set<string>()
   const lines = text.split('\n')
   let inFence = false
@@ -521,28 +523,20 @@ export function parseGlossaryMarkdown(text: string): GlossaryTerm[] {
     if (inFence) continue
     const trimmed = line.trim()
     if (!trimmed || trimmed.startsWith('#')) continue
-    if (/^\|?\s*:?-+:?\s*\|/.test(trimmed)) continue
+    if (/^\|/.test(trimmed)) continue
 
-    let preferred = ''
-    let avoidRaw = ''
-    const table = trimmed.match(/^\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|?\s*$/)
-    if (table) {
-      preferred = table[1].trim()
-      avoidRaw = table[2].trim()
-      if (/^preferred$/i.test(preferred) || /^推奨/.test(preferred)) continue
-      if (/^avoid$/i.test(avoidRaw) || /^避け/.test(avoidRaw)) continue
-    } else {
-      const pipe = trimmed.match(/^([^|#]+?)\s*\|\s*(.+)$/)
-      if (!pipe) continue
-      preferred = pipe[1].trim()
-      avoidRaw = pipe[2].trim()
-    }
-
+    const pipe = trimmed.match(/^([^|#]+?)\s*\|\s*(.+)$/)
+    if (!pipe) continue
+    const preferred = pipe[1].trim()
+    const avoidRaw = pipe[2].trim()
     if (!preferred || !avoidRaw) continue
     const avoid = avoidRaw
       .split(/[,、]/)
       .map((s) => s.trim())
-      .filter((s) => s.length > 0 && s.toLowerCase() !== preferred.toLowerCase())
+      .filter(
+        (s) =>
+          [...s].length >= 2 && s.toLowerCase() !== preferred.toLowerCase()
+      )
     if (avoid.length === 0) continue
     const key = preferred.toLowerCase()
     if (seen.has(key)) continue
@@ -552,8 +546,8 @@ export function parseGlossaryMarkdown(text: string): GlossaryTerm[] {
   return terms
 }
 
-/** 用語集の「避け」表記が本文に出ていれば term_mismatch。フェンス内は無視。 */
-export function findTermIssues(text: string, terms: GlossaryTerm[]): MarkdownHeadingIssue[] {
+/** 用語対の「避け」表記が本文に出ていれば term_mismatch。フェンス内は無視。 */
+export function findTermIssues(text: string, terms: TermPair[]): MarkdownHeadingIssue[] {
   if (terms.length === 0) return []
   const issues: MarkdownHeadingIssue[] = []
   const lines = text.split('\n')
@@ -570,7 +564,7 @@ export function findTermIssues(text: string, terms: GlossaryTerm[]): MarkdownHea
     const lower = line.toLowerCase()
     for (const term of terms) {
       for (const avoid of term.avoid) {
-        if (!avoid) continue
+        if (!avoid || [...avoid].length < 2) continue
         const needle = avoid.toLowerCase()
         let from = 0
         while (from <= lower.length) {
@@ -586,7 +580,9 @@ export function findTermIssues(text: string, terms: GlossaryTerm[]): MarkdownHea
             issues.push({
               kind: 'term_mismatch',
               line: i + 1,
-              message: `Prefer "${term.preferred}" instead of "${avoid}"`
+              message: `Prefer "${term.preferred}" instead of "${avoid}"`,
+              preferred: term.preferred,
+              avoid
             })
             break
           }
@@ -624,8 +620,8 @@ export function validateMarkdownDocument(
       })
     )
   }
-  if (options.glossaryTerms && options.glossaryTerms.length > 0) {
-    issues.push(...findTermIssues(text, options.glossaryTerms))
+  if (options.termPairs && options.termPairs.length > 0) {
+    issues.push(...findTermIssues(text, options.termPairs))
   }
   return issues
 }

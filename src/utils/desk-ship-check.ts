@@ -3,6 +3,7 @@ import {
   type OutboxDocMeta,
   type OutboxPreset
 } from './desk-frontmatter'
+import { findTermIssues, type TermPair } from './markdown-outline'
 
 export type ShipFindingSeverity = 'error' | 'warning' | 'info'
 
@@ -41,11 +42,11 @@ function excerptAround(text: string, index: number, len: number): string {
 
 /**
  * Stage A local rules for ship check (no LLM).
- * `glossaryText` optional: lines `Preferred | alias` warn when alias appears.
+ * `terms` optional: warn when an avoided form appears (same matcher as document verify).
  */
 export function runShipCheckStageA(
   raw: string,
-  options?: { glossaryText?: string }
+  options?: { terms?: TermPair[] }
 ): ShipCheckResult {
   const { meta, body } = parseDeskFrontmatter(raw)
   const outboxMeta = meta?.kind === 'outbox' ? meta : null
@@ -110,28 +111,24 @@ export function runShipCheckStageA(
     break
   }
 
-  const glossary = options?.glossaryText?.trim()
-  if (glossary) {
-    for (const line of glossary.split(/\r?\n/)) {
-      const trimmed = line.trim()
-      if (!trimmed || trimmed.startsWith('#')) continue
-      const parts = trimmed.split('|').map((p) => p.trim()).filter(Boolean)
-      if (parts.length < 2) continue
-      const preferred = parts[0]
-      for (const alias of parts.slice(1)) {
-        if (!alias || alias === preferred) continue
-        if (body.includes(alias) && !body.includes(preferred)) {
-          findings.push({
-            id: 'glossary_mismatch',
-            severity: 'warning',
-            message: `glossary: prefer "${preferred}" over "${alias}"`,
-            messageKey: 'desk.ship.finding.glossary',
-            messageParams: { preferred, alias },
-            source: 'rule',
-            excerpt: alias
-          })
-        }
-      }
+  const terms = options?.terms ?? []
+  if (terms.length > 0) {
+    const seen = new Set<string>()
+    for (const issue of findTermIssues(scanText, terms)) {
+      const preferred = issue.preferred ?? ''
+      const alias = issue.avoid ?? ''
+      const key = `${preferred}\0${alias}`
+      if (seen.has(key)) continue
+      seen.add(key)
+      findings.push({
+        id: 'term_mismatch',
+        severity: 'warning',
+        message: `prefer "${preferred}" over "${alias}"`,
+        messageKey: 'desk.ship.finding.term',
+        messageParams: { preferred, alias },
+        source: 'rule',
+        excerpt: alias
+      })
     }
   }
 

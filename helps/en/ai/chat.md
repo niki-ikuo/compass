@@ -40,8 +40,9 @@ Workspace instructions live in `.compass/instructions.md`. Open via **File → E
 
 - **Role** section — e.g. “You are the PM”. Replaces the use-case preset role at the start of the system prompt (Ask / Edit / Agent constraints do not change)
 - **Rules** section — tone, output paths, do-nots. Auto-attached to Ask / Edit / Agent within the context budget
+- **Terms** section — `preferred | avoid` pairs. Checked by document verify and ship check; a compact list is attached for the model. Do not write definitions
 
-For scheduled jobs, a per-job role prompt overrides the Role section. Do not put API keys there. Optional `.compass/glossary.md` holds `preferred | avoid` pairs for document verify (not in the File menu). Legacy `.compass/role.md` / `rules.md` are read only when `instructions.md` is missing.
+For scheduled jobs, a per-job role prompt overrides the Role section. Do not put API keys there. Legacy `.compass/role.md` / `rules.md` are read only when `instructions.md` is missing. Legacy `.compass/glossary.md` is read only when the Terms section is missing.
 
 | Preset | Typical Agent extras |
 |--------|----------------------|

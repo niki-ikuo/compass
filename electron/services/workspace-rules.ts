@@ -7,6 +7,7 @@ import {
   estimateTokens,
   truncateToTokenBudget
 } from '../../src/utils/context-budget'
+import { parseTermPairs, type TermPair } from '../../src/utils/markdown-outline'
 import { parseWorkspaceInstructions } from '../../src/utils/workspace-instructions'
 import { normalizeCustomRolePrompt } from '../../src/utils/system-prompt'
 import { decodeFileBuffer } from './encoding'
@@ -33,25 +34,49 @@ function formatSection(header: string, body: string, maxTokens: number): string 
   return `${header}\n${truncated}`
 }
 
+function formatTermPairsForAi(terms: TermPair[]): string {
+  return terms
+    .map((term) =>
+      t('ai.workspaceTermLine', {
+        preferred: term.preferred,
+        avoids: term.avoid.map((alias) => `"${alias}"`).join(', ')
+      })
+    )
+    .join('\n')
+}
+
 /**
  * instructions.md wins when present; otherwise legacy role.md + rules.md.
+ * Terms section with parseable pairs wins; otherwise legacy glossary.md.
  * Empty role section → null so the caller keeps the built-in preset role.
  */
 export async function loadWorkspaceInstructionLayers(workspaceRoot: string): Promise<{
   role: string | null
   rules: string | null
+  terms: string | null
 }> {
   const instructions = await readOptionalText(workspaceRoot, WORKSPACE_INSTRUCTIONS_RELATIVE)
-  if (instructions) return parseWorkspaceInstructions(instructions)
+  const glossary = await readOptionalText(workspaceRoot, WORKSPACE_GLOSSARY_RELATIVE)
+  if (instructions) {
+    const parsed = parseWorkspaceInstructions(instructions)
+    const sectionHasPairs = Boolean(parsed.terms && parseTermPairs(parsed.terms).length > 0)
+    return { ...parsed, terms: sectionHasPairs ? parsed.terms : glossary }
+  }
   const [role, rules] = await Promise.all([
     readOptionalText(workspaceRoot, WORKSPACE_ROLE_RELATIVE),
     readOptionalText(workspaceRoot, WORKSPACE_RULES_RELATIVE)
   ])
-  return { role, rules }
+  return { role, rules, terms: glossary }
+}
+
+export async function loadWorkspaceTermPairs(workspaceRoot: string): Promise<TermPair[]> {
+  const { terms } = await loadWorkspaceInstructionLayers(workspaceRoot)
+  if (!terms) return []
+  return parseTermPairs(terms)
 }
 
 /**
- * Load the rules layer (+ optional glossary) for Ask / Edit / Agent user context.
+ * Load the rules layer (+ compact term pairs) for Ask / Edit / Agent user context.
  */
 export async function formatWorkspaceRulesForAi(
   workspaceRoot: string,
@@ -59,22 +84,22 @@ export async function formatWorkspaceRulesForAi(
 ): Promise<string | null> {
   if (maxTokens <= 0) return null
 
-  const { rules } = await loadWorkspaceInstructionLayers(workspaceRoot)
-  const glossary = await readOptionalText(workspaceRoot, WORKSPACE_GLOSSARY_RELATIVE)
-  if (!rules && !glossary) return null
+  const { rules, terms: termsText } = await loadWorkspaceInstructionLayers(workspaceRoot)
+  const terms = termsText ? parseTermPairs(termsText) : []
+  if (!rules && terms.length === 0) return null
 
   const sections: string[] = []
   let remaining = maxTokens
 
   if (rules) {
-    const rulesBudget = glossary ? Math.max(Math.floor(remaining * 0.7), 400) : remaining
+    const rulesBudget = terms.length > 0 ? Math.max(remaining - 200, 400) : remaining
     const section = formatSection(t('ai.workspaceRulesHeader'), rules, rulesBudget)
     sections.push(section)
     remaining -= estimateTokens(section)
   }
 
-  if (glossary && remaining > 80) {
-    const section = formatSection(t('ai.workspaceGlossaryHeader'), glossary, remaining)
+  if (terms.length > 0 && remaining > 40) {
+    const section = formatSection(t('ai.workspaceTermsHeader'), formatTermPairsForAi(terms), remaining)
     sections.push(section)
   }
 

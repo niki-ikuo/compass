@@ -1,6 +1,5 @@
 import { clipboard } from 'electron'
 import { readFile } from 'fs/promises'
-import { join } from 'path'
 import {
   formatOutboxCopyPayload,
   runShipCheckStageA,
@@ -9,6 +8,7 @@ import {
 import { isUnderOutbox, markOutboxReadyAfterCopy } from './desk-outbox'
 import { assertInsideWorkspace } from './path-guard'
 import { t } from '../../src/i18n/runtime'
+import { loadWorkspaceTermPairs } from './workspace-rules'
 
 export async function runDeskShipCheck(
   workspaceRoot: string,
@@ -19,13 +19,8 @@ export async function runDeskShipCheck(
     throw new Error(t('desk.outbox.notOutbox'))
   }
   const raw = await readFile(absolutePath, 'utf-8')
-  let glossaryText: string | undefined
-  try {
-    glossaryText = await readFile(join(workspaceRoot, '.compass', 'glossary.md'), 'utf-8')
-  } catch {
-    glossaryText = undefined
-  }
-  return runShipCheckStageA(raw, { glossaryText })
+  const terms = await loadWorkspaceTermPairs(workspaceRoot)
+  return runShipCheckStageA(raw, { terms })
 }
 
 export async function copyOutboxPayload(

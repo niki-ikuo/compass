@@ -48,8 +48,8 @@ A `.compass/` directory may appear at the workspace root.
 | `chat-history.json` | Persisted chat history |
 | `settings.json` | Workspace settings (e.g. default use-case preset) |
 | `templates/` | Document templates (optional) |
-| `instructions.md` | Workspace instructions (Role section → system prompt; Rules section → chat context) |
-| `glossary.md` | Optional glossary (`preferred | avoid`; document verify + AI context) |
+| `instructions.md` | Workspace instructions (Role → system; Rules → chat context; Terms → document verify) |
+| `glossary.md` | Legacy; read only when the Terms section is missing |
 
 You usually don’t need to edit the index or history by hand. For role and conventions, use **File → Edit Workspace Instructions** (or the chat instructions button) to edit `instructions.md`. Legacy `role.md` / `rules.md` are used only when `instructions.md` is missing.
 

@@ -16,7 +16,7 @@ async function makeRoot(): Promise<string> {
 }
 
 describe('formatWorkspaceRulesForAi', () => {
-  it('returns null when neither rules nor glossary exist', async () => {
+  it('returns null when neither rules nor terms exist', async () => {
     const root = await makeRoot()
     expect(await formatWorkspaceRulesForAi(root)).toBeNull()
   })
@@ -44,33 +44,71 @@ describe('formatWorkspaceRulesForAi', () => {
     expect(text).not.toContain('Legacy rules.')
   })
 
-  it('includes optional glossary and prefers rules under a tight budget', async () => {
+  it('attaches compact term pairs from the Terms section', async () => {
     setLocale('en')
     const root = await makeRoot()
     await writeFile(
-      join(root, '.compass', 'rules.md'),
-      `Rules body ${'x'.repeat(2000)}\n`,
+      join(root, '.compass', 'instructions.md'),
+      '# Rules\nBe brief.\n\n# Terms\nAPI Key | apikey, APIキー\n',
       'utf-8'
     )
-    await writeFile(
-      join(root, '.compass', 'glossary.md'),
-      'API Key | apikey\n' + 'y'.repeat(2000),
-      'utf-8'
-    )
-    const text = await formatWorkspaceRulesForAi(root, 200)
+    const text = await formatWorkspaceRulesForAi(root)
     expect(text).toContain('[Workspace instructions')
-    expect(text).toContain('Rules body')
-    // Glossary may be truncated or omitted; rules must remain.
-    expect(text!.toLowerCase()).toContain('rules body')
+    expect(text).toContain('Be brief.')
+    expect(text).toContain('[Workspace terms')
+    expect(text).toContain('Prefer "API Key" over "apikey", "APIキー"')
+    expect(text).not.toContain('API Key | apikey')
   })
 
-  it('attaches glossary alone when rules are missing', async () => {
+  it('falls back to glossary.md when the Terms section is missing', async () => {
     setLocale('en')
     const root = await makeRoot()
     await writeFile(join(root, '.compass', 'glossary.md'), 'API Key | apikey\n', 'utf-8')
     const text = await formatWorkspaceRulesForAi(root)
-    expect(text).toContain('[Workspace glossary')
-    expect(text).toContain('API Key | apikey')
+    expect(text).toContain('[Workspace terms')
+    expect(text).toContain('Prefer "API Key" over "apikey"')
+  })
+
+  it('falls back to glossary.md when the Terms section has no pairs', async () => {
+    setLocale('en')
+    const root = await makeRoot()
+    await writeFile(join(root, '.compass', 'glossary.md'), 'API Key | apikey\n', 'utf-8')
+    await writeFile(
+      join(root, '.compass', 'instructions.md'),
+      '# Rules\nBe brief.\n\n# Terms\nLeave empty to skip checks.\n# API Key | ignored\n',
+      'utf-8'
+    )
+    const text = await formatWorkspaceRulesForAi(root)
+    expect(text).toContain('Be brief.')
+    expect(text).toContain('Prefer "API Key" over "apikey"')
+    expect(text).not.toContain('ignored')
+  })
+
+  it('prefers the Terms section over glossary.md', async () => {
+    setLocale('en')
+    const root = await makeRoot()
+    await writeFile(join(root, '.compass', 'glossary.md'), 'Old | oldterm\n', 'utf-8')
+    await writeFile(
+      join(root, '.compass', 'instructions.md'),
+      '# Rules\nBe brief.\n\n# Terms\nAPI Key | apikey\n',
+      'utf-8'
+    )
+    const text = await formatWorkspaceRulesForAi(root)
+    expect(text).toContain('Prefer "API Key" over "apikey"')
+    expect(text).not.toContain('oldterm')
+  })
+
+  it('keeps rules when the term list is present under a tight budget', async () => {
+    setLocale('en')
+    const root = await makeRoot()
+    await writeFile(
+      join(root, '.compass', 'instructions.md'),
+      `# Rules\nRules body ${'x'.repeat(2000)}\n\n# Terms\nAPI Key | apikey\n`,
+      'utf-8'
+    )
+    const text = await formatWorkspaceRulesForAi(root, 200)
+    expect(text).toContain('[Workspace instructions')
+    expect(text!.toLowerCase()).toContain('rules body')
   })
 })
 

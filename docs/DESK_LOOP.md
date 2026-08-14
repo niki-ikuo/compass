@@ -31,7 +31,7 @@ The four features are not separate products. They are **four stops on one path**
 1. **One intake** — drop text from Word / mail / browser into Compass  
 2. **One desk** — see inbox / outbox in one place  
 3. **Typed exits** — mail, minutes, report, chat drafts follow the same path  
-4. **Stop before shipping** — secrets, TBD, glossary issues before copy  
+4. **Stop before shipping** — secrets, TBD, term-pair issues before copy  
 
 ### 1.2 Non-goals (whole spec)
 
@@ -86,8 +86,8 @@ Under the existing workspace `.compass/`:
     done/
   outbox/
   templates/             # existing; may add outbox presets
-  instructions.md        # workspace instructions (Role + Rules)
-  glossary.md            # optional
+  instructions.md        # workspace instructions (Role + Rules + Terms)
+  glossary.md            # legacy (only if Terms section is missing)
   desk/
     settings.json        # optional desk-local settings
 ```
@@ -326,7 +326,7 @@ Body…
 4. Suggest `document` use-case; do not force  
 5. **Canonical path:** Edit-equivalent single proposal or Agent `proposeActions` with one `writeFile` → existing preview → Apply  
 
-Prompt must include: schema, outbox path, source body (truncated), rules/glossary.
+Prompt must include: schema, outbox path, source body (truncated), instructions rules/terms.
 
 ### 6.6 Templates
 
@@ -389,7 +389,7 @@ input (+ frontmatter)
 |---------|-------|----------|
 | `tbd_markers` | `TODO` / `TBD` / `要確認` / `FIXME` / `xxx` | warning |
 | `secret_pattern` | api key / Bearer / `sk-`-like / long tokens | error |
-| `glossary_mismatch` | light glossary violations when file exists | warning |
+| `term_mismatch` | avoided-form hits from the Terms section (or legacy glossary.md); same parser as document verify | warning |
 | `empty_body` | empty body | error |
 | `mail_missing_subject` | mail preset + empty subject | warning |
 

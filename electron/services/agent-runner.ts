@@ -353,7 +353,7 @@ const AGENT_TOOLS = [
     function: {
       name: 'verify',
       description:
-        'Post-edit verification. In code use-case: run project test / lint / typecheck via package scripts or safe fallbacks. In document use-case: check markdown heading structure, duplicate headings, broken relative .md links, and glossary term mismatches (`.compass/glossary.md`) on edited files. In data use-case: check CSV column counts, duplicate first-column keys, mixed column types, and JSON/YAML shape. Prefer after proposeActions is applied. Pass paths to limit which files are checked for document/data; otherwise the last applied paths are used. On failure, fix with proposeActions and verify again. If all checks are skipped because scripts/files are missing, do not narrate that skip in the final user-facing reply.',
+        'Post-edit verification. In code use-case: run project test / lint / typecheck via package scripts or safe fallbacks. In document use-case: check markdown heading structure, duplicate headings, broken relative .md links, and term-pair mismatches (Terms section of `.compass/instructions.md`, or legacy `.compass/glossary.md`) on edited files. In data use-case: check CSV column counts, duplicate first-column keys, mixed column types, and JSON/YAML shape. Prefer after proposeActions is applied. Pass paths to limit which files are checked for document/data; otherwise the last applied paths are used. On failure, fix with proposeActions and verify again. If all checks are skipped because scripts/files are missing, do not narrate that skip in the final user-facing reply.',
       parameters: {
         type: 'object',
         properties: {

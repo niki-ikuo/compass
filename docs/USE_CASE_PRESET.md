@@ -81,7 +81,7 @@ Keep them in separate UI controls as well.
 - Ask / Edit / Agent routing
 - `compass-actions` / `proposeActions` format
 - Agent tool list
-- `verify` contents for **code** (still test / lint / typecheck). Document/data light verify (headings / links / glossary / schema) is shipped
+- `verify` contents for **code** (still test / lint / typecheck). Document/data light verify (headings / links / terms / schema) is shipped
 - Index generation itself (heading index is a separate task)
 - `temperature` / `maxTokens` (stay global)
 
@@ -252,7 +252,7 @@ Approval flows (Edit / Agent) stay the same. The preset only changes *what* is w
 ### Document Agent strengthen — shipped
 
 - Markdown `readFile` with optional `heading` for section reads
-- Document light verify: duplicate headings, broken relative `.md` links, `.compass/glossary.md` terms
+- Document light verify: duplicate headings, broken relative `.md` links, Terms section pairs
 - Index context prioritizes Documents and follows sibling / doc links
 
 ### Data Agent tools — shipped

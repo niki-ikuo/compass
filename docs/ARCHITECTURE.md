@@ -117,12 +117,12 @@ Indexing policy is **include text / exclude binary** (not an extension allowlist
 | `chat-history.json` | Persisted chat sessions |
 | `settings.json` | Workspace settings (e.g. default use-case preset) |
 | `templates/` | Optional document templates |
-| `instructions.md` | Workspace instructions (Role section → system prompt; Rules section → Ask / Edit / Agent context). Created via File → Edit Workspace Instructions. Legacy `role.md` / `rules.md` are read if this file is missing |
-| `glossary.md` | Optional glossary (`preferred \| avoid` pairs; document verify + AI context) |
+| `instructions.md` | Workspace instructions (Role section → system; Rules section → Ask / Edit / Agent context; Terms section → document verify + compact AI attach). Created via File → Edit Workspace Instructions. Legacy `role.md` / `rules.md` are read if this file is missing. Legacy `glossary.md` is read if the Terms section is empty |
+| `glossary.md` | Legacy term pairs (`preferred \| avoid`); read only when the Terms section is missing |
 | `inbox/` | Clip captures (raw text). Done items under `inbox/done/` |
 | `outbox/` | Clip drafts (mail / minutes / report / chat). Details: [DESK_LOOP.md](./DESK_LOOP.md) |
 
-Relevant structure-index slices, hybrid-search Related workspace excerpts, and the Rules section of `.compass/instructions.md` (plus optional glossary) are added to chat context. The Role section of `.compass/instructions.md` is loaded into the system prompt role layer (not user context). Embeddings default to OpenAI-compatible `/embeddings` (optional separate Ollama provider); falls back to local hash on failure or when credentials/model are unavailable. Ask/Agent answers still use the online LLM.
+Relevant structure-index slices, hybrid-search Related workspace excerpts, and the Rules section of `.compass/instructions.md` (plus a compact term-pair list) are added to chat context. The Role section of `.compass/instructions.md` is loaded into the system prompt role layer (not user context). Embeddings default to OpenAI-compatible `/embeddings` (optional separate Ollama provider); falls back to local hash on failure or when credentials/model are unavailable. Ask/Agent answers still use the online LLM.
 
 ## Multi-LLM
 

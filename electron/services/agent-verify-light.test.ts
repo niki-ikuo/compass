@@ -68,8 +68,28 @@ describe('runAgentVerify use-case light checks', () => {
     expect(result.content).toMatch(/Broken doc link/)
   })
 
-  it('flags glossary term mismatches for document preset', async () => {
+  it('flags term-pair mismatches from instructions.md for document preset', async () => {
     const root = makeRoot('doc-terms')
+    mkdirSync(join(root, '.compass'), { recursive: true })
+    writeFileSync(
+      join(root, '.compass', 'instructions.md'),
+      '# Terms\nAPI Key | apikey\n',
+      'utf-8'
+    )
+    writeFileSync(join(root, 'notes.md'), '# Title\nUse an apikey here.\n', 'utf-8')
+    const result = await runAgentVerify({
+      workspaceRoot: root,
+      preset: 'document',
+      paths: ['notes.md'],
+      signal: new AbortController().signal
+    })
+    expect(result.ok).toBe(false)
+    expect(result.content).toMatch(/Prefer "API Key"/)
+    expect(result.checks.some((c) => c.check === 'terms')).toBe(true)
+  })
+
+  it('falls back to glossary.md when instructions have no Terms section', async () => {
+    const root = makeRoot('doc-terms-legacy')
     mkdirSync(join(root, '.compass'), { recursive: true })
     writeFileSync(join(root, '.compass', 'glossary.md'), 'API Key | apikey\n', 'utf-8')
     writeFileSync(join(root, 'notes.md'), '# Title\nUse an apikey here.\n', 'utf-8')

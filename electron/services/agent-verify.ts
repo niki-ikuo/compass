@@ -12,7 +12,7 @@ export type AgentVerifyCheck =
   | 'typecheck'
   | 'headings'
   | 'links'
-  | 'glossary'
+  | 'terms'
   | 'schema'
 
 export type AgentVerifyCommandSource = 'script' | 'fallback' | 'missing'
@@ -417,7 +417,7 @@ export const VERIFY_AFTER_APPLY_NUDGE =
 export function getVerifyAfterApplyNudge(preset?: UseCasePreset | null): string {
   const resolved = normalizeUseCasePreset(preset) ?? DEFAULT_SETTINGS.defaultUseCasePreset
   if (resolved === 'document') {
-    return 'After applying changes, run the verify tool to check markdown structure (broken ATX / level jumps / duplicate headings / broken relative .md links / glossary terms) on the edited files. If verify fails, fix with proposeActions and verify again.'
+    return 'After applying changes, run the verify tool to check markdown structure (broken ATX / level jumps / duplicate headings / broken relative .md links / term pairs in the Terms section of `.compass/instructions.md`) on the edited files. If verify fails, fix with proposeActions and verify again.'
   }
   if (resolved === 'data') {
     return 'After applying changes, run the verify tool to check CSV column counts and JSON/YAML shape on the edited files. If verify fails, fix with proposeActions and verify again.'

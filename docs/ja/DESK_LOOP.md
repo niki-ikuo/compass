@@ -86,8 +86,8 @@ Compass を「書いて直すエディタ」から **「取って → 整理し�
     done/                # 処理済み（削除せず移動）
   outbox/                # 外向け下書き
   templates/             # 既存。出口プリセット雛形を追加可
-  instructions.md        # ワークスペースの指示（役割 + ルール）
-  glossary.md            # 既存（任意）
+  instructions.md        # ワークスペースの指示（役割 + ルール + 用語）
+  glossary.md            # 旧形式（用語節が無いときだけ）
   desk/                  # クリップメタ（任意）
     settings.json        # ホットキー以外の机ローカル設定
 ```
@@ -340,7 +340,7 @@ updatedAt: 2026-07-28T09:05:00+09:00
 - 選択プリセットの出力スキーマ（frontmatter 必須キー）  
 - 出力パス（`.compass/outbox/...`）  
 - ソース本文（サイズ上限で切詰め）  
-- `.compass/instructions.md` / `glossary.md`（既存添付ロジック）
+- `.compass/instructions.md` のルール節と用語対（既存添付ロジック）
 
 ### 6.6 テンプレート
 
@@ -405,7 +405,7 @@ frontmatter: `label`, `fileName` パターン, `order`。AI へのヒントを�
 |-----------|------|--------|
 | `tbd_markers` | `TODO` / `TBD` / `要確認` / `FIXME` / `xxx`（単語境界配慮） | warning |
 | `secret_pattern` | `api[_-]?key`, `secret`, `Bearer `, `sk-` 風、長い Base64/Hex | error |
-| `glossary_mismatch` | `.compass/glossary.md` があるとき、禁止語・推奨語の簡易違反（既存 document verify と共有可能な粒度） | warning |
+| `term_mismatch` | `instructions.md` の用語節（なければ旧 `glossary.md`）があるとき、避けたい表記の出現（document verify と同じパーサ） | warning |
 | `empty_body` | 本文が実質空 | error |
 | `mail_missing_subject` | preset=mail かつ subject 空 | warning |
 

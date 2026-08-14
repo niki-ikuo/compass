@@ -48,8 +48,8 @@ Compass では「プロジェクト」＝開いたローカルフォルダ（ワ
 | `chat-history.json` | チャット履歴の永続化 |
 | `settings.json` | ワークスペース設定（例: 既定の用途プリセット） |
 | `templates/` | 文書テンプレート（任意） |
-| `instructions.md` | ワークスペースの指示（役割節 → system、ルール節 → チャットコンテキスト） |
-| `glossary.md` | 用語集（任意。`推奨 | 避けたい`。文書 verify と AI コンテキスト） |
+| `instructions.md` | ワークスペースの指示（役割節 → system、ルール節 → チャットコンテキスト、用語節 → 文書 verify） |
+| `glossary.md` | 旧形式。用語節が無いときだけ読む |
 
 索引や履歴は通常触る必要はありません。役割と約束は **ファイル → ワークスペースの指示を編集**（またはチャットの指示ボタン）で `instructions.md` を書けます。旧 `role.md` / `rules.md` は `instructions.md` が無いときだけ使われます。
 

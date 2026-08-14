@@ -15,7 +15,7 @@ export const CONTEXT_BUDGET = {
   currentFileTokens: 30_000,
   refsTokens: 36_000,
   perRefFileTokens: 6_000,
-  /** Rules section of `.compass/instructions.md` + optional glossary auto-attached to Ask / Edit / Agent */
+  /** Rules section of `.compass/instructions.md` + compact term pairs auto-attached to Ask / Edit / Agent */
   rulesTokens: 3_000,
   /** Role section of `.compass/instructions.md` / job rolePrompt replacing the preset role in the system prompt */
   roleTokens: 2_000,

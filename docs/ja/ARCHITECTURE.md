@@ -117,12 +117,12 @@ Renderer からは `window.compass.*` を呼び出します。実装の正は `e
 | `chat-history.json` | 永続化されたチャット履歴 |
 | `settings.json` | ワークスペース設定（例: 既定の用途プリセット） |
 | `templates/` | 任意の文書テンプレート |
-| `instructions.md` | ワークスペースの指示（役割節 → system、ルール節 → Ask / Edit / Agent のコンテキスト）。ファイル → ワークスペースの指示を編集。このファイルが無いときだけ旧 `role.md` / `rules.md` を読む |
-| `glossary.md` | 任意の用語集（`推奨 \| 避けたい`。文書 verify + AI コンテキスト） |
+| `instructions.md` | ワークスペースの指示（役割節 → system、ルール節 → Ask / Edit / Agent のコンテキスト、用語節 → 文書 verify と短い AI 添付）。ファイル → ワークスペースの指示を編集。このファイルが無いときだけ旧 `role.md` / `rules.md` を読む。用語節が空なら旧 `glossary.md` を読む |
+| `glossary.md` | 旧形式。`instructions.md` の用語節が無いときだけ読む（`推奨 \| 避けたい`） |
 | `inbox/` | クリップ取込（生テキスト）。処理済みは `inbox/done/` |
 | `outbox/` | クリップ下書き（mail / minutes / report / chat）。詳細: [DESK_LOOP.md](./DESK_LOOP.md) |
 
-チャット時に構造索引の関連部分と、ハイブリッド検索の Related workspace excerpts、および `.compass/instructions.md` のルール節（と任意の glossary）をコンテキストへ載せる。役割節は system の役割レイヤに載る（user コンテキストではない）。埋め込みは既定で OpenAI 互換 `/embeddings`（埋め込み専用に Ollama も可）。失敗時やキー未設定時はローカルハッシュへフォールバック。Ask/Agent の回答自体はオンライン LLM を使う。
+チャット時に構造索引の関連部分と、ハイブリッド検索の Related workspace excerpts、および `.compass/instructions.md` のルール節（と用語対の短いリスト）をコンテキストへ載せる。役割節は system の役割レイヤに載る（user コンテキストではない）。埋め込みは既定で OpenAI 互換 `/embeddings`（埋め込み専用に Ollama も可）。失敗時やキー未設定時はローカルハッシュへフォールバック。Ask/Agent の回答自体はオンライン LLM を使う。
 
 ## マルチ LLM
 
