@@ -287,7 +287,7 @@ export interface ScheduledJob {
   /**
    * Optional role overlay for this job’s system prompt.
    * When set, replaces the use-case preset role (not Ask/Edit/Agent constraints).
-   * Empty / omitted → `.compass/role.md`, then the built-in preset role.
+   * Empty / omitted → Role section of `.compass/instructions.md`, then the built-in preset role.
    */
   rolePrompt?: string
   preset: UseCasePreset
@@ -725,7 +725,7 @@ export interface ChatRequest {
   /**
    * Optional role overlay for this request (scheduled jobs).
    * When set, replaces the preset role in the system prompt.
-   * Empty / omitted → load `.compass/role.md` from workspaceRoot.
+   * Empty / omitted → Role section of `.compass/instructions.md` (or legacy `.compass/role.md`).
    */
   rolePrompt?: string
   context?: {

@@ -127,7 +127,7 @@ Today `getSystemPrompt(mode)` returns the full mode prompt. After presets:
 
 ```
 system = [
-  rolePrompt,           // job rolePrompt → .compass/role.md → preset role
+  rolePrompt,           // job rolePrompt → instructions.md Role section → preset role
   modePrompt(mode),     // Ask / Edit / Agent constraints (not user-editable)
 ].join('\n\n')
 ```
@@ -153,8 +153,8 @@ i18n keys (example): `ai.preset.code.role` / `document` / `data` / `general` (ja
 | UI | `sendPreset` in `ChatPanel` | Current chat selection |
 | Settings | `AppSettings.defaultUseCasePreset` | Default for new chats / startup |
 | Workspace | `.compass/settings.json` → `defaultUseCasePreset` | Folder default; overrides app settings |
-| Workspace role | `.compass/role.md` | Optional system-prompt role overlay (replaces preset role text) |
-| Job | `ScheduledJob.rolePrompt` | Optional per-job overlay; wins over `role.md` |
+| Workspace | `.compass/instructions.md` | One file: Role section → system overlay; Rules section → user context. Legacy `role.md` / `rules.md` are read if `instructions.md` is missing |
+| Job | `ScheduledJob.rolePrompt` | Optional per-job overlay; wins over the Role section |
 
 **Resolve order on send:**
 

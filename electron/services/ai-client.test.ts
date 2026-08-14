@@ -159,19 +159,27 @@ describe('getSystemPrompt', () => {
 })
 
 describe('resolveRequestRolePrompt', () => {
-  it('prefers the request overlay over role.md', async () => {
+  it('prefers the request overlay over workspace files', async () => {
     const root = await mkdtemp(join(tmpdir(), 'compass-role-req-'))
     await mkdir(join(root, '.compass'), { recursive: true })
-    await writeFile(join(root, '.compass', 'role.md'), 'You are from the file.\n', 'utf-8')
+    await writeFile(
+      join(root, '.compass', 'instructions.md'),
+      '# Role\nYou are from the file.\n',
+      'utf-8'
+    )
     await expect(
       resolveRequestRolePrompt({ workspaceRoot: root, rolePrompt: 'You are a PM.' })
     ).resolves.toBe('You are a PM.')
   })
 
-  it('loads .compass/role.md when the request overlay is empty', async () => {
+  it('loads the Role section of .compass/instructions.md when the request overlay is empty', async () => {
     const root = await mkdtemp(join(tmpdir(), 'compass-role-file-'))
     await mkdir(join(root, '.compass'), { recursive: true })
-    await writeFile(join(root, '.compass', 'role.md'), 'You are from the file.\n', 'utf-8')
+    await writeFile(
+      join(root, '.compass', 'instructions.md'),
+      '# Role\nYou are from the file.\n\n# Rules\nBe brief.\n',
+      'utf-8'
+    )
     await expect(resolveRequestRolePrompt({ workspaceRoot: root })).resolves.toBe(
       'You are from the file.'
     )

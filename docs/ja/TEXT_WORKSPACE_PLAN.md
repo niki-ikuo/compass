@@ -84,15 +84,15 @@ v2.0 以降の実装順。対象は **ローカルのあらゆるテキスト**�
 
 ---
 
-### 5. ワークスペースルール
+### 5. ワークスペースの指示
 
-- [x] 人が編集できる `.compass/rules.md`（用語集は任意）
-- [x] Ask / Edit / Agent に自動添付（コンテキスト予算を守る）
-- [x] ルールを開いて編集する簡単な UI
+- [x] 人が編集できる `.compass/instructions.md`（役割 + ルール。用語集は任意）
+- [x] ルール節を Ask / Edit / Agent に自動添付（コンテキスト予算を守る）。役割節は system に載せる
+- [x] 指示を開いて編集する簡単な UI（ファイルメニュー / チャットヘッダ）
 
 **完了:** 次回セッションで、長いプロンプト再貼り付けなしにトーン / 用語が効く。
 
-**主な変更箇所:** `workspace-rules`（Main + Renderer）、`buildUserMessagePayload`、ファイルメニュー / チャットヘッダ、`.compass/glossary.md` 任意添付。
+**主な変更箇所:** `workspace-rules` / `workspace-instructions`（Main + Renderer）、`buildUserMessagePayload`、ファイルメニュー / チャットヘッダ、`.compass/glossary.md` 任意添付。旧 `.compass/rules.md` / `role.md` は `instructions.md` が無いときだけ読む。
 
 ---
 

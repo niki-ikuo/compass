@@ -45,7 +45,7 @@ ChatPanel (mode: 'agent')
 | IPC | `electron/main.ts` | Route `ai:chat` / `ai:cancel` / resolve approval & continue |
 | Loop | `electron/services/agent-runner.ts` | `runAgent` — core orchestration |
 | Types | `src/types/index.ts` | `ChatMode`, `AgentToolStep`, IPC event shapes |
-| Prompt | `src/i18n/messages.ts` | `ai.agentSystemPrompt` and step labels; optional `.compass/role.md` / job `rolePrompt` replaces the preset role |
+| Prompt | `src/i18n/messages.ts` | `ai.agentSystemPrompt` and step labels; optional Role section of `.compass/instructions.md` / job `rolePrompt` replaces the preset role |
 
 Cancel: `ai:cancel` → shared AbortController in `ai-client` → pending approvals/continues reject → `ai:aborted`.
 
@@ -73,7 +73,7 @@ On chat-history reload, in-flight `running` / `waiting_*` steps are coerced to `
 2. Reject providers with `agentToolsSupport === 'unsupported'` (clear error, no auto Edit fallback)
 3. Validate API key / base URL
 4. Build API messages:
-   - `system`: agent system prompt (preset role, or `.compass/role.md` / job `rolePrompt`)
+   - `system`: agent system prompt (preset role, or instructions.md Role section / job `rolePrompt`)
    - prior user/assistant turns (text history)
    - one consolidated **historical tool context** from prior `agentSteps` (does not frame earlier Applied results as completing the latest ask; not interleaved after each assistant)
    - current user message via `buildUserMessage` (open file, selection, references, `.compass` index slice)

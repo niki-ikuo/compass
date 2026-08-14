@@ -86,7 +86,7 @@ Under the existing workspace `.compass/`:
     done/
   outbox/
   templates/             # existing; may add outbox presets
-  rules.md
+  instructions.md        # workspace instructions (Role + Rules)
   glossary.md            # optional
   desk/
     settings.json        # optional desk-local settings

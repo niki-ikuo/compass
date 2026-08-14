@@ -26,8 +26,22 @@ describe('formatWorkspaceRulesForAi', () => {
     const root = await makeRoot()
     await writeFile(join(root, '.compass', 'rules.md'), 'Use a calm tone.\n', 'utf-8')
     const text = await formatWorkspaceRulesForAi(root)
-    expect(text).toContain('[Workspace rules')
+    expect(text).toContain('[Workspace instructions')
     expect(text).toContain('Use a calm tone.')
+  })
+
+  it('prefers instructions.md over legacy rules.md', async () => {
+    setLocale('en')
+    const root = await makeRoot()
+    await writeFile(join(root, '.compass', 'rules.md'), 'Legacy rules.\n', 'utf-8')
+    await writeFile(
+      join(root, '.compass', 'instructions.md'),
+      '# Role\nYou are a PM.\n\n# Rules\nBe brief.\n',
+      'utf-8'
+    )
+    const text = await formatWorkspaceRulesForAi(root)
+    expect(text).toContain('Be brief.')
+    expect(text).not.toContain('Legacy rules.')
   })
 
   it('includes optional glossary and prefers rules under a tight budget', async () => {
@@ -44,7 +58,7 @@ describe('formatWorkspaceRulesForAi', () => {
       'utf-8'
     )
     const text = await formatWorkspaceRulesForAi(root, 200)
-    expect(text).toContain('[Workspace rules')
+    expect(text).toContain('[Workspace instructions')
     expect(text).toContain('Rules body')
     // Glossary may be truncated or omitted; rules must remain.
     expect(text!.toLowerCase()).toContain('rules body')
@@ -68,9 +82,20 @@ describe('loadWorkspaceRolePrompt', () => {
     expect(await loadWorkspaceRolePrompt(root)).toBeNull()
   })
 
-  it('returns trimmed role body without a section header', async () => {
+  it('returns trimmed role body from legacy role.md', async () => {
     const root = await makeRoot()
     await writeFile(join(root, '.compass', 'role.md'), '  You are a PM.\n', 'utf-8')
+    await expect(loadWorkspaceRolePrompt(root)).resolves.toBe('You are a PM.')
+  })
+
+  it('reads the Role section from instructions.md and ignores legacy role.md', async () => {
+    const root = await makeRoot()
+    await writeFile(join(root, '.compass', 'role.md'), 'Legacy role.\n', 'utf-8')
+    await writeFile(
+      join(root, '.compass', 'instructions.md'),
+      '# Role\nYou are a PM.\n\n# Rules\nBe brief.\n',
+      'utf-8'
+    )
     await expect(loadWorkspaceRolePrompt(root)).resolves.toBe('You are a PM.')
   })
 })

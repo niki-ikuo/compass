@@ -86,7 +86,7 @@ Compass を「書いて直すエディタ」から **「取って → 整理し�
     done/                # 処理済み（削除せず移動）
   outbox/                # 外向け下書き
   templates/             # 既存。出口プリセット雛形を追加可
-  rules.md               # 既存
+  instructions.md        # ワークスペースの指示（役割 + ルール）
   glossary.md            # 既存（任意）
   desk/                  # クリップメタ（任意）
     settings.json        # ホットキー以外の机ローカル設定
@@ -340,7 +340,7 @@ updatedAt: 2026-07-28T09:05:00+09:00
 - 選択プリセットの出力スキーマ（frontmatter 必須キー）  
 - 出力パス（`.compass/outbox/...`）  
 - ソース本文（サイズ上限で切詰め）  
-- `.compass/rules.md` / `glossary.md`（既存添付ロジック）
+- `.compass/instructions.md` / `glossary.md`（既存添付ロジック）
 
 ### 6.6 テンプレート
 

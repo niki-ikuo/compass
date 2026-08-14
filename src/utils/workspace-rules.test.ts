@@ -1,28 +1,23 @@
 import { describe, expect, it } from 'vitest'
-import { buildDefaultGlossaryMarkdown, buildDefaultRoleMarkdown, buildDefaultRulesMarkdown } from './workspace-rules'
+import { buildDefaultGlossaryMarkdown, buildDefaultInstructionsMarkdown } from './workspace-rules'
 
-describe('workspace-rules starters', () => {
-  it('builds Japanese rules starter', () => {
-    const md = buildDefaultRulesMarkdown('ja')
-    expect(md).toContain('# ワークスペースルール')
-    expect(md).toContain('glossary.md')
+describe('workspace instruction starters', () => {
+  it('builds Japanese instructions with 役割 and ルール', () => {
+    const md = buildDefaultInstructionsMarkdown('ja')
+    expect(md).toContain('# 役割')
+    expect(md).toContain('# ルール')
+    expect(md).toContain('秘密情報')
   })
 
-  it('builds English rules starter', () => {
-    const md = buildDefaultRulesMarkdown('en')
-    expect(md).toContain('# Workspace rules')
-    expect(md).toContain('Ask / Edit / Agent')
+  it('builds English instructions with Role and Rules', () => {
+    const md = buildDefaultInstructionsMarkdown('en')
+    expect(md).toContain('# Role')
+    expect(md).toContain('# Rules')
+    expect(md).toContain('secrets')
   })
 
   it('builds glossary starters with preferred|avoid form', () => {
     expect(buildDefaultGlossaryMarkdown('ja')).toContain('API Key |')
     expect(buildDefaultGlossaryMarkdown('en')).toContain('API Key |')
-  })
-
-  it('builds role starters that warn against secrets', () => {
-    expect(buildDefaultRoleMarkdown('ja')).toContain('# 役割')
-    expect(buildDefaultRoleMarkdown('ja')).toContain('秘密情報')
-    expect(buildDefaultRoleMarkdown('en')).toContain('# Role')
-    expect(buildDefaultRoleMarkdown('en')).toContain('secrets')
   })
 })

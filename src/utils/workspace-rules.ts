@@ -1,9 +1,12 @@
+import type { FileEncoding } from '@/types'
 import { getLocale, t } from '@/i18n'
 import { join } from '@/utils/path'
 import { openWorkspaceFile } from '@/utils/open-workspace-file'
 import { useAppStore } from '@/stores/app-store'
 import { focusMonacoEditor } from '@/utils/workbench-focus'
+import { buildInstructionsMarkdownFromLegacy } from '@/utils/workspace-instructions'
 
+export const WORKSPACE_INSTRUCTIONS_RELATIVE = '.compass/instructions.md'
 export const WORKSPACE_RULES_RELATIVE = '.compass/rules.md'
 export const WORKSPACE_GLOSSARY_RELATIVE = '.compass/glossary.md'
 export const WORKSPACE_ROLE_RELATIVE = '.compass/role.md'
@@ -12,46 +15,44 @@ function normalizePath(path: string): string {
   return path.replace(/\\/g, '/')
 }
 
-export function buildDefaultRulesMarkdown(locale: 'ja' | 'en' = getLocale()): string {
+export function buildDefaultInstructionsMarkdown(locale: 'ja' | 'en' = getLocale()): string {
   if (locale === 'ja') {
     return [
-      '# ワークスペースルール',
+      '# 役割',
       '',
-      'このフォルダで Ask / Edit / Agent が自動的に参照します。短く具体的に書いてください。',
+      '（例）あなたはこのフォルダの PM 担当です。計画と整理だけを行う。',
+      'ソースコードは作らない・編集しない。',
       '',
-      '## トーン',
+      '空のままなら、用途プリセットの役割文を使います。Ask / Edit / Agent の動作制約は変わりません。',
+      'API キーなどの秘密情報は書かないでください。',
+      '',
+      '# ルール',
       '',
       '- （例）丁寧で簡潔に。断定しすぎない',
-      '',
-      '## 用語・表記',
-      '',
-      '- （例）製品名は「Compass」と表記する',
-      '- 詳細な避けたい表記は `.compass/glossary.md` にも書けます',
-      '',
-      '## やってほしくないこと',
-      '',
+      '- （例）計画書は docs/plans/ に置く',
       '- （例）見出し階層を勝手に変えない',
+      '',
+      '表記の対（推奨 | 避けたい）が必要なときは `.compass/glossary.md` に書けます（文書 verify 用）。',
       ''
     ].join('\n')
   }
 
   return [
-    '# Workspace rules',
+    '# Role',
     '',
-    'Ask / Edit / Agent automatically attach this file. Keep it short and concrete.',
+    '(e.g.) You are the PM for this folder. Plan and organize only.',
+    'Do not create or edit source code.',
     '',
-    '## Tone',
+    'Leave this section empty to keep the use-case preset role. Ask / Edit / Agent constraints do not change.',
+    'Do not put API keys or other secrets here.',
+    '',
+    '# Rules',
     '',
     '- (e.g.) Polite and concise; avoid over-asserting',
-    '',
-    '## Terms & spelling',
-    '',
-    '- (e.g.) Product name is “Compass”',
-    '- Prefer `.compass/glossary.md` for avoid/prefer term pairs',
-    '',
-    '## Do not',
-    '',
+    '- (e.g.) Put plans in docs/plans/',
     '- (e.g.) Do not change heading hierarchy without asking',
+    '',
+    'For preferred|avoid term pairs used by document verify, add `.compass/glossary.md`.',
     ''
   ].join('\n')
 }
@@ -80,43 +81,6 @@ export function buildDefaultGlossaryMarkdown(locale: 'ja' | 'en' = getLocale()):
   ].join('\n')
 }
 
-export function buildDefaultRoleMarkdown(locale: 'ja' | 'en' = getLocale()): string {
-  if (locale === 'ja') {
-    return [
-      '# 役割',
-      '',
-      'このフォルダの Ask / Edit / Agent（およびスケジュールジョブ）の system 先頭に載ります。',
-      '用途プリセットの「あなたは〇〇アシスタントです」を置き換えます。Ask / Edit / Agent の動作制約は変わりません。',
-      '短く具体的に書いてください。API キーなどの秘密情報は書かないでください。',
-      '',
-      '## 役割',
-      '',
-      '- （例）あなたはこのフォルダの PM 担当です。計画と整理だけを行う。',
-      '',
-      '## やらない',
-      '',
-      '- （例）ソースコードを作らない・編集しない',
-      ''
-    ].join('\n')
-  }
-
-  return [
-    '# Role',
-    '',
-    'This file replaces the use-case preset role (“You are a … assistant”) at the start of the system prompt for Ask / Edit / Agent (and scheduled jobs). Mode constraints do not change.',
-    'Keep it short and concrete. Do not put API keys or other secrets here.',
-    '',
-    '## Role',
-    '',
-    '- (e.g.) You are the PM for this folder. Plan and organize only.',
-    '',
-    '## Do not',
-    '',
-    '- (e.g.) Do not create or edit source code',
-    ''
-  ].join('\n')
-}
-
 async function ensureCompassDir(workspaceRoot: string): Promise<void> {
   try {
     await window.compass.fs.createDirectory(workspaceRoot, '.compass')
@@ -125,72 +89,91 @@ async function ensureCompassDir(workspaceRoot: string): Promise<void> {
   }
 }
 
-async function openOrCreateRelativeFile(
+async function readOptionalRelativeText(
   workspaceRoot: string,
-  relativePath: string,
-  starter: string
-): Promise<void> {
+  relativePath: string
+): Promise<string | null> {
   const absolute = normalizePath(join(workspaceRoot, relativePath))
-  const store = useAppStore.getState()
-  const existing = store.openFiles.find((f) => normalizePath(f.path) === absolute)
-  if (existing) {
-    store.setActiveFile(existing.path)
-    focusMonacoEditor()
-    return
-  }
-
   try {
-    const opened = await window.compass.fs.openEditorFile(absolute)
-    if (opened.kind === 'text') {
-      store.openFile(absolute, opened.content, opened.encoding)
-      focusMonacoEditor()
-      return
-    }
+    const opened = await window.compass.fs.readFile(absolute)
+    const content = opened.content.trim()
+    return content.length > 0 ? opened.content : null
   } catch {
-    // Missing — create below.
+    return null
   }
-
-  await ensureCompassDir(workspaceRoot)
-  await window.compass.fs.writeFile(absolute, starter)
-  await openWorkspaceFile(absolute)
-  focusMonacoEditor()
 }
 
-/** Open `.compass/rules.md`, creating a starter file if missing. */
-export async function openOrCreateWorkspaceRules(workspaceRoot: string): Promise<void> {
+async function focusExistingEditor(absolute: string): Promise<boolean> {
+  const store = useAppStore.getState()
+  const existing = store.openFiles.find((f) => normalizePath(f.path) === absolute)
+  if (!existing) return false
+  store.setActiveFile(existing.path)
+  focusMonacoEditor()
+  return true
+}
+
+/** Open `.compass/instructions.md`. Merge legacy role.md / rules.md on first create. */
+export async function openOrCreateWorkspaceInstructions(workspaceRoot: string): Promise<void> {
   try {
-    await openOrCreateRelativeFile(
-      workspaceRoot,
-      WORKSPACE_RULES_RELATIVE,
-      buildDefaultRulesMarkdown()
-    )
+    const absolute = normalizePath(join(workspaceRoot, WORKSPACE_INSTRUCTIONS_RELATIVE))
+    if (await focusExistingEditor(absolute)) return
+
+    try {
+      const opened = await window.compass.fs.openEditorFile(absolute)
+      if (opened.kind === 'text') {
+        storeOpen(absolute, opened.content, opened.encoding)
+        return
+      }
+    } catch {
+      // Missing — migrate or create below.
+    }
+
+    const [role, rules] = await Promise.all([
+      readOptionalRelativeText(workspaceRoot, WORKSPACE_ROLE_RELATIVE),
+      readOptionalRelativeText(workspaceRoot, WORKSPACE_RULES_RELATIVE)
+    ])
+    const locale = getLocale()
+    const merged = buildInstructionsMarkdownFromLegacy(role, rules, {
+      role: locale === 'ja' ? '役割' : 'Role',
+      rules: locale === 'ja' ? 'ルール' : 'Rules'
+    })
+    const starter = merged ?? buildDefaultInstructionsMarkdown()
+
+    await ensureCompassDir(workspaceRoot)
+    await window.compass.fs.writeFile(absolute, starter)
+    await openWorkspaceFile(absolute)
+    focusMonacoEditor()
   } catch (err) {
-    window.alert(err instanceof Error ? err.message : t('rules.openFailed'))
+    window.alert(err instanceof Error ? err.message : t('instructions.openFailed'))
   }
+}
+
+function storeOpen(absolute: string, content: string, encoding: FileEncoding): void {
+  useAppStore.getState().openFile(absolute, content, encoding)
+  focusMonacoEditor()
 }
 
 /** Open `.compass/glossary.md`, creating a starter file if missing. */
 export async function openOrCreateWorkspaceGlossary(workspaceRoot: string): Promise<void> {
   try {
-    await openOrCreateRelativeFile(
-      workspaceRoot,
-      WORKSPACE_GLOSSARY_RELATIVE,
-      buildDefaultGlossaryMarkdown()
-    )
+    const absolute = normalizePath(join(workspaceRoot, WORKSPACE_GLOSSARY_RELATIVE))
+    if (await focusExistingEditor(absolute)) return
+
+    try {
+      const opened = await window.compass.fs.openEditorFile(absolute)
+      if (opened.kind === 'text') {
+        storeOpen(absolute, opened.content, opened.encoding)
+        return
+      }
+    } catch {
+      // Missing — create below.
+    }
+
+    await ensureCompassDir(workspaceRoot)
+    await window.compass.fs.writeFile(absolute, buildDefaultGlossaryMarkdown())
+    await openWorkspaceFile(absolute)
+    focusMonacoEditor()
   } catch (err) {
     window.alert(err instanceof Error ? err.message : t('rules.openGlossaryFailed'))
-  }
-}
-
-/** Open `.compass/role.md`, creating a starter file if missing. */
-export async function openOrCreateWorkspaceRole(workspaceRoot: string): Promise<void> {
-  try {
-    await openOrCreateRelativeFile(
-      workspaceRoot,
-      WORKSPACE_ROLE_RELATIVE,
-      buildDefaultRoleMarkdown()
-    )
-  } catch (err) {
-    window.alert(err instanceof Error ? err.message : t('rules.openRoleFailed'))
   }
 }

@@ -86,13 +86,13 @@ Build on shipped Change Sets ([AI_APPLY_UNDO.md](./AI_APPLY_UNDO.md)).
 
 ### 5. Workspace rules
 
-- [x] Human-editable `.compass/rules.md` (and optional glossary)
-- [x] Auto-attach to Ask / Edit / Agent (context budget aware)
-- [x] Simple UI to open/edit rules
+- [x] Human-editable `.compass/instructions.md` (Role + Rules; optional glossary)
+- [x] Auto-attach Rules to Ask / Edit / Agent (context budget aware); Role overlays the system prompt
+- [x] Simple UI to open/edit instructions (File menu / chat header)
 
 **Done:** second session follows tone/terms without pasting a long prompt.
 
-**Touch:** `workspace-rules` (Main + Renderer), `buildUserMessagePayload`, File menu / chat header, optional `.compass/glossary.md` attach.
+**Touch:** `workspace-rules` / `workspace-instructions` (Main + Renderer), `buildUserMessagePayload`, File menu / chat header, optional `.compass/glossary.md` attach. Legacy `.compass/rules.md` / `role.md` still load when `instructions.md` is missing.
 
 ---
 

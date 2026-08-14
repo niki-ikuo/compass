@@ -127,7 +127,7 @@ UI でも同じドロップダウンに同居させない。
 
 ```
 system = [
-  rolePrompt,           // ジョブ rolePrompt → .compass/role.md → プリセット役割
+  rolePrompt,           // ジョブ rolePrompt → instructions.md の役割節 → プリセット役割
   modePrompt(mode),     // Ask / Edit / Agent の制約（ユーザーは編集不可）
 ].join('\n\n')
 ```
@@ -153,8 +153,8 @@ i18n キー例: `ai.preset.code.role` / `document` / `data` / `general`（ja / e
 | UI | `ChatPanel` の `sendPreset` | 今の会話で選んでいる用途 |
 | 設定 | `AppSettings.defaultUseCasePreset` | 新規チャット / 起動時の初期値 |
 | ワークスペース | `.compass/settings.json` → `defaultUseCasePreset` | フォルダ既定。アプリ設定より優先 |
-| ワークスペース役割 | `.compass/role.md` | 任意。system の用途ロール文を置換 |
-| ジョブ | `ScheduledJob.rolePrompt` | 任意。その実行だけ `role.md` より優先 |
+| ワークスペース | `.compass/instructions.md` | 1ファイル。役割節 → system、ルール節 → user コンテキスト。`instructions.md` が無いときだけ旧 `role.md` / `rules.md` を読む |
+| ジョブ | `ScheduledJob.rolePrompt` | 任意。その実行だけ役割節より優先 |
 
 **送信時の解決順:**
 

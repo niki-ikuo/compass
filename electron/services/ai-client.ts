@@ -133,7 +133,7 @@ export function getSystemPrompt(
   return `${composeSystemPrompt(rolePrompt, modePrompt)}\n\n${t('ai.responseLanguage')}`
 }
 
-/** Job rolePrompt wins; otherwise `.compass/role.md`; otherwise null (preset role). */
+/** Job rolePrompt wins; otherwise instructions.md Role section (or legacy role.md). */
 export async function resolveRequestRolePrompt(
   request: Pick<ChatRequest, 'workspaceRoot' | 'rolePrompt'>
 ): Promise<string | null> {

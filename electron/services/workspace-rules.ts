@@ -7,9 +7,11 @@ import {
   estimateTokens,
   truncateToTokenBudget
 } from '../../src/utils/context-budget'
+import { parseWorkspaceInstructions } from '../../src/utils/workspace-instructions'
 import { normalizeCustomRolePrompt } from '../../src/utils/system-prompt'
 import { decodeFileBuffer } from './encoding'
 
+export const WORKSPACE_INSTRUCTIONS_RELATIVE = '.compass/instructions.md'
 export const WORKSPACE_RULES_RELATIVE = '.compass/rules.md'
 export const WORKSPACE_GLOSSARY_RELATIVE = '.compass/glossary.md'
 export const WORKSPACE_ROLE_RELATIVE = '.compass/role.md'
@@ -32,8 +34,24 @@ function formatSection(header: string, body: string, maxTokens: number): string 
 }
 
 /**
- * Load `.compass/rules.md` (+ optional glossary) and format for Ask / Edit / Agent.
- * Honors a dedicated token budget so rules stay small relative to the rest of context.
+ * instructions.md wins when present; otherwise legacy role.md + rules.md.
+ * Empty role section → null so the caller keeps the built-in preset role.
+ */
+export async function loadWorkspaceInstructionLayers(workspaceRoot: string): Promise<{
+  role: string | null
+  rules: string | null
+}> {
+  const instructions = await readOptionalText(workspaceRoot, WORKSPACE_INSTRUCTIONS_RELATIVE)
+  if (instructions) return parseWorkspaceInstructions(instructions)
+  const [role, rules] = await Promise.all([
+    readOptionalText(workspaceRoot, WORKSPACE_ROLE_RELATIVE),
+    readOptionalText(workspaceRoot, WORKSPACE_RULES_RELATIVE)
+  ])
+  return { role, rules }
+}
+
+/**
+ * Load the rules layer (+ optional glossary) for Ask / Edit / Agent user context.
  */
 export async function formatWorkspaceRulesForAi(
   workspaceRoot: string,
@@ -41,7 +59,7 @@ export async function formatWorkspaceRulesForAi(
 ): Promise<string | null> {
   if (maxTokens <= 0) return null
 
-  const rules = await readOptionalText(workspaceRoot, WORKSPACE_RULES_RELATIVE)
+  const { rules } = await loadWorkspaceInstructionLayers(workspaceRoot)
   const glossary = await readOptionalText(workspaceRoot, WORKSPACE_GLOSSARY_RELATIVE)
   if (!rules && !glossary) return null
 
@@ -49,7 +67,6 @@ export async function formatWorkspaceRulesForAi(
   let remaining = maxTokens
 
   if (rules) {
-    // Prefer rules over glossary when the budget is tight.
     const rulesBudget = glossary ? Math.max(Math.floor(remaining * 0.7), 400) : remaining
     const section = formatSection(t('ai.workspaceRulesHeader'), rules, rulesBudget)
     sections.push(section)
@@ -66,7 +83,7 @@ export async function formatWorkspaceRulesForAi(
 }
 
 /**
- * Load `.compass/role.md` as a system-prompt role overlay (no section header).
+ * Load the role overlay for the system prompt.
  * Empty / missing → null so the caller keeps the built-in preset role.
  */
 export async function loadWorkspaceRolePrompt(
@@ -74,6 +91,6 @@ export async function loadWorkspaceRolePrompt(
   maxTokens: number = CONTEXT_BUDGET.roleTokens
 ): Promise<string | null> {
   if (maxTokens <= 0) return null
-  const role = await readOptionalText(workspaceRoot, WORKSPACE_ROLE_RELATIVE)
+  const { role } = await loadWorkspaceInstructionLayers(workspaceRoot)
   return normalizeCustomRolePrompt(role, maxTokens, t('ai.contextTruncated'))
 }

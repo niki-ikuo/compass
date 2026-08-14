@@ -45,7 +45,7 @@ ChatPanel (mode: 'agent')
 | IPC | `electron/main.ts` | `ai:chat` / `ai:cancel` / 承認・続行の resolve |
 | ループ | `electron/services/agent-runner.ts` | `runAgent` — 本体 |
 | 型 | `src/types/index.ts` | `ChatMode`、`AgentToolStep`、IPC イベント |
-| プロンプト | `src/i18n/messages.ts` | `ai.agentSystemPrompt` とステップ文言。任意の `.compass/role.md` / ジョブ `rolePrompt` がプリセット役割を置換 |
+| プロンプト | `src/i18n/messages.ts` | `ai.agentSystemPrompt` とステップ文言。任意の `.compass/instructions.md` 役割節 / ジョブ `rolePrompt` がプリセット役割を置換 |
 
 キャンセル: `ai:cancel` → `ai-client` の AbortController → 待ち中の承認/続行を reject → `ai:aborted`。
 
@@ -73,7 +73,7 @@ idle → thinking → tool_call → (waiting_approval | waiting_continue)? → t
 2. `agentToolsSupport === 'unsupported'` のプロバイダは明確なエラーで拒否（自動 Edit フォールバックなし）
 3. API Key / Base URL 検証
 4. API messages を組み立て:
-   - `system`: Agent システムプロンプト（プリセット役割、または `.compass/role.md` / ジョブ `rolePrompt`）
+   - `system`: Agent システムプロンプト（プリセット役割、または instructions.md の役割節 / ジョブ `rolePrompt`）
    - 過去の user/assistant（テキスト履歴）
    - 過去 `agentSteps` をまとめた **1 件の historical tool context**（直前の Applied を「現依頼の完了」と誤読しない文言。各 assistant の直後には差し込まない）
    - 今回の user（`buildUserMessage` — 開いているファイル、選択、参照、`.compass` 要約）

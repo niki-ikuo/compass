@@ -36,9 +36,12 @@ Use the right-hand chat to ask AI about the current file or selection.
 
 Separately from Ask / Edit / Agent, use-case presets (General / Document / Data / Code) control tone and approach.
 
-Workspace-wide tone and terms live in `.compass/rules.md` (optional `.compass/glossary.md`). Open via **File → Edit Workspace Rules** or the rules button in the chat header. They are auto-attached to Ask / Edit / Agent within the context budget.
+Workspace instructions live in `.compass/instructions.md`. Open via **File → Edit Workspace Instructions** or the instructions button in the chat header.
 
-A role such as “You are the PM” lives in `.compass/role.md`. Open via **File → Edit Role Prompt** or the role button in the chat header. It replaces the use-case preset role at the start of the system prompt (Ask / Edit / Agent constraints do not change). For scheduled jobs, a per-job role prompt overrides `role.md`. Do not put API keys there.
+- **Role** section — e.g. “You are the PM”. Replaces the use-case preset role at the start of the system prompt (Ask / Edit / Agent constraints do not change)
+- **Rules** section — tone, output paths, do-nots. Auto-attached to Ask / Edit / Agent within the context budget
+
+For scheduled jobs, a per-job role prompt overrides the Role section. Do not put API keys there. Optional `.compass/glossary.md` holds `preferred | avoid` pairs for document verify (not in the File menu). Legacy `.compass/role.md` / `rules.md` are read only when `instructions.md` is missing.
 
 | Preset | Typical Agent extras |
 |--------|----------------------|
