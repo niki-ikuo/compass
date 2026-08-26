@@ -30,13 +30,21 @@ import type { ChatContentPart } from '../../src/utils/chat-content-parts'
 import { decodeFileBuffer } from './encoding'
 import { previewWorkspaceActions, resolveInsideWorkspace } from './filesystem'
 import { extractDocumentText } from '../../src/utils/extract-document-text'
+import { applyExactReplace } from '../../src/utils/agent-str-replace'
+import { formatFileLines } from '../../src/utils/agent-read-format'
 import {
   isExtractableDocumentPath,
   MAX_EXTRACTABLE_FILE_BYTES,
   MAX_EXTRACTED_TEXT_CHARS
 } from '../../src/utils/extractable-document'
-import { searchWorkspace } from './workspace-search'
+import { searchWorkspace, globWorkspaceFiles } from './workspace-search'
 import { runAgentExec, classifyAgentExecCommand } from './agent-exec'
+import { runAgentLints } from './agent-lints'
+import {
+  executeGitDiffTool,
+  executeGitStatusTool
+} from './agent-git-context'
+import { fetchPublicUrl, searchWeb } from './agent-web'
 import {
   resolveAgentApproval,
   resolveAgentContinue,
@@ -114,7 +122,7 @@ import {
 } from './agent-data-sandbox'
 import { redactSecrets, redactSecretsInArgs } from '../../src/utils/redact'
 import { formatAgentToolsUnsupportedError } from '../../src/utils/agent-tools'
-import { extractMarkdownSection } from '../../src/utils/markdown-outline'
+import { extractMarkdownSection, findMarkdownSectionRange } from '../../src/utils/markdown-outline'
 import { normalizeUseCasePreset } from '../../src/types'
 import {
   detailForProposeActionsReject,
@@ -132,14 +140,67 @@ import { parseChatCompletionUsage } from '../../src/utils/usage-period'
 export { resolveAgentApproval, resolveAgentContinue }
 
 /** 初期ターン／ツール予算（続行で追加付与） */
-const MAX_AGENT_TURNS = 16
-const MAX_TOOL_CALLS = 40
-const CONTINUE_TURN_GRANT = 12
-const CONTINUE_TOOL_GRANT = 30
+const MAX_AGENT_TURNS = 32
+const MAX_TOOL_CALLS = 80
+const CONTINUE_TURN_GRANT = 16
+const CONTINUE_TOOL_GRANT = 50
 const MAX_READ_BYTES = 200 * 1024
 const MAX_LIST_ENTRIES = 200
-const MAX_SEARCH_RESULTS = 30
+const MAX_SEARCH_RESULTS = 200
+const MAX_SEARCH_PER_FILE = 20
+const MAX_GLOB_RESULTS = 200
 const MAX_TOOL_RESULT_CHARS = 24_000
+
+const FILE_UNIT_WRITE_TOOLS = new Set([
+  'strReplace',
+  'writeFile',
+  'deleteFile',
+  'deleteDir',
+  'mkdir',
+  'replaceSection'
+])
+
+const PARALLEL_READ_TOOLS = new Set([
+  'readFile',
+  'listDir',
+  'search',
+  'searchMeaning',
+  'globFiles',
+  'gitStatus',
+  'gitDiff',
+  'profileData',
+  'queryData',
+  'readLints'
+])
+
+export type AgentToolCallGroupKind = 'writes' | 'parallel' | 'serial'
+
+export function groupAgentToolCalls<T extends { function: { name: string } }>(
+  calls: T[]
+): Array<{ kind: AgentToolCallGroupKind; calls: T[] }> {
+  const groups: Array<{ kind: AgentToolCallGroupKind; calls: T[] }> = []
+  let i = 0
+  while (i < calls.length) {
+    const name = calls[i].function.name
+    if (FILE_UNIT_WRITE_TOOLS.has(name)) {
+      let j = i + 1
+      while (j < calls.length && FILE_UNIT_WRITE_TOOLS.has(calls[j].function.name)) j++
+      groups.push({ kind: 'writes', calls: calls.slice(i, j) })
+      i = j
+      continue
+    }
+    if (PARALLEL_READ_TOOLS.has(name)) {
+      let j = i + 1
+      while (j < calls.length && PARALLEL_READ_TOOLS.has(calls[j].function.name)) j++
+      groups.push({ kind: 'parallel', calls: calls.slice(i, j) })
+      i = j
+      continue
+    }
+    groups.push({ kind: 'serial', calls: [calls[i]] })
+    i++
+  }
+  return groups
+}
 /**
  * Agent tool-call arguments (especially writeFile content) need more headroom than
  * chat answers. Settings default (4096) cuts ~300-line rewrites mid-JSON.
@@ -197,6 +258,14 @@ const AGENT_TOOLS = [
             type: 'string',
             description:
               'Markdown only: heading text (with or without #) to read a single section instead of the whole file'
+          },
+          offset: {
+            type: 'number',
+            description: '1-based start line (default 1). Use with limit for large files.'
+          },
+          limit: {
+            type: 'number',
+            description: 'Max number of lines to return. Prefer this over dumping huge files.'
           }
         },
         required: ['path']
@@ -225,18 +294,62 @@ const AGENT_TOOLS = [
     function: {
       name: 'search',
       description:
-        'Exact/keyword search of file contents (literal text). Prefer searchMeaning for “where is X?” or topic/meaning questions.',
+        'Search file contents. Supports literal text or regex (useRegex). Optional include/exclude globs (comma-separated, e.g. "*.ts,**/*.tsx"), wholeWord, contextLines (0–8), and path scope. Prefer globFiles to find files by name. Prefer searchMeaning for topic/meaning without exact wording.',
       parameters: {
         type: 'object',
         properties: {
-          query: { type: 'string', description: 'Search string' },
+          query: { type: 'string', description: 'Search string or regex' },
           path: {
             type: 'string',
             description: 'Optional subdirectory or file to scope the search'
           },
-          caseSensitive: { type: 'boolean' }
+          caseSensitive: { type: 'boolean' },
+          useRegex: {
+            type: 'boolean',
+            description: 'If true, treat query as a JavaScript regular expression'
+          },
+          wholeWord: { type: 'boolean' },
+          include: {
+            type: 'string',
+            description: 'Comma-separated glob include (e.g. "*.ts,*.tsx")'
+          },
+          exclude: {
+            type: 'string',
+            description: 'Comma-separated glob exclude'
+          },
+          contextLines: {
+            type: 'number',
+            description: 'Extra lines before/after each hit (default 2, max 8)'
+          },
+          maxResults: {
+            type: 'number',
+            description: 'Max content hits (default 80, max 200)'
+          }
         },
         required: ['query']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'globFiles',
+      description:
+        'Find files by glob pattern relative to the workspace root (e.g. "**/*.test.ts", "src/**/*.ts"). Use this instead of walking listDir. Honors ignore rules (node_modules, .git, dist, …).',
+      parameters: {
+        type: 'object',
+        properties: {
+          pattern: { type: 'string', description: 'Glob pattern' },
+          path: {
+            type: 'string',
+            description: 'Optional subdirectory to scope the search'
+          },
+          maxResults: {
+            type: 'number',
+            description: 'Max paths to return (default 200)'
+          }
+        },
+        required: ['pattern']
       }
     }
   },
@@ -271,7 +384,7 @@ const AGENT_TOOLS = [
     function: {
       name: 'proposeActions',
       description:
-        'Propose workspace file/folder changes for the user to preview and approve. Paths must be relative to the workspace root. Changes are NOT applied until the user approves. Pass `actions` as a real JSON array (never a stringified JSON blob). Prefer applyPatch (unified diff with @@ -start,count +start,count @@ hunks) for edits to existing files—send only the changed hunks, not the whole file. If applyPatch fails with hunk mismatch: call readFile with force=true on that path, then craft a new patch—never resend the identical failed hunk. After repeated mismatches on the same path, fall back to writeFile with full contents. For Markdown section rewrites, prefer replaceSection (path + heading + section content) so other chapters stay untouched. Never use Cursor/OpenAI *** Begin Patch / *** Update File: wrappers. Combine all edits to the same file into one applyPatch action (or one replaceSection per heading). Use writeFile for new files or tiny full rewrites. Truncated writeFile/applyPatch/replaceSection payloads are rejected.',
+        'Deprecated compatibility batch for preview/approval. Prefer strReplace / writeFile / replaceSection / deleteFile / mkdir as separate tools. If you must use this, pass `actions` as a real JSON array. Prefer strReplace over applyPatch. Never use *** Begin Patch / *** Update File:. Truncated payloads are rejected.',
       parameters: {
         type: 'object',
         properties: {
@@ -326,7 +439,7 @@ const AGENT_TOOLS = [
     function: {
       name: 'exec',
       description:
-        'Run a short non-interactive shell command with cwd inside the workspace. Prefer the verify tool for standard test/lint/typecheck. Use exec for builds, ad-hoc commands, or when verify has no matching script. Dangerous system/workspace-wipe commands are blocked. Destructive write commands (rm, git reset --hard, chmod, etc.) require the user to approve before running. Default timeout 30s (max 120s). Do not use for interactive programs.',
+        'Run a short non-interactive shell command with cwd inside the workspace. Prefer verify for test/lint/typecheck and readLints for diagnostics on files you just changed. Use exec for builds or ad-hoc commands. Dangerous workspace-wipe commands are blocked. Destructive write commands (rm, git reset --hard, chmod, etc.) require approval. Default timeout 60s (max 300s). Do not use for interactive programs.',
       parameters: {
         type: 'object',
         properties: {
@@ -341,7 +454,7 @@ const AGENT_TOOLS = [
           },
           timeoutMs: {
             type: 'number',
-            description: 'Timeout in milliseconds (default 30000, max 120000)'
+            description: 'Timeout in milliseconds (default 60000, max 300000)'
           }
         },
         required: ['command']
@@ -353,7 +466,7 @@ const AGENT_TOOLS = [
     function: {
       name: 'verify',
       description:
-        'Post-edit verification. In code use-case: run project test / lint / typecheck via package scripts or safe fallbacks. In document use-case: check markdown heading structure, duplicate headings, broken relative .md links, and term-pair mismatches (Terms section of `.compass/instructions.md`, or legacy `.compass/glossary.md`) on edited files. In data use-case: check CSV column counts, duplicate first-column keys, mixed column types, and JSON/YAML shape. Prefer after proposeActions is applied. Pass paths to limit which files are checked for document/data; otherwise the last applied paths are used. On failure, fix with proposeActions and verify again. If all checks are skipped because scripts/files are missing, do not narrate that skip in the final user-facing reply.',
+        'Post-edit verification. In code use-case: run project test / lint / typecheck via package scripts or safe fallbacks. Prefer readLints on just-changed files first; use verify before finishing a coding task. In document use-case: check markdown heading structure, duplicate headings, broken relative .md links, and term-pair mismatches (Terms section of `.compass/instructions.md`, or legacy `.compass/glossary.md`) on edited files. In data use-case: check CSV column counts, duplicate first-column keys, mixed column types, and JSON/YAML shape. Pass paths to limit which files are checked for document/data; otherwise the last applied paths are used. On failure, fix with strReplace/writeFile and verify again. If all checks are skipped because scripts/files are missing, do not narrate that skip in the final user-facing reply.',
       parameters: {
         type: 'object',
         properties: {
@@ -369,7 +482,7 @@ const AGENT_TOOLS = [
           paths: {
             type: 'array',
             description:
-              'Relative file paths to check for document/data light verify. Defaults to paths from the last applied proposeActions.',
+              'Relative file paths to check for document/data light verify. Defaults to paths from the last applied write.',
             items: { type: 'string' }
           },
           cwd: {
@@ -464,6 +577,164 @@ const AGENT_TOOLS = [
         required: ['note']
       }
     }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'strReplace',
+      description:
+        'Edit an existing file by exact string replacement (preferred over applyPatch). oldString must match uniquely unless replaceAll=true. Changes go through the same preview/approval as other writes. One path per call; call multiple times for multiple files.',
+      parameters: {
+        type: 'object',
+        properties: {
+          path: { type: 'string', description: 'Relative path from workspace root' },
+          oldString: { type: 'string', description: 'Exact existing text to find' },
+          newString: { type: 'string', description: 'Replacement text' },
+          replaceAll: {
+            type: 'boolean',
+            description: 'Replace every occurrence (default false; requires unique match)'
+          }
+        },
+        required: ['path', 'oldString', 'newString']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'writeFile',
+      description:
+        'Create a new file or replace an entire existing file. Prefer strReplace for surgical edits. One path per call. Preview/approval required (unless auto-apply is on).',
+      parameters: {
+        type: 'object',
+        properties: {
+          path: { type: 'string' },
+          content: { type: 'string', description: 'Full file contents' }
+        },
+        required: ['path', 'content']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'deleteFile',
+      description: 'Delete a file. Always requires preview approval (never auto-applied).',
+      parameters: {
+        type: 'object',
+        properties: { path: { type: 'string' } },
+        required: ['path']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'deleteDir',
+      description: 'Delete a directory. Always requires preview approval (never auto-applied).',
+      parameters: {
+        type: 'object',
+        properties: { path: { type: 'string' } },
+        required: ['path']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'mkdir',
+      description: 'Create a directory (and parents as needed) via preview/approval.',
+      parameters: {
+        type: 'object',
+        properties: { path: { type: 'string' } },
+        required: ['path']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'replaceSection',
+      description:
+        'Replace one Markdown heading subtree (that heading through the next same-or-higher heading). Prefer this over strReplace for a whole chapter.',
+      parameters: {
+        type: 'object',
+        properties: {
+          path: { type: 'string' },
+          heading: { type: 'string', description: 'Heading text without leading #' },
+          content: { type: 'string', description: 'New section body (include the heading line)' }
+        },
+        required: ['path', 'heading', 'content']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'readLints',
+      description:
+        'Diagnostics for specific files you just changed (TypeScript / ESLint on those paths only). Prefer after strReplace/writeFile is applied. Use verify for full project test/lint/typecheck.',
+      parameters: {
+        type: 'object',
+        properties: {
+          paths: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'Relative file paths to check'
+          }
+        },
+        required: ['paths']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'gitStatus',
+      description: 'Read-only git status (branch + dirty paths). Do not commit or push with this tool.',
+      parameters: { type: 'object', properties: {} }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'gitDiff',
+      description: 'Read-only git diff for one path (unstaged, staged, or auto).',
+      parameters: {
+        type: 'object',
+        properties: {
+          path: { type: 'string' },
+          side: { type: 'string', enum: ['auto', 'staged', 'unstaged'] }
+        },
+        required: ['path']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'webSearch',
+      description:
+        'Search the public web (DuckDuckGo HTML) for current library docs or APIs. Do not send secrets. Prefer fetchUrl when you already have a documentation URL.',
+      parameters: {
+        type: 'object',
+        properties: { query: { type: 'string' } },
+        required: ['query']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'fetchUrl',
+      description:
+        'HTTP GET a public URL and return text. Private/metadata hosts are blocked. Use for documentation pages after webSearch.',
+      parameters: {
+        type: 'object',
+        properties: { url: { type: 'string' } },
+        required: ['url']
+      }
+    }
   }
 ] as const
 
@@ -492,7 +763,7 @@ const DATA_AGENT_TOOLS = [
     function: {
       name: 'queryData',
       description:
-        'Run a read-only SELECT (or WITH … SELECT) on tabular files in the in-memory SQLite sandbox. Imports path/paths first (or reuses tables already imported by profileData). Table names come from file basenames; alias `t` always refers to the first path. Use this for counts, filters, aggregates, and JOINs instead of reading whole files into context. Do not use DDL/DML. Prefer aggregates and LIMIT over dumping whole tables. File changes still go through proposeActions — never write back via SQL.',
+        'Run a read-only SELECT (or WITH … SELECT) on tabular files in the in-memory SQLite sandbox. Imports path/paths first (or reuses tables already imported by profileData). Table names come from file basenames; alias `t` always refers to the first path. Use this for counts, filters, aggregates, and JOINs instead of reading whole files into context. Do not use DDL/DML. Prefer aggregates and LIMIT over dumping whole tables. File writes go through strReplace/writeFile (preview) — never write back via SQL.',
       parameters: {
         type: 'object',
         properties: {
@@ -530,17 +801,22 @@ function truncatePersistedObservation(content: string): string {
   return `${redacted.slice(0, MAX_PERSISTED_OBSERVATION_CHARS)}\n...(truncated for history)`
 }
 
-/** Summarize a past proposeActions step without sounding like the current request is done. */
-function formatHistoricalProposeActionsStep(step: AgentToolStep): string {
+/** Summarize a past write step without sounding like the current request is done. */
+function formatHistoricalWriteStep(step: AgentToolStep): string {
   const paths = extractActionPaths(step.args ?? {})
-  const pathPart = paths.length > 0 ? paths.join(', ') : '(paths unknown)'
+  const pathArg =
+    typeof step.args?.path === 'string' && step.args.path.trim()
+      ? step.args.path.replace(/\\/g, '/')
+      : ''
+  const pathPart =
+    paths.length > 0 ? paths.join(', ') : pathArg || '(paths unknown)'
   const outcome =
     step.ok === false
       ? step.summary?.toLowerCase().includes('reject')
         ? 'rejected'
         : 'failed'
       : 'applied'
-  return `HISTORICAL proposeActions (${outcome}) paths: ${pathPart} — earlier turn only; does not fulfill the latest user request`
+  return `HISTORICAL ${step.name} (${outcome}) paths: ${pathPart} — earlier turn only; does not fulfill the latest user request`
 }
 
 /**
@@ -557,7 +833,7 @@ export function buildPriorAgentContext(steps: AgentToolStep[]): string | null {
   const planBlock = formatAgentPlanForModel(rebuildPlanFromSteps(usable))
   const memoryBlock = formatAgentMemoryForModel(rebuildMemoryFromSteps(usable))
   const header =
-    '[Historical agent tool context from earlier turns in this chat. Prefer working memory and this summary over re-reading the same paths unless the files may have changed. IMPORTANT: This does NOT mean the latest user request is already done. For a new multi-part or longer ask, call updateTodo first with a fresh checklist, then work items in order. If the latest user message needs file changes, call proposeActions again — prior Applied/approved results do not satisfy a new request.]'
+    '[Historical agent tool context from earlier turns in this chat. Prefer working memory and this summary over re-reading the same paths unless the files may have changed. IMPORTANT: This does NOT mean the latest user request is already done. For a new multi-part or longer ask, call updateTodo first with a fresh checklist, then work items in order. If the latest user message needs file changes, call proposeActions again (prefer strReplace / writeFile) — prior Applied/approved results do not satisfy a new request.]'
   const toolBlocks: string[] = []
   let total =
     (planBlock?.length ?? 0) + (memoryBlock?.length ?? 0) + header.length
@@ -573,10 +849,10 @@ export function buildPriorAgentContext(steps: AgentToolStep[]): string | null {
     }
 
     let block: string
-    if (step.name === 'proposeActions') {
+    if (step.name === 'proposeActions' || FILE_UNIT_WRITE_TOOLS.has(step.name)) {
       // Never re-inject "User approved and applied…" observations — they bias
-      // follow-up turns into text-only finishes without a fresh proposeActions.
-      block = formatHistoricalProposeActionsStep(step)
+      // follow-up turns into text-only finishes without a fresh write.
+      block = formatHistoricalWriteStep(step)
     } else {
       let argsJson = '{}'
       try {
@@ -701,6 +977,74 @@ async function offerAgentContinue(
   })
   const decision = await waitForContinue(id, signal, webContents.id)
   return decision.continue
+}
+
+async function materializeFileUnitAction(
+  workspaceRoot: string,
+  name: string,
+  args: Record<string, unknown>,
+  rawArgumentText: string
+): Promise<{ action: WorkspaceAction } | { error: string; truncated?: boolean }> {
+  if (isIncompleteJson(rawArgumentText)) {
+    return { error: t('ai.agentProposeActionsTruncated'), truncated: true }
+  }
+  const pathArg = typeof args.path === 'string' ? args.path.trim() : ''
+  if (!pathArg) {
+    return { error: 'Error: path is required' }
+  }
+
+  if (name === 'writeFile') {
+    if (typeof args.content !== 'string') {
+      return { error: 'Error: content is required', truncated: true }
+    }
+    return { action: { type: 'writeFile', path: pathArg, content: args.content } }
+  }
+  if (name === 'mkdir') {
+    return { action: { type: 'mkdir', path: pathArg } }
+  }
+  if (name === 'deleteFile') {
+    return { action: { type: 'deleteFile', path: pathArg } }
+  }
+  if (name === 'deleteDir') {
+    return { action: { type: 'deleteDir', path: pathArg } }
+  }
+  if (name === 'replaceSection') {
+    const heading = typeof args.heading === 'string' ? args.heading.trim() : ''
+    if (!heading || typeof args.content !== 'string') {
+      return { error: 'Error: heading and content are required' }
+    }
+    return {
+      action: { type: 'replaceSection', path: pathArg, heading, content: args.content }
+    }
+  }
+  if (name === 'strReplace') {
+    const oldString = typeof args.oldString === 'string' ? args.oldString : ''
+    const newString = typeof args.newString === 'string' ? args.newString : ''
+    const replaceAll = args.replaceAll === true
+    try {
+      const { absolutePath, relativePath } = await resolveAgentToolPath(workspaceRoot, pathArg)
+      const info = await stat(absolutePath)
+      if (info.isDirectory()) {
+        return { error: 'Error: path is a directory' }
+      }
+      if (info.size > MAX_READ_BYTES) {
+        return {
+          error: `Error: file larger than ${MAX_READ_BYTES} bytes; use a smaller file or writeFile`
+        }
+      }
+      const buffer = await readFile(absolutePath)
+      const current = decodeFileBuffer(buffer).content
+      const replaced = applyExactReplace(current, oldString, newString, replaceAll)
+      if (!replaced.ok) {
+        return { error: replaced.message }
+      }
+      return { action: { type: 'writeFile', path: relativePath, content: replaced.content } }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      return { error: `Error: ${message}` }
+    }
+  }
+  return { error: `Error: unsupported write tool ${name}` }
 }
 
 function parseProposeActions(
@@ -866,13 +1210,35 @@ function normalizeToolArgsForCall(
   name: string,
   args: Record<string, unknown>
 ): Record<string, unknown> {
-  if (name === 'readFile' || name === 'listDir' || name === 'profileData') {
+  if (
+    name === 'readFile' ||
+    name === 'listDir' ||
+    name === 'profileData' ||
+    name === 'strReplace' ||
+    name === 'writeFile' ||
+    name === 'deleteFile' ||
+    name === 'deleteDir' ||
+    name === 'mkdir' ||
+    name === 'replaceSection' ||
+    name === 'gitDiff'
+  ) {
     const relativePath = normalizeAgentRelativePath(
       workspaceRoot,
       typeof args.path === 'string' ? args.path : undefined,
       { defaultToRoot: name === 'listDir' }
     )
-    if ((name === 'readFile' || name === 'profileData') && !relativePath) {
+    if (
+      (name === 'readFile' ||
+        name === 'profileData' ||
+        name === 'strReplace' ||
+        name === 'writeFile' ||
+        name === 'deleteFile' ||
+        name === 'deleteDir' ||
+        name === 'mkdir' ||
+        name === 'replaceSection' ||
+        name === 'gitDiff') &&
+      !relativePath
+    ) {
       return { ...args, path: typeof args.path === 'string' ? args.path : '' }
     }
     return { ...args, path: relativePath || '.' }
@@ -893,8 +1259,16 @@ function normalizeToolArgsForCall(
     }
     return next
   }
+  if (name === 'readLints' && Array.isArray(args.paths)) {
+    return {
+      ...args,
+      paths: args.paths
+        .filter((p): p is string => typeof p === 'string' && p.trim().length > 0)
+        .map((p) => normalizeAgentRelativePath(workspaceRoot, p, { defaultToRoot: false }))
+    }
+  }
   if (
-    (name === 'search' || name === 'searchMeaning') &&
+    (name === 'search' || name === 'searchMeaning' || name === 'globFiles') &&
     typeof args.path === 'string' &&
     args.path.trim()
   ) {
@@ -945,8 +1319,18 @@ async function executeReadFile(
       }
     }
 
-    // Full-file cache hits only (heading slices need fresh section extract from disk text).
-    if (!force && !headingArg) {
+    const offset =
+      typeof args.offset === 'number' && Number.isFinite(args.offset)
+        ? Math.floor(args.offset)
+        : undefined
+    const limit =
+      typeof args.limit === 'number' && Number.isFinite(args.limit)
+        ? Math.floor(args.limit)
+        : undefined
+    const sliceRequested = offset != null || limit != null
+
+    // Full-file cache hits only (heading / offset slices need line-numbered text).
+    if (!force && !headingArg && !sliceRequested) {
       const cached = getCachedRead(readCache, relativePath)
       if (cached && cached.mtimeMs === info.mtimeMs && cached.size === info.size) {
         return formatCacheHit(cached)
@@ -1005,23 +1389,38 @@ async function executeReadFile(
           content: `Error: heading "${headingArg}" not found in ${relativePath}\nOutline: ${outline || '(none)'}`
         }
       }
-      const body = `# ${relativePath} § ${headingArg}\nOutline: ${outline || '(none)'}\n${section}`
+      const range = findMarkdownSectionRange(text, headingArg)
+      const startLine = range ? range.startLine + 1 : 1
+      const numbered = formatFileLines(text, {
+        offset: startLine,
+        limit: limit ?? section.split('\n').length
+      })
+      const omitNote = truncated
+        ? `\nFile was byte-truncated; use offset/limit on a smaller range if needed.`
+        : numbered.omitted
+          ? `\nUse offset/limit to read other line ranges.`
+          : ''
+      const body = `# ${relativePath} § ${headingArg} (lines ${numbered.startLine}-${numbered.endLine} of ${numbered.totalLines})\nOutline: ${outline || '(none)'}\n${numbered.formatted}${omitNote}`
       return {
         ok: true,
-        summary: `Read ${relativePath} section "${headingArg}" (${section.length} chars)`,
+        summary: `Read ${relativePath} section "${headingArg}" (L${numbered.startLine}-${numbered.endLine})`,
         content: truncateForModel(body)
       }
     }
 
-    const body = truncated
-      ? `# ${relativePath} (truncated)\nOutline: ${outline || '(none)'}\n${text}`
-      : `# ${relativePath}\nOutline: ${outline || '(none)'}\n${text}`
+    const slice = formatFileLines(text, { offset, limit })
+    const omitNote = truncated
+      ? `\nByte-truncated at ${MAX_READ_BYTES} bytes. Use offset/limit to read a line range.`
+      : slice.omitted
+        ? `\nShowing L${slice.startLine}-${slice.endLine} of ${slice.totalLines}. Pass offset/limit for other ranges.`
+        : ''
+    const body = `# ${relativePath} (L${slice.startLine}-${slice.endLine} of ${slice.totalLines})\nOutline: ${outline || '(none)'}\n${slice.formatted}${omitNote}`
 
     return {
       ok: true,
       summary: truncated
-        ? `Read ${relativePath} (truncated to ${MAX_READ_BYTES} bytes)`
-        : `Read ${relativePath} (${text.length} chars)`,
+        ? `Read ${relativePath} (truncated to ${MAX_READ_BYTES} bytes, L${slice.startLine}-${slice.endLine})`
+        : `Read ${relativePath} L${slice.startLine}-${slice.endLine} (${text.length} chars)`,
       content: truncateForModel(body)
     }
   } catch (err) {
@@ -1079,6 +1478,47 @@ async function executeListDir(
   }
 }
 
+async function executeGlobFiles(
+  workspaceRoot: string,
+  args: Record<string, unknown>
+): Promise<{ ok: boolean; summary: string; content: string }> {
+  const pattern = typeof args.pattern === 'string' ? args.pattern.trim() : ''
+  if (!pattern) {
+    return { ok: false, summary: 'pattern is required', content: 'Error: pattern is required' }
+  }
+  try {
+    let scopedPath: string | undefined
+    if (typeof args.path === 'string' && args.path.trim()) {
+      const resolved = await resolveAgentToolPath(workspaceRoot, args.path, {
+        allowRoot: true,
+        defaultToRoot: true
+      })
+      scopedPath = resolved.absolutePath
+    }
+    const requested =
+      typeof args.maxResults === 'number' && Number.isFinite(args.maxResults)
+        ? Math.floor(args.maxResults)
+        : MAX_GLOB_RESULTS
+    const result = await globWorkspaceFiles(workspaceRoot, pattern, {
+      rootPath: scopedPath,
+      maxResults: Math.min(MAX_GLOB_RESULTS, Math.max(1, requested))
+    })
+    const lines = [
+      `# globFiles: ${pattern}`,
+      `files: ${result.files.length}${result.truncated ? ' (truncated)' : ''}`,
+      ...result.files.map((f) => f)
+    ]
+    return {
+      ok: true,
+      summary: `${result.files.length} file(s)`,
+      content: truncateForModel(lines.join('\n'))
+    }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    return { ok: false, summary: message, content: `Error: ${message}` }
+  }
+}
+
 async function executeSearch(
   workspaceRoot: string,
   args: Record<string, unknown>
@@ -1097,12 +1537,25 @@ async function executeSearch(
       })
       scopedPath = resolved.absolutePath
     }
+    const requestedMax =
+      typeof args.maxResults === 'number' && Number.isFinite(args.maxResults)
+        ? Math.floor(args.maxResults)
+        : 80
+    const contextLines =
+      typeof args.contextLines === 'number' && Number.isFinite(args.contextLines)
+        ? Math.max(0, Math.min(8, Math.floor(args.contextLines)))
+        : 2
     const result = await searchWorkspace(workspaceRoot, {
       query,
       mode: 'keyword',
       caseSensitive: Boolean(args.caseSensitive),
+      useRegex: Boolean(args.useRegex),
+      wholeWord: Boolean(args.wholeWord),
+      include: typeof args.include === 'string' ? args.include : undefined,
+      exclude: typeof args.exclude === 'string' ? args.exclude : undefined,
       rootPath: scopedPath,
-      maxResults: MAX_SEARCH_RESULTS
+      maxResults: Math.min(MAX_SEARCH_RESULTS, Math.max(1, requestedMax)),
+      contextLines
     })
 
     const lines: string[] = [
@@ -1112,9 +1565,14 @@ async function executeSearch(
     ]
     for (const file of result.files) {
       lines.push(`## ${file.relativePath}`)
-      for (const match of file.matches.slice(0, 5)) {
+      for (const match of file.matches.slice(0, MAX_SEARCH_PER_FILE)) {
         const heading = match.heading ? ` [${match.heading}]` : ''
-        lines.push(`L${match.line}${heading}: ${match.preview.trim()}`)
+        if (match.preview.includes('\n')) {
+          lines.push(`L${match.line}${heading}:`)
+          lines.push(match.preview)
+        } else {
+          lines.push(`L${match.line}${heading}: ${match.preview.trim()}`)
+        }
       }
     }
 
@@ -1506,6 +1964,28 @@ async function executeTool(
       return executeSearch(workspaceRoot, args)
     case 'searchMeaning':
       return executeSearchMeaning(workspaceRoot, args)
+    case 'globFiles':
+      return executeGlobFiles(workspaceRoot, args)
+    case 'readLints': {
+      const paths = Array.isArray(args.paths)
+        ? args.paths.filter((p): p is string => typeof p === 'string')
+        : lastAppliedPaths ?? []
+      return runAgentLints({ workspaceRoot, paths, signal })
+    }
+    case 'gitStatus':
+      return executeGitStatusTool(workspaceRoot)
+    case 'gitDiff':
+      return executeGitDiffTool(
+        workspaceRoot,
+        typeof args.path === 'string' ? args.path : '',
+        args.side === 'staged' || args.side === 'unstaged' || args.side === 'auto'
+          ? args.side
+          : 'auto'
+      )
+    case 'webSearch':
+      return searchWeb(typeof args.query === 'string' ? args.query : '', signal)
+    case 'fetchUrl':
+      return fetchPublicUrl(typeof args.url === 'string' ? args.url : '', signal)
     case 'exec':
       return executeExec(webContents, chatId, workspaceRoot, callId, args, signal)
     case 'verify':
@@ -1731,6 +2211,7 @@ export async function runAgent(webContents: WebContents, request: ChatRequest): 
       send('ai:error', t('ai.agentNeedsWorkspace'))
       return
     }
+    const workspaceRoot = request.workspaceRoot
 
     const settings = await getSettings()
     if (signal.aborted) {
@@ -2049,12 +2530,64 @@ export async function runAgent(webContents: WebContents, request: ChatRequest): 
         tool_calls: turnResult.toolCalls
       })
 
-      for (const call of turnResult.toolCalls) {
-        if (signal.aborted) {
-          send('ai:aborted')
-          return
-        }
+      type ToolExecResult = {
+        ok: boolean
+        summary: string
+        content: string
+        appliedPaths?: string[]
+        previewed?: boolean
+        rejectIntent?: ProposeActionsRejectIntent
+      }
 
+      const emitToolOutcome = (
+        call: ToolCall,
+        args: Record<string, unknown>,
+        result: ToolExecResult
+      ) => {
+        if (call.function.name !== 'remember') {
+          recordToolObservation(memory, call.function.name, args, result)
+        }
+        const observation = truncatePersistedObservation(result.content)
+        send('ai:toolResult', {
+          id: call.id,
+          name: call.function.name,
+          ok: result.ok,
+          summary: redactSecrets(result.summary),
+          observation
+        })
+        apiMessages.push({
+          role: 'tool',
+          tool_call_id: call.id,
+          name: call.function.name,
+          content: truncateForModel(result.content)
+        })
+      }
+
+      const applyWritePreviewFlags = (result: ToolExecResult, actionArgs: Record<string, unknown>) => {
+        if (result.previewed) {
+          proposeActionsReachedPreview = true
+        }
+        if (result.ok) {
+          proposeActionsApplied = true
+          proposeActionsTruncated = false
+          suppressOpenTodoNudgesAfterReject = false
+          const paths =
+            result.appliedPaths && result.appliedPaths.length > 0
+              ? result.appliedPaths
+              : extractActionPaths(actionArgs)
+          invalidateCachedPaths(readCache, paths)
+          invalidateDataSandboxPaths(dataSandbox, paths)
+          if (paths.length > 0) lastAppliedPaths = paths
+        } else if (result.rejectIntent === 'stop') {
+          stopAfterProposeReject = true
+        } else if (result.rejectIntent === 'revise') {
+          proposeActionsReachedPreview = false
+          suppressOpenTodoNudgesAfterReject = true
+        }
+      }
+
+      const processCall = async (call: ToolCall): Promise<'aborted' | 'ok'> => {
+        if (signal.aborted) return 'aborted'
         toolCallsUsed++
         if (call.function.name === 'updateTodo') {
           updateTodoCalledThisRun = true
@@ -2065,7 +2598,7 @@ export async function runAgent(webContents: WebContents, request: ChatRequest): 
           rawArgs = coerceProposeActionsArgs(rawArgs)
         }
         const args = normalizeToolArgsForCall(
-          request.workspaceRoot,
+          workspaceRoot,
           call.function.name,
           rawArgs
         )
@@ -2077,18 +2610,9 @@ export async function runAgent(webContents: WebContents, request: ChatRequest): 
           args: sanitized
         })
 
-        let result: {
-          ok: boolean
-          summary: string
-          content: string
-          appliedPaths?: string[]
-          previewed?: boolean
-          rejectIntent?: ProposeActionsRejectIntent
-        }
+        let result: ToolExecResult
         try {
           if (call.function.name === 'proposeActions') {
-            // Incomplete JSON (often max_tokens cut mid-writeFile) must not become a preview.
-            // finish_reason=length is an explicit cut signal even when bracket repair looks closed.
             const cutByLength = turnResult.finishReason === 'length'
             const incompleteArgs = isIncompleteJson(rawArgumentText) || cutByLength
             const hasRecoveredActions =
@@ -2100,7 +2624,7 @@ export async function runAgent(webContents: WebContents, request: ChatRequest): 
               result = await executeProposeActions(
                 webContents,
                 chatId,
-                request.workspaceRoot,
+                workspaceRoot,
                 call.id,
                 args,
                 signal,
@@ -2108,34 +2632,13 @@ export async function runAgent(webContents: WebContents, request: ChatRequest): 
                 patchRetry,
                 readCache
               )
-              if (result.previewed) {
-                proposeActionsReachedPreview = true
-              }
-              if (result.ok) {
-                proposeActionsApplied = true
-                proposeActionsTruncated = false
-                suppressOpenTodoNudgesAfterReject = false
-                const paths =
-                  result.appliedPaths && result.appliedPaths.length > 0
-                    ? result.appliedPaths
-                    : extractActionPaths(args)
-                invalidateCachedPaths(readCache, paths)
-                invalidateDataSandboxPaths(dataSandbox, paths)
-                if (paths.length > 0) lastAppliedPaths = paths
-              } else if (result.rejectIntent === 'stop') {
-                stopAfterProposeReject = true
-              } else if (result.rejectIntent === 'revise') {
-                // Allow missing-proposeActions nudges again so "ask for revision"
-                // does not silently end on a text-only reply.
-                proposeActionsReachedPreview = false
-                suppressOpenTodoNudgesAfterReject = true
-              }
+              applyWritePreviewFlags(result, args)
             }
           } else {
             result = await executeTool(
               webContents,
               chatId,
-              request.workspaceRoot,
+              workspaceRoot,
               call.id,
               call.function.name,
               args,
@@ -2150,31 +2653,135 @@ export async function runAgent(webContents: WebContents, request: ChatRequest): 
           }
         } catch (err) {
           if (isAbortError(err) || signal.aborted) {
-            send('ai:aborted')
-            return
+            return 'aborted'
           }
           throw err
         }
 
-        if (call.function.name !== 'remember') {
-          recordToolObservation(memory, call.function.name, args, result)
+        emitToolOutcome(call, args, result)
+        return 'ok'
+      }
+
+      const processWriteCluster = async (calls: ToolCall[]): Promise<'aborted' | 'ok'> => {
+        type Prepared = {
+          call: ToolCall
+          args: Record<string, unknown>
+          action?: WorkspaceAction
+          error?: ToolExecResult
+        }
+        const prepared: Prepared[] = []
+
+        for (const call of calls) {
+          if (signal.aborted) return 'aborted'
+          toolCallsUsed++
+          const rawArgumentText = call.function.arguments || ''
+          const rawArgs = parseToolArgs(rawArgumentText)
+          const args = normalizeToolArgsForCall(
+            workspaceRoot,
+            call.function.name,
+            rawArgs
+          )
+          send('ai:toolStart', {
+            id: call.id,
+            name: call.function.name,
+            args: sanitizeArgs(args, call.function.name)
+          })
+          const materialized = await materializeFileUnitAction(
+            workspaceRoot,
+            call.function.name,
+            args,
+            rawArgumentText
+          )
+          if ('error' in materialized) {
+            if (materialized.truncated) proposeActionsTruncated = true
+            prepared.push({
+              call,
+              args,
+              error: {
+                ok: false,
+                summary: materialized.error.slice(0, 200),
+                content: materialized.error
+              }
+            })
+          } else {
+            prepared.push({ call, args, action: materialized.action })
+          }
         }
 
-        const observation = truncatePersistedObservation(result.content)
-        send('ai:toolResult', {
-          id: call.id,
-          name: call.function.name,
-          ok: result.ok,
-          summary: redactSecrets(result.summary),
-          observation
-        })
+        const good = prepared.filter(
+          (item): item is Prepared & { action: WorkspaceAction } => Boolean(item.action)
+        )
+        let clusterResult: ToolExecResult | undefined
+        if (good.length > 0) {
+          const combinedArgs = { actions: good.map((item) => item.action) }
+          try {
+            clusterResult = await executeProposeActions(
+              webContents,
+              chatId,
+              workspaceRoot,
+              good[0].call.id,
+              combinedArgs,
+              signal,
+              request.preset,
+              patchRetry,
+              readCache
+            )
+          } catch (err) {
+            if (isAbortError(err) || signal.aborted) return 'aborted'
+            throw err
+          }
+          applyWritePreviewFlags(clusterResult, combinedArgs)
+        }
 
-        apiMessages.push({
-          role: 'tool',
-          tool_call_id: call.id,
-          name: call.function.name,
-          content: truncateForModel(result.content)
-        })
+        for (const item of prepared) {
+          const result: ToolExecResult = item.error
+            ? item.error
+            : clusterResult
+              ? {
+                  ...clusterResult,
+                  summary: clusterResult.ok
+                    ? `${item.call.function.name}: ${item.action?.path ?? ''}`
+                    : clusterResult.summary,
+                  content: clusterResult.ok
+                    ? `Applied ${item.call.function.name} on ${item.action?.path ?? ''}\n\n${clusterResult.content}`
+                    : clusterResult.content
+                }
+              : {
+                  ok: false,
+                  summary: 'not previewed',
+                  content: 'Error: write was not previewed'
+                }
+          emitToolOutcome(item.call, item.args, result)
+        }
+        return 'ok'
+      }
+
+      for (const group of groupAgentToolCalls(turnResult.toolCalls)) {
+        if (signal.aborted) {
+          send('ai:aborted')
+          return
+        }
+        if (group.kind === 'writes') {
+          const outcome = await processWriteCluster(group.calls)
+          if (outcome === 'aborted') {
+            send('ai:aborted')
+            return
+          }
+          continue
+        }
+        if (group.kind === 'parallel' && group.calls.length > 1) {
+          const outcomes = await Promise.all(group.calls.map((call) => processCall(call)))
+          if (outcomes.includes('aborted')) {
+            send('ai:aborted')
+            return
+          }
+          continue
+        }
+        const outcome = await processCall(group.calls[0])
+        if (outcome === 'aborted') {
+          send('ai:aborted')
+          return
+        }
       }
 
       if (stopAfterProposeReject) {

@@ -16,7 +16,8 @@ import {
   releaseChatAbortController,
   resolveRequestRolePrompt,
   sanitizeInlineCompletion,
-  sendAiEvent
+  sendAiEvent,
+  buildUserMessagePayload
 } from './ai-client'
 
 afterEach(() => {
@@ -130,6 +131,21 @@ describe('isAbortError / sendAiEvent', () => {
     const webContents = { send } as unknown as WebContents
     sendAiEvent(webContents, 'ai:chunk', 'chat-9', 'hello')
     expect(send).toHaveBeenCalledWith('ai:chunk', 'chat-9', 'hello')
+  })
+})
+
+describe('buildUserMessagePayload', () => {
+  it('injects open editor paths for Agent', async () => {
+    setLocale('en')
+    const payload = await buildUserMessagePayload({
+      chatId: 'c1',
+      mode: 'agent',
+      messages: [{ role: 'user', content: 'hello' }],
+      context: { openPaths: ['src/a.ts', 'src/b.ts'] }
+    })
+    expect(payload.text).toContain(en['ai.openEditorsHeader'])
+    expect(payload.text).toContain('- src/a.ts')
+    expect(payload.text).toContain('- src/b.ts')
   })
 })
 

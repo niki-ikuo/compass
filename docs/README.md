@@ -12,6 +12,7 @@ Developer docs for Compass (AI workspace for local folders). For product overvie
 | [DEVELOPMENT.md](./DEVELOPMENT.md) | Dev environment, commands, implementation notes |
 | [AGENT.md](./AGENT.md) | Agent runtime — tool loop, approvals, IPC, modules |
 | [AGENT_PLAN.md](./AGENT_PLAN.md) | v2.0 Agent phases 0–4 (shipped) + later roadmap |
+| [AGENT_CODEGEN_PLAN.md](./AGENT_CODEGEN_PLAN.md) | vs Cursor Agent — code-gen gap; assign by phase (Must = 1–6) |
 | [AI_APPLY_UNDO.md](./AI_APPLY_UNDO.md) | Post-Apply undo — Phase 1–2 shipped; Phase 3 backlog |
 | [TEXT_WORKSPACE_PLAN.md](./TEXT_WORKSPACE_PLAN.md) | Build order: text search → docs → PDF bridge → apply history |
 | [DESK_LOOP.md](./DESK_LOOP.md) | Clip (capture / outbox / ship check) — Phase 1 implemented |

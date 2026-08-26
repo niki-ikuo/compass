@@ -204,7 +204,15 @@ export function recordToolObservation(
     return
   }
 
-  if (toolName === 'proposeActions') {
+  if (
+    toolName === 'proposeActions' ||
+    toolName === 'strReplace' ||
+    toolName === 'writeFile' ||
+    toolName === 'deleteFile' ||
+    toolName === 'deleteDir' ||
+    toolName === 'mkdir' ||
+    toolName === 'replaceSection'
+  ) {
     pushEntry(state, 'write', result.summary)
   }
 }

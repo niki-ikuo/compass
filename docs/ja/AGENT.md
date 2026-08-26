@@ -310,6 +310,7 @@ src/
 | ドキュメント | 用途 |
 |--------------|------|
 | [AGENT_PLAN.md](./AGENT_PLAN.md) | Phase 0–4 出荷記録と後続ロードマップ |
+| [AGENT_CODEGEN_PLAN.md](./AGENT_CODEGEN_PLAN.md) | vs Cursor Agent のコード生成差 — フェーズ指定で作業指示 |
 | [ARCHITECTURE.md](./ARCHITECTURE.md) | プロセス / IPC 全体像 |
 | [SPEC.md](./SPEC.md) | Ask / Edit / Agent の製品境界 |
 | [USE_CASE_PRESET.md](./USE_CASE_PRESET.md) | 用途プリセット（モードとは別軸） |

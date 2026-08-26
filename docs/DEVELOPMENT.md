@@ -44,7 +44,7 @@ npm run dev
 | IPC handlers | `electron/main.ts` |
 | File ops | `electron/services/filesystem.ts` |
 | AI networking | `electron/services/ai-client.ts` |
-| Agent tool loop | `electron/services/agent-runner.ts`, `agent-exec.ts`, `agent-data-sandbox.ts`, [AGENT.md](./AGENT.md), [AGENT_PLAN.md](./AGENT_PLAN.md) |
+| Agent tool loop | `electron/services/agent-runner.ts`, `agent-exec.ts`, `agent-data-sandbox.ts`, [AGENT.md](./AGENT.md), [AGENT_PLAN.md](./AGENT_PLAN.md), [AGENT_CODEGEN_PLAN.md](./AGENT_CODEGEN_PLAN.md) |
 | Offline help / AI Help | `electron/services/help.ts`, `help-ask.ts`, `helps/`, `src/components/HelpDialog.tsx`, `HelpAskDialog.tsx` |
 | Workspace search | `electron/services/workspace-search.ts`, `src/components/SearchPanel.tsx`, `LeftSidebar.tsx` |
 | Git UI | `electron/services/git.ts`, `src/components/GitPanel.tsx`, `git:*` IPC |

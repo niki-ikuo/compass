@@ -168,7 +168,8 @@ SPEC に合わせる:
 | Spec | 範囲 | 状態 |
 |------|------|------|
 | v2.1 | セマンティック検索 / RAG / 埋め込み | 出荷済み（ハイブリッド + ハッシュ。任意で API 埋め込み） |
-| v3.0 | MCP、プラグイン、非 OpenAI 互換ネイティブ API | 未着手 |
+| v2.x コード生成 | Cursor Agent とのコード生成差（Grep/Glob、ファイル単位編集、診断、git 読取、Web） | 未着手 — [AGENT_CODEGEN_PLAN.md](./AGENT_CODEGEN_PLAN.md) |
+| v3.0 | MCP、プラグイン、非 OpenAI 互換ネイティブ API | 未着手（コード生成の必須の後） |
 | ポリシー | 任意の自動承認 UI / MCP 時代のツール allowlist（現行の組込読取ツールはすでに自動実行） | 未着手 |
 
 ---
@@ -186,7 +187,9 @@ Phase 3  制限付き exec（ユーザー PTY と分離）         ✅ 出荷済
    ↓
 Phase 4  UX、上限、プロバイダエラー、plan/memory     ✅ 出荷済み（v2.0）
    ↓
-Phase 5  RAG → MCP / プラグイン（SPEC v2.1 / v3.0）  ○ 後続
+Phase 4b Cursor 対比のコード生成ツール（AGENT_CODEGEN_PLAN） ○ 未着手
+   ↓
+Phase 5  MCP / プラグイン（SPEC v3.0）               ○ 後続
 ```
 
 ---

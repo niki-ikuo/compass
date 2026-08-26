@@ -9,7 +9,12 @@ import {
   isQuietAgentStep,
   segmentAgentSteps,
   shouldCollapseQuietSteps,
-  summarizeQuietSteps
+  summarizeQuietSteps,
+  partitionLiveAgentSteps,
+  shouldCollapseSettledAgentSteps,
+  shouldShowHistoryAccordion,
+  latestAgentStep,
+  summarizeSettledAgentSteps
 } from './agent-step-display'
 
 function step(partial: Partial<AgentToolStep> & Pick<AgentToolStep, 'id' | 'name'>): AgentToolStep {
@@ -44,6 +49,7 @@ describe('isQuietAgentStep', () => {
 
   it('keeps proposeActions, failures, and active steps prominent', () => {
     expect(isQuietAgentStep(step({ id: '1', name: 'proposeActions' }))).toBe(false)
+    expect(isQuietAgentStep(step({ id: '1b', name: 'strReplace' }))).toBe(false)
     expect(isQuietAgentStep(step({ id: '2', name: 'search', status: 'running' }))).toBe(false)
     expect(isQuietAgentStep(step({ id: '3', name: 'search', ok: false, status: 'error' }))).toBe(false)
     expect(
@@ -156,6 +162,71 @@ describe('summarizeQuietSteps', () => {
         step({ id: '2', name: 'verify', summary: 'no verify commands available; skipped' }),
         step({ id: '3', name: 'listDir' })
       ])
-    ).toEqual({ total: 3, ok: 2, skipped: 1, warning: 0 })
+    ).toEqual({ total: 3, ok: 2, skipped: 1, warning: 0, error: 0, cancelled: 0 })
+  })
+})
+
+describe('partitionLiveAgentSteps / shouldShowHistoryAccordion', () => {
+  it('splits active tools from completed ones', () => {
+    expect(
+      partitionLiveAgentSteps([
+        step({ id: '1', name: 'search' }),
+        step({ id: '2', name: 'readFile', status: 'running' }),
+        step({ id: '3', name: 'strReplace', status: 'waiting_approval' })
+      ])
+    ).toEqual({
+      settled: [expect.objectContaining({ id: '1' })],
+      live: [
+        expect.objectContaining({ id: '2' }),
+        expect.objectContaining({ id: '3' })
+      ]
+    })
+  })
+
+  it('shows the history accordion only after the first item exists', () => {
+    expect(shouldShowHistoryAccordion(0, true)).toBe(false)
+    expect(shouldShowHistoryAccordion(1, true)).toBe(true)
+    expect(shouldShowHistoryAccordion(0, false)).toBe(false)
+    expect(shouldShowHistoryAccordion(1, false)).toBe(true)
+  })
+
+  it('picks the in-flight tool as the latest step', () => {
+    const steps = [
+      step({ id: '1', name: 'search' }),
+      step({ id: '2', name: 'readFile', status: 'running' })
+    ]
+    const { live } = partitionLiveAgentSteps(steps)
+    expect(latestAgentStep(steps, live)?.id).toBe('2')
+    expect(latestAgentStep(steps, []).id).toBe('2')
+  })
+})
+
+describe('shouldCollapseSettledAgentSteps', () => {
+  it('folds settled steps after the run finishes', () => {
+    const steps = [
+      step({ id: '1', name: 'search' }),
+      step({ id: '2', name: 'strReplace' })
+    ]
+    expect(shouldCollapseSettledAgentSteps(steps, false)).toBe(true)
+    expect(shouldCollapseSettledAgentSteps(steps, true)).toBe(false)
+    expect(shouldCollapseSettledAgentSteps(steps.slice(0, 1), false)).toBe(true)
+    expect(
+      shouldCollapseSettledAgentSteps(
+        [step({ id: '1', name: 'search' }), step({ id: '2', name: 'strReplace', status: 'waiting_approval' })],
+        false
+      )
+    ).toBe(false)
+  })
+})
+
+describe('summarizeSettledAgentSteps', () => {
+  it('counts ok, skipped, and failed writes', () => {
+    expect(
+      summarizeSettledAgentSteps([
+        step({ id: '1', name: 'search' }),
+        step({ id: '2', name: 'verify', summary: 'no verify commands available; skipped' }),
+        step({ id: '3', name: 'strReplace', ok: false, status: 'error' })
+      ])
+    ).toEqual({ total: 3, ok: 1, skipped: 1, warning: 0, error: 1, cancelled: 0 })
   })
 })

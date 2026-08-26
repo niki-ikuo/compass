@@ -32,6 +32,7 @@ import { recordChatCompletionUsageFireAndForget } from './usage'
 import { ensureProjectIndex, getProjectIndexContext } from './project-indexer'
 import { formatMeaningExcerptsForAi } from './semantic-index'
 import { formatWorkspaceRulesForAi, loadWorkspaceRolePrompt } from './workspace-rules'
+import { loadGitDirtySummary } from './agent-git-context'
 import { resolveChatContext, isInsideWorkspace } from './filesystem'
 import { getLlmProvider, getProviderLabel } from '../../src/utils/llm-providers'
 import { withOpenWebUiChatCompat } from '../../src/utils/open-webui-compat'
@@ -289,6 +290,18 @@ export async function buildUserMessagePayload(request: ChatRequest): Promise<Use
       parts.push('')
     }
 
+    if (request.mode === 'agent') {
+      try {
+        const gitSummary = await loadGitDirtySummary(request.workspaceRoot)
+        if (gitSummary) {
+          parts.push(gitSummary)
+          parts.push('')
+        }
+      } catch {
+        // Git is optional orientation; continue without it.
+      }
+    }
+
     // Hybrid local search so Ask/Agent can answer “where is X?” without @ every file.
     const lastUserForSearch = [...request.messages].reverse().find((m) => m.role === 'user')
     if (lastUserForSearch?.content?.trim()) {
@@ -362,6 +375,19 @@ export async function buildUserMessagePayload(request: ChatRequest): Promise<Use
     parts.push(fileBody)
     parts.push('```')
     parts.push('')
+  }
+
+  if (request.mode === 'agent' && request.context?.openPaths?.length) {
+    const openPaths = request.context.openPaths
+      .filter((p) => typeof p === 'string' && p.trim().length > 0)
+      .slice(0, 16)
+    if (openPaths.length > 0) {
+      parts.push(t('ai.openEditorsHeader'))
+      for (const path of openPaths) {
+        parts.push(`- ${path.replace(/\\/g, '/')}`)
+      }
+      parts.push('')
+    }
   }
 
   const selections =

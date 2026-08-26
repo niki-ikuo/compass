@@ -21,6 +21,32 @@ export function detailForProposeActionsReject(intent: ProposeActionsRejectIntent
     : PROPOSE_ACTIONS_REJECT_STOP_DETAIL
 }
 
+/** エディタでファイル単位に採用/拒否し、プレビューが空になったときの承認結果 */
+export function buildFileUnitPreviewApproval(
+  applied: string[],
+  rejected: string[]
+): { approved: boolean; detail: string } {
+  if (applied.length === 0) {
+    return { approved: false, detail: PROPOSE_ACTIONS_REJECT_STOP_PARTIAL_DETAIL }
+  }
+  if (rejected.length === 0) {
+    return {
+      approved: true,
+      detail: `User approved and applied ${applied.length} workspace action(s):\n${applied
+        .map((path) => `- ${path}`)
+        .join('\n')}`
+    }
+  }
+  return {
+    approved: true,
+    detail: [
+      'User partially resolved the proposed workspace actions.',
+      `Applied:\n${applied.map((path) => `- ${path}`).join('\n')}`,
+      `Rejected:\n${rejected.map((path) => `- ${path}`).join('\n')}`
+    ].join('\n')
+  }
+}
+
 /**
  * 承認 resolve の detail から却下意図を判定。
  * 適用失敗の再提案依頼は revise。意図不明のフル却下は stop（安全側）。

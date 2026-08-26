@@ -412,15 +412,15 @@ export async function runAgentVerify(options: AgentVerifyOptions): Promise<Agent
 
 /** Nudge appended after successful proposeActions apply (code preset). */
 export const VERIFY_AFTER_APPLY_NUDGE =
-  'After applying changes, run the verify tool (test / lint / typecheck as available) or an equivalent exec command before finishing. If verify fails, fix with proposeActions and verify again. If verify only skips because scripts are missing, do not mention that in the final reply—the timeline already shows it.'
+  'After applying changes, run readLints on the touched files, then strReplace to fix diagnostics. Before finishing a coding task, run verify (test / lint / typecheck as available) or an equivalent exec command. If verify fails, fix with strReplace (or writeFile) and verify again. If verify only skips because scripts are missing, do not mention that in the final reply—the timeline already shows it.'
 
 export function getVerifyAfterApplyNudge(preset?: UseCasePreset | null): string {
   const resolved = normalizeUseCasePreset(preset) ?? DEFAULT_SETTINGS.defaultUseCasePreset
   if (resolved === 'document') {
-    return 'After applying changes, run the verify tool to check markdown structure (broken ATX / level jumps / duplicate headings / broken relative .md links / term pairs in the Terms section of `.compass/instructions.md`) on the edited files. If verify fails, fix with proposeActions and verify again.'
+    return 'After applying changes, run the verify tool to check markdown structure (broken ATX / level jumps / duplicate headings / broken relative .md links / term pairs in the Terms section of `.compass/instructions.md`) on the edited files. If verify fails, fix with strReplace or replaceSection and verify again.'
   }
   if (resolved === 'data') {
-    return 'After applying changes, run the verify tool to check CSV column counts and JSON/YAML shape on the edited files. If verify fails, fix with proposeActions and verify again.'
+    return 'After applying changes, run the verify tool to check CSV column counts and JSON/YAML shape on the edited files. If verify fails, fix with strReplace/writeFile and verify again.'
   }
   if (resolved === 'general') {
     return 'After applying changes, you may run verify if helpful; for general workspace tidying it is optional.'

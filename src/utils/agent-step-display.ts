@@ -9,7 +9,19 @@ export type AgentToolLabelKey =
   | 'chat.agentToolName.listDir'
   | 'chat.agentToolName.search'
   | 'chat.agentToolName.searchMeaning'
+  | 'chat.agentToolName.globFiles'
+  | 'chat.agentToolName.strReplace'
+  | 'chat.agentToolName.writeFile'
+  | 'chat.agentToolName.deleteFile'
+  | 'chat.agentToolName.deleteDir'
+  | 'chat.agentToolName.mkdir'
+  | 'chat.agentToolName.replaceSection'
   | 'chat.agentToolName.proposeActions'
+  | 'chat.agentToolName.readLints'
+  | 'chat.agentToolName.gitStatus'
+  | 'chat.agentToolName.gitDiff'
+  | 'chat.agentToolName.webSearch'
+  | 'chat.agentToolName.fetchUrl'
   | 'chat.agentToolName.exec'
   | 'chat.agentToolName.verify'
   | 'chat.agentToolName.profileData'
@@ -23,7 +35,19 @@ const AGENT_TOOL_LABEL_KEYS: Record<AgentToolName, AgentToolLabelKey> = {
   listDir: 'chat.agentToolName.listDir',
   search: 'chat.agentToolName.search',
   searchMeaning: 'chat.agentToolName.searchMeaning',
+  globFiles: 'chat.agentToolName.globFiles',
+  strReplace: 'chat.agentToolName.strReplace',
+  writeFile: 'chat.agentToolName.writeFile',
+  deleteFile: 'chat.agentToolName.deleteFile',
+  deleteDir: 'chat.agentToolName.deleteDir',
+  mkdir: 'chat.agentToolName.mkdir',
+  replaceSection: 'chat.agentToolName.replaceSection',
   proposeActions: 'chat.agentToolName.proposeActions',
+  readLints: 'chat.agentToolName.readLints',
+  gitStatus: 'chat.agentToolName.gitStatus',
+  gitDiff: 'chat.agentToolName.gitDiff',
+  webSearch: 'chat.agentToolName.webSearch',
+  fetchUrl: 'chat.agentToolName.fetchUrl',
   exec: 'chat.agentToolName.exec',
   verify: 'chat.agentToolName.verify',
   profileData: 'chat.agentToolName.profileData',
@@ -54,7 +78,17 @@ export function isQuietAgentStep(step: AgentToolStep): boolean {
   ) {
     return false
   }
-  if (step.name === 'proposeActions') return false
+  if (
+    step.name === 'proposeActions' ||
+    step.name === 'strReplace' ||
+    step.name === 'writeFile' ||
+    step.name === 'deleteFile' ||
+    step.name === 'deleteDir' ||
+    step.name === 'mkdir' ||
+    step.name === 'replaceSection'
+  ) {
+    return false
+  }
   if (step.status === 'error' || step.ok === false) return false
 
   const tone = getAgentStepTone(step)
@@ -163,20 +197,69 @@ export function shouldCollapseQuietSteps(steps: AgentToolStep[], hasActiveStep: 
   return steps.length >= QUIET_STEP_COLLAPSE_THRESHOLD
 }
 
+export function partitionLiveAgentSteps(steps: AgentToolStep[]): {
+  settled: AgentToolStep[]
+  live: AgentToolStep[]
+} {
+  const settled: AgentToolStep[] = []
+  const live: AgentToolStep[] = []
+  for (const step of steps) {
+    if (isActiveAgentStep(step)) live.push(step)
+    else settled.push(step)
+  }
+  return { settled, live }
+}
+
+/** Show the tools / file-update history accordion once there is at least one item. */
+export function shouldShowHistoryAccordion(itemCount: number, _runActive?: boolean): boolean {
+  return itemCount > 0
+}
+
+/** The step currently in progress, or the last completed step. */
+export function latestAgentStep(
+  steps: AgentToolStep[],
+  live: AgentToolStep[]
+): AgentToolStep | undefined {
+  if (live.length > 0) return live[live.length - 1]
+  return steps[steps.length - 1]
+}
+
+/** Fold the whole timeline into one accordion after the run has settled. */
+export function shouldCollapseSettledAgentSteps(
+  steps: AgentToolStep[],
+  runActive: boolean
+): boolean {
+  if (runActive) return false
+  if (steps.some(isActiveAgentStep)) return false
+  return shouldShowHistoryAccordion(steps.length, false)
+}
+
 export type QuietStepSummaryCounts = {
   total: number
   ok: number
   skipped: number
   warning: number
+  error: number
+  cancelled: number
 }
 
-export function summarizeQuietSteps(steps: AgentToolStep[]): QuietStepSummaryCounts {
+function countStepSummary(steps: AgentToolStep[]): QuietStepSummaryCounts {
   let ok = 0
   let skipped = 0
   let warning = 0
+  let error = 0
+  let cancelled = 0
 
   for (const step of steps) {
     const tone = getAgentStepTone(step)
+    if (tone === 'cancelled') {
+      cancelled += 1
+      continue
+    }
+    if (tone === 'failed' || step.status === 'error' || step.ok === false) {
+      error += 1
+      continue
+    }
     if (tone === 'warning') {
       if (step.name === 'verify') skipped += 1
       else warning += 1
@@ -185,5 +268,13 @@ export function summarizeQuietSteps(steps: AgentToolStep[]): QuietStepSummaryCou
     ok += 1
   }
 
-  return { total: steps.length, ok, skipped, warning }
+  return { total: steps.length, ok, skipped, warning, error, cancelled }
+}
+
+export function summarizeQuietSteps(steps: AgentToolStep[]): QuietStepSummaryCounts {
+  return countStepSummary(steps)
+}
+
+export function summarizeSettledAgentSteps(steps: AgentToolStep[]): QuietStepSummaryCounts {
+  return countStepSummary(steps)
 }

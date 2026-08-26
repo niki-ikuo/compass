@@ -130,7 +130,19 @@ export type AgentToolName =
   | 'listDir'
   | 'search'
   | 'searchMeaning'
+  | 'globFiles'
+  | 'strReplace'
+  | 'writeFile'
+  | 'deleteFile'
+  | 'deleteDir'
+  | 'mkdir'
+  | 'replaceSection'
   | 'proposeActions'
+  | 'readLints'
+  | 'gitStatus'
+  | 'gitDiff'
+  | 'webSearch'
+  | 'fetchUrl'
   | 'exec'
   | 'verify'
   | 'profileData'
@@ -735,6 +747,8 @@ export interface ChatRequest {
     selection?: string
     selections?: ChatSelectionRef[]
     references?: ChatContextRef[]
+    /** Open editor paths (workspace-absolute or relative) for Agent orientation */
+    openPaths?: string[]
   }
 }
 
@@ -951,6 +965,8 @@ export interface WorkspaceSearchOptions {
   exclude?: string
   rootPath?: string
   maxResults?: number
+  /** Extra lines before/after each keyword hit in `preview`. */
+  contextLines?: number
   /** Default: keyword. Hybrid/semantic use local chunk embeddings under `.compass/`. */
   mode?: WorkspaceSearchMode
 }

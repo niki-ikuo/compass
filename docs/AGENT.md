@@ -311,6 +311,7 @@ src/
 | Document | Use when |
 |----------|----------|
 | [AGENT_PLAN.md](./AGENT_PLAN.md) | Phases 0–4 shipped record + later roadmap |
+| [AGENT_CODEGEN_PLAN.md](./AGENT_CODEGEN_PLAN.md) | Code-generation gap vs Cursor Agent — assign by phase |
 | [ARCHITECTURE.md](./ARCHITECTURE.md) | Process / IPC layout |
 | [SPEC.md](./SPEC.md) | Product boundaries Ask / Edit / Agent |
 | [USE_CASE_PRESET.md](./USE_CASE_PRESET.md) | Use-case presets (orthogonal to mode) |

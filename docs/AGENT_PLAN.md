@@ -167,7 +167,8 @@ Aligned with SPEC:
 | Spec | Scope | Status |
 |------|--------|--------|
 | v2.1 | Semantic search / RAG / embeddings | Shipped (hybrid + hash; optional API embeddings) |
-| v3.0 | MCP, plugins, native non–OpenAI APIs | Not started |
+| v2.x codegen | Close code-generation gap vs Cursor Agent (Grep/Glob, file-unit edits, lints, git read, web) | Not started — [AGENT_CODEGEN_PLAN.md](./AGENT_CODEGEN_PLAN.md) |
+| v3.0 | MCP, plugins, native non–OpenAI APIs | Not started (after codegen Must) |
 | Policy | Optional user-facing auto-approve settings / MCP-era tool allowlist (current built-in read tools already auto-run) | Not started |
 
 ---
@@ -184,6 +185,8 @@ Phase 2  Writes via preview/apply + approval pause     ✅ shipped
 Phase 3  Restricted exec (separate from user PTY)      ✅ shipped
    ↓
 Phase 4  UX, limits, provider errors, plan/memory      ✅ shipped (v2.0)
+   ↓
+Phase 4b Code-gen tools vs Cursor (AGENT_CODEGEN_PLAN) ○ not started
    ↓
 Phase 5  MCP / plugins / native APIs (SPEC v3.0)       ○ later
 ```

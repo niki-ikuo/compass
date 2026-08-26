@@ -35,8 +35,8 @@ import {
 } from '@/types'
 import type { ProposeActionsRejectIntent } from '@/utils/agent-approval-reject'
 import {
-  detailForProposeActionsReject,
-  PROPOSE_ACTIONS_REJECT_STOP_PARTIAL_DETAIL
+  buildFileUnitPreviewApproval,
+  detailForProposeActionsReject
 } from '@/utils/agent-approval-reject'
 import { getLanguageFromPath } from '@/utils/language'
 import { generateId } from '@/utils/code-blocks'
@@ -415,58 +415,23 @@ function activePreviewSlice(
 
 function resolveAgentApprovalIfPreviewCleared(
   getState: () => {
-    pendingWorkspacePreview: {
-      chatId: string
-      actions: WorkspaceAction[]
-      items: ActionPreviewItem[]
-      approvalId?: string | null
-    } | null
-    pendingAgentApprovalId: string | null
-    agentApprovalTrace: { applied: string[]; rejected: string[] } | null
     pendingPreviewsByChatId: Record<string, PendingChatPreview>
-    activeChatId: string | null
   },
-  setState: (
-    partial: Partial<{
-      pendingWorkspacePreview: {
-        chatId: string
-        actions: WorkspaceAction[]
-        items: ActionPreviewItem[]
-        approvalId?: string | null
-      } | null
-      pendingAgentApprovalId: string | null
-      agentApprovalTrace: { applied: string[]; rejected: string[] } | null
-      pendingPreviewsByChatId: Record<string, PendingChatPreview>
-    }>
-  ) => void
+  captured: {
+    chatId: string
+    approvalId: string | null | undefined
+    applied: string[]
+    rejected: string[]
+  }
 ): void {
-  const state = getState()
-  const chatId = state.pendingWorkspacePreview?.chatId ?? state.activeChatId
-  if (!chatId) return
-  if (state.pendingWorkspacePreview || !state.pendingAgentApprovalId) return
-
-  const id = state.pendingAgentApprovalId
-  const applied = state.agentApprovalTrace?.applied ?? []
-  const rejected = state.agentApprovalTrace?.rejected ?? []
-  const nextMap = { ...state.pendingPreviewsByChatId }
-  delete nextMap[chatId]
-  setState({
-    pendingPreviewsByChatId: nextMap,
-    ...activePreviewSlice(nextMap, state.activeChatId)
-  })
-
-  const approved = applied.length > 0
-  const detail = approved
-    ? [
-        'User partially resolved the proposed workspace actions.',
-        applied.length > 0 ? `Applied:\n${applied.map((p) => `- ${p}`).join('\n')}` : null,
-        rejected.length > 0 ? `Rejected:\n${rejected.map((p) => `- ${p}`).join('\n')}` : null
-      ]
-        .filter(Boolean)
-        .join('\n')
-    : PROPOSE_ACTIONS_REJECT_STOP_PARTIAL_DETAIL
-
-  resolveApprovalById(id, approved, detail)
+  if (!captured.approvalId) return
+  // プレビューマップから消すと approvalId ミラーも消えるため、呼び出し側で撮った値を使う
+  if (getState().pendingPreviewsByChatId[captured.chatId]) return
+  const { approved, detail } = buildFileUnitPreviewApproval(
+    captured.applied,
+    captured.rejected
+  )
+  resolveApprovalById(captured.approvalId, approved, detail)
 }
 
 function finalizePreviewFileInOpenFiles(
@@ -2766,6 +2731,21 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
 
     const appliedLabel = writeItem.relativePath.replace(/\\/g, '/')
+    const latest = get()
+    const approvalId =
+      latest.pendingAgentApprovalId ??
+      latest.pendingPreviewsByChatId[chatId]?.approvalId ??
+      state.pendingAgentApprovalId
+    const nextApplied = [
+      ...(latest.agentApprovalTrace?.applied ??
+        latest.pendingPreviewsByChatId[chatId]?.trace?.applied ??
+        []),
+      appliedLabel
+    ]
+    const nextRejected =
+      latest.agentApprovalTrace?.rejected ??
+      latest.pendingPreviewsByChatId[chatId]?.trace?.rejected ??
+      []
     set((s) => {
       if (!s.pendingWorkspacePreview) return s
       const openFiles = finalizePreviewFileInOpenFiles(
@@ -2777,13 +2757,9 @@ export const useAppStore = create<AppState>((set, get) => ({
         s.pendingWorkspacePreview,
         filePath
       )
-      const trace = s.agentApprovalTrace
-        ? {
-            applied: [...s.agentApprovalTrace.applied, appliedLabel],
-            rejected: s.agentApprovalTrace.rejected
-          }
-        : s.pendingAgentApprovalId
-          ? { applied: [appliedLabel], rejected: [] }
+      const trace =
+        approvalId || s.agentApprovalTrace
+          ? { applied: nextApplied, rejected: nextRejected }
           : null
       const nextMap = { ...s.pendingPreviewsByChatId }
       if (!pendingWorkspacePreview) {
@@ -2792,7 +2768,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         nextMap[chatId] = {
           actions: pendingWorkspacePreview.actions,
           items: pendingWorkspacePreview.items,
-          approvalId: s.pendingAgentApprovalId,
+          approvalId,
           trace
         }
       }
@@ -2810,7 +2786,12 @@ export const useAppStore = create<AppState>((set, get) => ({
     })
     if (changeSet) scheduleChatHistorySave(get().workspaceRoot)
     if (changeSet) void get().refreshAiApplyHistory()
-    resolveAgentApprovalIfPreviewCleared(get, set)
+    resolveAgentApprovalIfPreviewCleared(get, {
+      chatId,
+      approvalId,
+      applied: nextApplied,
+      rejected: nextRejected
+    })
   },
 
   dismissAiApplyUndoBanner: () => set({ lastAiApplyUndo: null, lastAiUndoError: null }),
@@ -2909,12 +2890,15 @@ export const useAppStore = create<AppState>((set, get) => ({
     const state = get()
     if (!state.pendingWorkspacePreview) return
     const chatId = state.pendingWorkspacePreview.chatId
+    const approvalId = state.pendingAgentApprovalId
 
     const writeItem = state.pendingWorkspacePreview.items.find(
       (item): item is Extract<ActionPreviewItem, { type: 'writeFile' }> =>
         item.type === 'writeFile' && normalizePath(item.path) === normalizePath(filePath)
     )
     const rejectedLabel = writeItem?.relativePath.replace(/\\/g, '/') ?? normalizePath(filePath)
+    const nextApplied = state.agentApprovalTrace?.applied ?? []
+    const nextRejected = [...(state.agentApprovalTrace?.rejected ?? []), rejectedLabel]
 
     set((s) => {
       if (!s.pendingWorkspacePreview) return s
@@ -2928,13 +2912,9 @@ export const useAppStore = create<AppState>((set, get) => ({
         s.pendingWorkspacePreview,
         filePath
       )
-      const trace = s.agentApprovalTrace
-        ? {
-            applied: s.agentApprovalTrace.applied,
-            rejected: [...s.agentApprovalTrace.rejected, rejectedLabel]
-          }
-        : s.pendingAgentApprovalId
-          ? { applied: [], rejected: [rejectedLabel] }
+      const trace =
+        approvalId || s.agentApprovalTrace
+          ? { applied: nextApplied, rejected: nextRejected }
           : null
 
       const nextMap = { ...s.pendingPreviewsByChatId }
@@ -2944,7 +2924,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         nextMap[chatId] = {
           actions: pendingWorkspacePreview.actions,
           items: pendingWorkspacePreview.items,
-          approvalId: s.pendingAgentApprovalId,
+          approvalId,
           trace
         }
       }
@@ -2957,7 +2937,12 @@ export const useAppStore = create<AppState>((set, get) => ({
         lastApplyError: null
       }
     })
-    resolveAgentApprovalIfPreviewCleared(get, set)
+    resolveAgentApprovalIfPreviewCleared(get, {
+      chatId,
+      approvalId,
+      applied: nextApplied,
+      rejected: nextRejected
+    })
   },
 
   addChatContextRef: (ref) => {

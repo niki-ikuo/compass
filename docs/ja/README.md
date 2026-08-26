@@ -12,6 +12,7 @@
 | [DEVELOPMENT.md](./DEVELOPMENT.md) | 開発環境、コマンド、実装時の注意点 |
 | [AGENT.md](./AGENT.md) | Agent ランタイム — ツールループ、承認、IPC、モジュール |
 | [AGENT_PLAN.md](./AGENT_PLAN.md) | v2.0 Agent Phase 0–4（出荷済み）と後続ロードマップ |
+| [AGENT_CODEGEN_PLAN.md](./AGENT_CODEGEN_PLAN.md) | vs Cursor Agent — コード生成差。フェーズ指定で作業指示（必須 = 1–6） |
 | [AI_APPLY_UNDO.md](./AI_APPLY_UNDO.md) | Apply 後の取り消し — Phase 1–2 実装済み（Phase 3 はバックログ） |
 | [TEXT_WORKSPACE_PLAN.md](./TEXT_WORKSPACE_PLAN.md) | 実装順: テキスト検索 → 文書 → PDF橋渡し → Apply履歴 |
 | [DESK_LOOP.md](./DESK_LOOP.md) | クリップ（取込 / 下書き工場 / 検品）— Phase 1 実装済み |

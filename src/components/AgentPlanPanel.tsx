@@ -8,12 +8,15 @@ import {
 } from '@/utils/agent-plan'
 import { useI18n } from '@/i18n'
 import type { AgentToolStep } from '@/types'
+import { AnimatedEllipsis } from './AnimatedEllipsis'
 
 interface AgentPlanPanelProps {
   /** Cumulative agentSteps from chat start through this message (plan rebuild). */
   steps: AgentToolStep[]
   /** This message's agentSteps only — used to hide settled plans on later turns. */
   messageSteps?: AgentToolStep[]
+  /** Animate in-progress marks only while this chat turn is still running. */
+  runActive?: boolean
 }
 
 function statusMark(status: AgentTodoItem['status']): string {
@@ -29,7 +32,11 @@ function statusMark(status: AgentTodoItem['status']): string {
   }
 }
 
-export function AgentPlanPanel({ steps, messageSteps = [] }: AgentPlanPanelProps) {
+export function AgentPlanPanel({
+  steps,
+  messageSteps = [],
+  runActive = false
+}: AgentPlanPanelProps) {
   const { t } = useI18n()
   const plan: AgentPlanState = rebuildPlanFromSteps(steps)
   if (!shouldShowAgentPlanPanel(plan, messageSteps)) return null
@@ -74,7 +81,11 @@ export function AgentPlanPanel({ steps, messageSteps = [] }: AgentPlanPanelProps
               title={`${todo.id}: ${todo.content}`}
             >
               <span className="agent-plan-mark" aria-hidden="true">
-                {statusMark(todo.status)}
+                {todo.status === 'in_progress' && runActive ? (
+                  <AnimatedEllipsis />
+                ) : (
+                  statusMark(todo.status)
+                )}
               </span>
               <span className="agent-plan-item-text">{todo.content}</span>
             </li>

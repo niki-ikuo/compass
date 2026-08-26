@@ -158,8 +158,12 @@ export function WorkspaceActionPreview({
 
   return (
     <div className="workspace-action-preview">
-      <div className="diff-header">
-        <span>{t('preview.proposalTitle', { summary })}</span>
+      <div className="diff-header workspace-action-preview-title">
+        <span className="chat-code-icon" aria-hidden="true">
+          ✏️
+        </span>
+        <span className="chat-code-label">{t('preview.proposalTitle')}</span>
+        {summary ? <span className="chat-code-meta">{summary}</span> : null}
         <div className="diff-actions">
           <button className="btn-apply" onClick={onApply}>
             {applyError ? t('chat.retryApply') : t('preview.applyAll')}

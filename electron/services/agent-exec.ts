@@ -5,9 +5,9 @@ import { redactSecrets } from '../../src/utils/redact'
 import { resolveInsideWorkspace } from './filesystem'
 import { detectGitBash } from './terminal'
 
-const DEFAULT_TIMEOUT_MS = 30_000
-const MAX_TIMEOUT_MS = 120_000
-const MAX_OUTPUT_CHARS = 64_000
+const DEFAULT_TIMEOUT_MS = 60_000
+const MAX_TIMEOUT_MS = 300_000
+const MAX_OUTPUT_CHARS = 200_000
 const MAX_COMMAND_CHARS = 4_000
 /** timeout/abort 後、close が来なくても Promise を解消する猶予 */
 const KILL_GRACE_MS = 1_500

@@ -732,10 +732,12 @@ export const ja = {
   'chat.agentFallbackSwitched':
     '（送信モードを Edit に切り替えました）',
   'chat.agentSteps': 'ツール',
-  'chat.agentStepsCollapsed': 'ツール {count} 件',
+  'chat.agentStepsCollapsed': 'ツール履歴 {count} 件',
   'chat.agentStepsSummaryOk': '成功 {count}',
   'chat.agentStepsSummarySkipped': 'スキップ {count}',
   'chat.agentStepsSummaryWarning': '要更新 {count}',
+  'chat.agentStepsSummaryError': '失敗 {count}',
+  'chat.agentStepsSummaryCancelled': 'キャンセル {count}',
   'chat.agentPlan': '計画',
   'chat.agentPlanProgress': '{done}/{total} 完了（残り {open}）',
   'chat.agentPlanCoarseHint':
@@ -744,7 +746,19 @@ export const ja = {
   'chat.agentToolName.listDir': 'フォルダを一覧',
   'chat.agentToolName.search': '検索',
   'chat.agentToolName.searchMeaning': '意味検索',
+  'chat.agentToolName.globFiles': 'ファイルを探す',
+  'chat.agentToolName.strReplace': '文字列を置換',
+  'chat.agentToolName.writeFile': 'ファイルを書く',
+  'chat.agentToolName.deleteFile': 'ファイルを削除',
+  'chat.agentToolName.deleteDir': 'フォルダを削除',
+  'chat.agentToolName.mkdir': 'フォルダを作成',
+  'chat.agentToolName.replaceSection': '章を差し替え',
   'chat.agentToolName.proposeActions': '変更を提案',
+  'chat.agentToolName.readLints': '診断を読む',
+  'chat.agentToolName.gitStatus': 'Git 状態',
+  'chat.agentToolName.gitDiff': 'Git diff',
+  'chat.agentToolName.webSearch': 'Web 検索',
+  'chat.agentToolName.fetchUrl': 'URL を取得',
   'chat.agentToolName.exec': 'コマンドを実行',
   'chat.agentToolName.verify': '検証',
   'chat.agentToolName.profileData': 'データをプロファイル',
@@ -752,14 +766,14 @@ export const ja = {
   'chat.agentToolName.updateTodo': 'タスクを更新',
   'chat.agentToolName.checkpoint': 'チェックポイント',
   'chat.agentToolName.remember': 'メモを残す',
-  'chat.agentToolRunning': '実行中…',
+  'chat.agentToolRunning': '実行中',
   'chat.agentToolOk': '成功',
   'chat.agentToolWarning': '要更新',
   'chat.agentToolSkipped': 'スキップ',
   'chat.agentToolCancelled': 'キャンセル',
   'chat.agentToolBlocked': 'ブロック',
   'chat.agentToolError': '失敗',
-  'chat.agentWaitingApproval': '承認待ち（プレビューを確認してください）',
+  'chat.agentWaitingApproval': '確認待ち',
   'chat.agentAutoApplying': '変更を自動適用しています…',
   'chat.agentAutoApplyBadge': '自動適用 ON',
   'chat.agentAutoApplyBadgeTitle':
@@ -785,7 +799,7 @@ export const ja = {
   'chat.insertAtCursor': 'カーソル位置に挿入',
   'chat.aborted': '（中断されました）',
   'chat.preparingChanges': '変更を準備しています...',
-  'chat.reviewProposal': '変更提案をエディタで確認してください。',
+  'chat.reviewProposal': 'ファイル更新をエディタで確認してください。',
   'chat.previewFailed': 'プレビューの生成に失敗しました',
   'chat.errorPrefix': 'エラー: {error}',
   'chat.applied': '✅ {count} 件の変更を適用しました。',
@@ -961,9 +975,9 @@ export const ja = {
   'diff.newFile': '新規ファイル',
   'diff.changePreview': '変更プレビュー',
   'diff.apply': '適用',
-  'preview.proposalTitle': 'AIの変更提案 ({summary})',
+  'preview.proposalTitle': 'ファイル更新の確認',
   'preview.barHint':
-    'AIの変更提案 ({summary}) — エディタで差分を確認し、採用/拒否してください',
+    'ファイル更新の確認（{summary}） — エディタで差分を確認し、採用/拒否してください',
   'preview.openDiffHint': 'クリックでエディタの差分表示を開きます',
   'preview.applyAll': 'すべて適用',
   'undo.badge': '取り消し可',
@@ -990,6 +1004,7 @@ export const ja = {
   'undo.notLatestHint': 'より新しい適用があるため、先にそちらを取り消してください',
   'undo.messageApplied': '適用済み（{count} 件）',
   'undo.messageUndone': '取消済み（{count} 件）',
+  'chat.appliedChangesCollapsed': 'ファイル更新 {count} 件',
   'undo.undoThisChat': 'このチャットの適用を取り消す',
   'undo.confirmChatMessage':
     'このチャットの適用を、新しいものから順に取り消します。他チャットのより新しい適用があるとそこで止まります。続行しますか？',
@@ -1067,14 +1082,14 @@ export const ja = {
   'ai.preset.document.reminder':
     '[文書向け] 見出し階層を壊さない。章単位は replaceSection、それ以外は小さな差分を優先。ワークスペースの指示（用語節を含む）があれば従う。',
   'ai.preset.data.reminder':
-    '[データ向け] 表は原則 profileData → queryData（一時 SQLite、複数は paths）。表の全文 readFile はしない。列名・キー名・列順を勝手に変えない。書き戻しは proposeActions のみ。結果保存はソース横の .result.md（frontmatter: kind/sources/sql/format）と必要なら .result.csv。',
+    '[データ向け] 表は原則 profileData → queryData（一時 SQLite、複数は paths）。表の全文 readFile はしない。列名・キー名・列順を勝手に変えない。書き戻しは strReplace / writeFile（プレビュー）。結果保存はソース横の .result.md（frontmatter: kind/sources/sql/format）と必要なら .result.csv。',
   'ai.preset.general.reminder': '[一般向け] 短く整理し、次のアクションを示す。',
   'ai.editSystemPrompt':
     'Editモードでは、ファイル/フォルダの作成・変更・削除は必ず```compass-actions```コードブロック内のJSONだけで返してください。通常の```css```や```html```などのコードブロックでファイル全体を提示してはいけません。説明文は短くし、実際の変更内容はcompass-actionsに含めてください。形式は {"actions":[{"type":"mkdir","path":"relative/path"},{"type":"applyPatch","path":"relative/file.ts","patch":"@@ -10,3 +10,4 @@\\n context\\n-old\\n+new\\n context"},{"type":"replaceSection","path":"relative/doc.md","heading":"セットアップ","content":"## セットアップ\\n..."},{"type":"writeFile","path":"relative/file.ts","content":"..."},{"type":"deleteFile","path":"relative/file.ts"},{"type":"deleteDir","path":"relative/folder"}]} とし、既存ファイルの修正は全文 writeFile より applyPatch（unified diff の hunk）を優先してください。Markdown の特定見出し配下だけ書き換えるときは replaceSection を使い、他の章を触らないでください。patch は @@ -start,count +start,count @@ 形式の unified diff のみ（*** Begin Patch / *** Update File: は禁止）。同一ファイルへの変更は1つの applyPatch にまとめてください。pathはワークスペース直下からの相対パス（例: style.css。フォルダ名を重複して含めない）のみ使用してください。プロジェクト構造インデックス(.compass)が提供された場合は、ファイル間の関係を踏まえて回答してください。ワークスペースの指示（.compass/instructions.md）の役割・ルール・用語に従ってください。',
   'ai.askSystemPrompt':
     '現在はAskモードです。説明、質問への回答、調査、レビューのみを行い、ワークスペースへのファイル作成・変更・削除は行わないでください。```compass-actions```コードブロックは絶対に出力しないでください。コード例や文言例は通常の```コードブロックで示し、ユーザーが手動で適用できるようにしてください。プロジェクト構造インデックス(.compass)や Related workspace excerpts が提供された場合は、パス・見出し・スニペットを引用して「どこにあるか」にも答えてください。ワークスペースの指示（.compass/instructions.md）の役割・ルール・用語に従ってください。',
   'ai.agentSystemPrompt':
-    'Agent としてツール（readFile / listDir / search / searchMeaning / proposeActions / verify / exec / updateTodo / checkpoint / remember）でワークスペースを調査・変更提案・検証・短いコマンド実行ができます。意味・トピックで探すときは searchMeaning、文言の完全一致は search を使ってください。パスはすべてワークスペースルートからの相対パスです。ルートは "." を使い、ワークスペースフォルダ名そのものをサブパスにしないでください。ファイル変更は proposeActions で提案し、ユーザーがプレビュー承認するまで適用されません。チャット本文や ```compass-actions``` / actions JSON に変更を書いてもプレビューも適用もされません。変更依頼では必ず proposeActions ツールを呼び、途中切れしたら1ファイルずつ短い applyPatch で再提案してください。proposeActions の actions は必ず JSON 配列として渡し、JSON 文字列や一塊の文字列にしないでください。既存ファイルの修正は applyPatch（unified diff・変更 hunk のみ）を優先し、大きな全文 writeFile は避けてください。Markdown の特定見出し配下だけ書き換えるときは replaceSection（path + heading + 章本文）を使い、他の章を触らないでください。patch は @@ -start,count +start,count @@ 形式のみ。*** Begin Patch / *** Update File: 形式は禁止。同一ファイルへの変更は1つの applyPatch にまとめてください。関連する複数ファイルの変更は1回の proposeActions にまとめてよいですが、無関係な作業や大きい変更セットは複数回に分割してください。新規ファイルやごく短い全置換だけ writeFile を使ってください。変更が適用されたら、終了前に verify（test / lint / typecheck）で確かめてください。失敗したら proposeActions で直し、再度 verify する定石を守ってください。verify が解決できない場合のみ exec で同等のコマンドを実行してください。スクリプトが無く verify がスキップされただけなら、最終回答では触れないでください（タイムラインに表示済み）。実際に実行して失敗したときだけ検証結果を書いてください。exec はビルドやアドホックな短命非対話コマンド向けです。ワークスペース全体の削除（例: rm -rf .）などの危険コマンドは拒否され、rm や git reset --hard などの書き込み系はユーザー承認後のみ実行されます。ユーザー用ターミナルとは別です。Windows では Git Bash があればそこで実行されます（なければ cmd.exe）。同じファイルを再読するとキャッシュヒット（アウトラインのみ）になることがあります。全文が必要なら force=true を渡してください。複数依頼や長めの変更は、作業前に updateTodo で成果物単位の短いチェックリストにしてください（目安 3〜5、上限 8。調査／実装／テストのようなフェーズ名だけや、ターンを増やす過剰な細分化は避ける）。各項目は検証可能な成果（対象・挙動・確認内容）にし、受け入れ条件が不明なら実装前に確認または仮定を明示する項目を入れてください。調査で前提が変わったら merge=true で計画を更新して構いません。pending / in_progress が残っている間はテキストだけで終了せず、ツールで続けてください。全項目が done / cancelled になってから簡潔な最終回答を返してください。単一依頼でも複数ステップなら早めに updateTodo を使ってください。重要な発見・原因・契約は remember で作業メモリに残してください。ターン／ツール上限の直前や長い調査の区切りでは checkpoint に短い再開要約（何が済み、何が残るか）を残してください。Continue 後は計画と作業メモリを優先して続けてください。ワークスペースの指示（.compass/instructions.md）の役割・ルール・用語に従ってください。必要なツールを使い、依頼を完了してから簡潔な結論をテキストで返してください。',
+    'Agent としてツールでワークスペースを調査・編集・検証・短いコマンド実行ができます。パスはワークスペースルートからの相対パス。ルートは "."。識別子は search（リテラルまたは useRegex。include/exclude glob、contextLines 可）。パスパターンは globFiles（例: **/*.test.ts）。意味・トピックは searchMeaning。listDir の連打はしない。readFile は 1 始まりの行番号付き。大きいファイルは offset/limit。再読はキャッシュされることがある（force=true で再取得）。既存ファイルは strReplace（完全一致。replaceAll 以外は oldString が一意）。新規・ごく短い全置換は writeFile。Markdown の 1 章は replaceSection。削除・mkdir は各ツール。1 呼び出し 1 パス。チャット本文や ```compass-actions``` に変更を書いても適用されない。*** Begin Patch / *** Update File: は禁止。proposeActions / applyPatch は互換のため残るが非推奨。書き込みはプレビュー承認まで（自動適用設定時は即適用）。適用後は触ったファイルだけ readLints、直しは strReplace。コーディング完了前に verify（test/lint/typecheck）。スクリプト無しのスキップは最終回答で触れない。失敗時は strReplace で直して再 verify。gitStatus / gitDiff は読み取り専用。進行中の dirty に重ねる前に見る。webSearch / fetchUrl は公開 URL の GET（プライベートホストは拒否）。現行 API は捏造せずページを見る。exec は短命・ワークスペース内。ユーザー端末とは別。危険コマンドは拒否、書き込み系は承認。Windows では Git Bash があれば使う。複数依頼や長めの作業は先に updateTodo（目安 3〜5、上限 8、検証可能な成果）。pending が残る間は終了しない。重要な発見は remember。上限前は checkpoint。Continue 後は計画と作業メモリを優先。.compass/instructions.md に従い、依頼を完了してから簡潔な結論を返す。',
   'ai.userRefsHeader': '[ユーザーが指定したファイル/フォルダ]',
   'ai.userRefsIntro': '以下はエクスプローラーから明示的に指定されたコンテキストです。',
   'ai.folderHeading': '## フォルダ: {path}',
@@ -1101,12 +1116,13 @@ export const ja = {
   'ai.imageTooLarge': '（画像が大きすぎるため添付できませんでした。上限: 約 {maxMb}MB）',
   'ai.imageLimitReached': '（画像の添付上限 {max} 枚に達したためスキップしました）',
   'ai.currentFile': '[現在のファイル: {path}]',
+  'ai.openEditorsHeader': '[開いているエディタ]',
   'ai.selectionsHeader': '[ユーザーが指定した選択行]',
   'ai.selectionText': '選択テキスト',
   'ai.editModeReminder':
     '[Editモード] ファイル変更は通常のコードブロックではなく、必ず```compass-actions```のJSONのみで返してください。既存ファイルは applyPatch（unified diff の @@ hunk。*** Begin Patch 禁止。同一ファイルは1パッチ）を優先。',
   'ai.agentModeReminder':
-    '[Agentモード] readFile / listDir / search / searchMeaning で調査（意味・トピックは searchMeaning）、変更は必ず proposeActions ツール（チャットや compass-actions では不可。actions は配列。既存ファイルは applyPatch＝unified diff の @@ hunkのみ、*** Begin Patch 禁止、同一ファイルは1パッチ。hunk 不一致時は force=true で再読してから新規パッチ、同一 hunk の連打禁止、繰り返し失敗時は writeFile。新規・短い全置換は writeFile。途中切れは1ファイルずつ再提案）。適用後は verify（test/lint/typecheck）→失敗なら再提案のループ。スクリプト無しのスキップは最終回答で触れない。verify 不可時のみ exec（短命・ワークスペース内。破壊的コマンドは拒否／書き込み系は承認）。複数依頼や長めのタスクは先に updateTodo で成果物単位（目安3〜5、上限8、検証可能な項目）に分解し、受け入れ条件が不明なら実装前に確認する。pending が残る間は終了しない（checkpoint / remember も活用。調査後は計画更新可）。関連変更は1提案、無関係・大規模は proposeActions を分割。同じファイルの再読はキャッシュされる（force=true で再取得）。パスは相対、ルートは "."。',
+    '[Agentモード] 識別子は search（regex/glob 可）、パスは globFiles、意味は searchMeaning。読むときは行番号付き readFile（offset/limit）。既存ファイルは strReplace、新規・短い全置換は writeFile、MD 章は replaceSection。チャットや compass-actions では不可。*** Begin Patch 禁止。proposeActions/applyPatch は非推奨。適用後は readLints→strReplace、完了前に verify。gitStatus を dirty 重ねの前に。現行 API は webSearch/fetchUrl。exec は短命・承認ゲート。複数依頼は updateTodo。pending が残る間は終了しない。パスは相対、ルートは "."。',
   'ai.responseLanguage':
     'ユーザー向けの説明・最終回答は必ず日本語で書いてください。コード識別子・パス・ツール名・JSONキーはそのままで構いません。英語のツール指示やコードがあっても、ユーザーへの返答言語は日本語のままにしてください。',
   'ai.agentInitialTodoPlanNudge':
@@ -1116,13 +1132,13 @@ export const ja = {
   'ai.agentOpenTodosNudge':
     '[Agent] 未完了の todo が残っています。まだ終了しないでください。\n各項目が done または cancelled になるまでツールで続け、進捗に応じて updateTodo を呼んでください。\n未完了がなくなってからテキストで終了してください。\n\n未完了の todo ({count}):',
   'ai.agentMissingProposeActionsNudge':
-    '[Agent] ファイル変更の依頼なのに proposeActions が呼ばれていません。まだ終了しないでください。\nチャット本文や ```compass-actions``` / actions JSON に変更を書いてもプレビューも適用もされません。\n必ず proposeActions ツールを呼び、actions を JSON 配列で渡してください（既存ファイルは短い applyPatch）。ユーザーがプレビュー承認するまで適用されません。',
+    '[Agent] ファイル変更の依頼なのに proposeActions が呼ばれていません。まだ終了しないでください。\nチャット本文や ```compass-actions``` / actions JSON に変更を書いてもプレビューも適用もされません。\n既存ファイルは strReplace、新規は writeFile を呼んでください（互換のため proposeActions も可）。ユーザーがプレビュー承認するまで適用されません。',
   'ai.agentFalseAppliedProposeActionsNudge':
-    '[Agent] チャット本文で「修正が適用された／完了した」と書いていますが、proposeActions は呼ばれていない（または承認されていません）。ディスク上のファイルはまだ変わっていません。まだ終了しないでください。\n必ず proposeActions ツールを呼び、actions を JSON 配列で渡してください（既存ファイルは短い applyPatch）。プレビュー承認後にのみ適用されます。チャットの完了宣言だけでは反映されません。',
+    '[Agent] チャット本文で「修正が適用された／完了した」と書いていますが、proposeActions は呼ばれていない（または承認されていません）。ディスク上のファイルはまだ変わっていません。まだ終了しないでください。\nstrReplace または writeFile を呼んでください。プレビュー承認後にのみ適用されます。チャットの完了宣言だけでは反映されません。',
   'ai.agentFinishWithoutProposeActionsNotice':
-    '⚠️ この応答では proposeActions によるプレビュー／適用が行われていません。チャット上の「修正しました／提案しました」だけではファイルは更新されません。もう一度送るか、Continue で proposeActions の実行を続けてください。',
+    '⚠️ この応答では proposeActions によるプレビュー／適用が行われていません。チャット上の「修正しました／提案しました」だけではファイルは更新されません。strReplace / writeFile を呼ぶか、Continue で続けてください。',
   'ai.agentTruncatedProposeActionsNudge':
-    '[Agent] 直前の proposeActions は途中切れのためプレビューされていません。まだ終了しないでください。\n1ファイルずつ・短い applyPatch hunk だけでもう一度 proposeActions を呼んでください。大きな writeFile や複数ファイルの一括提案は避けてください。',
+    '[Agent] 直前の書き込みツールが途中切れのためプレビューされていません。まだ終了しないでください。\n1ファイルずつ strReplace または短い writeFile でもう一度呼んでください。大きな全文や複数ファイルの一括は避けてください。',
   'ai.agentPatchMismatchForceReread':
     '[Agent] applyPatch が現在のファイル内容と一致しませんでした（{paths}）。\n同じパッチを再送しないでください。先に readFile を force=true で呼び、ディスク上の最新内容を読んでから、新しい applyPatch を作ってください。',
   'ai.agentPatchMismatchWriteFileFallback':
@@ -1154,14 +1170,14 @@ export const ja = {
   'ai.agentStepCheckingPlan': '計画を確認中',
   'ai.agentStepCheckingWork': '残作業を確認中',
   'ai.agentStepCheckingChanges': '変更提案を確認中',
-  'ai.agentStepWaitingApproval': '変更提案の承認待ち',
+  'ai.agentStepWaitingApproval': 'ファイル更新の確認待ち',
   'ai.agentStepWaitingExecApproval': 'コマンド実行の承認待ち',
   'ai.agentStepNeedContinueTurns': 'ターン上限 — 続行の確認待ち',
   'ai.agentStepNeedContinueTools': 'ツール上限 — 続行の確認待ち',
   'ai.agentProposeActionsFormatError':
     'proposeActions の形式ミスです（{reason}）。actions は JSON 配列として直接渡し、文字列化しないでください。正しい形式で再提案してください。既存ファイルは applyPatch。関連する変更は1回にまとめ、無関係・大きい変更は複数回の proposeActions に分割してください。',
   'ai.agentProposeActionsTruncated':
-    'proposeActions の引数が途中で切れました（出力トークン上限の可能性が高いです）。不完全な writeFile / applyPatch はプレビューしません。既存ファイルは短い applyPatch hunk で再提案し、無関係な変更や大きな変更セットは複数回の proposeActions に分割してください（1ファイルずつでも可）。',
+    'proposeActions の引数が途中で切れました（出力トークン上限の可能性が高いです）。不完全な writeFile / strReplace はプレビューしません。1ファイルずつ短い strReplace または writeFile で再提案してください。',
   'ai.agentToolsUnsupported':
     'このモデル/プロバイダはツール呼び出し（Agent）に対応していません。Edit モードを使うか、tools 対応のモデルに切り替えてください。',
   'ai.agentToolsUnsupportedOllama':
@@ -1909,10 +1925,12 @@ export const en: Record<MessageKey, string> = {
   'chat.agentFallbackSwitched':
     '(Switched send mode to Edit)',
   'chat.agentSteps': 'Tools',
-  'chat.agentStepsCollapsed': '{count} tools',
+  'chat.agentStepsCollapsed': 'Tool history ({count})',
   'chat.agentStepsSummaryOk': '{count} ok',
   'chat.agentStepsSummarySkipped': '{count} skipped',
   'chat.agentStepsSummaryWarning': '{count} need refresh',
+  'chat.agentStepsSummaryError': '{count} failed',
+  'chat.agentStepsSummaryCancelled': '{count} cancelled',
   'chat.agentPlan': 'Plan',
   'chat.agentPlanProgress': '{done}/{total} done ({open} left)',
   'chat.agentPlanCoarseHint':
@@ -1921,7 +1939,19 @@ export const en: Record<MessageKey, string> = {
   'chat.agentToolName.listDir': 'List folder',
   'chat.agentToolName.search': 'Search',
   'chat.agentToolName.searchMeaning': 'Meaning search',
+  'chat.agentToolName.globFiles': 'Find files',
+  'chat.agentToolName.strReplace': 'Replace string',
+  'chat.agentToolName.writeFile': 'Write file',
+  'chat.agentToolName.deleteFile': 'Delete file',
+  'chat.agentToolName.deleteDir': 'Delete folder',
+  'chat.agentToolName.mkdir': 'Create folder',
+  'chat.agentToolName.replaceSection': 'Replace section',
   'chat.agentToolName.proposeActions': 'Propose changes',
+  'chat.agentToolName.readLints': 'Read lints',
+  'chat.agentToolName.gitStatus': 'Git status',
+  'chat.agentToolName.gitDiff': 'Git diff',
+  'chat.agentToolName.webSearch': 'Web search',
+  'chat.agentToolName.fetchUrl': 'Fetch URL',
   'chat.agentToolName.exec': 'Run command',
   'chat.agentToolName.verify': 'Verify',
   'chat.agentToolName.profileData': 'Profile data',
@@ -1929,14 +1959,14 @@ export const en: Record<MessageKey, string> = {
   'chat.agentToolName.updateTodo': 'Update tasks',
   'chat.agentToolName.checkpoint': 'Checkpoint',
   'chat.agentToolName.remember': 'Remember',
-  'chat.agentToolRunning': 'Running…',
+  'chat.agentToolRunning': 'Running',
   'chat.agentToolOk': 'ok',
   'chat.agentToolWarning': 'needs refresh',
   'chat.agentToolSkipped': 'skipped',
   'chat.agentToolCancelled': 'cancelled',
   'chat.agentToolBlocked': 'blocked',
   'chat.agentToolError': 'failed',
-  'chat.agentWaitingApproval': 'Waiting for approval (review the preview)',
+  'chat.agentWaitingApproval': 'Waiting to review',
   'chat.agentAutoApplying': 'Auto-applying changes…',
   'chat.agentAutoApplyBadge': 'Auto-apply ON',
   'chat.agentAutoApplyBadgeTitle':
@@ -1962,7 +1992,7 @@ export const en: Record<MessageKey, string> = {
   'chat.insertAtCursor': 'Insert at cursor',
   'chat.aborted': '(Stopped)',
   'chat.preparingChanges': 'Preparing changes...',
-  'chat.reviewProposal': 'Review the proposed changes in the editor.',
+  'chat.reviewProposal': 'Review the file updates in the editor.',
   'chat.previewFailed': 'Failed to generate preview',
   'chat.errorPrefix': 'Error: {error}',
   'chat.applied': '✅ Applied {count} change(s).',
@@ -2133,9 +2163,9 @@ export const en: Record<MessageKey, string> = {
   'diff.newFile': 'New file',
   'diff.changePreview': 'Change preview',
   'diff.apply': 'Apply',
-  'preview.proposalTitle': 'AI proposed changes ({summary})',
+  'preview.proposalTitle': 'Review file updates',
   'preview.barHint':
-    'AI proposed changes ({summary}) — review the diff in the editor, then accept or reject',
+    'Review file updates ({summary}) — review the diff in the editor, then accept or reject',
   'preview.openDiffHint': 'Click to open the diff in the editor',
   'preview.applyAll': 'Apply All',
   'undo.badge': 'Undo available',
@@ -2162,6 +2192,7 @@ export const en: Record<MessageKey, string> = {
   'undo.notLatestHint': 'A newer apply exists — undo that one first',
   'undo.messageApplied': 'Applied ({count})',
   'undo.messageUndone': 'Undone ({count})',
+  'chat.appliedChangesCollapsed': 'File updates ({count})',
   'undo.undoThisChat': 'Undo applies from this chat',
   'undo.confirmChatMessage':
     'Undo this chat’s applies newest-first? If another chat has a newer apply, undo stops there. Continue?',
@@ -2229,14 +2260,14 @@ export const en: Record<MessageKey, string> = {
   'ai.preset.document.reminder':
     '[Document] Do not break heading hierarchy. Prefer replaceSection for chapter edits; otherwise small patches. Follow workspace instructions (including the Terms section) when present.',
   'ai.preset.data.reminder':
-    '[Data] For tables: profileData then queryData (temp SQLite; paths for multiple). No whole-table readFile. Do not rename/reorder columns/keys casually; write only via proposeActions. Persist results as .result.md next to sources (frontmatter: kind/sources/sql/format) and .result.csv when useful.',
+    '[Data] For tables: profileData then queryData (temp SQLite; paths for multiple). No whole-table readFile. Do not rename/reorder columns/keys casually; write via strReplace/writeFile (preview). Persist results as .result.md next to sources (frontmatter: kind/sources/sql/format) and .result.csv when useful.',
   'ai.preset.general.reminder': '[General] Keep it short; suggest clear next actions.',
   'ai.editSystemPrompt':
     'In Edit mode, create/update/delete files and folders only via a ```compass-actions``` JSON code block. Do not present full file contents in normal ```css``` / ```html``` (etc.) code blocks. Keep explanations short; put the actual changes in compass-actions. Format: {"actions":[{"type":"mkdir","path":"relative/path"},{"type":"applyPatch","path":"relative/file.ts","patch":"@@ -10,3 +10,4 @@\\n context\\n-old\\n+new\\n context"},{"type":"replaceSection","path":"relative/doc.md","heading":"Setup","content":"## Setup\\n..."},{"type":"writeFile","path":"relative/file.ts","content":"..."},{"type":"deleteFile","path":"relative/file.ts"},{"type":"deleteDir","path":"relative/folder"}]}. Prefer applyPatch (unified-diff hunks) for edits to existing files over full writeFile rewrites. For rewriting one Markdown heading subtree only, use replaceSection and leave other chapters untouched. The patch must be unified diff with @@ -start,count +start,count @@ hunks only—never Cursor/OpenAI *** Begin Patch / *** Update File: wrappers. Combine all edits to the same file into one applyPatch. Paths must be relative to the workspace root (e.g. style.css; do not duplicate folder names). If a project structure index (.compass) is provided, use file relationships in your answer. Follow workspace instructions (.compass/instructions.md), including the Terms section, when present.',
   'ai.askSystemPrompt':
     'You are in Ask mode. Only explain, answer questions, investigate, and review. Do not create, modify, or delete workspace files. Never output a ```compass-actions``` block. Show code or text examples in normal ``` code blocks so the user can apply them manually. If a project structure index (.compass) or Related workspace excerpts are provided, cite path, heading, and snippets when answering “where is X?” questions. Follow workspace instructions (.compass/instructions.md), including the Terms section, for tone and terms when present.',
   'ai.agentSystemPrompt':
-    'As an Agent, use tools (readFile / listDir / search / searchMeaning / proposeActions / verify / exec / updateTodo / checkpoint / remember) to inspect the workspace, propose changes, verify, and run short commands. Prefer searchMeaning for topic/meaning lookup; use search for exact text matches. Paths are relative to the workspace root. Use "." for the root; do not use the workspace folder name as a nested subpath. File changes must go through proposeActions and are not applied until the user approves the preview. Writing changes in chat (or as ```compass-actions``` / actions JSON) never opens preview and is never applied—always call the proposeActions tool; if arguments truncate, re-propose one file at a time with small applyPatch hunks. For proposeActions, always pass `actions` as a real JSON array—never a stringified JSON blob. Prefer applyPatch (unified diff with only the changed hunks) for edits to existing files; avoid large full-file writeFile payloads. For rewriting one Markdown heading subtree, prefer replaceSection (path + heading + section body) so other chapters stay untouched. Patches must use @@ -start,count +start,count @@ hunks only—never *** Begin Patch / *** Update File: wrappers. Combine all edits to the same file into one applyPatch. Related multi-file edits may share one proposeActions; split unrelated or large change sets across multiple proposals. Use writeFile for new files or tiny full replacements. After changes are applied, run verify (test / lint / typecheck as available) before finishing. If verify fails, fix with proposeActions and verify again. Prefer verify over ad-hoc exec for those checks; use exec for builds or other short non-interactive commands when verify cannot resolve a script. If verify only skips because scripts are missing, do not mention that in the final reply (the timeline already shows it)—only discuss verify when checks actually ran and failed. Workspace-wipe commands (e.g. rm -rf .) are blocked; write/destructive commands (rm, git reset --hard, etc.) require user approval before running. Exec is separate from the user terminal. On Windows, exec uses Git Bash when available (otherwise cmd.exe). Re-reading an unchanged file may return a cache hit (outline only); pass force=true to reload full contents. For multiple asks or longer changes, call updateTodo first with a short outcome-level checklist (about 3–5 items, hard max 8; avoid phase-only labels like investigate/implement/test alone, and avoid micro-step over-splitting that burns turns). Each item must be a verifiable outcome (target, behavior, or check). If acceptance criteria are unclear, add a clarify-or-state-assumptions item before implementation. After investigation changes your assumptions, update the plan with merge=true. Do not finish with text-only while any todo is pending or in_progress—keep using tools until every item is done or cancelled, then return a concise final answer. For single asks that still need multiple steps, call updateTodo early as well. Use remember for durable facts (root causes, contracts, key paths) so they survive truncated tool history. Before long bursts or turn/tool limits, save a short checkpoint summarizing what is done and what remains. After Continue, follow the plan and working memory. Follow workspace instructions (.compass/instructions.md), including the Terms section, when present. Use tools as needed, complete the user\'s requests, then return a concise final answer in text.',
+    'As an Agent, use tools to inspect, edit, verify, and run short commands. Paths are relative to the workspace root; use "." for the root. Find identifiers with search (literal or useRegex; include/exclude globs; contextLines). Find paths with globFiles (e.g. **/*.test.ts). Use searchMeaning for topic/meaning. Do not walk listDir repeatedly. readFile returns 1-based line numbers; use offset/limit for large files. Re-reads may be cached (force=true to reload). Edit existing files with strReplace (exact unique oldString unless replaceAll). Create or tiny full-replace with writeFile. Markdown chapters: replaceSection. Delete/mkdir via those tools. One path per write call. Never put edits in chat or ```compass-actions```. Never use *** Begin Patch / *** Update File:. proposeActions / applyPatch remain for compatibility but are deprecated. Writes go through preview/approval (auto-apply may skip the click). After apply: readLints on touched files, then strReplace to fix. Before finishing coding, verify (test/lint/typecheck). If verify only skips for missing scripts, omit that from the final reply. gitStatus / gitDiff are read-only — check git before overlaying dirty work. webSearch / fetchUrl are GET/read of public URLs (private hosts blocked); use for current APIs, do not invent signatures. exec is short-lived, inside the workspace, separate from the user terminal. Wipe commands blocked; writes need approval. On Windows, Git Bash if available. For multi-part or longer work, updateTodo first (about 3–5, max 8, verifiable outcomes). Do not finish while todos are pending. remember durable facts; checkpoint before limits. After Continue, follow the plan and working memory. Follow .compass/instructions.md. Complete the request, then a concise final answer.',
   'ai.userRefsHeader': '[User-specified files/folders]',
   'ai.userRefsIntro': 'The following context was explicitly selected from the explorer.',
   'ai.folderHeading': '## Folder: {path}',
@@ -2263,12 +2294,13 @@ export const en: Record<MessageKey, string> = {
   'ai.imageTooLarge': '(Image is too large to attach. Limit: about {maxMb}MB)',
   'ai.imageLimitReached': '(Skipped: image attachment limit of {max} reached)',
   'ai.currentFile': '[Current file: {path}]',
+  'ai.openEditorsHeader': '[Open editors]',
   'ai.selectionsHeader': '[User-selected lines]',
   'ai.selectionText': 'Selected text',
   'ai.editModeReminder':
     '[Edit mode] Return file changes only as ```compass-actions``` JSON, not as normal code blocks. Prefer applyPatch (unified-diff @@ hunks; never *** Begin Patch; one patch per file) for existing files.',
   'ai.agentModeReminder':
-    '[Agent mode] Inspect with readFile / listDir / search / searchMeaning (prefer searchMeaning for topic/meaning); file changes must use the proposeActions tool only (never chat / compass-actions; actions must be an array; prefer applyPatch with unified-diff @@ hunks only—never *** Begin Patch—one patch per file; on hunk mismatch re-read with force=true then craft a new patch—identical hunk retries are blocked; after repeated mismatches fall back to writeFile; writeFile for new/tiny files; on truncation re-propose one file at a time); after apply, verify (test/lint/typecheck) then re-propose on failure; if verify only skips for missing scripts, omit that from the final reply. Prefer verify over exec for those checks (exec is short-lived, inside workspace; wipe commands blocked; writes need approval). For multiple asks or longer tasks, split with updateTodo into a short outcome-level checklist first (about 3–5 verifiable deliverables, hard max 8; clarify acceptance criteria before implementing if unclear; avoid micro-step over-splitting) and do not finish while todos remain pending (also use checkpoint + remember; revise the plan after investigation). Batch related edits; split unrelated/large proposeActions. Re-reads may be cached (force=true to reload). Paths are relative; root is ".".',
+    '[Agent mode] Find identifiers with search (regex/globs ok), paths with globFiles, meaning with searchMeaning. Read with line-numbered readFile (offset/limit). Edit existing files with strReplace; new/tiny files with writeFile; Markdown chapters with replaceSection. Never chat / compass-actions. Never *** Begin Patch. proposeActions/applyPatch are deprecated. After apply: readLints then strReplace; verify before finishing a coding task. Check gitStatus before overlaying dirty work. Use webSearch/fetchUrl for current APIs. Exec is short-lived and gated. For multi-part work, updateTodo first; do not finish while todos remain. Paths are relative; root is ".".',
   'ai.responseLanguage':
     'Write user-facing explanations and final replies in English. Code identifiers, paths, tool names, and JSON keys may stay as-is. Even if tool instructions or code are mixed in, keep the reply language English for the user.',
   'ai.agentInitialTodoPlanNudge':
@@ -2278,13 +2310,13 @@ export const en: Record<MessageKey, string> = {
   'ai.agentOpenTodosNudge':
     '[Agent] Open todos remain. Do not finish yet.\nContinue with tools until each item is done or cancelled; call updateTodo as you progress.\nOnly finish with text when nothing is left open.\n\nOpen todos ({count}):',
   'ai.agentMissingProposeActionsNudge':
-    '[Agent] This looks like a file-change request, but proposeActions was not called. Do not finish yet.\nWriting changes in chat (or as ```compass-actions``` / actions JSON) does not open preview and is never applied.\nCall the proposeActions tool with `actions` as a JSON array (prefer small applyPatch for existing files). Changes apply only after the user approves the preview.',
+    '[Agent] This looks like a file-change request, but proposeActions was not called. Do not finish yet.\nWriting changes in chat (or as ```compass-actions``` / actions JSON) does not open preview and is never applied.\nCall strReplace for existing files or writeFile for new files (proposeActions remains for compatibility). Changes apply only after the user approves the preview.',
   'ai.agentFalseAppliedProposeActionsNudge':
-    '[Agent] Your reply claims the fix was applied or completed, but proposeActions was not called (or not approved). Nothing was written to disk. Do not finish yet.\nCall the proposeActions tool with `actions` as a JSON array (prefer small applyPatch for existing files). Changes apply only after the user approves the preview — chat completion claims do not apply edits.',
+    '[Agent] Your reply claims the fix was applied or completed, but proposeActions was not called (or not approved). Nothing was written to disk. Do not finish yet.\nCall strReplace or writeFile. Changes apply only after the user approves the preview — chat completion claims do not apply edits.',
   'ai.agentFinishWithoutProposeActionsNotice':
-    '⚠️ This reply did not open a proposeActions preview or apply any files. Chat claims like “fixed” / “proposed” do not update the workspace. Send again or Continue so proposeActions can run.',
+    '⚠️ This reply did not open a proposeActions preview or apply any files. Chat claims like “fixed” / “proposed” do not update the workspace. Call strReplace / writeFile, or Continue so a write tool can run.',
   'ai.agentTruncatedProposeActionsNudge':
-    '[Agent] The previous proposeActions call was truncated and was not shown in preview. Do not finish yet.\nCall proposeActions again with one file at a time and small applyPatch hunks only. Avoid large writeFile payloads and multi-file batches.',
+    '[Agent] The previous write tool call was truncated and was not shown in preview. Do not finish yet.\nCall strReplace or a short writeFile again, one file at a time. Avoid large full-file payloads and multi-file batches.',
   'ai.agentPatchMismatchForceReread':
     '[Agent] applyPatch did not match the current file contents ({paths}).\nDo not resend the same patch. Call readFile with force=true, read the latest disk contents, then craft a new applyPatch.',
   'ai.agentPatchMismatchWriteFileFallback':
@@ -2316,14 +2348,14 @@ export const en: Record<MessageKey, string> = {
   'ai.agentStepCheckingPlan': 'Checking the plan',
   'ai.agentStepCheckingWork': 'Checking remaining work',
   'ai.agentStepCheckingChanges': 'Checking change proposals',
-  'ai.agentStepWaitingApproval': 'Waiting for change approval',
+  'ai.agentStepWaitingApproval': 'Waiting to review file updates',
   'ai.agentStepWaitingExecApproval': 'Waiting for command approval',
   'ai.agentStepNeedContinueTurns': 'Turn limit — waiting to continue',
   'ai.agentStepNeedContinueTools': 'Tool limit — waiting to continue',
   'ai.agentProposeActionsFormatError':
     'Invalid proposeActions format ({reason}). Pass `actions` as a JSON array directly—do not stringify it. Re-propose correctly. Prefer applyPatch for existing files. Batch related edits in one proposal; split unrelated or large changes across multiple proposeActions calls.',
   'ai.agentProposeActionsTruncated':
-    'proposeActions arguments were truncated (likely hit the output token limit). Incomplete writeFile/applyPatch payloads are not shown in preview. Prefer small applyPatch hunks for existing files, and split unrelated or large change sets across multiple proposeActions calls (one file at a time is fine).',
+    'proposeActions arguments were truncated (likely hit the output token limit). Incomplete writeFile/strReplace payloads are not shown in preview. Re-propose one file at a time with strReplace or a short writeFile.',
   'ai.agentToolsUnsupported':
     'This model/provider does not support tool calling (Agent). Use Edit mode or switch to a tools-capable model.',
   'ai.agentToolsUnsupportedOllama':

@@ -149,10 +149,12 @@ async function collectFiles(dir: string, files: string[]): Promise<void> {
 function searchInContent(
   content: string,
   matcher: RegExp,
-  maxRemaining: number
+  maxRemaining: number,
+  contextLines = 0
 ): { matches: WorkspaceSearchMatch[]; truncated: boolean } {
   const matches: WorkspaceSearchMatch[] = []
   const lines = content.split(/\r?\n/)
+  const ctx = Math.max(0, Math.min(8, Math.floor(contextLines)))
 
   for (let lineIndex = 0; lineIndex < lines.length; lineIndex++) {
     const line = lines[lineIndex]
@@ -164,11 +166,26 @@ function searchInContent(
         matcher.lastIndex++
         continue
       }
+      const start = Math.max(0, lineIndex - ctx)
+      const end = Math.min(lines.length, lineIndex + 1 + ctx)
+      let preview: string
+      if (ctx > 0) {
+        preview = lines
+          .slice(start, end)
+          .map((l, i) => {
+            const n = start + i + 1
+            const mark = start + i === lineIndex ? '>' : ' '
+            return `L${n}${mark}|${l.length > 200 ? `${l.slice(0, 200)}…` : l}`
+          })
+          .join('\n')
+      } else {
+        preview = line.length > 200 ? `${line.slice(0, 200)}…` : line
+      }
       matches.push({
         line: lineIndex + 1,
         column: match.index + 1,
         endColumn: match.index + text.length + 1,
-        preview: line.length > 200 ? `${line.slice(0, 200)}…` : line,
+        preview,
         matchText: text
       })
       if (matches.length >= maxRemaining) {
@@ -342,7 +359,8 @@ async function searchKeywordWorkspace(
     const { matches, truncated: fileTruncated } = searchInContent(
       content,
       matcher,
-      maxResults - totalMatches
+      maxResults - totalMatches,
+      options.contextLines ?? 0
     )
     if (matches.length === 0) continue
 
@@ -476,6 +494,47 @@ export async function replaceInWorkspace(
     changedFiles,
     errors
   }
+}
+
+const DEFAULT_GLOB_MAX = 200
+
+export async function globWorkspaceFiles(
+  workspaceRoot: string,
+  pattern: string,
+  options?: { rootPath?: string; maxResults?: number }
+): Promise<{ files: string[]; truncated: boolean; searched: number }> {
+  const raw = pattern.trim()
+  if (!raw) {
+    return { files: [], truncated: false, searched: 0 }
+  }
+  const searchRoot = resolveSearchRoot(workspaceRoot, options?.rootPath)
+  const maxResults = Math.min(
+    1000,
+    Math.max(1, options?.maxResults ?? DEFAULT_GLOB_MAX)
+  )
+  const matcher = globToRegExp(raw)
+  const allFiles: string[] = []
+  const rootStat = await stat(searchRoot)
+  if (rootStat.isFile()) {
+    allFiles.push(searchRoot)
+  } else {
+    await collectFiles(searchRoot, allFiles)
+  }
+
+  const workspaceResolved = resolve(workspaceRoot)
+  const files: string[] = []
+  let truncated = false
+  for (const filePath of allFiles) {
+    const relativePath = normalizeSlashes(relative(workspaceResolved, filePath))
+    const baseName = relativePath.split('/').pop() ?? relativePath
+    if (!matcher.test(relativePath) && !matcher.test(baseName)) continue
+    files.push(relativePath)
+    if (files.length >= maxResults) {
+      truncated = true
+      break
+    }
+  }
+  return { files, truncated, searched: allFiles.length }
 }
 
 /** path separator helper kept for potential Windows path checks */

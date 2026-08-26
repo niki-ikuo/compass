@@ -27,6 +27,7 @@ import {
 import { AgentStepTimeline } from './AgentStepTimeline'
 import { AgentPlanPanel } from './AgentPlanPanel'
 import { collectAgentStepsThrough, rebuildPlanFromSteps, shouldShowAgentPlanPanel } from '@/utils/agent-plan'
+import { filterTimelineAgentSteps } from '@/utils/agent-step-display'
 import { AnimatedStatus } from './AnimatedEllipsis'
 import { ChatHistoryIcon, PlusIcon, CloseIcon, WorkspaceRulesIcon } from './icons/ToolbarIcons'
 import {
@@ -47,7 +48,8 @@ import {
   normalizeSelectionLines,
   parseChatSelectionDrag,
   resolveSelectionFromClipboard,
-  toChatSelectionRef
+  toChatSelectionRef,
+  toRelativeLabel
 } from '@/utils/chat-selection-drag'
 import { buildWorkspaceIndex, ensureWorkspaceIndex } from '@/utils/project-index'
 import { getLlmProvider, getModelOptions, getProviderLabel, isAgentModeAvailable } from '@/utils/llm-providers'
@@ -181,6 +183,7 @@ export function ChatPanel() {
   const editorSelection = useAppStore((s) => s.editorSelection)
   const updateFileContent = useAppStore((s) => s.updateFileContent)
   const activeFilePath = useAppStore((s) => s.activeFilePath)
+  const openFiles = useAppStore((s) => s.openFiles)
   const workspaceRoot = useAppStore((s) => s.workspaceRoot)
   const setPendingWorkspacePreview = useAppStore((s) => s.setPendingWorkspacePreview)
   const openPreviewFile = useAppStore((s) => s.openPreviewFile)
@@ -1001,7 +1004,22 @@ export function ChatPanel() {
             ? activeFile.content
             : undefined,
         selections: selectionsForRequest.length > 0 ? selectionsForRequest : undefined,
-        references: historyContextRefs.length > 0 ? historyContextRefs : undefined
+        references: historyContextRefs.length > 0 ? historyContextRefs : undefined,
+        openPaths:
+          messageMode === 'agent'
+            ? openFiles
+                .filter(
+                  (file) =>
+                    !isMediaOpenFile(file) &&
+                    !isBinaryOpenFile(file) &&
+                    !isBrowserOpenFile(file) &&
+                    !isSettingsOpenFile(file) &&
+                    !isCompareOpenFile(file)
+                )
+                .map((file) => toRelativeLabel(file.path, workspaceRoot ?? null))
+                .filter((path) => path.trim().length > 0)
+                .slice(0, 16)
+            : undefined
       }
     })
   }
@@ -1781,6 +1799,13 @@ export function ChatPanel() {
           const requestModeLabel = requestMode
             ? (CHAT_MODE_OPTIONS.find((option) => option.id === requestMode)?.label ?? requestMode)
             : null
+          const appliedChangeSets =
+            msg.role === 'assistant' && msg.appliedChangeSets ? msg.appliedChangeSets : []
+          const showFilePreview =
+            isLast && isActiveChatPreview && Boolean(pendingWorkspacePreview)
+          const showToolShell =
+            filterTimelineAgentSteps(msg.agentSteps ?? [], { planPanelVisible }).length > 0
+          const showFileShell = appliedChangeSets.length > 0 || showFilePreview
           const requestModel =
             typeof requestMeta?.model === 'string' && requestMeta.model.trim()
               ? requestMeta.model.trim()
@@ -1809,17 +1834,59 @@ export function ChatPanel() {
                 ) : null}
               </div>
               <div className="chat-content">
-                {cumulativeAgentSteps && msg.agentSteps ? (
-                  <>
-                    <AgentPlanPanel
-                      steps={cumulativeAgentSteps}
-                      messageSteps={msg.agentSteps}
-                    />
-                    <AgentStepTimeline
-                      steps={msg.agentSteps}
-                      planPanelVisible={planPanelVisible}
-                    />
-                  </>
+                {(showToolShell || showFileShell) ? (
+                  <div className="agent-run-summaries">
+                    {cumulativeAgentSteps && msg.agentSteps ? (
+                      <AgentPlanPanel
+                        steps={cumulativeAgentSteps}
+                        messageSteps={msg.agentSteps}
+                        runActive={isRunActive}
+                      />
+                    ) : null}
+                    {showToolShell ? (
+                      <div className="agent-run-group">
+                        <AgentStepTimeline
+                          steps={msg.agentSteps ?? []}
+                          planPanelVisible={planPanelVisible}
+                          runActive={isRunActive}
+                        />
+                      </div>
+                    ) : null}
+                    {showFileShell ? (
+                      <div className="agent-run-group">
+                        <ChatAppliedChangeSets
+                          items={appliedChangeSets}
+                          allowEmpty={appliedChangeSets.length === 0}
+                          runActive={isRunActive}
+                          liveCount={
+                            showFilePreview && pendingWorkspacePreview
+                              ? pendingWorkspacePreview.items.length
+                              : 0
+                          }
+                        >
+                          {showFilePreview && pendingWorkspacePreview ? (
+                            <WorkspaceActionPreview
+                              items={pendingWorkspacePreview.items}
+                              applyError={lastApplyError}
+                              onApply={() => void handleApplyActions()}
+                              onReject={() => revertWorkspacePreview('stop')}
+                              onAskRevision={
+                                pendingAgentApprovalId
+                                  ? () => revertWorkspacePreview('revise')
+                                  : undefined
+                              }
+                              onAskAgentFix={
+                                lastApplyError && pendingAgentApprovalId
+                                  ? () => sendApplyFailureToAgent()
+                                  : undefined
+                              }
+                              onSelectItem={handleSelectPreviewItem}
+                            />
+                          ) : null}
+                        </ChatAppliedChangeSets>
+                      </div>
+                    ) : null}
+                  </div>
                 ) : null}
                 <ChatMessageContent
                   content={msg.content}
@@ -1827,11 +1894,6 @@ export function ChatPanel() {
                   hideStreamingPlaceholder={Boolean(agentStreamStatus)}
                   stripActions={msg.role === 'assistant'}
                 />
-                {msg.role === 'assistant' &&
-                msg.appliedChangeSets &&
-                msg.appliedChangeSets.length > 0 ? (
-                  <ChatAppliedChangeSets items={msg.appliedChangeSets} />
-                ) : null}
                 {isRunActive && agentStreamStatus ? (
                   <div
                     className={`chat-agent-stream-status${answerLooksSettled ? ' is-settled' : ''}`}
@@ -1844,24 +1906,6 @@ export function ChatPanel() {
           )
         })}
       </div>
-
-      {isActiveChatPreview && pendingWorkspacePreview && (
-        <WorkspaceActionPreview
-          items={pendingWorkspacePreview.items}
-          applyError={lastApplyError}
-          onApply={() => void handleApplyActions()}
-          onReject={() => revertWorkspacePreview('stop')}
-          onAskRevision={
-            pendingAgentApprovalId ? () => revertWorkspacePreview('revise') : undefined
-          }
-          onAskAgentFix={
-            lastApplyError && pendingAgentApprovalId
-              ? () => sendApplyFailureToAgent()
-              : undefined
-          }
-          onSelectItem={handleSelectPreviewItem}
-        />
-      )}
 
       {pendingContinue && (
         <div className="agent-continue-bar">

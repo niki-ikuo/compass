@@ -82,7 +82,6 @@ export function CodeEditor() {
   const activeFilePath = useAppStore((s) => s.activeFilePath)
   const openFiles = useAppStore((s) => s.openFiles)
   const workspaceRoot = useAppStore((s) => s.workspaceRoot)
-  const pendingWorkspacePreview = useAppStore((s) => s.pendingWorkspacePreview)
   const monacoTheme = useAppStore((s) => getColorTheme(s.settings.colorTheme).monacoTheme)
   const inlineCompletionsEnabled = useAppStore((s) => s.settings.inlineCompletionsEnabled)
   const editorMinimapEnabled = useAppStore((s) => s.settings.editorMinimapEnabled !== false)
@@ -94,9 +93,6 @@ export function CodeEditor() {
   const setFileTree = useAppStore((s) => s.setFileTree)
   const applyPreviewFile = useAppStore((s) => s.applyPreviewFile)
   const rejectPreviewFile = useAppStore((s) => s.rejectPreviewFile)
-  const applyWorkspacePreview = useAppStore((s) => s.applyWorkspacePreview)
-  const revertWorkspacePreview = useAppStore((s) => s.revertWorkspacePreview)
-  const pendingAgentApprovalId = useAppStore((s) => s.pendingAgentApprovalId)
   const editorSelection = useAppStore((s) => s.editorSelection)
   const requestChatComposerInsert = useAppStore((s) => s.requestChatComposerInsert)
   const editorRevealRequest = useAppStore((s) => s.editorRevealRequest)
@@ -399,25 +395,6 @@ export function CodeEditor() {
     rejectPreviewFile(activeFilePath)
   }
 
-  const handleApplyAll = async () => {
-    if (isApplying) return
-    setIsApplying(true)
-    try {
-      await applyWorkspacePreview()
-      await refreshWorkspace()
-    } finally {
-      setIsApplying(false)
-    }
-  }
-
-  const handleRejectAll = () => {
-    revertWorkspacePreview('stop')
-  }
-
-  const handleAskRevisionAll = () => {
-    revertWorkspacePreview('revise')
-  }
-
   const goToPreview = (offset: number) => {
     if (previewFiles.length === 0) return
     const baseIndex = previewIndex >= 0 ? previewIndex : 0
@@ -590,40 +567,6 @@ export function CodeEditor() {
             </button>
           </div>
         </div>
-
-        {pendingWorkspacePreview && previewFiles.length > 1 && (
-          <div className="editor-preview-bulk-bar">
-            <span>{t('editor.otherChanges', { count: previewFiles.length - 1 })}</span>
-            <div className="editor-preview-bulk-actions">
-              {pendingAgentApprovalId ? (
-                <button
-                  type="button"
-                  className="btn-secondary btn-compact"
-                  onClick={handleAskRevisionAll}
-                  disabled={isApplying}
-                >
-                  {t('editor.askRevisionAll')}
-                </button>
-              ) : null}
-              <button
-                type="button"
-                className="btn-secondary btn-compact"
-                onClick={handleRejectAll}
-                disabled={isApplying}
-              >
-                {pendingAgentApprovalId ? t('editor.rejectAllAndStop') : t('editor.rejectAll')}
-              </button>
-              <button
-                type="button"
-                className="btn-apply btn-compact"
-                onClick={() => void handleApplyAll()}
-                disabled={isApplying}
-              >
-                {t('editor.acceptAll')}
-              </button>
-            </div>
-          </div>
-        )}
 
         <div className="editor-body">
           <DiffEditor

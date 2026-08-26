@@ -22,6 +22,7 @@ import { getSettings } from './settings'
 import {
   appendHistoryMessages,
   buildPriorAgentContext,
+  groupAgentToolCalls,
   isToolsUnsupportedApiError,
   runAgent
 } from './agent-runner'
@@ -75,6 +76,31 @@ function sseResponse(parts: string[]): Response {
 
 function toolCallTurn(name: string, args: Record<string, unknown>, id = 'call_1'): string[] {
   return toolCallTurnRaw(name, JSON.stringify(args), id)
+}
+
+function toolCallsTurn(
+  calls: Array<{ name: string; args: Record<string, unknown> | string; id: string }>
+): string[] {
+  return [
+    sseChunk({
+      choices: [
+        {
+          delta: {
+            tool_calls: calls.map((call, index) => ({
+              index,
+              id: call.id,
+              function: {
+                name: call.name,
+                arguments:
+                  typeof call.args === 'string' ? call.args : JSON.stringify(call.args)
+              }
+            }))
+          }
+        }
+      ]
+    }),
+    sseChunk({ choices: [{ finish_reason: 'tool_calls', delta: {} }] })
+  ]
 }
 
 function toolCallTurnRaw(name: string, argumentsJson: string, id = 'call_1'): string[] {
@@ -419,8 +445,146 @@ describe('runAgent tool loop', () => {
     const toolResult = events.find((e) => e.channel === 'ai:toolResult')
     expect(toolResult?.payload[0]).toMatchObject({ name: 'readFile', ok: true })
     expect(String((toolResult?.payload[0] as { observation?: string }).observation)).toContain(
-      'alpha beta'
+      '1|alpha beta'
     )
+  })
+
+  it('globs **/*.test.ts and searches with regex', async () => {
+    const root = makeTempRoot('glob-search')
+    tempRoots.push(root)
+    mkdirSync(join(root, 'src'))
+    writeFileSync(join(root, 'src', 'a.test.ts'), 'export {}\n', 'utf-8')
+    writeFileSync(join(root, 'src', 'lib.ts'), 'export function foo() { return 1 }\n', 'utf-8')
+
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(
+        sseResponse(
+          toolCallsTurn([
+            { name: 'globFiles', args: { pattern: '**/*.test.ts' }, id: 'call_glob' },
+            {
+              name: 'search',
+              args: { query: 'export function foo', useRegex: true },
+              id: 'call_search'
+            }
+          ])
+        )
+      )
+      .mockResolvedValueOnce(sseResponse(textTurn('Found them.')))
+
+    const { webContents, events } = createWebContents()
+    await runAgent(webContents, baseRequest(root))
+
+    const results = events.filter((e) => e.channel === 'ai:toolResult')
+    const glob = results.find((e) => (e.payload[0] as { name?: string }).name === 'globFiles')
+    const search = results.find((e) => (e.payload[0] as { name?: string }).name === 'search')
+    expect(glob?.payload[0]).toMatchObject({ name: 'globFiles', ok: true })
+    expect(String((glob?.payload[0] as { observation?: string }).observation)).toContain(
+      'src/a.test.ts'
+    )
+    expect(search?.payload[0]).toMatchObject({ name: 'search', ok: true })
+    expect(String((search?.payload[0] as { observation?: string }).observation)).toMatch(
+      /export function foo/
+    )
+  })
+
+  it('previews strReplace via approval and does not drop a sibling writeFile', async () => {
+    const root = makeTempRoot('str-replace')
+    tempRoots.push(root)
+    writeFileSync(join(root, 'note.txt'), 'hello world\n', 'utf-8')
+
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(
+        sseResponse(
+          toolCallsTurn([
+            {
+              name: 'strReplace',
+              args: { path: 'note.txt', oldString: 'hello', newString: 'hi' },
+              id: 'call_sr'
+            },
+            {
+              name: 'writeFile',
+              args: '{ "path": "new.md", "content": "partial',
+              id: 'call_wf'
+            }
+          ])
+        )
+      )
+      .mockResolvedValueOnce(sseResponse(textTurn('Updated note.txt.')))
+
+    const { webContents, events } = createWebContents()
+    const running = runAgent(webContents, baseRequest(root, { messages: [{ role: 'user', content: 'Change hello' }] }))
+
+    await vi.waitFor(() => {
+      expect(events.some((e) => e.channel === 'ai:needApproval')).toBe(true)
+    })
+    const approval = events.find((e) => e.channel === 'ai:needApproval')
+    const payload = approval?.payload[0] as {
+      id: string
+      actions: Array<{ type: string; path: string; content?: string }>
+    }
+    expect(payload.id).toBe('call_sr')
+    expect(payload.actions).toHaveLength(1)
+    expect(payload.actions[0]).toMatchObject({
+      type: 'writeFile',
+      path: 'note.txt',
+      content: 'hi world\n'
+    })
+    expect(resolveAgentApproval({ id: 'call_sr', approved: true })).toBe(true)
+    await running
+
+    const results = events.filter((e) => e.channel === 'ai:toolResult')
+    expect(results.some((e) => (e.payload[0] as { name: string; ok: boolean }).name === 'strReplace' && (e.payload[0] as { ok: boolean }).ok)).toBe(true)
+    expect(
+      results.some(
+        (e) =>
+          (e.payload[0] as { name: string; ok: boolean }).name === 'writeFile' &&
+          (e.payload[0] as { ok: boolean }).ok === false
+      )
+    ).toBe(true)
+  })
+
+  it('returns a unique-match error for strReplace without opening preview', async () => {
+    const root = makeTempRoot('str-miss')
+    tempRoots.push(root)
+    writeFileSync(join(root, 'note.txt'), 'hello world\n', 'utf-8')
+
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(
+        sseResponse(
+          toolCallTurn(
+            'strReplace',
+            { path: 'note.txt', oldString: 'missing', newString: 'x' },
+            'call_miss'
+          )
+        )
+      )
+      .mockResolvedValueOnce(sseResponse(textTurn('Need to re-read.')))
+
+    const { webContents, events } = createWebContents()
+    await runAgent(webContents, baseRequest(root))
+
+    expect(events.some((e) => e.channel === 'ai:needApproval')).toBe(false)
+    const toolResult = events.find((e) => e.channel === 'ai:toolResult')
+    expect(toolResult?.payload[0]).toMatchObject({ name: 'strReplace', ok: false })
+    expect(String((toolResult?.payload[0] as { observation?: string }).observation)).toContain(
+      'oldString was not found'
+    )
+  })
+
+  it('groups consecutive reads vs writes', () => {
+    expect(
+      groupAgentToolCalls([
+        { function: { name: 'readFile' } },
+        { function: { name: 'globFiles' } },
+        { function: { name: 'strReplace' } },
+        { function: { name: 'writeFile' } },
+        { function: { name: 'exec' } }
+      ]).map((g) => [g.kind, g.calls.length])
+    ).toEqual([
+      ['parallel', 2],
+      ['writes', 2],
+      ['serial', 1]
+    ])
   })
 
   it('nudges and continues when finishing with open todos, then done after closing them', async () => {
