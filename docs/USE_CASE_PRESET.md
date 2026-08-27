@@ -4,7 +4,7 @@
 
 Product spec for **use-case presets** (`general` / `document` / `data` / `code`) that position Compass as an **AI workspace** for local folders (text work: notes, docs, data, code — not a code-only IDE).
 
-Related: [SPEC.md](./SPEC.md) (Ask / Edit / Agent), [ARCHITECTURE.md](./ARCHITECTURE.md)
+Related: [SPEC.md](./SPEC.md) (Ask / Edit / Agent), [ARCHITECTURE.md](./ARCHITECTURE.md). Agent + `code` vs Cursor: [CODE_AGENT_COMPARISON.md](./CODE_AGENT_COMPARISON.md).
 
 **Status:** Implemented (UI header + settings / workspace defaults + system-prompt roles + Agent light verify for document/data + data-use-case `profileData` / `queryData`)
 

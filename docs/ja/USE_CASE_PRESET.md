@@ -4,7 +4,7 @@
 
 Compass をローカルフォルダ向けの **AI ワークスペース**（コード専用 IDE ではなく、メモ・文書・データ・コードなどテキスト作業全般）として位置づけるための **用途プリセット**（`general` / `document` / `data` / `code`）の製品仕様です。
 
-関連: [SPEC.md](./SPEC.md)（Ask / Edit / Agent）、[ARCHITECTURE.md](./ARCHITECTURE.md)
+関連: [SPEC.md](./SPEC.md)（Ask / Edit / Agent）、[ARCHITECTURE.md](./ARCHITECTURE.md)。Agent + `code` 対 Cursor: [CODE_AGENT_COMPARISON.md](./CODE_AGENT_COMPARISON.md)。
 
 **実装状態:** 実装済み（チャットヘッダ UI・アプリ／ワークスペース既定・用途別 system ロール・Agent の document/data 向け light verify・data 用途の `profileData` / `queryData`）
 

@@ -312,6 +312,7 @@ src/
 |----------|----------|
 | [AGENT_PLAN.md](./AGENT_PLAN.md) | Phases 0–4 shipped record + later roadmap |
 | [AGENT_CODEGEN_PLAN.md](./AGENT_CODEGEN_PLAN.md) | Code-generation gap vs Cursor Agent — assign by phase |
+| [CODE_AGENT_COMPARISON.md](./CODE_AGENT_COMPARISON.md) | Code-use-case Agent vs Cursor Agent — current capability snapshot |
 | [ARCHITECTURE.md](./ARCHITECTURE.md) | Process / IPC layout |
 | [SPEC.md](./SPEC.md) | Product boundaries Ask / Edit / Agent |
 | [USE_CASE_PRESET.md](./USE_CASE_PRESET.md) | Use-case presets (orthogonal to mode) |

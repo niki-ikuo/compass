@@ -311,6 +311,7 @@ src/
 |--------------|------|
 | [AGENT_PLAN.md](./AGENT_PLAN.md) | Phase 0–4 出荷記録と後続ロードマップ |
 | [AGENT_CODEGEN_PLAN.md](./AGENT_CODEGEN_PLAN.md) | vs Cursor Agent のコード生成差 — フェーズ指定で作業指示 |
+| [CODE_AGENT_COMPARISON.md](./CODE_AGENT_COMPARISON.md) | コード用途 Agent 対 Cursor Agent — 現行の能力スナップショット |
 | [ARCHITECTURE.md](./ARCHITECTURE.md) | プロセス / IPC 全体像 |
 | [SPEC.md](./SPEC.md) | Ask / Edit / Agent の製品境界 |
 | [USE_CASE_PRESET.md](./USE_CASE_PRESET.md) | 用途プリセット（モードとは別軸） |

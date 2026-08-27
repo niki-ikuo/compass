@@ -6,9 +6,9 @@ Compass Agent と Cursor Agent の **コード生成** 差を埋めるための�
 
 この文書の Phase **1–7** は作業指示用のスライスである。[AGENT_PLAN.md](./AGENT_PLAN.md) の v2.0 Phase 1–4（出荷済み）とは番号が別。
 
-現行ランタイム: [AGENT.md](./AGENT.md)。v2.0 出荷済みフェーズ: [AGENT_PLAN.md](./AGENT_PLAN.md)。製品境界: [SPEC.md](./SPEC.md)。
+現行ランタイム: [AGENT.md](./AGENT.md)。v2.0 出荷済みフェーズ: [AGENT_PLAN.md](./AGENT_PLAN.md)。製品境界: [SPEC.md](./SPEC.md)。Phase 1–7 完了後の能力スナップショット: [CODE_AGENT_COMPARISON.md](./CODE_AGENT_COMPARISON.md)。
 
-**比較時点:** Compass 2.2.x Agent（Phase 0–4 出荷済み）対 Cursor IDE エージェントの公開ツール面。モデル重みと Cursor 内部プロンプトは対象外。
+**比較時点（この作業指示書）:** Compass 2.2.x Agent（Phase 0–4 出荷済み）対 Cursor IDE エージェントの公開ツール面 — Phase 1–7 の出発点。付録 A はその古い表面のまま。2.5 以降のインベントリは [CODE_AGENT_COMPARISON.md](./CODE_AGENT_COMPARISON.md)。モデル重みと Cursor 内部プロンプトは対象外。
 
 ---
 

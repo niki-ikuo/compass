@@ -6,9 +6,9 @@ Close the **code-generation** gap between Compass Agent and Cursor Agent. This i
 
 Phases **1–7 in this file** are assignment slices. They are not [AGENT_PLAN.md](./AGENT_PLAN.md)’s v2.0 Phase 1–4 (already shipped).
 
-Runtime today: [AGENT.md](./AGENT.md). Shipped v2.0 phases: [AGENT_PLAN.md](./AGENT_PLAN.md). Product boundary: [SPEC.md](./SPEC.md).
+Runtime today: [AGENT.md](./AGENT.md). Shipped v2.0 phases: [AGENT_PLAN.md](./AGENT_PLAN.md). Product boundary: [SPEC.md](./SPEC.md). Current capability snapshot (after Phases 1–7): [CODE_AGENT_COMPARISON.md](./CODE_AGENT_COMPARISON.md).
 
-**Compared against:** Compass 2.2.x Agent (Phases 0–4 shipped) vs Cursor IDE Agent public tool surface. Model weights and Cursor’s private prompt are out of scope.
+**Compared against (this assignment doc):** Compass 2.2.x Agent (Phases 0–4 shipped) vs Cursor IDE Agent public tool surface — the starting point for Phases 1–7. Appendix A still describes that older surface. For the post-2.5 inventory use [CODE_AGENT_COMPARISON.md](./CODE_AGENT_COMPARISON.md). Model weights and Cursor’s private prompt are out of scope.
 
 ---
 
