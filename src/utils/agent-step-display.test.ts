@@ -197,7 +197,7 @@ describe('partitionLiveAgentSteps / shouldShowHistoryAccordion', () => {
     ]
     const { live } = partitionLiveAgentSteps(steps)
     expect(latestAgentStep(steps, live)?.id).toBe('2')
-    expect(latestAgentStep(steps, []).id).toBe('2')
+    expect(latestAgentStep(steps, [])?.id).toBe('2')
   })
 })
 

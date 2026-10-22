@@ -179,48 +179,49 @@ function getSettingsPath(): string {
   return join(app.getPath('userData'), 'settings.json')
 }
 
-function encryptApiKey(apiKey: string): string | null {
+async function encryptApiKey(apiKey: string): Promise<string | null> {
   if (!apiKey) return null
-  if (!safeStorage.isEncryptionAvailable()) {
+  if (!(await safeStorage.isAsyncEncryptionAvailable())) {
     return Buffer.from(apiKey).toString('base64')
   }
-  return safeStorage.encryptString(apiKey).toString('base64')
+  return (await safeStorage.encryptStringAsync(apiKey)).toString('base64')
 }
 
-function decryptApiKey(encrypted: string | null): string {
+async function decryptApiKey(encrypted: string | null): Promise<string> {
   if (!encrypted) return ''
   try {
     const buffer = Buffer.from(encrypted, 'base64')
-    if (!safeStorage.isEncryptionAvailable()) {
+    if (!(await safeStorage.isAsyncEncryptionAvailable())) {
       return buffer.toString('utf-8')
     }
-    return safeStorage.decryptString(buffer)
+    const decrypted = await safeStorage.decryptStringAsync(buffer)
+    return decrypted.result
   } catch {
     return ''
   }
 }
 
-function decryptProviderKeys(
+async function decryptProviderKeys(
   encrypted: Partial<Record<LlmProviderId, string>> | undefined
-): Partial<Record<LlmProviderId, string>> {
+): Promise<Partial<Record<LlmProviderId, string>>> {
   if (!encrypted) return {}
   const result: Partial<Record<LlmProviderId, string>> = {}
   for (const [id, value] of Object.entries(encrypted)) {
     if (!isLlmProviderId(id) || !value) continue
-    const decrypted = decryptApiKey(value)
+    const decrypted = await decryptApiKey(value)
     if (decrypted) result[id] = decrypted
   }
   return result
 }
 
-function encryptProviderKeys(
+async function encryptProviderKeys(
   keys: Partial<Record<LlmProviderId, string>> | undefined
-): Partial<Record<LlmProviderId, string>> {
+): Promise<Partial<Record<LlmProviderId, string>>> {
   if (!keys) return {}
   const result: Partial<Record<LlmProviderId, string>> = {}
   for (const [id, value] of Object.entries(keys)) {
     if (!isLlmProviderId(id) || !value) continue
-    const encrypted = encryptApiKey(value)
+    const encrypted = await encryptApiKey(value)
     if (encrypted) result[id] = encrypted
   }
   return result
@@ -342,10 +343,10 @@ async function writeStoredSettings(stored: StoredSettings): Promise<void> {
   await writeFile(getSettingsPath(), JSON.stringify(stored, null, 2), 'utf-8')
 }
 
-function toAppSettings(stored: StoredSettings): AppSettings {
+async function toAppSettings(stored: StoredSettings): Promise<AppSettings> {
   const providerId = resolveProviderId(stored.providerId, stored.apiBaseUrl)
-  const providerKeys = decryptProviderKeys(stored.encryptedProviderKeys)
-  const legacyKey = decryptApiKey(stored.encryptedApiKey)
+  const providerKeys = await decryptProviderKeys(stored.encryptedProviderKeys)
+  const legacyKey = await decryptApiKey(stored.encryptedApiKey)
 
   // 旧設定からの移行: 単一キーを現在プロバイダへ割り当て
   if (legacyKey && !providerKeys[providerId]) {
@@ -394,7 +395,7 @@ function toAppSettings(stored: StoredSettings): AppSettings {
 
 export async function getSettings(): Promise<AppSettings> {
   const stored = await readStoredSettings()
-  const settings = toAppSettings(stored)
+  const settings = await toAppSettings(stored)
   setLocale(settings.locale)
   return settings
 }
@@ -412,13 +413,14 @@ export async function getPublicSettings(): Promise<AppSettings> {
     providerKeys: {},
     apiKeyConfigured: Boolean(full.apiKey.trim()),
     configuredProviderIds,
-    apiKeyStorageInsecure: !safeStorage.isEncryptionAvailable() && Boolean(full.apiKey.trim())
+    apiKeyStorageInsecure:
+      !(await safeStorage.isAsyncEncryptionAvailable()) && Boolean(full.apiKey.trim())
   }
 }
 
 export async function setSettings(settings: AppSettings): Promise<void> {
   const stored = await readStoredSettings()
-  const current = toAppSettings(stored)
+  const current = await toAppSettings(stored)
   const providerId = isLlmProviderId(settings.providerId)
     ? settings.providerId
     : inferLlmProviderId(settings.apiBaseUrl)
@@ -438,8 +440,8 @@ export async function setSettings(settings: AppSettings): Promise<void> {
   }
 
   const activeKey = providerKeys[providerId] ?? ''
-  const encryptedProviderKeys = encryptProviderKeys(providerKeys)
-  const activeEncrypted = encryptApiKey(activeKey)
+  const encryptedProviderKeys = await encryptProviderKeys(providerKeys)
+  const activeEncrypted = await encryptApiKey(activeKey)
   const locale = resolveLocale(settings.locale)
   const allowLanApiBaseUrl = resolveAllowLanApiBaseUrl(settings.allowLanApiBaseUrl)
   const openWebUiChatCompat = resolveOpenWebUiChatCompat(settings.openWebUiChatCompat)

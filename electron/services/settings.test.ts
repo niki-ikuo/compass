@@ -14,11 +14,11 @@ vi.mock('electron', () => ({
     getPath: (name: string) => (name === 'userData' ? electronState.userData : '')
   },
   safeStorage: {
-    isEncryptionAvailable: () => electronState.encryptionAvailable,
-    encryptString: (value: string) => Buffer.from(`enc:${value}`, 'utf-8'),
-    decryptString: (buffer: Buffer) => {
+    isAsyncEncryptionAvailable: async () => electronState.encryptionAvailable,
+    encryptStringAsync: async (value: string) => Buffer.from(`enc:${value}`, 'utf-8'),
+    decryptStringAsync: async (buffer: Buffer) => {
       const text = buffer.toString('utf-8')
-      return text.startsWith('enc:') ? text.slice(4) : text
+      return { result: text.startsWith('enc:') ? text.slice(4) : text, shouldReEncrypt: false }
     }
   }
 }))

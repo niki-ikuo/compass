@@ -54,7 +54,7 @@ export async function captureClipboardToInbox(
     }
   }
 
-  const text = (textFromCaller ?? clipboard.readText() ?? '').replace(/\r\n/g, '\n')
+  const text = (textFromCaller ?? (await clipboard.readText()) ?? '').replace(/\r\n/g, '\n')
   if (!text.trim()) {
     return {
       ok: false,

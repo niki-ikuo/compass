@@ -37,7 +37,7 @@ export async function copyOutboxPayload(
     }
     const raw = await readFile(absolutePath, 'utf-8')
     const payload = formatOutboxCopyPayload(raw)
-    clipboard.writeText(payload)
+    await clipboard.writeText(payload)
     const marked = await markOutboxReadyAfterCopy(absolutePath)
     return {
       ok: true,
